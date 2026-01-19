@@ -2,7 +2,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEFAULT_BIN_DIR="${SCRIPT_DIR}/bin"
+DEFAULT_BIN_DIR="${SCRIPT_DIR}/../.venv/bin"
 BIN_DIR=${1:-"${DEFAULT_BIN_DIR}"}
 GITHUB_REPO="fluxcd/flux2"
 

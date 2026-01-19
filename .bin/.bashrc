@@ -9,13 +9,22 @@ if [ -n "$ZSH_NAME" ]; then
 fi
 
 if [ ! -f "$SCRIPT_DIR/../.venv/bin/activate" ]; then
-    python3 -m venv "$SCRIPT_DIR/../.venv"
-    source "$HOME/.bashrc"
+    python3 -m venv --without-scm-ignore-files "$SCRIPT_DIR/../.venv"
+    if [ -f "$HOME/.bashrc" ]; then
+        source "$HOME/.bashrc"
+    fi
     source "$SCRIPT_DIR/../.venv/bin/activate"
     pip3 install --upgrade pip
-    pip3 install -r "$SCRIPT_DIR/../requirements.txt"
+    pip3 install -r "$SCRIPT_DIR/requirements.txt"
     # ansible-galaxy install -r "$SCRIPT_DIR/../requirements.yml"
 else
-    source "$HOME/.bashrc"
+    if [ -f "$HOME/.bashrc" ]; then
+        source "$HOME/.bashrc"
+    fi
     source "$SCRIPT_DIR/../.venv/bin/activate"
+fi
+
+# Install flux CLI if not already installed
+if [ ! -f "$SCRIPT_DIR/../.venv/bin/flux" ]; then
+    bash "$SCRIPT_DIR/install-flux.sh"
 fi
