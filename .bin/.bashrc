@@ -9,7 +9,7 @@ if [ -n "$ZSH_NAME" ]; then
 fi
 
 if [ ! -f "$SCRIPT_DIR/../.venv/bin/activate" ]; then
-    python3 --python 'python>=3.10'-m venv "$SCRIPT_DIR/../.venv"
+    python3 -m venv "$SCRIPT_DIR/../.venv"
     source "$HOME/.bashrc"
     source "$SCRIPT_DIR/../.venv/bin/activate"
     pip3 install --upgrade pip
