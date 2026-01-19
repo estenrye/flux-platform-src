@@ -3,14 +3,14 @@
   "terminal.integrated.profiles.linux": {
     "bash (venv)": {
       "path": "bash",
-      "args": ["--init-file", "./.venv/.bashrc"]
+      "args": ["--init-file", "./.bin/.bashrc"]
     }
   },
   "terminal.integrated.defaultProfile.osx": "bash (venv)",
   "terminal.integrated.profiles.osx": {
     "bash (venv)": {
       "path": "bash",
-      "args": ["--init-file", "./.venv/.bashrc"]
+      "args": ["--init-file", "./.bin/.bashrc"]
     }
   }
 }

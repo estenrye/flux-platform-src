@@ -8,14 +8,14 @@ if [ -n "$ZSH_NAME" ]; then
     SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
 fi
 
-if [ ! -f "$SCRIPT_DIR/bin/activate" ]; then
-    python3 -m venv "$SCRIPT_DIR"
+if [ ! -f "$SCRIPT_DIR/../.venv/bin/activate" ]; then
+    python3 --python 'python>=3.10'-m venv "$SCRIPT_DIR/../.venv"
     source "$HOME/.bashrc"
-    source "$SCRIPT_DIR/bin/activate"
+    source "$SCRIPT_DIR/../.venv/bin/activate"
     pip3 install --upgrade pip
     pip3 install -r "$SCRIPT_DIR/../requirements.txt"
     # ansible-galaxy install -r "$SCRIPT_DIR/../requirements.yml"
 else
     source "$HOME/.bashrc"
-    source "$SCRIPT_DIR/bin/activate"
+    source "$SCRIPT_DIR/../.venv/bin/activate"
 fi
