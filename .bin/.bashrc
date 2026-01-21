@@ -38,3 +38,8 @@ fi
 if [ ! -f "$SCRIPT_DIR/../.venv/bin/age" ]; then
     bash "$SCRIPT_DIR/install-age.sh"
 fi
+
+# Install sops if not already installed
+if [ ! -f "$SCRIPT_DIR/../.venv/bin/sops" ]; then
+    bash "$SCRIPT_DIR/install-sops.sh"
+fi
