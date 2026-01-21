@@ -28,3 +28,8 @@ fi
 if [ ! -f "$SCRIPT_DIR/../.venv/bin/flux" ]; then
     bash "$SCRIPT_DIR/install-flux.sh"
 fi
+
+# Install age if not already installed
+if [ ! -f "$SCRIPT_DIR/../.venv/bin/age" ]; then
+    bash "$SCRIPT_DIR/install-age.sh"
+fi
