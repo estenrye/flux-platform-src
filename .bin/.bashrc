@@ -48,3 +48,8 @@ fi
 if [ ! -f "$SCRIPT_DIR/../.venv/bin/yq" ]; then
     bash "$SCRIPT_DIR/install-yq.sh"
 fi
+
+# Install kustomize if not already installed
+if [ ! -f "$SCRIPT_DIR/../.venv/bin/kustomize" ]; then
+    bash "$SCRIPT_DIR/install-kustomize.sh"
+fi
