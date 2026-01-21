@@ -43,3 +43,8 @@ fi
 if [ ! -f "$SCRIPT_DIR/../.venv/bin/sops" ]; then
     bash "$SCRIPT_DIR/install-sops.sh"
 fi
+
+# Install yq if not already installed
+if [ ! -f "$SCRIPT_DIR/../.venv/bin/yq" ]; then
+    bash "$SCRIPT_DIR/install-yq.sh"
+fi
