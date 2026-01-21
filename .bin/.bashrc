@@ -24,6 +24,11 @@ else
     source "$SCRIPT_DIR/../.venv/bin/activate"
 fi
 
+# Install jq if not already installed
+if [ ! -f "$SCRIPT_DIR/../.venv/bin/jq" ]; then
+    bash "$SCRIPT_DIR/install-jq.sh"
+fi
+
 # Install flux CLI if not already installed
 if [ ! -f "$SCRIPT_DIR/../.venv/bin/flux" ]; then
     bash "$SCRIPT_DIR/install-flux.sh"
