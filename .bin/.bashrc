@@ -63,3 +63,8 @@ fi
 if [ ! -f "$SCRIPT_DIR/../.venv/bin/gh" ]; then
     bash "$SCRIPT_DIR/install-gh.sh"
 fi
+
+# Install chainsaw if not already installed
+if [ ! -f "$SCRIPT_DIR/../.venv/bin/chainsaw" ]; then
+    bash "$SCRIPT_DIR/install-chainsaw.sh"
+fi
