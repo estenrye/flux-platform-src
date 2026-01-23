@@ -53,3 +53,8 @@ fi
 if [ ! -f "$SCRIPT_DIR/../.venv/bin/kustomize" ]; then
     bash "$SCRIPT_DIR/install-kustomize.sh"
 fi
+
+# Install kubectl if not already installed
+if [ ! -f "$SCRIPT_DIR/../.venv/bin/kubectl" ]; then
+    bash "$SCRIPT_DIR/install-kubectl.sh"
+fi
