@@ -58,3 +58,8 @@ fi
 if [ ! -f "$SCRIPT_DIR/../.venv/bin/kubectl" ]; then
     bash "$SCRIPT_DIR/install-kubectl.sh"
 fi
+
+# Install gh if not already installed
+if [ ! -f "$SCRIPT_DIR/../.venv/bin/gh" ]; then
+    bash "$SCRIPT_DIR/install-gh.sh"
+fi
