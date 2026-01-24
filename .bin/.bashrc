@@ -75,3 +75,8 @@ fi
 if [ ! -f "$SCRIPT_DIR/../.venv/bin/saml2aws" ]; then
     bash "$SCRIPT_DIR/install-saml2aws.sh"
 fi
+
+# Install spotctl if not already installed
+if [ ! -f "$SCRIPT_DIR/../.venv/bin/spotctl" ]; then
+    bash "$SCRIPT_DIR/install-spotctl.sh"
+fi
