@@ -191,9 +191,7 @@ setup_binary() {
     setup_verify_arch
     verify_downloader curl || verify_downloader wget || fatal 'Can not find curl or wget for downloading files'
     setup_tmp
-    echo "${OS} ${ARCH} ${DOWNLOADER} ${TMP_DIR}" 
     get_release_version
-    echo "${OS} ${ARCH} ${DOWNLOADER} ${TMP_DIR} ${TAG_NAME} ${VERSION_KUSTOMIZE}" 
     download_hash
     download_binary
     verify_binary
