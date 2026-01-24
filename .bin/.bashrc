@@ -22,6 +22,8 @@ else
         source "$HOME/.bashrc"
     fi
     source "$SCRIPT_DIR/../.venv/bin/activate"
+    pip3 install --upgrade pip
+    pip3 install -r "$SCRIPT_DIR/requirements.txt"
 fi
 
 # Install jq if not already installed
@@ -67,4 +69,9 @@ fi
 # Install chainsaw if not already installed
 if [ ! -f "$SCRIPT_DIR/../.venv/bin/chainsaw" ]; then
     bash "$SCRIPT_DIR/install-chainsaw.sh"
+fi
+
+# Install saml2aws if not already installed
+if [ ! -f "$SCRIPT_DIR/../.venv/bin/saml2aws" ]; then
+    bash "$SCRIPT_DIR/install-saml2aws.sh"
 fi

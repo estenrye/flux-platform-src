@@ -1,0 +1,2 @@
+awscli
+awscliv2
