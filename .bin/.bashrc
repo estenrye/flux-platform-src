@@ -80,3 +80,8 @@ fi
 if [ ! -f "$SCRIPT_DIR/../.venv/bin/spotctl" ]; then
     bash "$SCRIPT_DIR/install-spotctl.sh"
 fi
+
+# Install talosctl if installed
+if [ -f "$SCRIPT_DIR/../.venv/bin/talosctl" ]; then
+    bash "$SCRIPT_DIR/install-talosctl.sh"
+fi
