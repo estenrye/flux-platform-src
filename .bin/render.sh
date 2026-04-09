@@ -16,6 +16,7 @@ export RENDER_GITHUB_TOKEN
 
 ${SCRIPTS_DIR}/render/render-put-target-repository-clone.sh
 ${SCRIPTS_DIR}/render/render-put-target-repository-branch.sh
+${SCRIPTS_DIR}/render/render-bin.sh
 
 find "${APP_DIR}" -name "kustomization.yaml" -exec dirname {} \; | sed "s|${BASE_DIR}/||" | while read -r directory; do
   echo "Rendering '${directory}' ..."

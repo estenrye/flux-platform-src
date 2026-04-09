@@ -1,4 +1,4 @@
-# 4. Bootstrapping a Flux-Enabled Kubernetes Cluster
+# 2. Bootstrapping a Flux-Enabled Kubernetes Cluster
 
 Date: 2025-12-03
 
