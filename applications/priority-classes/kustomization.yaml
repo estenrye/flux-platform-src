@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - resources/always-preempted.yaml
+  - resources/application-best-effort.yaml
+  - resources/application-critical.yaml
+  - resources/application.yaml
+  - resources/cicd.yaml
+  - resources/datastore.yaml
+  - resources/never-preempted.yaml
+  - resources/opentelemetry.yaml
+  - resources/platform-best-effort.yaml
+  - resources/platform-critical.yaml
+  - resources/platform.yaml

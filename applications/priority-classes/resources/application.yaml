@@ -1,0 +1,8 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: application
+value: 100
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "Reserved for General Application Workloads."

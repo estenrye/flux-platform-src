@@ -15,7 +15,7 @@ fi
 mkdir -p ${RENDER_DIR}/${TARGET_REPO_NAME}/${RELATIVE_PATH}
 
 TMP_DIR="$(mktemp -d)"
-cp ${BASE_DIR}/${RELATIVE_PATH}/* ${TMP_DIR}
+cp -r ${BASE_DIR}/${RELATIVE_PATH}/* ${TMP_DIR}
 pushd ${BASE_DIR}/${RELATIVE_PATH}
 ${SCRIPTS_DIR}/render/render-labels-transformer.sh > ${TMP_DIR}/labels.yaml
 ls -l ${TMP_DIR}

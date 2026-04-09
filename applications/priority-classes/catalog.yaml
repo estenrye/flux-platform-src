@@ -1,0 +1,14 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: priority-classes
+  description: |-
+    This service manages Kubernetes priority classes, which determine the scheduling priority of pods within the cluster.
+  tags:
+    - scheduling
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   

@@ -1,0 +1,8 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: application-best-effort
+value: 0
+preemptionPolicy: PreemptLowerPriority
+globalDefault: true
+description: "Reserved for Applications that can be scheduled on a Best Effort basis."

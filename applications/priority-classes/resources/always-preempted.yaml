@@ -1,0 +1,8 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: always-preempted
+value: -2147483648
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "Applications with no priority."
