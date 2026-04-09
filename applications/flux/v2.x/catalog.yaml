@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: flux
+  description: |-
+    This service provides a GitOps-based continuous delivery solution for Kubernetes,
+    enabling automated deployment and management of applications and infrastructure.
+  tags:
+    - flux
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   
