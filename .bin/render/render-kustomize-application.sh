@@ -23,6 +23,8 @@ popd
 
 kustomize build --enable-helm ${TMP_DIR} > ${RENDER_DIR}/${TARGET_REPO_NAME}/${RELATIVE_PATH}/rendered.yaml
 
+cp ${BASE_DIR}/${RELATIVE_PATH}/catalog.yaml ${RENDER_DIR}/${TARGET_REPO_NAME}/${RELATIVE_PATH}/catalog.yaml
+
 cat > ${RENDER_DIR}/${TARGET_REPO_NAME}/${RELATIVE_PATH}/kustomization.yaml <<EOF
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
