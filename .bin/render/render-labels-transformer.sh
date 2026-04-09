@@ -1,6 +1,11 @@
 #!/bin/bash
-COMMIT_ID=$(gh api "repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)/commits/$(git branch --show-current)" --jq '.sha')
+SCRIPTS_DIR=${SCRIPTS_DIR:-$(cd "$(dirname "$0")/.." && pwd)}
 LABEL_ZONE=${LABEL_ZONE:-com.example}
+
+REPO_OWNER=$(${SCRIPTS_DIR}/render/render-get-source-repository-owner.sh)
+REPO_NAME=$(${SCRIPTS_DIR}/render/render-get-source-repository-name.sh)
+COMMIT_HASH=$(${SCRIPTS_DIR}/render/render-get-source-repository-commit-hash.sh)
+
 COMPONENT_NAME="unknown"
 COMPONENT_OWNER="unknown"
 COMPONENT_CHART_NAME="N/A"
@@ -18,7 +23,8 @@ kind: LabelTransformer
 metadata:
   name: global-labels
 labels:
-  ${LABEL_ZONE}/flux-src-commit-hash: ${COMMIT_ID}
+  ${LABEL_ZONE}/flux-src-repository: ${REPO}
+  ${LABEL_ZONE}/flux-src-commit-hash: ${COMMIT_HASH}
   ${LABEL_ZONE}/component: ${COMPONENT_NAME}
   ${LABEL_ZONE}/owner: ${COMPONENT_OWNER}
 fieldSpecs:
