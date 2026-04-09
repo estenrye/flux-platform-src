@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane
+  description: |-
+    This service operates the Crossplane control plane,
+    which manages the lifecycle of infrastructure resources
+    across multiple cloud providers.
+  tags:
+    - crossplane
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   
