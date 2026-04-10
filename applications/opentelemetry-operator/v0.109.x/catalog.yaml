@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: prometheus-operator-crds
+  description: |-
+    This component provides the Custom Resource
+    Definitions (CRDs) for the Prometheus Operator
+    and the OpenTelemetry Operator.
+  tags:
+    - monitoring
+    - crds
+    - operators
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   
