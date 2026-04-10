@@ -1,0 +1,15 @@
+- op: replace
+  path: /spec/template/spec/containers/0/env
+  value:
+  - name: AWS_DEFAULT_REGION
+    value: ${region:-not-set}
+  - name: AWS_ACCESS_KEY_ID
+    value: ${route53_access_key_id:-not-set}
+  - name: AWS_SECRET_ACCESS_KEY
+    value: ${route53_secret_access_key:-not-set}
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --txt-owner-id=${deployment:-app}.${region:-not-set}.${top_level_domain:-not-set}
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --zone-id-filter=${route53_zone_id:-not-set}

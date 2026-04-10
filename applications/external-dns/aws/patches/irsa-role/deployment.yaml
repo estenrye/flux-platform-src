@@ -1,0 +1,6 @@
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --txt-owner-id=${deployment:-app}.${region:-not-set}.${top_level_domain:-not-set}
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --zone-id-filter=${route53_zone_id:-not-set}

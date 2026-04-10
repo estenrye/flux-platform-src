@@ -1,0 +1,77 @@
+logLevel: debug
+logFormat: json
+interval: 3m
+triggerLoopOnEvent: true
+registry: txt
+txtPrefix: edns.
+extraArgs:
+  - --aws-zone-type=public
+  - --aws-prefer-cname
+serviceAccount:
+  # Reuse existing service account created by Terragrunt.
+  # Toggle to true once external-dns is fully managed by ArgoCD.
+  # and the IRSA is modified to allow the service account to
+  # assume the IAM role.
+  create: true
+  name: external-dns
+sources:
+  # Currently ingress, service and crd sources are installed by Terragrunt.
+  # Add these services here when external-dns is fully managed by ArgoCD.
+  - gateway-grpcroute
+  - gateway-httproute
+  - gateway-tlsroute
+  - gateway-udproute
+  - gateway-tcproute
+  - service
+  - ingress
+  - crd
+policy: sync
+provider:
+  name: aws
+serviceMonitor:
+  enabled: true
+  interval: 60s
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 1024Mi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  unhealthyPodEvictionPolicy: AlwaysAllow
+
+tolerations:
+- key: "system-critical"
+  operator: "Exists"
+  effect: "NoSchedule"
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: role
+              operator: In
+              values:
+              - system-critical
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: external-dns
+          topologyKey: kubernetes.io/hostname
+        weight: 100
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: external-dns

@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: external-dns-aws-irsa
+  description: |-
+    This service provides an operator and crds for
+    managing DNS.
+  tags:
+    - dns
+    - crds
+    - operators
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   
