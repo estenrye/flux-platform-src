@@ -1,0 +1,14 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: reloader
+  description: |-
+    This service reloads pods when annotated configmaps and secrets are updated.
+  tags:
+    - cicd
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   

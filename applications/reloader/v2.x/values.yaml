@@ -1,0 +1,7 @@
+reloader:
+  enableMetricsByNamespace: true
+  readOnlyRootFileSystem: true
+  resourceLabelSelector: "rye.ninja/reloader=enabled"
+
+deployment:
+  priorityClassName: cicd
