@@ -8,6 +8,7 @@ metadata:
     across multiple cloud providers.
   tags:
     - crossplane
+    - operators
     - platform
     - infrastructure
 spec:

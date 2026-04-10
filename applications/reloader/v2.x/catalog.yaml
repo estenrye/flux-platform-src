@@ -6,6 +6,7 @@ metadata:
     This service reloads pods when annotated configmaps and secrets are updated.
   tags:
     - cicd
+    - operators
     - platform
     - infrastructure
 spec:

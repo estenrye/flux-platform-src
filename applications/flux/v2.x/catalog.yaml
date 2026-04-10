@@ -7,6 +7,7 @@ metadata:
     enabling automated deployment and management of applications and infrastructure.
   tags:
     - flux
+    - operators
     - platform
     - infrastructure
 spec:
