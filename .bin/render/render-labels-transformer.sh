@@ -1,6 +1,6 @@
 #!/bin/bash
 SCRIPTS_DIR=${SCRIPTS_DIR:-$(cd "$(dirname "$0")/.." && pwd)}
-LABEL_ZONE=${LABEL_ZONE:-com.example}
+LABEL_ZONE=${LABEL_ZONE:-rye.ninja}
 
 REPO=$(${SCRIPTS_DIR}/render/render-get-source-repository.sh)
 COMMIT_HASH=$(${SCRIPTS_DIR}/render/render-get-source-repository-commit-hash.sh)
