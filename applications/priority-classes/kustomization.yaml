@@ -13,6 +13,3 @@ resources:
   - resources/platform-best-effort.yaml
   - resources/platform-critical.yaml
   - resources/platform.yaml
-
-transformers:
-  - labels.yaml

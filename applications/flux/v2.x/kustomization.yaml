@@ -12,6 +12,3 @@ patches:
       - op: add
         path: /spec/template/spec/priorityClassName
         value: cicd
-
-transformers:
-  - labels.yaml

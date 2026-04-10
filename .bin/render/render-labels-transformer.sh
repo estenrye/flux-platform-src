@@ -1,11 +1,8 @@
 #!/bin/bash
 SCRIPTS_DIR=${SCRIPTS_DIR:-$(cd "$(dirname "$0")/.." && pwd)}
-WORKING_DIR=${WORKING_DIR:-$(cd "$(dirname "$SCRIPTS_DIR")" && pwd)}
-LABEL_ZONE=${LABEL_ZONE:-rye.ninja}
-RELATIVE_PATH=${1:-}
-
-REPO=$(${SCRIPTS_DIR}/render/render-get-source-repository.sh)
-COMMIT_HASH=$(${SCRIPTS_DIR}/render/render-get-source-repository-commit-hash.sh)
+REPO=${1:-$REPO}
+COMMIT_HASH=${2:-$COMMIT_HASH}
+LABEL_ZONE=${3:-$LABEL_ZONE}
 
 COMPONENT_NAME="unknown"
 COMPONENT_OWNER="unknown"
@@ -13,8 +10,8 @@ COMPONENT_CHART_NAME="N/A"
 COMPONENT_CHART_REPO="N/A"
 COMPONENT_CHART_VERSION="N/A"
 
-if [ -z "$RELATIVE_PATH" ] || [ -z "$WORKING_DIR" ]; then
-  echo "Usage: $0 <relative-path> <working-dir>"
+if [ -z "$REPO" ] || [ -z "$COMMIT_HASH" ] || [ -z "$LABEL_ZONE" ]; then
+  echo "Usage: $0 <repo> <commit-hash> <label-zone>"
   exit 1
 fi
 
@@ -23,9 +20,7 @@ if [ -f catalog.yaml ]; then
   COMPONENT_OWNER=$(yq e '.spec.owner' catalog.yaml)
 fi
 
-pushd "${WORKING_DIR}/${RELATIVE_PATH}" > /dev/null || exit 1
-
-cat > "${WORKING_DIR}/${RELATIVE_PATH}/labels.yaml" <<EOF
+cat <<EOF
 apiVersion: builtin
 kind: LabelTransformer
 metadata:
@@ -42,5 +37,3 @@ fieldSpecs:
   create: true
   kind: Deployment
 EOF
-
-popd > /dev/null || exit 1

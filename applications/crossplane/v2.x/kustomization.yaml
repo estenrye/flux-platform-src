@@ -11,6 +11,3 @@ helmCharts:
     namespace: crossplane-system
     includeCRDs: true
     valuesFile: values.yaml
-
-transformers:
-  - labels.yaml

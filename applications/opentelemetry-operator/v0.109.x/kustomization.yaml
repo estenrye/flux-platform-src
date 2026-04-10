@@ -10,6 +10,3 @@ helmCharts:
     namespace: opentelemetry-operator-system
     includeCRDs: true
     valuesFile: values.yaml
-
-transformers:
-  - labels.yaml
