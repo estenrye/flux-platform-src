@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: flux-state-metrics
+  namespace: flux-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+      app.kubernetes.io/instance: flux-state-metrics
+  endpoints:
+    - port: http
+      interval: 10s
+      path: /metrics
