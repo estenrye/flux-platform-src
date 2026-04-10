@@ -2,8 +2,7 @@
 SCRIPTS_DIR=${SCRIPTS_DIR:-$(cd "$(dirname "$0")/.." && pwd)}
 LABEL_ZONE=${LABEL_ZONE:-com.example}
 
-REPO_OWNER=$(${SCRIPTS_DIR}/render/render-get-source-repository-owner.sh)
-REPO_NAME=$(${SCRIPTS_DIR}/render/render-get-source-repository-name.sh)
+REPO=$(${SCRIPTS_DIR}/render/render-get-source-repository.sh)
 COMMIT_HASH=$(${SCRIPTS_DIR}/render/render-get-source-repository-commit-hash.sh)
 
 COMPONENT_NAME="unknown"

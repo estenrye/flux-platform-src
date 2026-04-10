@@ -7,4 +7,4 @@ pushd ${BASE_DIR} > /dev/null
 REPO=${GITHUB_REPOSITORY:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}
 popd > /dev/null
 
-echo "${REPO}"
+echo -n "${REPO}"
