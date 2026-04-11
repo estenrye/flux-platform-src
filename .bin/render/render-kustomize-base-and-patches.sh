@@ -14,6 +14,7 @@ mkdir -p "${RENDER_DIR}/${TARGET_REPO_NAME}"
 
 find "${WORKING_DIR}/${RELATIVE_PATH}" -name "kustomization.yaml" -exec dirname {} \; | sed "s|${WORKING_DIR}/${RELATIVE_PATH}/||" | while read -r directory; do
   echo "Rendering '${WORKING_DIR}/${RELATIVE_PATH}/${directory}' ..."
+  mkdir -p "${RENDER_DIR}/${TARGET_REPO_NAME}"/${RELATIVE_PATH}/${directory}
   pushd "${WORKING_DIR}/${RELATIVE_PATH}/${directory}" > /dev/null || exit 1
   kustomize build --enable-helm . > "${RENDER_DIR}/${TARGET_REPO_NAME}/${RELATIVE_PATH}/${directory}/rendered.yaml"
   cp catalog.yaml "${RENDER_DIR}/${TARGET_REPO_NAME}/${RELATIVE_PATH}/${directory}/catalog.yaml"

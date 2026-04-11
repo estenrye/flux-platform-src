@@ -11,6 +11,6 @@ GH_TOKEN=${RENDER_GITHUB_TOKEN:-$(gh auth token)}
 BRANCH_NAME="rendered/${SOURCE_REPO_OWNER}/${SOURCE_REPO_NAME}/${SOURCE_REPO_COMMIT_HASH}"
 echo "Creating Branch: ${BRANCH_NAME}"
 
-pushd ${RENDER_DIR}/${TARGET_REPO_NAME}
+pushd ${RENDER_DIR}/${TARGET_REPO_NAME} > /dev/null || exit 1
 git checkout -b ${BRANCH_NAME}
-popd
+popd > /dev/null || exit 1
