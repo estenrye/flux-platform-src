@@ -1,0 +1,23 @@
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: deny-app-policy
+spec:
+  namespaceSelector: kubernetes.io/metadata.name not in {"calico-apiserver", "calico-system", "kube-node-lease", "kube-public", "kube-system", "projectsveltos", "tigera-operator"}
+  types:
+  - Ingress
+  - Egress
+  egress:
+   # allow all namespaces to communicate to DNS pods
+  - action: Allow
+    destination:
+      services:
+        name: kube-dns
+        namespace: kube-system
+    protocol: TCP
+  - action: Allow
+    destination:
+      services:
+        name: kube-dns
+        namespace: kube-system
+    protocol: UDP

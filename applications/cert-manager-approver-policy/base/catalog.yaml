@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cert-manager-approver-policy
+  description: |-
+    approver-policy is a cert-manager approver that will approve or deny 
+    CertificateRequests based on policies defined in the CertificateRequestPolicy
+    custom resource.
+  tags:
+    - certificates
+    - crds
+    - operators
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   

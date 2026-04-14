@@ -1,0 +1,20 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: global-network-policy-default-deny-rackspace-spot
+  description: |-
+    This component configures the default deny global network
+    policy for the Rackspace Spot cluster. This policy ensures
+    that all traffic is denied by default, and only explicitly
+    allowed traffic is permitted. This is a critical security
+    measure to protect the cluster from unauthorized access
+    and potential threats.
+  tags:
+    - network
+    - security
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   

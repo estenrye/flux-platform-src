@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cert-manager
+
+resources:
+  - resources/selfsigned.clusterissuer.yaml
+  - resources/csi-driver-spiffe-ca.certificaterequestpolicy.yaml
+  - resources/csi-driver-spiffe-ca.clusterrole.yaml
+  - resources/csi-driver-spiffe-ca.clusterrolebinding.yaml
+  - resources/csi-driver-spiffe-ca.certificate.yaml
+  - resources/csi-driver-spiffe-ca.clusterissuer.yaml

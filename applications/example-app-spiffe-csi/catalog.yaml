@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: example-app-spiffe-csi
+  description: |-
+    This component demonstrates how to deploy a simple example application that uses
+    the SPIFFE CSI driver to obtain certificates for secure workload identity. The 
+    application is deployed in a sandbox namespace and includes the necessary RBAC 
+    permissions and service account to interact with the cert-manager SPIFFE CSI driver.
+  tags:
+    - certificates
+    - csi
+    - spiffe
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   

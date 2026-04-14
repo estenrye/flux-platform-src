@@ -1,0 +1,9 @@
+apiVersion: v1
+data:
+  issuer-group: cert-manager.io
+  issuer-kind: ClusterIssuer
+  issuer-name: csi-driver-spiffe-ca
+kind: ConfigMap
+metadata:
+  name: spiffe-issuer
+  namespace: cert-manager

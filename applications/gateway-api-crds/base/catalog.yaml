@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: gateway-api-crds
+  description: |-
+    This component installs the Gateway API CRDs for the Kubernetes cluster.
+    The Gateway API provides a set of resources for managing ingress and
+    routing in a Kubernetes-native way, offering more flexibility and
+    extensibility compared to the traditional Ingress API.
+  tags:
+    - crds
+    - gateway-api
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   
