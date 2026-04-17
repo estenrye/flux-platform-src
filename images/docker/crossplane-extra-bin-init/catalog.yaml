@@ -1,0 +1,21 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-extra-bin-init
+  description: |-
+    This docker image is used to initialize an extra volume with binaries
+    that are not included in the main Crossplane image, such as the AWS signing helper.
+  tags:
+    - crossplane
+    - operators
+    - platform
+    - infrastructure
+links:
+  - url: https://github.com/aws/rolesanywhere-credential-helper
+    title: AWS Roles Anywhere Credential Helper
+    icon: github
+    type: source
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   

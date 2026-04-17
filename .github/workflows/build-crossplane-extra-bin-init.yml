@@ -1,0 +1,21 @@
+name: Build Image | estenrye/crossplane-extra-bin-init
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'images/docker/crossplane-extra-bin-init/**'
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'images/docker/crossplane-extra-bin-init/**'
+
+jobs:
+  call-workflow:
+    uses: estenrye/.github/.github/workflows/docker-multiarch-slsa-releaser.yml@main
+    with:
+      push: true
+      image_name: flags-example
+      context: images/docker/crossplane-extra-bin-init
+    secrets:
+      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
