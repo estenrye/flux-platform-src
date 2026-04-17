@@ -23,5 +23,6 @@ jobs:
       image_name: crossplane-extra-bin-init
       context: images/docker/crossplane-extra-bin-init
       provenance_generation: false
+      private_repository: true
     secrets:
       OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
