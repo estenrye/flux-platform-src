@@ -1,4 +1,4 @@
-name: Build Image | estenrye/crossplane-extra-bin-init
+name: Build Image estenrye/crossplane-extra-bin-init
 on:
   push:
     branches: [main]
@@ -13,9 +13,14 @@ on:
 jobs:
   call-workflow:
     uses: estenrye/.github/.github/workflows/docker-multiarch-slsa-releaser.yml@main
+    permissions:
+      contents: read # for checking out the repository.
+      actions: read # for detecting the Github Actions environment.
+      id-token: write # for creating OIDC tokens for signing.
+      packages: write # for uploading attestations.
     with:
       push: true
-      image_name: flags-example
+      image_name: crossplane-extra-bin-init
       context: images/docker/crossplane-extra-bin-init
     secrets:
       OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
