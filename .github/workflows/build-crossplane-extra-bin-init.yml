@@ -22,5 +22,6 @@ jobs:
       push: true
       image_name: crossplane-extra-bin-init
       context: images/docker/crossplane-extra-bin-init
+      provenance_generation: false
     secrets:
       OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
