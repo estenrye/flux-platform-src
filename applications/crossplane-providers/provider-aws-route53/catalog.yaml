@@ -1,0 +1,27 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-provider-family-aws
+  description: |-
+    This component installs the Crossplane AWS provider,
+    which allows you to manage AWS resources using Crossplane.
+  tags:
+    - crossplane
+    - crossplane-provider
+    - aws
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://marketplace.upbound.io/providers/upbound/provider-family-aws/
+      title: Upjet-based Crossplane provider for AWS
+      icon: docs
+      type: documentation
+    - url: https://github.com/crossplane-contrib/provider-upjet-aws
+      title: GitHub repository for the Upjet-based Crossplane provider for AWS
+      icon: github
+      type: source
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   

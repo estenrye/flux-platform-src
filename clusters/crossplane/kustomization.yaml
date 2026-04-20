@@ -9,6 +9,8 @@ resources:
   - ../../applications/cert-manager/base
   - ../../applications/cert-manager-approver-policy/base
   - ../../applications/cert-manager-spiffe-issuer/base
-  - ../../applications/cert-manager-trust-managerx/base
+  - ../../applications/cert-manager-trust-manager/base
   - ../../applications/cert-manager-spiffe-csi-driver/base
-  # - ../../applications/crossplane/base
+  - ../../applications/crossplane/base
+  - ../../applications/crossplane-providers/family-aws
+  - ../../applications/crossplane-providers/provider-aws-route53

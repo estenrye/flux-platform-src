@@ -1,0 +1,14 @@
+generate an aws cloudformation stack that does the following:
+- takes a parameter called role_name with a default value of `crossplane-provider-admin`
+- takes a parameter called spiffe_uri with a default value of `spiffe://cluster.local/ns/sandbox/sa/example-app`
+- takes a parameter called ca_x509_cert that the user can put their PEM formatted certificate into.
+- creates an IAM Roles Anywhere Trust Anchor named the value of parameter role_name from an external CA X509 PEM Certificate uploaded via parameter ca_x509_cert.
+- Creates an IAM Role named the value of parameter role_name with the following permissions:
+  - Create/Update/Delete IAM Roles Anywhere Trust Anchors
+  - Create/Update/Delete IAM Roles
+  - Create/Update/Delete IAM Policies
+  - Create/Update/Delete IAM Role Trust Relastionships
+  - Create/Update/Delete Route53 Hosted Zones
+  - Create/Update/Delete Route53 DNS Records
+- Configures a Trust Relationship between the role named the value of parameter role_name Trust Anchor and the IAM Role named the value of parameter role_name for the `aws:PrincipalTag/x509Issuer/CN` specified in the parameter spiffe_url
+- Creates an IAM Roles Anywhere Profile named the value of parameter role_name

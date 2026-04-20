@@ -1,0 +1,10 @@
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: upbound-provider-aws-route53
+spec:
+  package: xpkg.upbound.io/upbound/provider-aws-route53:v2.5.2
+  runtimeConfigRef:
+    apiVersion: pkg.crossplane.io/v1beta1
+    kind: DeploymentRuntimeConfig
+    name: aws-route53-dns-provider

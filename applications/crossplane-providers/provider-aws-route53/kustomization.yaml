@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ./resources/provider.yaml
+  - ./resources/service-account.yaml
+  - ./resources/role-binding.yaml
+  - ./resources/deployment-runtime-config.yaml
+  - ./resources/providerconfig.yaml
+  - ./resources/network-policy.yaml

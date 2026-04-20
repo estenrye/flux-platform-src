@@ -1,0 +1,9 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: crossplane-spiffe-csi-driver
+  namespace: crossplane-system
+rules:
+- apiGroups: ["cert-manager.io"]
+  resources: ["certificaterequests"]
+  verbs: ["create"]

@@ -1,0 +1,196 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IAM Roles Anywhere stack for Crossplane provider with SPIFFE identity integration'
+
+Parameters:
+  RoleName:
+    Type: String
+    Default: 'crossplane-provider-dns-admin'
+    Description: 'Name for the IAM role, trust anchor, and profile'
+    
+  SpiffeUri:
+    Type: String
+    Default: 'spiffe://cluster.local/ns/crossplane-system/sa/aws-route53-dns-provider'
+    Description: 'SPIFFE URI that will be used in the trust relationship'
+    
+  CaX509Cert:
+    Type: String
+    Description: 'PEM formatted X.509 certificate from external CA for the trust anchor'
+    NoEcho: true
+
+Resources:
+  # IAM Roles Anywhere Trust Anchor
+  TrustAnchor:
+    Type: 'AWS::RolesAnywhere::TrustAnchor'
+    Properties:
+      Name: !Ref RoleName
+      Source:
+        SourceType: 'CERTIFICATE_BUNDLE'
+        SourceData:
+          X509CertificateData: !Ref CaX509Cert
+      Enabled: true
+      Tags:
+        - Key: 'Name'
+          Value: !Ref RoleName
+        - Key: 'Purpose'
+          Value: 'Crossplane Provider Authentication'
+
+  # IAM Role with comprehensive permissions
+  CrossplaneRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Ref RoleName
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 'rolesanywhere.amazonaws.com'
+            Action: 
+              - 'sts:AssumeRole'
+              - 'sts:SetSourceIdentity'
+              - 'sts:TagSession'
+            Condition:
+              StringEquals:
+                'aws:PrincipalTag/x509SAN/URI': !Ref SpiffeUri
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/IAMFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
+      Policies:
+        - PolicyName: 'RolesAnywhereManagement'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'rolesanywhere:CreateTrustAnchor'
+                  - 'rolesanywhere:UpdateTrustAnchor'
+                  - 'rolesanywhere:DeleteTrustAnchor'
+                  - 'rolesanywhere:GetTrustAnchor'
+                  - 'rolesanywhere:ListTrustAnchors'
+                  - 'rolesanywhere:TagResource'
+                  - 'rolesanywhere:UntagResource'
+                  - 'rolesanywhere:ListTagsForResource'
+                  - 'rolesanywhere:CreateProfile'
+                  - 'rolesanywhere:UpdateProfile'
+                  - 'rolesanywhere:DeleteProfile'
+                  - 'rolesanywhere:GetProfile'
+                  - 'rolesanywhere:ListProfiles'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'iam:CreateRole'
+                  - 'iam:UpdateRole'
+                  - 'iam:DeleteRole'
+                  - 'iam:GetRole'
+                  - 'iam:ListRoles'
+                  - 'iam:CreatePolicy'
+                  - 'iam:UpdateAssumeRolePolicy'
+                  - 'iam:DeletePolicy'
+                  - 'iam:GetPolicy'
+                  - 'iam:ListPolicies'
+                  - 'iam:AttachRolePolicy'
+                  - 'iam:DetachRolePolicy'
+                  - 'iam:ListAttachedRolePolicies'
+                  - 'iam:PutRolePolicy'
+                  - 'iam:DeleteRolePolicy'
+                  - 'iam:GetRolePolicy'
+                  - 'iam:ListRolePolicies'
+                  - 'iam:TagRole'
+                  - 'iam:UntagRole'
+                  - 'iam:ListRoleTags'
+                  - 'iam:TagPolicy'
+                  - 'iam:UntagPolicy'
+                  - 'iam:ListPolicyTags'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'route53:CreateHostedZone'
+                  - 'route53:UpdateHostedZoneComment'
+                  - 'route53:DeleteHostedZone'
+                  - 'route53:GetHostedZone'
+                  - 'route53:ListHostedZones'
+                  - 'route53:ListHostedZonesByName'
+                  - 'route53:ChangeResourceRecordSets'
+                  - 'route53:GetChange'
+                  - 'route53:ListResourceRecordSets'
+                  - 'route53:ListTagsForResource'
+                  - 'route53:ChangeTagsForResource'
+                Resource: '*'
+      Tags:
+        - Key: 'Name'
+          Value: !Ref RoleName
+        - Key: 'Purpose'
+          Value: 'Crossplane Provider Role'
+
+  # IAM Roles Anywhere Profile
+  RolesAnywhereProfile:
+    Type: 'AWS::RolesAnywhere::Profile'
+    Properties:
+      Name: !Ref RoleName
+      RoleArns:
+        - !GetAtt CrossplaneRole.Arn
+      RequireInstanceProperties: false
+      Enabled: true
+      SessionPolicy: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "iam:*",
+                "rolesanywhere:*",
+                "route53:*"
+              ],
+              "Resource": "*"
+            }
+          ]
+        }
+      Tags:
+        - Key: 'Name'
+          Value: !Ref RoleName
+        - Key: 'Purpose'
+          Value: 'Crossplane Provider Profile'
+
+Outputs:
+  RoleName:
+    Description: 'Name of the created IAM role'
+    Value: !Ref RoleName
+    Export:
+      Name: !Sub '${AWS::StackName}-RoleName'
+      
+  RoleArn:
+    Description: 'ARN of the created IAM role'
+    Value: !GetAtt CrossplaneRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-RoleArn'
+      
+  TrustAnchorId:
+    Description: 'ID of the created trust anchor'
+    Value: !Ref TrustAnchor
+    Export:
+      Name: !Sub '${AWS::StackName}-TrustAnchorId'
+      
+  TrustAnchorArn:
+    Description: 'ARN of the created trust anchor'
+    Value: !GetAtt TrustAnchor.TrustAnchorArn
+    Export:
+      Name: !Sub '${AWS::StackName}-TrustAnchorArn'
+      
+  ProfileId:
+    Description: 'ID of the created roles anywhere profile'
+    Value: !Ref RolesAnywhereProfile
+    Export:
+      Name: !Sub '${AWS::StackName}-ProfileId'
+      
+  ProfileArn:
+    Description: 'ARN of the created roles anywhere profile'
+    Value: !GetAtt RolesAnywhereProfile.ProfileArn
+    Export:
+      Name: !Sub '${AWS::StackName}-ProfileArn'
+
+  SpiffeUri:
+    Description: 'SPIFFE URI used in trust relationship'
+    Value: !Ref SpiffeUri
+    Export:
+      Name: !Sub '${AWS::StackName}-SpiffeUri'

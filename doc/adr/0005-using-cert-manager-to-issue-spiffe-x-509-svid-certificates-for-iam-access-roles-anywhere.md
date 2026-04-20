@@ -31,3 +31,25 @@ I want to manage access to AWS resources from Kubernetes workloads using IAM Acc
 ## Consequences
 
 - An approval policy will need to be implemented to approve certificate requests for external issuers to maintain previously expected behaviors of the cert-manager deployment.
+
+
+## Configuring AWS IAM Access Roles Anywhere to trust cert-manager issued SPIFFE certificates
+
+- Create a trust anchor in IAM Access Roles Anywhere that corresponds to the CA certificate used by cert-manager to issue SPIFFE X.509 SVID certificates.
+
+```bash
+SPIFFE_CA_NAMESPACE=cert-manager
+SPIFFE_CA_NAME=csi-driver-spiffe-ca
+SPIFFE_CA_SECRET_NAME=`kubectl get certificate -n ${SPIFFE_CA_NAMESPACE} ${SPIFFE_CA_NAME} -o jsonpath='{.spec.secretName}'`
+SPIFFE_CA_CERT=$(kubectl get secret -n ${SPIFFE_CA_NAMESPACE} ${SPIFFE_CA_SECRET_NAME} -o jsonpath='{.data.ca\.crt}' | base64 --decode)
+
+aws cloudformation create-stack \
+  --profile AdministratorAccess-IAMIC-832767337984 \
+  --stack-name crossplane-provider-dns-admin \
+  --template-body file://providers/aws/crossplane-iam-roles-anywhere.yaml \
+  --parameters \
+    ParameterKey=RoleName,ParameterValue=crossplane-provider-dns-admin \
+    ParameterKey=SpiffeUri,ParameterValue=spiffe://cluster.local/ns/crossplane-system/sa/aws-route53-dns-provider \
+    ParameterKey=CaX509Cert,ParameterValue="${SPIFFE_CA_CERT}" \
+  --capabilities CAPABILITY_NAMED_IAM
+```

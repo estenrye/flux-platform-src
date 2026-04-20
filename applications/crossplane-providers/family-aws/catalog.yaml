@@ -1,0 +1,28 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-provider-aws-route53
+  description: |-
+    This component installs the Crossplane AWS Route53 provider,
+    which allows you to manage AWS Route53 resources using Crossplane.
+  tags:
+    - crossplane
+    - crossplane-provider
+    - dns
+    - aws
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://marketplace.upbound.io/providers/upbound/provider-aws-route53
+      title: Upjet-based Crossplane provider for AWS Route53
+      icon: docs
+      type: documentation
+    - url: https://github.com/crossplane-contrib/provider-upjet-aws
+      title: GitHub repository for the Upjet-based Crossplane provider for AWS
+      icon: github
+      type: source
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   

@@ -3,7 +3,11 @@ kind: Kustomization
 namespace: crossplane-system
 
 resources:
-  - namespace.yaml
+  - resources/namespace.yaml
+  - resources/role.yaml
+  - resources/role-binding.yaml
+  - resources/crossplane-network-policy.yaml
+  - resources/crossplane-rbac-manager-network-policy.yaml
 
 helmCharts:
   - name: crossplane
