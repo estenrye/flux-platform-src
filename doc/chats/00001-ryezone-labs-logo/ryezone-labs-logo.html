@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ryezone Labs — Logo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@600;700&family=Exo+2:wght@300;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #080c10;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 60px;
+    font-family: 'Share Tech Mono', monospace;
+    padding: 40px 20px;
+  }
+
+  .label {
+    color: #3a5a6a;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  /* ── LOGO CARD ─────────────────────────────────────── */
+  .logo-card {
+    background: #0d1318;
+    border: 1px solid #1a2a35;
+    border-radius: 4px;
+    padding: 56px 72px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* subtle grid texture */
+  .logo-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,200,180,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,200,180,0.03) 1px, transparent 1px);
+    background-size: 24px 24px;
+    pointer-events: none;
+  }
+
+  /* ── MARK SVG ───────────────────────────────────────── */
+  .mark {
+    width: 96px;
+    height: 96px;
+    position: relative;
+  }
+
+  /* ── WORDMARK ───────────────────────────────────────── */
+  .wordmark {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .wordmark-top {
+    display: flex;
+    align-items: baseline;
+    gap: 0;
+  }
+
+  .rye {
+    font-family: 'Exo 2', sans-serif;
+    font-weight: 800;
+    font-size: 42px;
+    color: #e8f4f8;
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+
+  .zone {
+    font-family: 'Exo 2', sans-serif;
+    font-weight: 300;
+    font-size: 42px;
+    color: #00c8b4;
+    letter-spacing: 0.05em;
+    line-height: 1;
+  }
+
+  .labs {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    color: #3a8a7a;
+    letter-spacing: 0.45em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  /* ── TAGLINE ────────────────────────────────────────── */
+  .tagline {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: #2a5a52;
+    letter-spacing: 0.2em;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+
+  .tagline span {
+    color: #00c8b4;
+    opacity: 0.7;
+  }
+
+  /* ── DIVIDER ────────────────────────────────────────── */
+  .divider {
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #1a3540, #00c8b4, #1a3540, transparent);
+    opacity: 0.5;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── LIGHT BG VARIANT ───────────────────────────────── */
+  .logo-card.light {
+    background: #f0f5f7;
+    border-color: #c8dde4;
+  }
+  .logo-card.light::before {
+    background-image:
+      linear-gradient(rgba(0,150,130,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,150,130,0.06) 1px, transparent 1px);
+  }
+  .logo-card.light .rye   { color: #0d2028; }
+  .logo-card.light .zone  { color: #007a6e; }
+  .logo-card.light .labs  { color: #4a8a80; }
+  .logo-card.light .tagline { color: #7aaaa0; }
+  .logo-card.light .tagline span { color: #007a6e; }
+  .logo-card.light .divider { background: linear-gradient(90deg, transparent, #a0c8c0, #007a6e, #a0c8c0, transparent); }
+
+  /* icon-only variant */
+  .icon-only {
+    background: #0d1318;
+    border: 1px solid #1a2a35;
+    border-radius: 4px;
+    padding: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── ANIMATION ──────────────────────────────────────── */
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  .glow-pulse { animation: pulse-glow 3s ease-in-out infinite; }
+
+  @keyframes dash {
+    to { stroke-dashoffset: 0; }
+  }
+  .draw-in {
+    stroke-dasharray: 300;
+    stroke-dashoffset: 300;
+    animation: dash 1.8s ease forwards;
+  }
+  .draw-in-delay {
+    stroke-dasharray: 200;
+    stroke-dashoffset: 200;
+    animation: dash 1.4s 0.4s ease forwards;
+  }
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .rye   { animation: fade-up 0.6s 1.0s both; }
+  .zone  { animation: fade-up 0.6s 1.2s both; }
+  .labs  { animation: fade-up 0.6s 1.4s both; }
+  .tagline { animation: fade-up 0.6s 1.6s both; }
+</style>
+</head>
+<body>
+
+  <!-- ── PRIMARY DARK LOGO ───────────────────────────── -->
+  <div>
+    <p class="label">Primary — Dark</p>
+    <div class="logo-card">
+
+      <!-- MARK: stacked infrastructure hexagon + cloud/code hybrid -->
+      <svg class="mark" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="g1" x1="0" y1="0" x2="96" y2="96" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#00c8b4"/>
+            <stop offset="100%" stop-color="#0070a0"/>
+          </linearGradient>
+          <linearGradient id="g2" x1="96" y1="0" x2="0" y2="96" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#00c8b4" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#004a6a" stop-opacity="0.1"/>
+          </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="1.5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- Outer hexagon frame -->
+        <polygon class="draw-in"
+          points="48,4 86,26 86,70 48,92 10,70 10,26"
+          stroke="url(#g1)" stroke-width="1.5" fill="url(#g2)" stroke-linejoin="round"/>
+
+        <!-- Inner hexagon (rotated) — suggests layered infra zones -->
+        <polygon class="draw-in-delay"
+          points="48,16 74,31 74,61 48,76 22,61 22,31"
+          stroke="#00c8b4" stroke-width="1" stroke-opacity="0.4" fill="none" stroke-linejoin="round"/>
+
+        <!-- Infrastructure stack: 3 horizontal layer bars -->
+        <!-- Layer 3 (cloud) -->
+        <rect x="30" y="29" width="36" height="7" rx="3.5"
+          fill="#00c8b4" fill-opacity="0.15" stroke="#00c8b4" stroke-width="1" stroke-opacity="0.7"/>
+        <!-- cloud arc cutout illusion: two small bumps on top -->
+        <circle cx="39" cy="29" r="4" fill="#0d1318" stroke="none"/>
+        <circle cx="48" cy="27" r="5.5" fill="#0d1318" stroke="none"/>
+        <circle cx="57" cy="29" r="4" fill="#0d1318" stroke="none"/>
+        <!-- redraw top of bar cleanly -->
+        <path d="M30 32.5 Q30 29 33.5 29 Q33 25 39 25 Q42 22 48 21.5 Q54 22 57 25 Q63 25 62.5 29 Q66 29 66 32.5"
+          stroke="#00c8b4" stroke-width="1" fill="#00c8b415" stroke-opacity="0.9"/>
+        <line x1="30" y1="36" x2="66" y2="36" stroke="#00c8b4" stroke-width="1" stroke-opacity="0.7"/>
+
+        <!-- Layer 2 (IaC code block) -->
+        <rect x="30" y="41" width="36" height="7" rx="1.5"
+          fill="#0070a0" fill-opacity="0.12" stroke="#0095c8" stroke-width="1" stroke-opacity="0.5"/>
+        <!-- code chevrons inside -->
+        <polyline points="35,44.5 33,45 35,45.5" stroke="#00c8b4" stroke-width="1" stroke-opacity="0.8" fill="none" stroke-linejoin="round"/>
+        <polyline points="43,44.5 45,45 43,45.5" stroke="#00c8b4" stroke-width="1" stroke-opacity="0.8" fill="none" stroke-linejoin="round"/>
+        <line x1="37" y1="45" x2="41" y2="45" stroke="#0095c8" stroke-width="1" stroke-opacity="0.6"/>
+        <line x1="47" y1="43.5" x2="61" y2="43.5" stroke="#0095c8" stroke-width="0.75" stroke-opacity="0.4"/>
+        <line x1="47" y1="46" x2="57" y2="46" stroke="#0095c8" stroke-width="0.75" stroke-opacity="0.4"/>
+
+        <!-- Layer 1 (platform / compute) -->
+        <rect x="30" y="53" width="36" height="7" rx="1.5"
+          fill="#003a50" fill-opacity="0.3" stroke="#005a7a" stroke-width="1" stroke-opacity="0.5"/>
+        <!-- grid dots suggesting compute nodes -->
+        <circle cx="36" cy="56.5" r="1.2" fill="#00c8b4" fill-opacity="0.7"/>
+        <circle cx="43" cy="56.5" r="1.2" fill="#00c8b4" fill-opacity="0.5"/>
+        <circle cx="50" cy="56.5" r="1.2" fill="#00c8b4" fill-opacity="0.5"/>
+        <circle cx="57" cy="56.5" r="1.2" fill="#00c8b4" fill-opacity="0.3"/>
+
+        <!-- Connecting vertical lines between layers -->
+        <line x1="38" y1="36" x2="38" y2="41" stroke="#00c8b4" stroke-width="0.75" stroke-opacity="0.3"/>
+        <line x1="58" y1="36" x2="58" y2="41" stroke="#00c8b4" stroke-width="0.75" stroke-opacity="0.3"/>
+        <line x1="38" y1="48" x2="38" y2="53" stroke="#0095c8" stroke-width="0.75" stroke-opacity="0.3"/>
+        <line x1="58" y1="48" x2="58" y2="53" stroke="#0095c8" stroke-width="0.75" stroke-opacity="0.3"/>
+
+        <!-- Corner accent dots on hex vertices -->
+        <circle cx="48" cy="4"  r="2" fill="#00c8b4" class="glow-pulse"/>
+        <circle cx="86" cy="26" r="2" fill="#00c8b4" fill-opacity="0.5"/>
+        <circle cx="86" cy="70" r="2" fill="#00c8b4" fill-opacity="0.5"/>
+        <circle cx="48" cy="92" r="2" fill="#00c8b4" fill-opacity="0.3"/>
+        <circle cx="10" cy="70" r="2" fill="#00c8b4" fill-opacity="0.5"/>
+        <circle cx="10" cy="26" r="2" fill="#00c8b4" fill-opacity="0.5"/>
+      </svg>
+
+      <div class="wordmark">
+        <div class="wordmark-top">
+          <span class="rye">Rye</span><span class="zone">zone</span>
+        </div>
+        <div class="labs">Labs</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="tagline">
+        <span>cloud://</span>native · infra<span>As</span>Code · scale
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── LIGHT VARIANT ───────────────────────────────── -->
+  <div>
+    <p class="label">Light Variant</p>
+    <div class="logo-card light">
+
+      <svg class="mark" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gl1" x1="0" y1="0" x2="96" y2="96" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#007a6e"/>
+            <stop offset="100%" stop-color="#004a8a"/>
+          </linearGradient>
+          <linearGradient id="gl2" x1="0" y1="0" x2="96" y2="96" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#007a6e" stop-opacity="0.08"/>
+            <stop offset="100%" stop-color="#004a8a" stop-opacity="0.04"/>
+          </linearGradient>
+        </defs>
+        <polygon points="48,4 86,26 86,70 48,92 10,70 10,26"
+          stroke="url(#gl1)" stroke-width="1.5" fill="url(#gl2)" stroke-linejoin="round"/>
+        <polygon points="48,16 74,31 74,61 48,76 22,61 22,31"
+          stroke="#007a6e" stroke-width="1" stroke-opacity="0.3" fill="none" stroke-linejoin="round"/>
+        <!-- Cloud -->
+        <path d="M30 32.5 Q30 29 33.5 29 Q33 25 39 25 Q42 22 48 21.5 Q54 22 57 25 Q63 25 62.5 29 Q66 29 66 32.5"
+          stroke="#007a6e" stroke-width="1" fill="#007a6e18" stroke-opacity="0.9"/>
+        <line x1="30" y1="36" x2="66" y2="36" stroke="#007a6e" stroke-width="1" stroke-opacity="0.7"/>
+        <!-- IaC -->
+        <rect x="30" y="41" width="36" height="7" rx="1.5" fill="#007a6e10" stroke="#007a6e" stroke-width="1" stroke-opacity="0.4"/>
+        <polyline points="35,44.5 33,45 35,45.5" stroke="#007a6e" stroke-width="1" stroke-opacity="0.8" fill="none"/>
+        <polyline points="43,44.5 45,45 43,45.5" stroke="#007a6e" stroke-width="1" stroke-opacity="0.8" fill="none"/>
+        <line x1="37" y1="45" x2="41" y2="45" stroke="#007a6e" stroke-width="1" stroke-opacity="0.5"/>
+        <line x1="47" y1="43.5" x2="61" y2="43.5" stroke="#007a6e" stroke-width="0.75" stroke-opacity="0.3"/>
+        <line x1="47" y1="46" x2="57" y2="46" stroke="#007a6e" stroke-width="0.75" stroke-opacity="0.3"/>
+        <!-- Compute -->
+        <rect x="30" y="53" width="36" height="7" rx="1.5" fill="#007a6e08" stroke="#007a6e" stroke-width="1" stroke-opacity="0.3"/>
+        <circle cx="36" cy="56.5" r="1.2" fill="#007a6e" fill-opacity="0.7"/>
+        <circle cx="43" cy="56.5" r="1.2" fill="#007a6e" fill-opacity="0.5"/>
+        <circle cx="50" cy="56.5" r="1.2" fill="#007a6e" fill-opacity="0.5"/>
+        <circle cx="57" cy="56.5" r="1.2" fill="#007a6e" fill-opacity="0.3"/>
+        <line x1="38" y1="36" x2="38" y2="41" stroke="#007a6e" stroke-width="0.75" stroke-opacity="0.25"/>
+        <line x1="58" y1="36" x2="58" y2="41" stroke="#007a6e" stroke-width="0.75" stroke-opacity="0.25"/>
+        <line x1="38" y1="48" x2="38" y2="53" stroke="#007a6e" stroke-width="0.75" stroke-opacity="0.25"/>
+        <line x1="58" y1="48" x2="58" y2="53" stroke="#007a6e" stroke-width="0.75" stroke-opacity="0.25"/>
+        <circle cx="48" cy="4"  r="2" fill="#007a6e"/>
+        <circle cx="86" cy="26" r="2" fill="#007a6e" fill-opacity="0.4"/>
+        <circle cx="86" cy="70" r="2" fill="#007a6e" fill-opacity="0.4"/>
+        <circle cx="48" cy="92" r="2" fill="#007a6e" fill-opacity="0.3"/>
+        <circle cx="10" cy="70" r="2" fill="#007a6e" fill-opacity="0.4"/>
+        <circle cx="10" cy="26" r="2" fill="#007a6e" fill-opacity="0.4"/>
+      </svg>
+
+      <div class="wordmark">
+        <div class="wordmark-top">
+          <span class="rye">Rye</span><span class="zone">zone</span>
+        </div>
+        <div class="labs">Labs</div>
+      </div>
+      <div class="divider"></div>
+      <div class="tagline"><span>cloud://</span>native · infra<span>As</span>Code · scale</div>
+    </div>
+  </div>
+
+  <!-- ── ICON ONLY ────────────────────────────────────── -->
+  <div>
+    <p class="label">Icon Mark</p>
+    <div class="icon-only">
+      <svg width="80" height="80" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gi1" x1="0" y1="0" x2="96" y2="96" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#00c8b4"/>
+            <stop offset="100%" stop-color="#0070a0"/>
+          </linearGradient>
+          <linearGradient id="gi2" x1="0" y1="0" x2="96" y2="96" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#00c8b4" stop-opacity="0.2"/>
+            <stop offset="100%" stop-color="#004a6a" stop-opacity="0.05"/>
+          </linearGradient>
+        </defs>
+        <polygon points="48,4 86,26 86,70 48,92 10,70 10,26"
+          stroke="url(#gi1)" stroke-width="2" fill="url(#gi2)" stroke-linejoin="round"/>
+        <polygon points="48,16 74,31 74,61 48,76 22,61 22,31"
+          stroke="#00c8b4" stroke-width="1" stroke-opacity="0.35" fill="none" stroke-linejoin="round"/>
+        <path d="M30 32.5 Q30 29 33.5 29 Q33 25 39 25 Q42 22 48 21.5 Q54 22 57 25 Q63 25 62.5 29 Q66 29 66 32.5"
+          stroke="#00c8b4" stroke-width="1.2" fill="#00c8b418"/>
+        <line x1="30" y1="36" x2="66" y2="36" stroke="#00c8b4" stroke-width="1.2" stroke-opacity="0.8"/>
+        <rect x="30" y="41" width="36" height="7" rx="1.5" fill="#0070a012" stroke="#0095c8" stroke-width="1.2" stroke-opacity="0.6"/>
+        <polyline points="35,44.5 33,45 35,45.5" stroke="#00c8b4" stroke-width="1.2" fill="none"/>
+        <polyline points="43,44.5 45,45 43,45.5" stroke="#00c8b4" stroke-width="1.2" fill="none"/>
+        <line x1="37" y1="45" x2="41" y2="45" stroke="#0095c8" stroke-width="1.2"/>
+        <rect x="30" y="53" width="36" height="7" rx="1.5" fill="#003a5018" stroke="#005a7a" stroke-width="1.2" stroke-opacity="0.6"/>
+        <circle cx="36" cy="56.5" r="1.5" fill="#00c8b4" fill-opacity="0.8"/>
+        <circle cx="43" cy="56.5" r="1.5" fill="#00c8b4" fill-opacity="0.6"/>
+        <circle cx="50" cy="56.5" r="1.5" fill="#00c8b4" fill-opacity="0.6"/>
+        <circle cx="57" cy="56.5" r="1.5" fill="#00c8b4" fill-opacity="0.4"/>
+        <circle cx="48" cy="4"  r="2.5" fill="#00c8b4"/>
+        <circle cx="86" cy="26" r="2.5" fill="#00c8b4" fill-opacity="0.5"/>
+        <circle cx="86" cy="70" r="2.5" fill="#00c8b4" fill-opacity="0.5"/>
+        <circle cx="48" cy="92" r="2.5" fill="#00c8b4" fill-opacity="0.3"/>
+        <circle cx="10" cy="70" r="2.5" fill="#00c8b4" fill-opacity="0.5"/>
+        <circle cx="10" cy="26" r="2.5" fill="#00c8b4" fill-opacity="0.5"/>
+      </svg>
+    </div>
+  </div>
+
+</body>
+</html>
