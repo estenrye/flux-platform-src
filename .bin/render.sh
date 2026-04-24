@@ -6,7 +6,6 @@ RENDER_DIR=${RENDER_DIR:-$(dirname "$SCRIPTS_DIR")/.render}
 BASE_DIR=${BASE_DIR:-$(dirname "$SCRIPTS_DIR")}
 APP_DIR=${APP_DIR:-$(cd ${BASE_DIR}/applications && pwd)}
 
-echo "Cloning Target Repository: ${TARGET_REPO_OWNER}/${TARGET_REPO_NAME}"
 if [ -z "$GITHUB_TOKEN" ]; then
   echo "Error: GITHUB_TOKEN is not set. Please set the GITHUB_TOKEN environment variable or ensure you are authenticated with gh."
   exit 1
@@ -14,7 +13,6 @@ fi
 
 GITHUB_TOKEN=${GITHUB_TOKEN:-$(gh auth token)}
 
-echo "Cloning Target Repository: ${TARGET_REPO_OWNER}/${TARGET_REPO_NAME}"
 if [ -z "$RENDER_GITHUB_TOKEN" ]; then
   echo "Error: RENDER_GITHUB_TOKEN is not set. Please set the RENDER_GITHUB_TOKEN environment variable or ensure you are authenticated with gh."
   exit 1

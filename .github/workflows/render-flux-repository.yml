@@ -18,6 +18,8 @@ jobs:
     - name: Configure 1Password Service Account
       uses: 1password/load-secrets-action@v2
       id: load-secrets
+      with:
+        export-env: true
       env:
         OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         RENDER_GITHUB_TOKEN: "op://wvraeffbmpocy5jpzwgyerj3qi/4gs3fu4ul3ei2wrbgmw36c3kbu/token"
@@ -29,4 +31,3 @@ jobs:
       run: make render
       env:
         GITHUB_TOKEN: ${{ github.token }}
-        RENDER_GITHUB_TOKEN: ${{ steps.load-secrets.outputs.RENDER_GITHUB_TOKEN }}
