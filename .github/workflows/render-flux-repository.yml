@@ -23,8 +23,7 @@ jobs:
         RENDER_GITHUB_TOKEN: "op://wvraeffbmpocy5jpzwgyerj3qi/4gs3fu4ul3ei2wrbgmw36c3kbu/token"
     
     - name: Install dependencies
-      run: |
-        source .bin/.bashrc
+      run: make render-deps
 
     - name: Run make render
       run: make render
