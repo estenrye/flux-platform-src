@@ -28,5 +28,5 @@ jobs:
     - name: Run make render
       run: make render
       env:
-        GH_TOKEN: ${{ steps.load-secrets.outputs.RENDER_GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ github.token }}
         RENDER_GITHUB_TOKEN: ${{ steps.load-secrets.outputs.RENDER_GITHUB_TOKEN }}
