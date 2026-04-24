@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 SCRIPTS_DIR=${SCRIPTS_DIR:-$(cd "$(dirname "$0")/.." && pwd)}
 REPO_OWNER=$(${SCRIPTS_DIR}/render/render-get-source-repository-owner.sh)
 REPO_NAME=$(${SCRIPTS_DIR}/render/render-get-source-repository-name.sh)

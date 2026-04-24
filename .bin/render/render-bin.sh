@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 SCRIPTS_DIR=${SCRIPTS_DIR:-$(cd "$(dirname "$0")/.." && pwd)}
 RENDER_DIR=${RENDER_DIR:-$(cd "$(dirname "$SCRIPTS_DIR")/.render" && pwd)}
 BASE_DIR=${BASE_DIR:-$(dirname "$SCRIPTS_DIR")}

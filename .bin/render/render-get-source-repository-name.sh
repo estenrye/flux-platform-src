@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 SCRIPTS_DIR=${SCRIPTS_DIR:-$(cd "$(dirname "$0")/.." && pwd)}
 GH_TOKEN=${GITHUB_TOKEN:-$(gh auth token)}
 pushd ${SCRIPTS_DIR} > /dev/null

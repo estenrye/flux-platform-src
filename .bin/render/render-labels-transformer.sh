@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 SCRIPTS_DIR=${SCRIPTS_DIR:-$(cd "$(dirname "$0")/.." && pwd)}
 REPO=${1:-$REPO}
 COMMIT_HASH=${2:-$COMMIT_HASH}

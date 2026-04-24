@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 REPO=${REPO:-estenrye/flux-platform-rendered}
 SCRIPTS_DIR=${SCRIPTS_DIR:-$(cd "$(dirname "$0")" && pwd)}
 RENDER_DIR=${RENDER_DIR:-$(dirname "$SCRIPTS_DIR")/.render}
