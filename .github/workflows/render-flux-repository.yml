@@ -31,3 +31,4 @@ jobs:
       run: make render
       env:
         GITHUB_TOKEN: ${{ github.token }}
+        RENDER_GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
