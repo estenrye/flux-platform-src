@@ -9,7 +9,7 @@ if [ -n "$ZSH_NAME" ]; then
 fi
 
 if [ ! -f "$SCRIPT_DIR/../.venv/bin/activate" ]; then
-    python3 -m venv --without-scm-ignore-files "$SCRIPT_DIR/../.venv"
+    python3 -m venv "$SCRIPT_DIR/../.venv"
     if [ -f "$HOME/.bashrc" ]; then
         source "$HOME/.bashrc"
     fi
