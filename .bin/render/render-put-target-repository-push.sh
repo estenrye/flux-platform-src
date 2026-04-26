@@ -14,5 +14,9 @@ BRANCH_NAME="rendered/${SOURCE_REPO_OWNER}/${SOURCE_REPO_NAME}/${SOURCE_REPO_BRA
 echo "Creating Branch: ${BRANCH_NAME}"
 
 pushd ${RENDER_DIR}/${TARGET_REPO_NAME} > /dev/null || exit 1
-git checkout -b ${BRANCH_NAME}
+git add .
+git commit \
+  -m "Render ${SOURCE_REPO_NAME}/${SOURCE_REPO_BRANCH}" \
+  -m "Commit: ${SOURCE_REPO_COMMIT_HASH}"
+git push origin ${BRANCH_NAME}
 popd > /dev/null || exit 1

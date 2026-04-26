@@ -1,0 +1,34 @@
+#!/bin/bash
+set -e
+REPO=${REPO:-estenrye/flux-platform-rendered}
+SCRIPTS_DIR=${SCRIPTS_DIR:-$(cd "$(dirname "$0")" && pwd)}
+RENDER_DIR=${RENDER_DIR:-$(dirname "$SCRIPTS_DIR")/.render}
+BASE_DIR=${BASE_DIR:-$(dirname "$SCRIPTS_DIR")}
+APP_DIR=${APP_DIR:-$(cd ${BASE_DIR}/applications && pwd)}
+BIN_DIR=${BIN_DIR:-$(dirname "$SCRIPTS_DIR")/.venv/bin}
+
+if [ -z "$GITHUB_TOKEN" ]; then
+  echo "Error: GITHUB_TOKEN is not set. Please set the GITHUB_TOKEN environment variable or ensure you are authenticated with gh."
+  exit 1
+fi
+
+GITHUB_TOKEN=${GITHUB_TOKEN:-$(gh auth token)}
+
+if [ -z "$RENDER_GITHUB_TOKEN" ]; then
+  echo "Error: RENDER_GITHUB_TOKEN is not set. Please set the RENDER_GITHUB_TOKEN environment variable or ensure you are authenticated with gh."
+  exit 1
+fi
+
+RENDER_GITHUB_TOKEN=${RENDER_GITHUB_TOKEN:-$(gh auth token)}
+LABEL_ZONE=${LABEL_ZONE:-rye.ninja}
+
+export REPO
+export RENDER_DIR
+export SCRIPTS_DIR
+export APP_DIR
+export GITHUB_TOKEN
+export RENDER_GITHUB_TOKEN
+export LABEL_ZONE
+
+find ${RENDER_DIR} -type f -name "*.yaml" -o -name "*.yml" | xargs ${BIN_DIR}/kube-linter lint \
+  --config ${BASE_DIR}/.kube-linter/config.yaml

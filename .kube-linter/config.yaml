@@ -1,0 +1,13 @@
+checks:
+  addAllBuiltIn: true
+  ignorePaths:
+    - ".bin/**"
+    - ".github/**"
+    - ".kube-linter/**"
+    - ".venv/**"
+    - ".vscode/**"
+    - "doc/**"
+    - "images/**"
+    - "providers/**"
+    - "**/catalog.yaml"
+    - "**/labels.yaml"

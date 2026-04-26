@@ -6,6 +6,6 @@ REPO_NAME=$(${SCRIPTS_DIR}/render/render-get-source-repository-name.sh)
 GH_TOKEN=${GITHUB_TOKEN:-$(gh auth token)}
 export GH_TOKEN
 
-COMMIT_HASH=${GITHUB_SHA:-$(gh api "repos/${REPO_OWNER}/${REPO_NAME}/commits/$(git branch --show-current)" --jq '.sha')}
+COMMIT_HASH=${GITHUB_SHA:-$(git rev-parse HEAD)}
 
 echo "${COMMIT_HASH}"
