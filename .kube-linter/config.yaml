@@ -11,3 +11,25 @@ checks:
     - "providers/**"
     - "**/catalog.yaml"
     - "**/labels.yaml"
+  exclude:
+    - "dnsconfig-options"
+    - "priority-class-name"
+    - "required-label-owner"
+    - "required-annotation-email"
+
+customChecks:
+  - name: "platform-priority-class-name"
+    template: "priority-class-name"
+    params:
+      acceptedPriorityClassNames:
+        - always-prempted
+        - application-best-effort
+        - application-critical
+        - application
+        - cicd
+        - datastore
+        - never-prempted
+        - opentelemetry
+        - platform-best-effort
+        - platform-critical
+        - platform
