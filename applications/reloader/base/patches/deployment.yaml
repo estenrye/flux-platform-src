@@ -1,0 +1,13 @@
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: OnFailure
+- op: add
+  path: /spec/strategy
+  value:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+- op: add
+  path: /spec/template/spec/dnsPolicy
+  value: Default

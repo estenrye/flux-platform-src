@@ -10,3 +10,12 @@ helmCharts:
     namespace: reloader
     includeCRDs: true
     valuesFile: values.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+  
+  - target:
+      kind: ClusterRoleBinding
+    path: patches/clusterRoleBinding.yaml
