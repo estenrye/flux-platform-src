@@ -1,0 +1,27 @@
+- op: add
+  path: /metadata/labels/helm.sh~1hook
+  value: test
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1restart-policy
+  value: "This deployment needs a restart policy of Never in order to properly function as a test job."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-liveness-probe
+  value: "This deployment does not need a liveness probe because it is a test job that will not be restarted on failure and does not need health monitoring."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-readiness-probe
+  value: "This deployment does not need a readiness probe because it is a test job that will not be restarted on failure and does not need health monitoring."
+- op: add
+  path: /spec/affinity
+  value:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          preference:
+            matchExpressions:
+              - key: servers.ngpc.rxt.io/type
+                operator: In
+                values:
+                  - spot
+- op: add
+  path: /spec/serviceAccountName
+  value: opentelemetry-operator-tests

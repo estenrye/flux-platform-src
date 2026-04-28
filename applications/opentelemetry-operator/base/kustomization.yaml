@@ -10,3 +10,23 @@ helmCharts:
     namespace: opentelemetry-operator-system
     includeCRDs: true
     valuesFile: values.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+  - target:
+      kind: Pod
+      annotationSelector: "helm.sh/hook=test"
+    path: patches/pod.yaml
+  - target:
+      kind: ClusterRoleBinding
+    path: patches/clusterRoleBinding.yaml
+  - target:
+      kind: RoleBinding
+    path: patches/clusterRoleBinding.yaml
+
+resources:
+  - resources/networkpolicy.test-pods.yaml
+  - resources/networkpolicy.deployment.yaml
+  - resources/serviceaccount.test.yaml

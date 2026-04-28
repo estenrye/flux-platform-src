@@ -1,0 +1,41 @@
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: OnFailure
+- op: add
+  path: /spec/template/spec/containers/0/ports/-
+  value:
+    containerPort: 8081
+    name: healthz
+    protocol: TCP
+- op: add
+  path: /spec/template/spec/containers/1/args/-
+  value: --proxy-endpoints-port=8081
+- op: add
+  path: /spec/template/spec/containers/1/ports/-
+  value:
+    containerPort: 8081
+    name: healthz
+    protocol: TCP
+- op: add
+  path: /spec/template/spec/containers/1/livenessProbe
+  value:
+    httpGet:
+      path: /healthz
+      port: 8081
+    initialDelaySeconds: 15
+    periodSeconds: 20
+- op: add
+  path: /spec/template/spec/containers/1/readinessProbe
+  value:
+    httpGet:
+      path: /healthz
+      port: 8081
+    initialDelaySeconds: 5
+    periodSeconds: 10
+- op: add
+  path: /spec/strategy
+  value:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
