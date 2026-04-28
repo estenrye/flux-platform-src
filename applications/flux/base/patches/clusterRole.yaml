@@ -1,0 +1,3 @@
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1wildcard-in-rules
+  value: "This role needs wildcard permissions to reconcile resources across the cluster."
