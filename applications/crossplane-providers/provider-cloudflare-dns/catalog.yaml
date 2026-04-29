@@ -1,0 +1,32 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-provider-cloudflare-dns
+  description: |-
+    This component installs the Crossplane Cloudflare provider,
+    which allows you to manage Cloudflare resources using Crossplane.
+
+    When deploying this component, you need to create a secret on the cluster
+    with a Cloudflare API Key.
+
+  tags:
+    - crossplane
+    - crossplane-provider
+    - dns
+    - cloudflare
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://marketplace.upbound.io/providers/wildbitca/provider-cloudflare-dns
+      title: Upjet-based Crossplane provider for Cloudflare
+      icon: docs
+      type: documentation
+    - url: https://github.com/wildbitca/provider-upjet-cloudflare
+      title: GitHub repository for the Upjet-based Crossplane provider for Cloudflare
+      icon: github
+      type: source
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   
