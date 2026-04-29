@@ -1,3 +1,5 @@
+annotations:
+  ignore-check.kube-linter.io/minimum-three-replicas: "This deployment is statically sharded and intentionally deployed with less than three replicas."
 prometheusScrape: true
 collectors: [ ]
 podLabels:
@@ -11,6 +13,24 @@ resources:
   limits:
     memory: "128Mi"
     cpu: "200m"
+networkPolicy:
+  enabled: true
+  flavor: kubernetes
+  podSelector:
+    matchLabels:
+      app: flux-state-metrics
+      app.kubernetes.io/instance: flux-state-metrics
+
+kubeRBACProxy:
+  enabled: false
+#   resources:
+#     limits:
+#       cpu: 100m
+#       memory: 64Mi
+#     requests:
+#       cpu: 10m
+#       memory: 32Mi
+
 rbac:
   extraRules:
     - apiGroups:

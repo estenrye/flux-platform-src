@@ -10,3 +10,11 @@ helmCharts:
     namespace: flux-system
     includeCRDs: true
     valuesFile: values.yaml
+
+# resources:
+#   - resources/network-policy.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml

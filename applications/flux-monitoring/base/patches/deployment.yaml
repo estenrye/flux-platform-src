@@ -1,0 +1,43 @@
+# - op: add
+#   path: /spec/replicas
+#   value: 3
+- op: add
+  path: /spec/template/spec/priorityClassName
+  value: cicd
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: OnFailure
+# - op: add
+#   path: /spec/strategy
+#   value:
+#     type: RollingUpdate
+#     rollingUpdate:
+#       maxSurge: 1
+#       maxUnavailable: 1
+- op: add
+  path: /spec/template/spec/affinity
+  value: {}
+- op: add
+  path: /spec/template/spec/affinity/nodeAffinity
+  value:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 1
+        preference:
+          matchExpressions:
+            - key: servers.ngpc.rxt.io/type
+              operator: In
+              values:
+                - ondemand
+# - op: add
+#   path: /spec/template/spec/affinity/podAntiAffinity
+#   value:
+#     preferredDuringSchedulingIgnoredDuringExecution:
+#       - weight: 1
+#         podAffinityTerm:
+#           labelSelector:
+#             matchExpressions:
+#               - key: "app.kubernetes.io/instance"
+#                 operator: In
+#                 values:
+#                   - flux-system
+#           topologyKey: "kubernetes.io/hostname"
