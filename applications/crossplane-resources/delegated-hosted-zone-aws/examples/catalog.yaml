@@ -1,0 +1,44 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: delegated-hosted-zone-aws-examples
+  description: |-
+    Example configurations for the delegated-hosted-zone-aws 
+    Crossplane composition. These examples demonstrate how to 
+    create AWS Route53 delegated hosted zones using both 
+    composite resources and claims. Includes sample 
+    configurations for production and staging environments 
+    with different provider configuration approaches 
+    (ClusterProviderConfig vs namespace-scoped ProviderConfig).
+
+  tags:
+    - crossplane
+    - crossplane-examples
+    - dns
+    - cloudflare
+    - aws
+    - route53
+    - examples
+    - documentation
+    - platform
+  links:
+    - url: https://docs.crossplane.io/latest/concepts/composite-resources/
+      title: Crossplane Composite Resources Documentation
+      icon: docs
+      type: documentation
+    - url: https://docs.crossplane.io/latest/concepts/claims/
+      title: Crossplane Claims Documentation
+      icon: docs
+      type: documentation
+    - url: ../README.md
+      title: Delegated Hosted Zone AWS Documentation
+      icon: docs
+      type: documentation
+    - url: ../../../../doc/chats/00003-generate-delegatedHostedZone-composition/troubleshooting.md
+      title: Troubleshooting Guide
+      icon: docs
+      type: documentation
+spec:
+  type: documentation
+  lifecycle: production
+  owner: platform-engineering
