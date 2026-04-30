@@ -17,4 +17,8 @@ resources:
   - ../../applications/crossplane-providers/family-cloudflare
   - ../../applications/crossplane-providers/provider-cloudflare-dns
   - ../../applications/crossplane-providers/provider-cloudflare-zone
+  - ../../applications/crossplane-functions/function-go-templating
+  - ../../applications/crossplane-resources/delegated-hosted-zone-aws
   - ../../applications/flux/base
+  - resources/namespace.crossplane-controlplane-cluster.yaml
+  - resources/delegated-hosted-zone-aws.crossplane-rye-ninja.yaml

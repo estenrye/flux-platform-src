@@ -1,0 +1,44 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-function-go-templating
+  description: |-
+    This component installs the Crossplane Go Templating Function,
+    which enables the use of Go templates in Crossplane Compositions
+    using Pipeline mode. This function allows for dynamic resource
+    generation and complex templating logic in Crossplane compositions.
+
+    The function supports:
+    - Dynamic resource creation based on composite resource inputs
+    - Conditional logic and loops in templates
+    - String manipulation and formatting functions
+    - Access to observed composite and managed resource state
+    
+    This is required for compositions that use Pipeline mode with
+    Go templating instead of the traditional patch-and-transform mode.
+  tags:
+    - crossplane
+    - crossplane-function
+    - go-templating
+    - composition
+    - pipeline
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://docs.crossplane.io/latest/concepts/composition-functions/
+      title: Crossplane Composition Functions Documentation
+      icon: docs
+      type: documentation
+    - url: https://marketplace.upbound.io/functions/crossplane-contrib/function-go-templating
+      title: Go Templating Function on Upbound Marketplace
+      icon: docs
+      type: documentation
+    - url: https://github.com/crossplane-contrib/function-go-templating
+      title: GitHub repository for the Go Templating Function
+      icon: github
+      type: source
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

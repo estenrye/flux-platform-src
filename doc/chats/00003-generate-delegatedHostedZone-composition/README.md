@@ -2,287 +2,159 @@
 
 **Date:** April 30, 2026  
 **Context:** Crossplane Composite Resource Development  
-**Objective:** Create and refactor Kubernetes manifests for a Crossplane Composite Resource that provisions delegated hosted zones in AWS
+**Status:** ✅ Complete - AWS-specific implementation deployed  
+**Objective:** AWS-specific Crossplane Composite Resource for delegated hosted zones
 
-## Initial Request
+## Implementation Overview
 
-The user requested to build Kubernetes manifests for a Crossplane Composite Resource based on detailed requirements documented in `applications/crossplane-resources/delegated-hosted-zone/README.md`.
+### Final Architecture
+- **Purpose**: AWS-specific delegated hosted zone provisioning using Route53 and Cloudflare DNS
+- **API**: `XDelegatedHostedZoneAWS` composite resource with v2 API compliance
+- **Pipeline**: 3-step Go template composition (create-zone → create-ns-records → status-update)
+- **Dependencies**: Requires function-go-templating for Pipeline mode execution
 
-## Follow-up Refactoring Request
-
-After the initial implementation, the user requested to refactor the composition and XRD to focus solely on delivering a delegated hosted zone in AWS, using the context in `applications/crossplane-resources/delegated-hosted-zone-aws/README.md` to gain clarity on the design decisions.
-
-## API Version Update Request
-
-After the AWS-specific refactoring, the user noted that `apiextensions.crossplane.io/v1` is deprecated and requested updates based on design decisions in the README to use `apiextensions.crossplane.io/v2`.
-
-## Context Analysis
-
-### Requirements Summary (Initial)
-- **Purpose**: Provision a Delegated Hosted Zone in AWS Route53 and create corresponding Cloudflare NS records
-- **API Inputs**: 
-  - `targetCloud` (enum: aws)
-  - `zoneId` (Cloudflare Zone ID)
-  - `zoneName` (DNS zone name in Cloudflare)
-  - `subdomain` (subdomain to delegate)
-  - `ttl` (optional, defaults to 1)
-  - Provider config references for AWS and Cloudflare
-- **Logic**: Two-step process - create AWS hosted zone, then create Cloudflare NS records pointing to AWS nameservers
-
-### Requirements Summary (Post-Refactoring)
-- **Purpose**: AWS-specific delegated hosted zone provisioning
-- **API Inputs** (simplified): 
-  - `zoneId` (Cloudflare Zone ID)
-  - `zoneName` (DNS zone name in Cloudflare)
-  - `subdomain` (subdomain to delegate)
-  - `ttl` (optional, defaults to 1)
-  - Provider config references for AWS and Cloudflare
-- **Design Decision**: Focus solely on AWS, removing multi-cloud abstraction for simplicity
-
-### Technical Constraints
-- Must support dynamic creation of NS records based on actual AWS nameserver count
-- Must follow specific naming conventions (dot-to-dash replacement)
-- Must use modern Crossplane pipeline mode with Go templating
-- Must expose status information (nameservers, zone ID)
-
-## Decisions Made
-
-### 1. Architecture Choice: Pipeline Mode with Go Templates
-**Decision**: Used Crossplane Pipeline mode with Go templating functions instead of traditional patch-and-transform approach.
-
-**Rationale**: 
-- More flexible for dynamic resource generation
-- Better handling of conditional logic
-- Cleaner template syntax for complex transformations
-- Easier to debug and maintain
-
-### 2. Resource Structure
-**Decision**: Created separate XRD and Composition files with organized directory structure.
-
-**Files Created**:
-- `xrd.yaml` - Composite Resource Definition
-- `composition.yaml` - Composition implementation
-- `kustomization.yaml` - Kustomize configuration
-- `examples/` directory with example usage and documentation
-
-### 3. Pipeline Steps
-**Decision**: Implemented three-step pipeline:
-
-1. **create-zone**: Provisions AWS Route53 hosted zone
-2. **create-ns-records**: Dynamically creates Cloudflare NS records for each nameserver
-3. **status-update**: Updates composite resource status with nameservers and zone ID
-
-**Rationale**: 
-- Clear separation of concerns
-- Proper dependency handling (NS records wait for zone creation)
-- Status propagation for observability
-
-### 4. Dynamic Resource Generation
-**Decision**: Used Go template loops to create NS records dynamically based on actual AWS nameserver count.
-
-**Implementation**:
+### API Specification
 ```yaml
-{{ range $i, $ns := $nameServers }}
-# Creates Record resource for each nameserver
-{{ end }}
+spec:
+  zoneId: string          # Cloudflare Zone ID
+  zoneName: string        # DNS zone name in Cloudflare  
+  subdomain: string       # Subdomain to delegate
+  ttl: integer           # Optional, defaults to 1
+  awsProviderConfigRef: object      # AWS provider reference
+  cloudflareProviderConfigRef: object # Cloudflare provider reference
 ```
 
-**Rationale**: 
-- AWS typically returns 4 nameservers, but count can vary
-- Avoids hardcoding resource count
-- More resilient to AWS changes
-
-### 5. AWS-Specific Refactoring
-**Decision**: Refactored from generic multi-cloud to AWS-specific implementation.
-
-**Changes Made**:
-- Removed `targetCloud` field from API
-- Changed resource names from `XDelegatedHostedZone` to `XDelegatedHostedZoneAWS`
-- Simplified composition logic by removing cloud selection
-- Updated all related documentation and examples
-
-**Rationale**: 
-- Aligns with design decision to focus on AWS-only implementation
-- Reduces API complexity and potential for user error
-- Prepares for future multi-cloud strategy with dedicated compositions per cloud
-- Clearer intent and reduced cognitive load
-
-### 6. API Version Migration
-**Decision**: Migrated from deprecated `apiextensions.crossplane.io/v1` to `apiextensions.crossplane.io/v2`.
-
-**Changes Made**:
-- Updated XRD apiVersion from v1 to v2
-- Updated Composition apiVersion from v1 to v2
-- Ensured README alignment with AWS-specific focus
-
-**Rationale**: 
-- Follow Crossplane best practices and avoid deprecated APIs
-- Align with design decisions documented in README
-- Ensure long-term compatibility and support
-
-## Actions Taken
-
-### Phase 1: Initial Implementation
-
-#### 1. Created Composite Resource Definition (XRD)
-- **File**: `applications/crossplane-resources/delegated-hosted-zone/xrd.yaml`
-- **Content**: OpenAPI v3 schema defining the API specification
-- **Key Features**:
-  - Enum validation for `targetCloud`
-  - Required field validation
-  - Default value for `ttl` field
-  - Status schema for nameservers and zone ID
-
-#### 2. Created Composition
-- **File**: `applications/crossplane-resources/delegated-hosted-zone/composition.yaml`
-- **Content**: Three-step pipeline using Go templating
-- **Key Features**:
-  - AWS Route53 Zone creation with proper naming
-  - Dynamic Cloudflare NS record generation
-  - Status propagation to composite resource
-  - Proper provider config reference handling
-
-#### 3. Created Support Files
-- **Kustomize Configuration**: `kustomization.yaml` for resource organization
-- **Example Usage**: `examples/example-claim.yaml` based on README specification
-- **Documentation**: `examples/README.md` with usage instructions
-
-### Phase 3: API Version Migration
-
-#### 1. Updated to Crossplane v2 APIs
-- **Files**: `xrd.yaml` and `composition.yaml`
-- **Changes**:
-  - XRD: `apiextensions.crossplane.io/v1` → `apiextensions.crossplane.io/v2`
-  - Composition: `apiextensions.crossplane.io/v1` → `apiextensions.crossplane.io/v2`
-
-#### 2. README Consistency Updates
-- **File**: `README.md`
-- **Changes**:
-  - Removed remaining `targetCloud` references from API specification
-  - Updated deployment logic to be AWS-specific rather than multi-cloud
-  - Simplified resource type documentation
-  - Updated examples to remove `targetCloud: aws` field
-  - Hardcoded cloud references to "aws" in documentation tables
-
-#### 3. Final Alignment
-- Ensured complete consistency between README documentation and implementation
-- Validated that all references now align with AWS-specific focus
-- Confirmed modern Crossplane v2 API usage throughout
-
-### Phase 2: AWS-Specific Refactoring
-
-#### 1. Refactored XRD for AWS Focus
-- **File**: `applications/crossplane-resources/delegated-hosted-zone-aws/xrd.yaml`
-- **Changes**:
-  - Resource name: `XDelegatedHostedZone` → `XDelegatedHostedZoneAWS`
-  - API group: `xdelegatedhostedzone` → `xdelegatedhostedzoneaws`
-  - Claim names: `DelegatedHostedZone` → `DelegatedHostedZoneAWS`
-  - Removed `targetCloud` field from spec
-  - Updated required fields list
-
-#### 2. Refactored Composition
-- **File**: `applications/crossplane-resources/delegated-hosted-zone-aws/composition.yaml`
-- **Changes**:
-  - Updated composite type reference to `XDelegatedHostedZoneAWS`
-  - Removed `targetCloud` variable references
-  - Hardcoded "aws" in NS record comments
-  - Simplified template logic
-
-#### 3. Updated Support Files
-- **Example Claim**: Updated to use `DelegatedHostedZoneAWS` kind and removed `targetCloud`
-- **Documentation**: Updated kubectl commands and resource type references
-- **Catalog**: Updated to reflect AWS-specific focus
-
-### 4. Final File Structure
+### Current File Structure
 ```
 applications/crossplane-resources/delegated-hosted-zone-aws/
-├── README.md (existing)
-├── catalog.yaml (existing)
-├── xrd.yaml (refactored)
-├── composition.yaml (refactored)
-├── kustomization.yaml
+├── README.md                    # Design documentation
+├── catalog.yaml                 # Service catalog metadata
+├── xrd.yaml                    # v2 CompositeResourceDefinition
+├── composition.yaml            # v1 Pipeline Composition
+├── kustomization.yaml          # Deployment configuration
 └── examples/
-    ├── README.md (updated)
-    ├── example-claim.yaml (updated)
+    ├── README.md
+    ├── example-composite-resource.yaml
     └── kustomization.yaml
+
+applications/crossplane-functions/function-go-templating/
+├── function.yaml               # Function package definition
+├── catalog.yaml               # Function documentation  
+└── kustomization.yaml         # Function deployment
 ```
 
-## Technical Implementation Details
+## Key Technical Decisions
+
+### 1. Pipeline Mode with Go Templates
+**Rationale**: More flexible for dynamic resource generation, better conditional logic, cleaner template syntax
+
+### 2. AWS-Specific Focus
+**Decision**: Removed multi-cloud abstraction, simplified API by removing `targetCloud` field
+**Rationale**: Reduces complexity, clearer intent, enables future cloud-specific optimizations
+
+### 3. API Version Strategy
+**XRD**: `apiextensions.crossplane.io/v2` (modern, no claims support)
+**Composition**: `apiextensions.crossplane.io/v1` (v2 not available for Compositions)
+
+### 4. Dependency Management  
+**Requirement**: function-go-templating must be deployed before compositions can execute
+**Solution**: Added function deployment to cluster kustomization with proper ordering
+
+### 5. Resource Generation Pattern
+**Implementation**: Dynamic NS record creation using Go template loops based on actual AWS nameserver count
+**Benefit**: Resilient to AWS nameserver variations (typically 4, but can vary)
+
+## Implementation Summary
+
+### Evolution Path
+1. **Initial**: Generic multi-cloud composite resource with `targetCloud` field
+2. **Refactor**: AWS-specific focus, simplified API, removed multi-cloud abstraction  
+3. **Modernize**: Updated to Crossplane v2 APIs (XRD only, Composition remains v1)
+4. **Compliance**: Removed claims support (not available in v2), direct composite resource usage
+5. **Dependencies**: Discovered and resolved function-go-templating requirement
+6. **Finalize**: Corrected kustomization structure (catalog.yaml excluded from resources)
+
+### Key Corrections Made
+- **Claims Removal**: v2 APIs don't support claims - examples now use `XDelegatedHostedZoneAWS` directly
+- **API Version Split**: XRD uses v2, Composition must remain at v1 (v2 unavailable for Compositions)  
+- **Function Dependency**: Added function-go-templating deployment before composite resource deployment
+- **Resource Ordering**: Updated cluster kustomization to deploy providers → functions → composite resources
+- **Configuration Cleanup**: Removed catalog.yaml from kustomization resources (documentation only)
+
+### Current Deployment Structure
+```yaml
+# clusters/crossplane/kustomization.yaml
+resources:
+  - ../../applications/crossplane-providers/family-aws
+  - ../../applications/crossplane-providers/family-cloudflare  
+  - ../../applications/crossplane-functions/function-go-templating
+  - ../../applications/crossplane-resources/delegated-hosted-zone-aws
+```
+
+## Technical Details
+
+### Pipeline Steps
+1. **create-zone**: Provisions AWS Route53 hosted zone with naming convention
+2. **create-ns-records**: Dynamically creates Cloudflare NS records for each nameserver  
+3. **status-update**: Updates composite resource status with nameservers and zone ID
 
 ### Resource Naming Convention
-- **Zone Resource**: `{subdomain-with-dashes}-{zoneName-with-dashes}`
+- **Zone**: `{subdomain-with-dashes}-{zoneName-with-dashes}`
 - **NS Records**: `ns{index}-{subdomain-with-dashes}-{zoneName-with-dashes}`
 - **Example**: `crossplane-rye-ninja` for subdomain `crossplane` and zone `rye.ninja`
 
-### Provider Integration
-- **AWS Route53**: Uses `route53.aws.m.upbound.io/v1beta1` Zone resource
-- **Cloudflare**: Uses `dns.upjet-cloudflare.m.upbound.io/v1alpha1` Record resource
-- **Configuration**: Separate ProviderConfig references for each provider
+### Dependencies
+- **AWS Provider**: `family-aws` (Route53 resources)
+- **Cloudflare Provider**: `family-cloudflare` (DNS records)  
+- **Function**: `function-go-templating` (Pipeline mode execution)
 
-### Status Management
-- Extracts nameservers from AWS Zone status
-- Propagates to composite resource status
-- Includes zone ID for reference
+## Current Status
 
-## Validation
+✅ **Complete Implementation**
+- AWS-specific XRD using Crossplane v2 APIs (no claims)
+- Pipeline Composition with v1 API (function dependency resolved)  
+- Function deployment configured with proper ordering
+- Documentation and examples updated for direct composite resource usage
+- Kustomization structure finalized (catalog.yaml excluded from deployment)
 
-The initial implementation was validated against the original README requirements:
-- ✅ All required API fields implemented
-- ✅ Proper resource naming following specification
-- ✅ Dynamic NS record creation
-- ✅ Status propagation
-- ✅ Example matches provided specification
-- ✅ Proper Go template syntax and logic
+## Usage
 
-The refactored implementation was validated against the AWS-specific design decisions:
-- ✅ Focused solely on AWS Route53 (no multi-cloud abstraction)
-- ✅ Removed unnecessary `targetCloud` field
-- ✅ Updated resource names to be AWS-specific
-- ✅ Simplified composition logic
-- ✅ Maintained all core functionality
-The API version migration was validated for modern Crossplane compatibility:
-- ✅ Updated to non-deprecated `apiextensions.crossplane.io/v2`
-- ✅ Maintained all functionality during API version migration
-- ✅ README fully aligned with AWS-specific implementation
-- ✅ Removed all remaining multi-cloud abstractions from documentation
-- ✅ Ensured consistency between code and documentation
+### Deploy via Flux (Recommended)
+The resources deploy automatically via Flux using the cluster kustomization at [clusters/crossplane/kustomization.yaml](clusters/crossplane/kustomization.yaml).
 
-## Usage Instructions
-
-### Deploy Core Resources
+### Manual Deployment
 ```bash
+# Deploy function dependency first
+kubectl apply -k applications/crossplane-functions/function-go-templating/
+
+# Deploy composite resource  
 kubectl apply -k applications/crossplane-resources/delegated-hosted-zone-aws/
-```
 
-### Deploy Example
-```bash
+# Deploy example
 kubectl apply -k applications/crossplane-resources/delegated-hosted-zone-aws/examples/
 ```
 
 ### Monitor Status
 ```bash
-kubectl get delegatedhostedzoneaws crossplane-rye-ninja -n crossplane-system
-kubectl describe delegatedhostedzoneaws crossplane-rye-ninja -n crossplane-system
+kubectl get xdelegatedhostedzoneaws crossplane-rye-ninja -n crossplane-system
+kubectl describe xdelegatedhostedzoneaws crossplane-rye-ninja -n crossplane-system
 ```
 
-## Future Considerations
+## Key Learnings & Outcomes
 
-1. **Multi-Cloud Strategy**: The refactoring aligns with the design to create dedicated compositions for each cloud:
-   - Create additional AWS compositions (e.g., for different AWS configurations)
-   - Develop similar compositions for GCP Cloud DNS, Azure DNS
-   - Build a generic wrapper composition that selects the appropriate cloud-specific composition
-2. **Validation**: Consider adding additional validation functions for DNS names and zone IDs
-3. **Error Handling**: Current implementation relies on Crossplane's built-in error handling
-4. **Testing**: Consider adding integration tests for the composition
-5. **Monitoring**: Add Prometheus metrics for delegation success/failure rates
-6. **Regional Support**: Consider adding AWS region-specific optimizations
+### Technical Insights
+- **API Evolution**: Crossplane v2 removes claims support, requiring direct composite resource usage
+- **Function Dependencies**: Pipeline mode requires explicit function deployment before compositions can execute  
+- **API Version Split**: Only XRDs support v2 APIs; Compositions must remain at v1
+- **Kustomize Best Practices**: Catalog.yaml files provide documentation but should not be deployed as resources
 
-## Key Learnings
+### Architecture Benefits
+- **AWS-Specific Focus**: Simplified API and clearer intent vs. multi-cloud abstraction
+- **Pipeline Mode**: More flexible than patch-and-transform for dynamic resource generation
+- **Dependency Ordering**: Proper provider → function → composite resource deployment sequence prevents failures
 
-1. **Design Evolution**: Starting with a generic approach and then refactoring to be cloud-specific proved to be a good strategy for understanding requirements
-2. **API Simplicity**: Removing unnecessary fields (like `targetCloud`) significantly improved the user experience
-3. **Future-Proofing**: The AWS-specific approach doesn't preclude future multi-cloud support; it actually makes it easier to implement properly
-4. **Documentation Importance**: Having clear design decisions documented (like in the AWS-specific README) made refactoring straightforward
-5. **Go Templating**: The pipeline mode with Go templates provided excellent flexibility for both the initial and refactored implementations
-6. **API Evolution**: Following Crossplane's API deprecation timeline prevents future compatibility issues
-7. **Consistency**: Keeping documentation aligned with implementation throughout iterations prevents confusion and technical debt
+### Future Evolution Path
+The current AWS-specific approach enables future multi-cloud support through:
+- Dedicated compositions per cloud provider (AWS, GCP, Azure)  
+- Generic wrapper composition for cloud selection
+- Cloud-specific optimizations and configurations

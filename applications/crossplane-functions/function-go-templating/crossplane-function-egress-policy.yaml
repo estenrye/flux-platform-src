@@ -1,0 +1,24 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: crossplane-allow-egress-to-functions
+  namespace: crossplane-system
+  labels:
+    rye.ninja/component: crossplane-function-networking
+    rye.ninja/owner: platform-engineering
+spec:
+  podSelector:
+    matchLabels:
+      app: crossplane
+  policyTypes:
+  - Egress
+  egress:
+  # Allow egress to function pods on gRPC port
+  - to:
+    - podSelector:
+        matchLabels:
+          pkg.crossplane.io/function: function-go-templating
+    ports:
+    - protocol: TCP
+      port: 9443

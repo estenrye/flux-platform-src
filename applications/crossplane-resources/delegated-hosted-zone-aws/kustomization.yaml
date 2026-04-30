@@ -5,6 +5,7 @@ resources:
 - xrd.yaml
 - composition.yaml
 
-commonLabels:
-  rye.ninja/component: crossplane-delegated-hosted-zone
-  rye.ninja/owner: platform-engineering
+labels:
+- pairs:
+    rye.ninja/component: crossplane-delegated-hosted-zone
+    rye.ninja/owner: platform-engineering

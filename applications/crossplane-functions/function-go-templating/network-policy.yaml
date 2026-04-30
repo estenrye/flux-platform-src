@@ -1,0 +1,47 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: function-go-templating-allow-ingress
+  namespace: crossplane-system
+  labels:
+    rye.ninja/component: crossplane-function-go-templating
+    rye.ninja/owner: platform-engineering
+spec:
+  podSelector:
+    matchLabels:
+      pkg.crossplane.io/function: function-go-templating
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow ingress from Crossplane controller on gRPC port
+  - from:
+    - podSelector:
+        matchLabels:
+          app: crossplane
+    ports:
+    - protocol: TCP
+      port: 9443
+  # Allow ingress from any pod for metrics (optional)
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: function-go-templating-allow-egress
+  namespace: crossplane-system
+  labels:
+    rye.ninja/component: crossplane-function-go-templating
+    rye.ninja/owner: platform-engineering
+spec:
+  podSelector:
+    matchLabels:
+      pkg.crossplane.io/function: function-go-templating
+  policyTypes:
+  - Egress
+  egress:
+  # Allow all egress (function might need to make external API calls)
+  - {}

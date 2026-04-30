@@ -7,9 +7,6 @@ spec:
   names:
     kind: XDelegatedHostedZoneAWS
     plural: xdelegatedhostedzoneaws
-  claimNames:
-    kind: DelegatedHostedZoneAWS
-    plural: delegatedhostedzoneaws
   versions:
   - name: v1alpha1
     served: true
@@ -40,6 +37,9 @@ spec:
                 type: object
                 description: "ProviderConfigReference specifies how the provider that will be used to create, observe, update, and delete the delegated hosted zone should be configured."
                 properties:
+                  apiVersion:
+                    type: string
+                    description: "API version of the referenced object."
                   kind:
                     type: string
                     description: "Kind of the referenced object."
@@ -53,6 +53,9 @@ spec:
                 type: object
                 description: "ProviderConfigReference specifies how the provider that will be used to create, observe, update, and delete the Cloudflare NS records should be configured."
                 properties:
+                  apiVersion:
+                    type: string
+                    description: "API version of the referenced object."
                   kind:
                     type: string
                     description: "Kind of the referenced object."

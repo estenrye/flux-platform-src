@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- function.yaml
+- network-policy.yaml
+- crossplane-function-egress-policy.yaml
+
+labels:
+- pairs:
+    rye.ninja/component: crossplane-function-go-templating
+    rye.ninja/owner: platform-engineering

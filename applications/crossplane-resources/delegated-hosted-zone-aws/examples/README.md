@@ -1,6 +1,6 @@
 # Examples
 
-This directory contains example usage of the DelegatedHostedZoneAWS composite resource.
+This directory contains example usage of the XDelegatedHostedZoneAWS composite resource.
 
 ## Prerequisites
 
@@ -16,7 +16,7 @@ Before using this composite resource, ensure you have:
 To create a delegated hosted zone:
 
 ```bash
-kubectl apply -f example-claim.yaml
+kubectl apply -f example-composite-resource.yaml
 ```
 
 This will:
@@ -29,8 +29,8 @@ This will:
 Check the status of your composite resource:
 
 ```bash
-kubectl get delegatedhostedzoneaws crossplane-rye-ninja -n crossplane-system
-kubectl describe delegatedhostedzoneaws crossplane-rye-ninja -n crossplane-system
+kubectl get xdelegatedhostedzoneaws crossplane-rye-ninja -n crossplane-system
+kubectl describe xdelegatedhostedzoneaws crossplane-rye-ninja -n crossplane-system
 ```
 
 ## Troubleshooting
