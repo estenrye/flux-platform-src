@@ -6,7 +6,7 @@
   value: cicd
 - op: add
   path: /spec/template/spec/restartPolicy
-  value: OnFailure
+  value: Always
 # - op: add
 #   path: /spec/strategy
 #   value:
