@@ -16,4 +16,5 @@ resources:
   - ../../applications/crossplane-providers/provider-aws-route53
   - ../../applications/crossplane-providers/family-cloudflare
   - ../../applications/crossplane-providers/provider-cloudflare-dns
+  - ../../applications/crossplane-providers/provider-cloudflare-zone
   - ../../applications/flux/base

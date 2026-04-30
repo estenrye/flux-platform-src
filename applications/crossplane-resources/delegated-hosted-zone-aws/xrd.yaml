@@ -1,0 +1,87 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xdelegatedhostedzone.dns.platform.rye.ninja
+spec:
+  group: dns.platform.rye.ninja
+  names:
+    kind: XDelegatedHostedZone
+    plural: xdelegatedhostedzone
+  claimNames:
+    kind: DelegatedHostedZone
+    plural: delegatedhostedzone
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              targetCloud:
+                type: string
+                description: "Instructs Crossplane the target cloud infrastructure to which the delegated hosted zone will be deployed."
+                enum:
+                - aws
+              zoneId:
+                type: string
+                description: "This is the Cloudflare Zone Id that will be used in the Record.dns.upjet-cloudflare.m.upbound.io resource to populate a record of type NS for each nameserver in the status fields of the delegated hosted zone."
+              zoneName:
+                type: string
+                description: "This is the DNS Name of the Zone in Cloudflare the delegated hosted zone is delegated from."
+              subdomain:
+                type: string
+                description: "This is the subdomain under the Cloudflare Zone being delegated to the delegated hosted zone."
+              ttl:
+                type: integer
+                description: "This is the ttl for the Cloudflare NS records. The composite resource should default to a value of 1 for 'automatic'. Otherwise the Value must be between 60 and 86400, with the minimum reduced to 30 for enterprise zones."
+                default: 1
+                minimum: 1
+                maximum: 86400
+              delegatedZoneProviderConfigRef:
+                type: object
+                description: "ProviderConfigReference specifies how the provider that will be used to create, observe, update, and delete the delegated hosted zone should be configured."
+                properties:
+                  kind:
+                    type: string
+                    description: "Kind of the referenced object."
+                  name:
+                    type: string
+                    description: "Name of the referenced object."
+                required:
+                - kind
+                - name
+              cloudflareProviderConfigRef:
+                type: object
+                description: "ProviderConfigReference specifies how the provider that will be used to create, observe, update, and delete the Cloudflare NS records should be configured."
+                properties:
+                  kind:
+                    type: string
+                    description: "Kind of the referenced object."
+                  name:
+                    type: string
+                    description: "Name of the referenced object."
+                required:
+                - kind
+                - name
+            required:
+            - targetCloud
+            - zoneId
+            - zoneName
+            - subdomain
+            - delegatedZoneProviderConfigRef
+            - cloudflareProviderConfigRef
+          status:
+            type: object
+            properties:
+              nameServers:
+                type: array
+                description: "The nameservers for the delegated hosted zone."
+                items:
+                  type: string
+              zoneId:
+                type: string
+                description: "The zone ID of the created delegated hosted zone."

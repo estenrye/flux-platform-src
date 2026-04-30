@@ -1,0 +1,130 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: delegated-hosted-zone-aws
+  labels:
+    provider: aws
+    service: route53
+spec:
+  compositeTypeRef:
+    apiVersion: dns.platform.rye.ninja/v1alpha1
+    kind: XDelegatedHostedZone
+
+  mode: Pipeline
+  pipeline:
+  - step: create-zone
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline: |
+        {{ $subdomain := .observed.composite.resource.spec.subdomain }}
+        {{ $zoneName := .observed.composite.resource.spec.zoneName }}
+        {{ $resourceName := printf "%s-%s" (replace $subdomain "." "-" -1) (replace $zoneName "." "-" -1) }}
+        {{ $fullZoneName := printf "%s.%s" $subdomain $zoneName }}
+        
+        ---
+        apiVersion: route53.aws.m.upbound.io/v1beta1
+        kind: Zone
+        metadata:
+          name: {{ $resourceName }}
+          annotations:
+            gotemplating.fn.crossplane.io/composition-resource-name: delegated-zone
+        spec:
+          forProvider:
+            name: {{ $fullZoneName }}
+            comment: "Delegated Hosted Zone for {{ $fullZoneName }} from Cloudflare Zone {{ $zoneName }}"
+          providerConfigRef:
+            kind: {{ .observed.composite.resource.spec.delegatedZoneProviderConfigRef.kind }}
+            name: {{ .observed.composite.resource.spec.delegatedZoneProviderConfigRef.name }}
+
+  - step: create-ns-records
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline: |
+        {{ $subdomain := .observed.composite.resource.spec.subdomain }}
+        {{ $zoneName := .observed.composite.resource.spec.zoneName }}
+        {{ $zoneId := .observed.composite.resource.spec.zoneId }}
+        {{ $targetCloud := .observed.composite.resource.spec.targetCloud }}
+        {{ $ttl := .observed.composite.resource.spec.ttl | default 1 }}
+        {{ $resourceName := printf "%s-%s" (replace $subdomain "." "-" -1) (replace $zoneName "." "-" -1) }}
+        {{ $fullZoneName := printf "%s.%s" $subdomain $zoneName }}
+        {{ $cfProviderConfig := .observed.composite.resource.spec.cloudflareProviderConfigRef }}
+        
+        {{ $nameServers := list }}
+        {{ if .observed.resources }}
+          {{ range $name, $resource := .observed.resources }}
+            {{ if eq $resource.resource.kind "Zone" }}
+              {{ if $resource.resource.status.atProvider.nameServers }}
+                {{ $nameServers = $resource.resource.status.atProvider.nameServers }}
+              {{ end }}
+            {{ end }}
+          {{ end }}
+        {{ end }}
+        
+        {{ if $nameServers }}
+        {{ range $i, $ns := $nameServers }}
+        ---
+        apiVersion: dns.upjet-cloudflare.m.upbound.io/v1alpha1
+        kind: Record
+        metadata:
+          name: ns{{ $i }}-{{ $resourceName }}
+          annotations:
+            gotemplating.fn.crossplane.io/composition-resource-name: ns-record-{{ $i }}
+        spec:
+          forProvider:
+            zoneId: {{ $zoneId }}
+            type: "NS"
+            name: {{ $subdomain }}
+            content: {{ $ns }}
+            ttl: {{ $ttl }}
+            comment: "Delegated Hosted Zone NS-{{ $i }} for {{ $fullZoneName }} in {{ $targetCloud }}"
+          providerConfigRef:
+            kind: {{ $cfProviderConfig.kind }}
+            name: {{ $cfProviderConfig.name }}
+        {{ end }}
+        {{ end }}
+
+  - step: status-update
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline: |
+        {{ $nameServers := list }}
+        {{ $zoneId := "" }}
+        
+        {{ if .observed.resources }}
+          {{ range $name, $resource := .observed.resources }}
+            {{ if eq $resource.resource.kind "Zone" }}
+              {{ if $resource.resource.status.atProvider.nameServers }}
+                {{ $nameServers = $resource.resource.status.atProvider.nameServers }}
+              {{ end }}
+              {{ if $resource.resource.status.atProvider.zoneId }}
+                {{ $zoneId = $resource.resource.status.atProvider.zoneId }}
+              {{ end }}
+            {{ end }}
+          {{ end }}
+        {{ end }}
+        
+        {{ if $nameServers }}
+        ---
+        apiVersion: dns.platform.rye.ninja/v1alpha1
+        kind: XDelegatedHostedZone
+        status:
+          nameServers:
+          {{ range $nameServers }}
+          - {{ . }}
+          {{ end }}
+          {{ if $zoneId }}
+          zoneId: {{ $zoneId }}
+          {{ end }}
+        {{ end }}
