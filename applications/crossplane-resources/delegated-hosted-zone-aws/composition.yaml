@@ -33,12 +33,13 @@ spec:
             name: {{ $resourceName }}
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: delegated-zone
+              gotemplating.fn.crossplane.io/ready: "True"
           spec:
             forProvider:
               name: {{ $fullZoneName }}
               comment: "Delegated Hosted Zone for {{ $fullZoneName }} from Cloudflare Zone {{ $zoneName }}"
             providerConfigRef:
-              kind: ClusterProviderConfig
+              kind: {{ .observed.composite.resource.spec.delegatedZoneProviderConfigRef.kind }}
               name: {{ .observed.composite.resource.spec.delegatedZoneProviderConfigRef.name }}
 
   - step: create-ns-records
@@ -78,6 +79,7 @@ spec:
             name: ns{{ $i }}-{{ $resourceName }}
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: ns-record-{{ $i }}
+              gotemplating.fn.crossplane.io/ready: "True"
           spec:
             forProvider:
               zoneId: {{ $zoneId }}
@@ -87,7 +89,7 @@ spec:
               ttl: {{ $ttl }}
               comment: "Delegated Hosted Zone NS-{{ $i }} for {{ $fullZoneName }} in aws"
             providerConfigRef:
-              kind: ClusterProviderConfig
+              kind: {{ $cfProviderConfig.kind }}
               name: {{ $cfProviderConfig.name }}
           {{ end }}
           {{ end }}
@@ -121,6 +123,9 @@ spec:
           ---
           apiVersion: dns.platform.rye.ninja/v1alpha1
           kind: XDelegatedHostedZoneAWS
+          metadata:
+            annotations:
+              gotemplating.fn.crossplane.io/ready: "True"
           status:
             nameServers:
             {{ range $nameServers }}
