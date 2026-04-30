@@ -1,6 +1,6 @@
 # Examples
 
-This directory contains example usage of the DelegatedHostedZone composite resource.
+This directory contains example usage of the DelegatedHostedZoneAWS composite resource.
 
 ## Prerequisites
 
@@ -29,8 +29,8 @@ This will:
 Check the status of your composite resource:
 
 ```bash
-kubectl get delegatedhostedzone crossplane-rye-ninja -n crossplane-system
-kubectl describe delegatedhostedzone crossplane-rye-ninja -n crossplane-system
+kubectl get delegatedhostedzoneaws crossplane-rye-ninja -n crossplane-system
+kubectl describe delegatedhostedzoneaws crossplane-rye-ninja -n crossplane-system
 ```
 
 ## Troubleshooting

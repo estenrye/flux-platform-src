@@ -1,15 +1,15 @@
-apiVersion: apiextensions.crossplane.io/v1
+apiVersion: apiextensions.crossplane.io/v2
 kind: CompositeResourceDefinition
 metadata:
-  name: xdelegatedhostedzone.dns.platform.rye.ninja
+  name: xdelegatedhostedzoneaws.dns.platform.rye.ninja
 spec:
   group: dns.platform.rye.ninja
   names:
-    kind: XDelegatedHostedZone
-    plural: xdelegatedhostedzone
+    kind: XDelegatedHostedZoneAWS
+    plural: xdelegatedhostedzoneaws
   claimNames:
-    kind: DelegatedHostedZone
-    plural: delegatedhostedzone
+    kind: DelegatedHostedZoneAWS
+    plural: delegatedhostedzoneaws
   versions:
   - name: v1alpha1
     served: true
@@ -21,11 +21,6 @@ spec:
           spec:
             type: object
             properties:
-              targetCloud:
-                type: string
-                description: "Instructs Crossplane the target cloud infrastructure to which the delegated hosted zone will be deployed."
-                enum:
-                - aws
               zoneId:
                 type: string
                 description: "This is the Cloudflare Zone Id that will be used in the Record.dns.upjet-cloudflare.m.upbound.io resource to populate a record of type NS for each nameserver in the status fields of the delegated hosted zone."
@@ -68,7 +63,6 @@ spec:
                 - kind
                 - name
             required:
-            - targetCloud
             - zoneId
             - zoneName
             - subdomain

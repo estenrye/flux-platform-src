@@ -1,4 +1,4 @@
-apiVersion: apiextensions.crossplane.io/v1
+apiVersion: apiextensions.crossplane.io/v2
 kind: Composition
 metadata:
   name: delegated-hosted-zone-aws
@@ -8,7 +8,7 @@ metadata:
 spec:
   compositeTypeRef:
     apiVersion: dns.platform.rye.ninja/v1alpha1
-    kind: XDelegatedHostedZone
+    kind: XDelegatedHostedZoneAWS
 
   mode: Pipeline
   pipeline:
@@ -51,7 +51,6 @@ spec:
         {{ $subdomain := .observed.composite.resource.spec.subdomain }}
         {{ $zoneName := .observed.composite.resource.spec.zoneName }}
         {{ $zoneId := .observed.composite.resource.spec.zoneId }}
-        {{ $targetCloud := .observed.composite.resource.spec.targetCloud }}
         {{ $ttl := .observed.composite.resource.spec.ttl | default 1 }}
         {{ $resourceName := printf "%s-%s" (replace $subdomain "." "-" -1) (replace $zoneName "." "-" -1) }}
         {{ $fullZoneName := printf "%s.%s" $subdomain $zoneName }}
@@ -84,7 +83,7 @@ spec:
             name: {{ $subdomain }}
             content: {{ $ns }}
             ttl: {{ $ttl }}
-            comment: "Delegated Hosted Zone NS-{{ $i }} for {{ $fullZoneName }} in {{ $targetCloud }}"
+            comment: "Delegated Hosted Zone NS-{{ $i }} for {{ $fullZoneName }} in aws"
           providerConfigRef:
             kind: {{ $cfProviderConfig.kind }}
             name: {{ $cfProviderConfig.name }}
@@ -118,7 +117,7 @@ spec:
         {{ if $nameServers }}
         ---
         apiVersion: dns.platform.rye.ninja/v1alpha1
-        kind: XDelegatedHostedZone
+        kind: XDelegatedHostedZoneAWS
         status:
           nameServers:
           {{ range $nameServers }}

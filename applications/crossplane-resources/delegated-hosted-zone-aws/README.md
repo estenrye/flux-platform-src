@@ -14,18 +14,16 @@ This Composite Resource will provision a Delegated Hosted Zone in a supported
 Public Cloud and create a Cloudflare NS Record delegating Name Resolution to
 the created Zone.
 
+## Design Decisions
+- `apiextensions.crossplane.io/v1` is deprecated and is replaced by `apiextensions.crossplane.io/v2`.  For all composite resource definitions, we will use `apiextensions.crossplane.io/v2` as the apiVersion.
+- This composite resource will focus only on DelegatedHostedZoneAWS that delivers a Route53 hosted zone as the target destination for the delegated hosted zone.
+- Support for additional clouds may be added in the future.
+  - This will be implemented by creating dedicated compositions for each supported cloud and a generic DelegatedHostedZone composite resource that references the appropriate composition based on the value of `targetCloud` in the claim.
+  - The API specification of the claim will be shared across all supported clouds.
+
 ## API Specification
 
 The Composite Resource should take in the following inputs:
-
-### targetCloud
-Description:
-  Instructs Crossplane the target cloud infrastructure to which the
-  delegated hosted zone will be deployed.
-Data Type: string enum
-Required: yes
-Valid Values:
-  - `aws`
 
 ### zoneId
 Description:
@@ -89,17 +87,15 @@ FIELDS:
 
 ## Deployment Logic
 
-The composite resource will first provision the delegated hosted zone
-on the desired cloud infrastructure target using the appropriate
-Crossplane provider resource.  It will then interrogate the status
-fields of that resource to determine the ip addresses of the nameservers
+The composite resource will provision a delegated hosted zone
+in AWS Route53 using the AWS Crossplane provider. It will then interrogate the status
+fields of that resource to determine the nameservers
 for that delegated hosted zone and provision an NS Record in Cloudflare
 for every nameserver in that list.
 
-### Choosing the Delegated Hosted Zone Resource Type
+### Delegated Hosted Zone Resource Type
 
-#### targetCloud == 'aws'
-Desired Resource Type: `Zone.route53.aws.m.upbound.io`
+This composition uses the `Zone.route53.aws.m.upbound.io` resource type.
 
 Below is a table describing the value mapping for the delegated hosted zone.
 
@@ -115,8 +111,6 @@ Below is a table describing the value mapping for the delegated hosted zone.
 
 The NS Records are defined using a resource of type `Record.dns.upjet-cloudflare.m.upbound.io`
 
-#### targetCloud == 'aws'
-
 Below is a table describing the value mapping for each `ns,i` in `Zone.status.atProvider.nameServers`.
 
 | Field in Record | Value Source |
@@ -125,15 +119,13 @@ Below is a table describing the value mapping for each `ns,i` in `Zone.status.at
 | `Record.spec.forProvider.zoneId`  | `spec.zoneId` |
 | `Record.spec.forProvider.type`    | `NS` |
 | `Record.spec.forProvider.name`    | `${inputs.subdomain}` |
-| `Record.spec.forProvider.comment` | `Delgated Hosted Zone NS-${i} for ${inputs.subdomain}.${inputs.zoneName} in ${inputs.targetCloud}` |
+| `Record.spec.forProvider.comment` | `Delgated Hosted Zone NS-${i} for ${inputs.subdomain}.${inputs.zoneName} in aws` |
 | `Record.spec.forProvider.ttl`     | `${inputs.ttl:-1}` |
 | `Record.spec.forProvider.content` | `${ns}` |
 | `Record.spec.providerConfigRef`   | `${inputs.cloudflareProviderConfigRef}` |
 
 
 ## Example Managed Resources
-
-### targetCloud == 'aws'
 
 #### Input Resource
 
@@ -150,7 +142,6 @@ spec:
   subdomain: crossplane
   zoneName: rye.ninja
   zoneId: 186a0fa51e8dd54ee6910d0f35d5f0c8
-  targetCloud: aws
   delegatedZoneProviderConfigRef:
     kind: ProviderConfig
     name: dns-admin

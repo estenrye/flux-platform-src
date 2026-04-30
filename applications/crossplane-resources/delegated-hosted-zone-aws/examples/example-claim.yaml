@@ -1,5 +1,5 @@
 apiVersion: dns.platform.rye.ninja/v1alpha1
-kind: DelegatedHostedZone
+kind: DelegatedHostedZoneAWS
 metadata:
   name: crossplane-rye-ninja
   namespace: crossplane-system
@@ -12,7 +12,6 @@ spec:
   subdomain: crossplane
   zoneName: rye.ninja
   zoneId: 186a0fa51e8dd54ee6910d0f35d5f0c8
-  targetCloud: aws
   delegatedZoneProviderConfigRef:
     kind: ProviderConfig
     name: dns-admin

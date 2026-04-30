@@ -2,15 +2,23 @@
 
 **Date:** April 30, 2026  
 **Context:** Crossplane Composite Resource Development  
-**Objective:** Create Kubernetes manifests for a Crossplane Composite Resource that provisions delegated hosted zones
+**Objective:** Create and refactor Kubernetes manifests for a Crossplane Composite Resource that provisions delegated hosted zones in AWS
 
 ## Initial Request
 
 The user requested to build Kubernetes manifests for a Crossplane Composite Resource based on detailed requirements documented in `applications/crossplane-resources/delegated-hosted-zone/README.md`.
 
+## Follow-up Refactoring Request
+
+After the initial implementation, the user requested to refactor the composition and XRD to focus solely on delivering a delegated hosted zone in AWS, using the context in `applications/crossplane-resources/delegated-hosted-zone-aws/README.md` to gain clarity on the design decisions.
+
+## API Version Update Request
+
+After the AWS-specific refactoring, the user noted that `apiextensions.crossplane.io/v1` is deprecated and requested updates based on design decisions in the README to use `apiextensions.crossplane.io/v2`.
+
 ## Context Analysis
 
-### Requirements Summary
+### Requirements Summary (Initial)
 - **Purpose**: Provision a Delegated Hosted Zone in AWS Route53 and create corresponding Cloudflare NS records
 - **API Inputs**: 
   - `targetCloud` (enum: aws)
@@ -20,6 +28,16 @@ The user requested to build Kubernetes manifests for a Crossplane Composite Reso
   - `ttl` (optional, defaults to 1)
   - Provider config references for AWS and Cloudflare
 - **Logic**: Two-step process - create AWS hosted zone, then create Cloudflare NS records pointing to AWS nameservers
+
+### Requirements Summary (Post-Refactoring)
+- **Purpose**: AWS-specific delegated hosted zone provisioning
+- **API Inputs** (simplified): 
+  - `zoneId` (Cloudflare Zone ID)
+  - `zoneName` (DNS zone name in Cloudflare)
+  - `subdomain` (subdomain to delegate)
+  - `ttl` (optional, defaults to 1)
+  - Provider config references for AWS and Cloudflare
+- **Design Decision**: Focus solely on AWS, removing multi-cloud abstraction for simplicity
 
 ### Technical Constraints
 - Must support dynamic creation of NS records based on actual AWS nameserver count
@@ -74,9 +92,39 @@ The user requested to build Kubernetes manifests for a Crossplane Composite Reso
 - Avoids hardcoding resource count
 - More resilient to AWS changes
 
+### 5. AWS-Specific Refactoring
+**Decision**: Refactored from generic multi-cloud to AWS-specific implementation.
+
+**Changes Made**:
+- Removed `targetCloud` field from API
+- Changed resource names from `XDelegatedHostedZone` to `XDelegatedHostedZoneAWS`
+- Simplified composition logic by removing cloud selection
+- Updated all related documentation and examples
+
+**Rationale**: 
+- Aligns with design decision to focus on AWS-only implementation
+- Reduces API complexity and potential for user error
+- Prepares for future multi-cloud strategy with dedicated compositions per cloud
+- Clearer intent and reduced cognitive load
+
+### 6. API Version Migration
+**Decision**: Migrated from deprecated `apiextensions.crossplane.io/v1` to `apiextensions.crossplane.io/v2`.
+
+**Changes Made**:
+- Updated XRD apiVersion from v1 to v2
+- Updated Composition apiVersion from v1 to v2
+- Ensured README alignment with AWS-specific focus
+
+**Rationale**: 
+- Follow Crossplane best practices and avoid deprecated APIs
+- Align with design decisions documented in README
+- Ensure long-term compatibility and support
+
 ## Actions Taken
 
-### 1. Created Composite Resource Definition (XRD)
+### Phase 1: Initial Implementation
+
+#### 1. Created Composite Resource Definition (XRD)
 - **File**: `applications/crossplane-resources/delegated-hosted-zone/xrd.yaml`
 - **Content**: OpenAPI v3 schema defining the API specification
 - **Key Features**:
@@ -85,7 +133,7 @@ The user requested to build Kubernetes manifests for a Crossplane Composite Reso
   - Default value for `ttl` field
   - Status schema for nameservers and zone ID
 
-### 2. Created Composition
+#### 2. Created Composition
 - **File**: `applications/crossplane-resources/delegated-hosted-zone/composition.yaml`
 - **Content**: Three-step pipeline using Go templating
 - **Key Features**:
@@ -94,21 +142,68 @@ The user requested to build Kubernetes manifests for a Crossplane Composite Reso
   - Status propagation to composite resource
   - Proper provider config reference handling
 
-### 3. Created Support Files
+#### 3. Created Support Files
 - **Kustomize Configuration**: `kustomization.yaml` for resource organization
 - **Example Usage**: `examples/example-claim.yaml` based on README specification
 - **Documentation**: `examples/README.md` with usage instructions
 
-### 4. Organized File Structure
+### Phase 3: API Version Migration
+
+#### 1. Updated to Crossplane v2 APIs
+- **Files**: `xrd.yaml` and `composition.yaml`
+- **Changes**:
+  - XRD: `apiextensions.crossplane.io/v1` → `apiextensions.crossplane.io/v2`
+  - Composition: `apiextensions.crossplane.io/v1` → `apiextensions.crossplane.io/v2`
+
+#### 2. README Consistency Updates
+- **File**: `README.md`
+- **Changes**:
+  - Removed remaining `targetCloud` references from API specification
+  - Updated deployment logic to be AWS-specific rather than multi-cloud
+  - Simplified resource type documentation
+  - Updated examples to remove `targetCloud: aws` field
+  - Hardcoded cloud references to "aws" in documentation tables
+
+#### 3. Final Alignment
+- Ensured complete consistency between README documentation and implementation
+- Validated that all references now align with AWS-specific focus
+- Confirmed modern Crossplane v2 API usage throughout
+
+### Phase 2: AWS-Specific Refactoring
+
+#### 1. Refactored XRD for AWS Focus
+- **File**: `applications/crossplane-resources/delegated-hosted-zone-aws/xrd.yaml`
+- **Changes**:
+  - Resource name: `XDelegatedHostedZone` → `XDelegatedHostedZoneAWS`
+  - API group: `xdelegatedhostedzone` → `xdelegatedhostedzoneaws`
+  - Claim names: `DelegatedHostedZone` → `DelegatedHostedZoneAWS`
+  - Removed `targetCloud` field from spec
+  - Updated required fields list
+
+#### 2. Refactored Composition
+- **File**: `applications/crossplane-resources/delegated-hosted-zone-aws/composition.yaml`
+- **Changes**:
+  - Updated composite type reference to `XDelegatedHostedZoneAWS`
+  - Removed `targetCloud` variable references
+  - Hardcoded "aws" in NS record comments
+  - Simplified template logic
+
+#### 3. Updated Support Files
+- **Example Claim**: Updated to use `DelegatedHostedZoneAWS` kind and removed `targetCloud`
+- **Documentation**: Updated kubectl commands and resource type references
+- **Catalog**: Updated to reflect AWS-specific focus
+
+### 4. Final File Structure
 ```
-applications/crossplane-resources/delegated-hosted-zone/
+applications/crossplane-resources/delegated-hosted-zone-aws/
 ├── README.md (existing)
-├── xrd.yaml
-├── composition.yaml
+├── catalog.yaml (existing)
+├── xrd.yaml (refactored)
+├── composition.yaml (refactored)
 ├── kustomization.yaml
 └── examples/
-    ├── README.md
-    ├── example-claim.yaml
+    ├── README.md (updated)
+    ├── example-claim.yaml (updated)
     └── kustomization.yaml
 ```
 
@@ -131,7 +226,7 @@ applications/crossplane-resources/delegated-hosted-zone/
 
 ## Validation
 
-The implementation was validated against the README requirements:
+The initial implementation was validated against the original README requirements:
 - ✅ All required API fields implemented
 - ✅ Proper resource naming following specification
 - ✅ Dynamic NS record creation
@@ -139,28 +234,55 @@ The implementation was validated against the README requirements:
 - ✅ Example matches provided specification
 - ✅ Proper Go template syntax and logic
 
+The refactored implementation was validated against the AWS-specific design decisions:
+- ✅ Focused solely on AWS Route53 (no multi-cloud abstraction)
+- ✅ Removed unnecessary `targetCloud` field
+- ✅ Updated resource names to be AWS-specific
+- ✅ Simplified composition logic
+- ✅ Maintained all core functionality
+The API version migration was validated for modern Crossplane compatibility:
+- ✅ Updated to non-deprecated `apiextensions.crossplane.io/v2`
+- ✅ Maintained all functionality during API version migration
+- ✅ README fully aligned with AWS-specific implementation
+- ✅ Removed all remaining multi-cloud abstractions from documentation
+- ✅ Ensured consistency between code and documentation
+
 ## Usage Instructions
 
 ### Deploy Core Resources
 ```bash
-kubectl apply -k applications/crossplane-resources/delegated-hosted-zone/
+kubectl apply -k applications/crossplane-resources/delegated-hosted-zone-aws/
 ```
 
 ### Deploy Example
 ```bash
-kubectl apply -k applications/crossplane-resources/delegated-hosted-zone/examples/
+kubectl apply -k applications/crossplane-resources/delegated-hosted-zone-aws/examples/
 ```
 
 ### Monitor Status
 ```bash
-kubectl get delegatedhostedzone crossplane-rye-ninja -n crossplane-system
-kubectl describe delegatedhostedzone crossplane-rye-ninja -n crossplane-system
+kubectl get delegatedhostedzoneaws crossplane-rye-ninja -n crossplane-system
+kubectl describe delegatedhostedzoneaws crossplane-rye-ninja -n crossplane-system
 ```
 
 ## Future Considerations
 
-1. **Multi-Cloud Support**: The architecture is designed to easily extend to other cloud providers (GCP, Azure)
+1. **Multi-Cloud Strategy**: The refactoring aligns with the design to create dedicated compositions for each cloud:
+   - Create additional AWS compositions (e.g., for different AWS configurations)
+   - Develop similar compositions for GCP Cloud DNS, Azure DNS
+   - Build a generic wrapper composition that selects the appropriate cloud-specific composition
 2. **Validation**: Consider adding additional validation functions for DNS names and zone IDs
 3. **Error Handling**: Current implementation relies on Crossplane's built-in error handling
 4. **Testing**: Consider adding integration tests for the composition
 5. **Monitoring**: Add Prometheus metrics for delegation success/failure rates
+6. **Regional Support**: Consider adding AWS region-specific optimizations
+
+## Key Learnings
+
+1. **Design Evolution**: Starting with a generic approach and then refactoring to be cloud-specific proved to be a good strategy for understanding requirements
+2. **API Simplicity**: Removing unnecessary fields (like `targetCloud`) significantly improved the user experience
+3. **Future-Proofing**: The AWS-specific approach doesn't preclude future multi-cloud support; it actually makes it easier to implement properly
+4. **Documentation Importance**: Having clear design decisions documented (like in the AWS-specific README) made refactoring straightforward
+5. **Go Templating**: The pipeline mode with Go templates provided excellent flexibility for both the initial and refactored implementations
+6. **API Evolution**: Following Crossplane's API deprecation timeline prevents future compatibility issues
+7. **Consistency**: Keeping documentation aligned with implementation throughout iterations prevents confusion and technical debt
