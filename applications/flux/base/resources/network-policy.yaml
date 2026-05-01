@@ -1,0 +1,73 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: flux-system-allow-egress
+  namespace: flux-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: flux-system
+  policyTypes:
+  - Egress
+  egress:
+  - ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: flux-system-allow-ingress
+  namespace: flux-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: flux-system
+  policyTypes:
+  - Ingress
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: healthz
+    - protocol: TCP
+      port: http-prom
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: flux-system-source-controller-allow-ingress
+  namespace: flux-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: source-controller
+      app.kubernetes.io/instance: flux-system
+  policyTypes:
+  - Ingress
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: http
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: flux-system-notification-controller-allow-ingress
+  namespace: flux-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: notification-controller
+      app.kubernetes.io/instance: flux-system
+  policyTypes:
+  - Ingress
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: http-webhook
+    - protocol: TCP
+      port: http

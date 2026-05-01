@@ -4,6 +4,7 @@ namespace: flux-system
 
 resources:
   - https://github.com/fluxcd/flux2/releases/download/v2.7.5/install.yaml
+  - resources/network-policy.yaml
 
 patches:
   - target:
