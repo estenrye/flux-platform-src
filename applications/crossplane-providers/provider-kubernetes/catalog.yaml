@@ -1,0 +1,32 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-provider-kubernetes
+  description: |-
+    This component installs the Crossplane Kubernetes provider,
+    which allows you to manage Kubernetes resources using Crossplane.
+
+    When deploying this component, you need to ensure proper RBAC
+    permissions are configured for the provider to manage resources
+    in the target clusters.
+
+  tags:
+    - crossplane
+    - crossplane-provider
+    - kubernetes
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://marketplace.upbound.io/providers/crossplane-contrib/provider-kubernetes
+      title: Crossplane provider for Kubernetes
+      icon: docs
+      type: documentation
+    - url: https://github.com/crossplane-contrib/provider-kubernetes
+      title: GitHub repository for the Crossplane provider for Kubernetes
+      icon: github
+      type: source
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
