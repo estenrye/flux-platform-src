@@ -11,3 +11,14 @@ helmCharts:
     includeCRDs: true
     valuesInline: {}
     valuesFile: values.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+  - target:
+      kind: ClusterRole
+    path: patches/cluster-role.yaml
+
+resources:
+  - resources/network-policy.yaml

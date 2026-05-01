@@ -4,14 +4,11 @@ interval: 3m
 triggerLoopOnEvent: true
 registry: txt
 txtPrefix: edns.
-# extraArgs:
-#   - --aws-zone-type=public
-#   - --aws-prefer-cname
+
+extraArgs:
+  - --enable-leader-election
+
 serviceAccount:
-  # Reuse existing service account created by Terragrunt.
-  # Toggle to true once external-dns is fully managed by ArgoCD.
-  # and the IRSA is modified to allow the service account to
-  # assume the IAM role.
   create: true
   name: external-dns
 sources:

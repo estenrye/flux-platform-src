@@ -1,0 +1,22 @@
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: Always
+- op: add
+  path: /spec/strategy
+  value:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+- op: add
+  path: /spec/template/spec/dnsPolicy
+  value: Default
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1read-secret-from-env-var
+  value: "This is not a custom application."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1env-value-from
+  value: "Secret comes from an external source."
+- op: replace
+  path: /spec/replicas
+  value: 3
