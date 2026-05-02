@@ -2,6 +2,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: provider-kubernetes-admin-binding
+  annotations:
+    ignore-check.kube-linter.io/cluster-admin-role-binding: "This ClusterRoleBinding is required for the provider to function correctly and cannot be removed."
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole

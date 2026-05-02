@@ -39,7 +39,8 @@ dnsPolicy: ""
 customLabels: {}
 
 # -- Add custom `annotations` to the Crossplane pod deployment.
-customAnnotations: {}
+customAnnotations:
+  ignore-check.kube-linter.io/env-var-secret: "This secret comes from an external source and should be ignored."
 
 serviceAccount:
   # -- Specifies whether Crossplane ServiceAccount should be created

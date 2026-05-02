@@ -3,6 +3,8 @@ kind: NetworkPolicy
 metadata:
   name: wildbitca-provider-cloudflare-zone-allow-egress
   namespace: crossplane-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This policy addresses a pod that is dynamically created by the provider and cannot be referenced by a static analysis of the NetworkPolicy."
 spec:
   podSelector:
     matchLabels:
@@ -35,6 +37,8 @@ kind: NetworkPolicy
 metadata:
   name: wildbitca-provider-cloudflare-zone-allow-ingress
   namespace: crossplane-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This policy addresses a pod that is dynamically created by the provider and cannot be referenced by a static analysis of the NetworkPolicy."
 spec:
   ingress:
   - ports:
