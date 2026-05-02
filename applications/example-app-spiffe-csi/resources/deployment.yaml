@@ -5,6 +5,14 @@ metadata:
   namespace: sandbox
   labels:
     app: my-csi-app
+  annotations:
+    ignore-check.kube-linter.io/minimum-three-replicas: "This is a demo application and does not require high availability."
+    ignore-check.kube-linter.io/no-rolling-update-strategy: "This is a demo application and does not require high availability."
+    ignore-check.kube-linter.io/no-readiness-probe: "This is a demo application and does not require readiness probes."
+    ignore-check.kube-linter.io/no-liveness-probe: "This is a demo application and does not require liveness probes."
+    ignore-check.kube-linter.io/non-isolated-pod: "This is a demo application and does not require isolated pods."
+    ignore-check.kube-linter.io/no-node-affinity: "This is a demo application and does not require isolated pods."
+    ignore-check.kube-linter.io/latest-tag: "This is a demo application and should run latest."
 spec:
   replicas: 1
   selector:
@@ -15,6 +23,7 @@ spec:
       labels:
         app: my-csi-app
     spec:
+      restartPolicy: Always
       serviceAccountName: example-app
       containers:
         - name: my-frontend
@@ -24,6 +33,11 @@ spec:
           volumeMounts:
           - mountPath: "/var/run/secrets/spiffe.io"
             name: spiffe
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsGroup: 2000
+            runAsNonRoot: true
+            runAsUser: 2000
           resources:
             limits:
               cpu: 10m
