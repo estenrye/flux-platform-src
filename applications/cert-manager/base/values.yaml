@@ -117,18 +117,17 @@ crds:
 #
 # Note that cert-manager uses leader election to ensure that there can
 # only be a single instance active at a time.
-replicaCount: 1
+replicaCount: 3
 
 # Deployment update strategy for the cert-manager controller deployment.
 # For more information, see the [Kubernetes documentation](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy).
 #
 # For example:
-#  strategy:
-#    type: RollingUpdate
-#    rollingUpdate:
-#      maxSurge: 0
-#      maxUnavailable: 1
-strategy: {}
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 0
+    maxUnavailable: 1
 
 podDisruptionBudget:
   # Enable or disable the PodDisruptionBudget resource.
@@ -413,11 +412,11 @@ extraEnv: []
 # For more information, see [Resource Management for Pods and Containers](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/).
 resources:
   requests:
-    memory: "512Mi"
-    cpu: "250m"
+    cpu: 200m
+    memory: 150Mi
   limits:
-    memory: "1000Mi"
-    cpu: "500m"
+    cpu: 1000m
+    memory: 400Mi
 
 # Pod Security Context.
 # For more information, see [Configure a Security Context for a Pod or Container](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/).
@@ -585,16 +584,25 @@ ingressShim: {}
 # A Kubernetes Affinity, if required. For more information, see [Affinity v1 core](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#affinity-v1-core).
 #
 # For example:
-#   affinity:
-#     nodeAffinity:
-#      requiredDuringSchedulingIgnoredDuringExecution:
-#        nodeSelectorTerms:
-#        - matchExpressions:
-#          - key: foo.bar.com/role
-#            operator: In
-#            values:
-#            - master
-affinity: {}
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 1
+        preference:
+          matchExpressions:
+            - key: servers.ngpc.rxt.io/type
+              operator: In
+              values:
+                - ondemand
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: cert-manager
+              app.kubernetes.io/instance: cert-manager
+          topologyKey: kubernetes.io/hostname
+        weight: 100
 
 # A list of Kubernetes Tolerations, if required. For more information, see [Toleration v1 core](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#toleration-v1-core).
 #
@@ -769,7 +777,7 @@ webhook:
   # availability.
   #
   # If `replicas > 1`, consider setting `webhook.podDisruptionBudget.enabled=true`.
-  replicaCount: 1
+  replicaCount: 3
 
   # The number of seconds the API server should wait for the webhook to respond before treating the call as a failure.
   # The value must be between 1 and 30 seconds. For more information, see
@@ -819,12 +827,11 @@ webhook:
   # For more information, see the [Kubernetes documentation](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy)
   #
   # For example:
-  #  strategy:
-  #    type: RollingUpdate
-  #    rollingUpdate:
-  #      maxSurge: 0
-  #      maxUnavailable: 1
-  strategy: {}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
 
   # Pod Security Context to be set on the webhook component Pod.
   # For more information, see [Configure a Security Context for a Pod or Container](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/).
@@ -939,12 +946,13 @@ webhook:
   # Resources to provide to the cert-manager webhook pod.
   #
   # For example:
-  #  requests:
-  #    cpu: 10m
-  #    memory: 32Mi
-  #
-  # For more information, see [Resource Management for Pods and Containers](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/).
-  resources: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 160Mi
+    limits:
+      cpu: 500m
+      memory: 320Mi
 
   # Liveness probe values.
   # For more information, see [Container probes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes).
@@ -980,17 +988,25 @@ webhook:
 
   # A Kubernetes Affinity, if required. For more information, see [Affinity v1 core](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#affinity-v1-core).
   #
-  # For example:
-  #   affinity:
-  #     nodeAffinity:
-  #      requiredDuringSchedulingIgnoredDuringExecution:
-  #        nodeSelectorTerms:
-  #        - matchExpressions:
-  #          - key: foo.bar.com/role
-  #            operator: In
-  #            values:
-  #            - master
-  affinity: {}
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          preference:
+            matchExpressions:
+              - key: servers.ngpc.rxt.io/type
+                operator: In
+                values:
+                  - ondemand
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app: webhook
+                app.kubernetes.io/instance: cert-manager
+            topologyKey: kubernetes.io/hostname
+          weight: 100
 
   # A list of Kubernetes Tolerations, if required. For more information, see [Toleration v1 core](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#toleration-v1-core).
   #
@@ -1191,7 +1207,7 @@ cainjector:
   #
   # Note that cert-manager uses leader election to ensure that there can
   # only be a single instance active at a time.
-  replicaCount: 1
+  replicaCount: 3
 
   # This is used to configure options for the cainjector pod.
   # It allows setting options that are usually provided via flags.
@@ -1222,12 +1238,11 @@ cainjector:
   # For more information, see the [Kubernetes documentation](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy).
   #
   # For example:
-  #  strategy:
-  #    type: RollingUpdate
-  #    rollingUpdate:
-  #      maxSurge: 0
-  #      maxUnavailable: 1
-  strategy: {}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
 
   # Pod Security Context to be set on the cainjector component Pod
   # For more information, see [Configure a Security Context for a Pod or Container](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/).
@@ -1346,14 +1361,13 @@ cainjector:
 
   # Resources to provide to the cert-manager cainjector pod.
   #
-  # For example:
-  #  requests:
-  #    cpu: 10m
-  #    memory: 32Mi
-  #
-  # For more information, see [Resource Management for Pods and Containers](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/).
-  resources: {}
-
+  resources:
+    requests:
+      cpu: 200m
+      memory: 300Mi
+    limits:
+      cpu: 1000m
+      memory: 800Mi
 
   # The nodeSelector on Pods tells Kubernetes to schedule Pods on the nodes with
   # matching labels.
@@ -1367,17 +1381,25 @@ cainjector:
 
   # A Kubernetes Affinity, if required. For more information, see [Affinity v1 core](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#affinity-v1-core).
   #
-  # For example:
-  #   affinity:
-  #     nodeAffinity:
-  #      requiredDuringSchedulingIgnoredDuringExecution:
-  #        nodeSelectorTerms:
-  #        - matchExpressions:
-  #          - key: foo.bar.com/role
-  #            operator: In
-  #            values:
-  #            - master
-  affinity: {}
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          preference:
+            matchExpressions:
+              - key: servers.ngpc.rxt.io/type
+                operator: In
+                values:
+                  - ondemand
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app: cainjector
+                app.kubernetes.io/instance: cert-manager
+            topologyKey: kubernetes.io/hostname
+          weight: 100
 
   # A list of Kubernetes Tolerations, if required. For more information, see [Toleration v1 core](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#toleration-v1-core).
   #

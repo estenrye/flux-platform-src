@@ -1,0 +1,24 @@
+- op: add
+  path: /spec/template/spec/containers/0/livenessProbe
+  value:
+    httpGet:
+      path: /metrics
+      port: http-metrics
+      scheme: HTTP
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+- op: add
+  path: /spec/template/spec/containers/0/readinessProbe
+  value:
+    httpGet:
+      path: /metrics
+      port: http-metrics
+      scheme: HTTP
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+    successThreshold: 1

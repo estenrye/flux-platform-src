@@ -1,0 +1,6 @@
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-secrets
+  value: "Crossplane needs access to secrets to manage external resources."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-create-pods
+  value: "Crossplane needs access to create pods to manage external resources."

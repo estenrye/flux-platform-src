@@ -1,0 +1,12 @@
+- op: add
+  path: /spec/template/spec/containers/0/readinessProbe
+  value:
+    httpGet:
+      path: /livez
+      port: http-healthz
+      scheme: HTTP
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+    successThreshold: 1
