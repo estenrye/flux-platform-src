@@ -23,6 +23,10 @@ patches:
       kind: Deployment
     path: patches/deployment.yaml
   - target:
+      kind: Deployment
+      name: crossplane-rbac-manager
+    path: patches/deployment-rbac-manager.yaml
+  - target:
       kind: ClusterRoleBinding
     path: patches/cluster-role-binding.yaml
   - target:

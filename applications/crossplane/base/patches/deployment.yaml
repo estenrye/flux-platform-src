@@ -1,6 +1,18 @@
 - op: add
   path: /spec/template/spec/restartPolicy
   value: Always
+- op: add
+  path: /spec/template/spec/containers/0/livenessProbe
+  value:
+    httpGet:
+      path: /healthz
+      port: readyz
+- op: add
+  path: /spec/template/spec/containers/0/readinessProbe
+  value:
+    httpGet:
+      path: /readyz
+      port: readyz
 # - op: add
 #   path: /spec/strategy
 #   value:
