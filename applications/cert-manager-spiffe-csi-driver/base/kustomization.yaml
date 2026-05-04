@@ -20,3 +20,6 @@ patches:
   - target:
       kind: DaemonSet
     path: patches/daemonset.yaml
+  - target:
+      kind: DaemonSet
+    path: patches/daemonset-sidecar-resources.yaml

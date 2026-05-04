@@ -4,6 +4,23 @@
 
 This document analyzes the DaemonSet configuration for cert-manager-spiffe-csi driver and explains why it requires read/write hostPath volumes, addressing potential security linting concerns.
 
+## 🎯 Implementation Status
+
+### ✅ COMPLETED: Comprehensive Resource Allocation
+- **Phase 1**: Main container resource limits via Helm values  
+- **Phase 2**: Sidecar container resource limits via Kustomize patches
+- **Result**: Complete resource governance across all 4 containers (1 main + 2 DaemonSet sidecars + 1 Deployment)
+
+### 📊 READY: Production Deployment  
+- All containers have resource requests/limits configured
+- Cluster scaling impact calculated and documented
+- Ready for deployment and monitoring Phase 3
+
+### 📋 DOCUMENTED: Security Requirements Justified
+- hostPath volumes, root privileges, and privileged containers explained
+- Technical justifications provided for CSI specification compliance
+- kube-linter ignore annotations implemented where appropriate
+
 ## Analysis Command
 
 ```bash
@@ -415,15 +432,84 @@ To apply resource limits to these containers, you would need to:
    - Collect metrics after deployment
    - Establish baseline performance data
 
-### Phase 2: Sidecar Resource Management (Future Enhancement)
-1. Evaluate impact of uncontrolled sidecar resource usage
-2. Consider implementing Kustomize patches if resource contention observed
-3. Monitor for upstream Helm chart enhancements to expose sidecar resource configuration
+### ✅ Phase 2: Sidecar Resource Management (COMPLETED)
+1. ✅ Evaluated sidecar container resource requirements (node-driver-registrar, liveness-probe)
+2. ✅ Implemented Kustomize patches to address upstream chart limitations  
+3. ✅ Verified complete resource governance across all DaemonSet containers
 
-### Phase 3: Production Tuning (Ongoing)
-1. Collect metrics from production workloads
-2. Adjust resource limits based on actual certificate request patterns
-3. Scale recommendations based on cluster growth and workload density
+**Implementation Details**:
+- Created [`patches/daemonset-sidecar-resources.yaml`](../../../applications/cert-manager-spiffe-csi-driver/base/patches/daemonset-sidecar-resources.yaml)
+- Updated [`kustomization.yaml`](../../../applications/cert-manager-spiffe-csi-driver/base/kustomization.yaml) to apply patches
+
+**Sidecar Resource Allocation**:
+```yaml
+# Both node-driver-registrar and liveness-probe sidecars
+resources:
+  requests:
+    cpu: 10m
+    memory: 20Mi  
+  limits:
+    cpu: 100m
+    memory: 50Mi
+```
+
+**Impact**: Complete resource control prevents unbounded resource consumption by sidecar containers
+
+## Phase 1-2 Combined Results
+
+### Complete DaemonSet Resource Allocation
+
+**Per-Node Resource Requirements**:
+```yaml
+# cert-manager-csi-driver-spiffe (main container)
+resources:
+  requests: { cpu: 100m, memory: 128Mi }
+  limits:   { cpu: 500m, memory: 512Mi }
+
+# node-driver-registrar (sidecar)
+resources:
+  requests: { cpu: 10m, memory: 20Mi }
+  limits:   { cpu: 100m, memory: 50Mi }
+
+# liveness-probe (sidecar) 
+resources:
+  requests: { cpu: 10m, memory: 20Mi }
+  limits:   { cpu: 100m, memory: 50Mi }
+
+# TOTAL PER NODE:
+# requests: { cpu: 120m, memory: 168Mi }
+# limits:   { cpu: 700m, memory: 612Mi }
+```
+
+**Cluster-Wide Impact** (DaemonSet multiplier):
+- 10 nodes: 1.2 CPU cores, 1.68 GB memory requests
+- 50 nodes: 6.0 CPU cores, 8.4 GB memory requests  
+- 100 nodes: 12.0 CPU cores, 16.8 GB memory requests
+
+**Approver Deployment Resources**:
+```yaml
+# cert-manager-csi-driver-spiffe-approver (single replica)
+resources:
+  requests: { cpu: 50m, memory: 64Mi }
+  limits:   { cpu: 200m, memory: 128Mi }
+```
+
+### 📊 Phase 3: Production Tuning (Ready for Deployment)
+1. **Deploy configured resources** to production environment
+2. **Monitor metrics** via Prometheus/Grafana dashboards:
+   - CPU/memory utilization per container
+   - Certificate request latency and throughput  
+   - Resource contention indicators
+3. **Collect baseline data** over 30-day period
+4. **Fine-tune allocations** based on observed patterns:
+   - Increase limits if seeing resource throttling
+   - Decrease requests if consistently over-provisioned
+   - Scale recommendations for cluster growth projections
+
+**Monitoring Focus Areas**:
+- DaemonSet resource utilization across node diversity (spot vs on-demand)
+- Certificate request spikes during cluster scaling events
+- Memory usage patterns during certificate rotation cycles
 
 ## Phase 1 Implementation Results
 
