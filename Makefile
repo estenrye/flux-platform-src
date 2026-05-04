@@ -12,7 +12,9 @@ lint-deps:
 	@${SCRIPTS_DIR}/install-kube-linter.sh
 
 render: render-deps
-	@${SCRIPTS_DIR}/render.sh
+	@export GITHUB_TOKEN=$${GITHUB_TOKEN:-$$(gh auth token)}; \
+	export RENDER_GITHUB_TOKEN=$${RENDER_GITHUB_TOKEN:-$$(gh auth token)}; \
+	${SCRIPTS_DIR}/render.sh
 
 push-render: render
 	@${SCRIPTS_DIR}/render/render-put-target-repository-push.sh

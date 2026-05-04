@@ -12,5 +12,8 @@
       "path": "bash",
       "args": ["--init-file", "./.bin/.bashrc"]
     }
+  },
+  "chat.tools.terminal.autoApprove": {
+    "make": true
   }
 }
