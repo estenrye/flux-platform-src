@@ -13,3 +13,15 @@ helmCharts:
     namespace: cert-manager
     includeCRDs: true
     valuesFile: values.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+  - target:
+      kind: Deployment
+      name: trust-manager
+    path: patches/deployment.trust-manager.yaml
+  - target:
+      kind: RoleBinding
+    path: patches/role-binding.yaml

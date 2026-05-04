@@ -29,7 +29,7 @@ crds:
 #   replicaCount: ${REPLICAS_OVERRIDE:=3}
 #
 # +docs:type=number,string,null
-replicaCount: 1
+replicaCount: 3
 # The number of old ReplicaSets to retain to allow rollback.
 # This is used to control the number of old ReplicaSets that are retained to allow rollback.
 # If set to 0, no old ReplicaSets are retained.
@@ -97,14 +97,14 @@ defaultPackage:
   # Kubernetes pod resource limits for default package init container.
   #
   # For example:
-  #  resources:
-  #    limits:
-  #      cpu: 100m
-  #      memory: 128Mi
-  #    requests:
-  #      cpu: 100m
-  #      memory: 128Mi
-  resources: {}
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
 defaultPackageImage:
   # Target image registry. This value is prepended to the target image repository, if set.
   # For example:
@@ -181,14 +181,14 @@ secretTargets:
 # Kubernetes pod resource limits for trust.
 #
 # For example:
-#  resources:
-#    limits:
-#      cpu: 100m
-#      memory: 128Mi
-#    requests:
-#      cpu: 100m
-#      memory: 128Mi
-resources: {}
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
 # Configure the priority class of the pod. For more information, see [PriorityClass](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass).
 priorityClassName: "platform-critical"
 # Configure the nodeSelector; defaults to any Linux node (trust-manager doesn't support Windows nodes)
@@ -196,17 +196,26 @@ priorityClassName: "platform-critical"
 nodeSelector:
   kubernetes.io/os: linux
 # Kubernetes Affinity. For more information, see [Affinity v1 core](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#affinity-v1-core).
-# For example:
-#   affinity:
-#     nodeAffinity:
-#      requiredDuringSchedulingIgnoredDuringExecution:
-#        nodeSelectorTerms:
-#        - matchExpressions:
-#          - key: foo.bar.com/role
-#            operator: In
-#            values:
-#            - master
-affinity: {}
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 1
+        preference:
+          matchExpressions:
+            - key: servers.ngpc.rxt.io/type
+              operator: In
+              values:
+                - ondemand
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: trust-manager
+              app.kubernetes.io/instance: trust-manager
+          topologyKey: kubernetes.io/hostname
+        weight: 100
+
 # List of Kubernetes Tolerations, if required. For more information, see [Toleration v1 core](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#toleration-v1-core).
 # For example:
 #   tolerations:
