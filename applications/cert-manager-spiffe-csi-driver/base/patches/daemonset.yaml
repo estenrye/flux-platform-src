@@ -1,0 +1,12 @@
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1writable-host-mount
+  value: "The cert-manager SPIFFE CSI driver needs to write to the host filesystem to store the SPIFFE socket."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1run-as-non-root
+  value: "The cert-manager SPIFFE CSI driver needs to run as root to access the SPIFFE socket and manage certificates."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1privileged-container
+  value: "The cert-manager SPIFFE CSI driver requires privileged mode for bidirectional mount propagation to kubelet pods directory."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1privilege-escalation-container
+  value: "The cert-manager SPIFFE CSI driver requires CAP_SYS_ADMIN capability for mount operations and cannot restrict privilege escalation."
