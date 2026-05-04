@@ -230,3 +230,235 @@ ALL node-level CSI drivers require privileged mode for the same reason:
 **Do not restrict these hostPath volumes or root privileges** - they are essential for CSI driver compliance and SPIFFE certificate provisioning functionality. The security controls in place (capability dropping, privilege escalation prevention, read-only root filesystem) provide appropriate risk mitigation while maintaining required CSI functionality.
 
 Both `runAsUser: 0` and `privileged: true` are **architecturally required** by the CSI specification and cannot be eliminated while maintaining functionality.
+
+## Resource Allocation Recommendations
+
+### Current State: No Resource Limits Set
+
+The cert-manager-spiffe-csi DaemonSet currently has no resource limits configured for any containers, which can lead to resource contention and unpredictable performance.
+
+### Recommended Resource Allocations
+
+#### node-driver-registrar Container
+**Purpose**: Registers the CSI driver with kubelet's plugin discovery mechanism
+
+```yaml
+resources:
+  requests:
+    memory: "20Mi"
+    cpu: "10m"
+  limits:
+    memory: "50Mi"  
+    cpu: "100m"
+```
+
+**Justification**:
+- **Memory Request (20Mi)**: Covers Go runtime overhead + minimal registration state
+- **Memory Limit (50Mi)**: Generous buffer for Go GC spikes
+- **CPU Request (10m)**: 1/100th of a core - minimal for startup registration task
+- **CPU Limit (100m)**: Allows burst during startup, then idles
+
+#### liveness-probe Container  
+**Purpose**: Monitors CSI driver health via HTTP probe endpoint
+
+```yaml  
+resources:
+  requests:
+    memory: "20Mi"
+    cpu: "10m"
+  limits:
+    memory: "50Mi"
+    cpu: "100m"
+```
+
+**Justification**:
+- **Memory Request (20Mi)**: HTTP client + Go runtime baseline
+- **Memory Limit (50Mi)**: Buffer for HTTP response parsing
+- **CPU Request (10m)**: Minimal for periodic health checks (every few seconds)
+- **CPU Limit (100m)**: Burst capacity for HTTP processing
+
+#### cert-manager-csi-driver-spiffe Container (Main Driver)
+**Purpose**: Core CSI operations - certificate creation, mounting, lifecycle management
+
+```yaml
+resources:
+  requests:
+    memory: "128Mi" 
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"  
+```
+
+**Justification**:
+- **Memory Request (128Mi)**: Certificate processing + mount operation buffers
+- **Memory Limit (512Mi)**: Handles multiple concurrent certificate requests  
+- **CPU Request (100m)**: Baseline for cert generation + I/O operations
+- **CPU Limit (500m)**: Burst capacity for heavy certificate workloads
+
+### Resource Scaling Considerations
+
+#### Node-Level Impact
+CSI driver DaemonSet runs on **every node**, so resource allocation multiplies by cluster size:
+- 10 nodes × 148Mi total requests = 1.48Gi cluster-wide memory reserved
+- 100 nodes × 148Mi total requests = 14.8Gi cluster-wide memory reserved
+
+#### Workload Density Impact  
+Higher pod density = more certificate requests = higher resource needs:
+- **Low density** (< 10 pods/node): Use minimum recommendations above
+- **High density** (> 50 pods/node): Consider 2x memory limits  
+- **Very high density** (> 100 pods/node): Monitor metrics and tune accordingly
+
+### Quality of Service Classification
+
+With the recommended settings, containers will have **Burstable** QoS class:
+- **Guaranteed scheduling** due to resource requests
+- **Eviction protection** compared to BestEffort pods
+- **Burst capability** when node resources available
+- **Resource enforcement** via cgroup limits to prevent resource monopolization
+
+### Implementation via Helm Values
+
+The current values.yaml configuration has placeholder resource blocks:
+
+```yaml
+# Line 169 - Main CSI driver container
+app:
+  driver:
+    resources: {}  # Currently empty
+
+# Line 305 - Approver container  
+approver:
+  resources: {}  # Currently empty
+```
+
+**Recommended Implementation** - Update the values.yaml file:
+
+```yaml
+app:
+  driver:
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+approver:
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m" 
+    limits:
+      memory: "128Mi"
+      cpu: "200m"
+```
+
+### Sidecar Container Resource Limitation
+
+**Important**: The upstream Helm chart does **not expose** resource configuration for sidecar containers:
+- `node-driver-registrar` 
+- `liveness-probe`
+
+To apply resource limits to these containers, you would need to:
+
+1. **Create Kustomize patches** for the DaemonSet
+2. **Fork/modify the Helm chart** to expose sidecar resource values
+3. **Use a post-renderer** to inject resource configurations
+
+**Example Kustomize patch** for sidecar resources:
+
+```yaml
+# patches/daemonset-resources.yaml
+- op: add
+  path: /spec/template/spec/containers/0/resources
+  value:
+    requests:
+      memory: "20Mi"
+      cpu: "10m"
+    limits:
+      memory: "50Mi"
+      cpu: "100m"
+- op: add
+  path: /spec/template/spec/containers/1/resources  
+  value:
+    requests:
+      memory: "20Mi"
+      cpu: "10m"
+    limits:
+      memory: "50Mi"
+      cpu: "100m"
+```
+
+### Monitoring and Tuning Strategy
+
+1. **Initial Implementation**: Start with recommended minimums
+2. **Metrics Collection**: Monitor actual CPU/Memory usage via:
+   - `kubectl top pods -n cert-manager`
+   - Prometheus metrics from kubelet cAdvisor
+   - Cluster monitoring dashboards
+3. **Performance Tuning**: Adjust limits based on observed usage patterns
+4. **Load Testing**: Test resource adequacy under certificate request load
+5. **Node Capacity Planning**: Ensure total requests don't exceed node allocatable resources
+
+## Implementation Action Plan
+
+### Phase 1: Configure Available Resources ✅ **COMPLETED**
+1. ✅ **Updated `values.yaml` with driver and approver resource limits**
+   - **Driver container**: 128Mi/100m requests, 512Mi/500m limits
+   - **Approver container**: 64Mi/50m requests, 128Mi/200m limits
+2. ⏳ **Test deployment with resource constraints** - *In Progress*
+   - Updated Helm values successfully applied
+   - Deployment verification pending (requires render regeneration)
+3. 📋 **Monitor baseline resource usage** - *Next*
+   - Collect metrics after deployment
+   - Establish baseline performance data
+
+### Phase 2: Sidecar Resource Management (Future Enhancement)
+1. Evaluate impact of uncontrolled sidecar resource usage
+2. Consider implementing Kustomize patches if resource contention observed
+3. Monitor for upstream Helm chart enhancements to expose sidecar resource configuration
+
+### Phase 3: Production Tuning (Ongoing)
+1. Collect metrics from production workloads
+2. Adjust resource limits based on actual certificate request patterns
+3. Scale recommendations based on cluster growth and workload density
+
+## Phase 1 Implementation Results
+
+### ✅ Values Configuration Updated
+
+**Driver Container Resources** (`app.driver.resources`):
+```yaml
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+```
+
+**Approver Container Resources** (`approver.resources`):
+```yaml
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "50m"
+  limits:
+    memory: "128Mi"
+    cpu: "200m"
+```
+
+### 🔄 Next Steps
+1. **Regenerate rendered manifests** using `make render`
+2. **Verify resource allocation** in DaemonSet and Deployment specs
+3. **Deploy to test environment** and monitor resource utilization
+4. **Collect baseline metrics** for performance analysis
+
+### 📊 Expected Impact
+- **Per-node resource footprint**: ~192Mi memory requests, ~150m CPU requests
+- **Burstable QoS class**: Provides guaranteed scheduling with burst capability
+- **Resource enforcement**: Prevents runaway resource consumption
+- **Improved stability**: Predictable resource allocation across cluster nodes

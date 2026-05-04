@@ -166,7 +166,13 @@ app:
     #    requests:
     #      cpu: 100m
     #      memory: 128Mi
-    resources: {}
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
     nodeDriverRegistrarImage:
       # Target image registry. This value is prepended to the target image repository, if set.
       # For example:
@@ -302,7 +308,13 @@ app:
     #    requests:
     #      cpu: 100m
     #      memory: 128Mi
-    resources: {}
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "200m"
 # Optional priority class to be used for the csi-driver pods.
 priorityClassName: "platform-critical"
 # Labels to apply to all resources
