@@ -264,7 +264,7 @@ app:
   # Options for approver controller
   approver:
     # Number of replicas of the approver to run.
-    replicaCount: 1
+    replicaCount: 3
     # A signer name that the csi-driver-spiffe approver will be given
     # permission to approve and deny. CertificateRequests referencing this
     # signer name can be processed by the SPIFFE approver. See:
@@ -335,7 +335,25 @@ nodeSelector:
 #            operator: In
 #            values:
 #            - master
-affinity: {}
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 1
+        preference:
+          matchExpressions:
+            - key: servers.ngpc.rxt.io/type
+              operator: In
+              values:
+                - ondemand
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: cert-manager-csi-driver-spiffe-approver
+              app.kubernetes.io/instance: cert-manager-csi-driver-spiffe
+          topologyKey: kubernetes.io/hostname
+        weight: 100
 # Kubernetes pod tolerations for cert-manager-csi-driver-spiffe.
 #
 # For example:

@@ -10,3 +10,19 @@
 - op: add
   path: /metadata/annotations/ignore-check.kube-linter.io~1privilege-escalation-container
   value: "The cert-manager SPIFFE CSI driver requires CAP_SYS_ADMIN capability for mount operations and cannot restrict privilege escalation."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-liveness-probe
+  value: "CSI helper sidecars (node-driver-registrar and liveness-probe) intentionally omit container liveness probes; the main CSI driver container exposes /healthz and is the liveness-probed container by design."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-readiness-probe
+  value: "CSI helper sidecars (node-driver-registrar and liveness-probe) do not serve pod traffic and do not require readiness probes; readiness is not a functional gate for these sidecars."
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: Always
+- op: add
+  path: /spec/updateStrategy
+  value:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%

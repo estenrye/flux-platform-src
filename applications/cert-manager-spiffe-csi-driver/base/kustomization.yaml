@@ -23,3 +23,9 @@ patches:
   - target:
       kind: DaemonSet
     path: patches/daemonset-sidecar-resources.yaml
+  - target:
+      kind: DaemonSet
+    path: patches/daemonset-liveness-probe-sidecar-readiness.yaml
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
