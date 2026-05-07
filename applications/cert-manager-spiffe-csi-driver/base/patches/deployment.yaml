@@ -4,6 +4,16 @@
     containerPort: 6060
     name: readyz
 - op: add
+  path: /spec/template/spec/containers/0/livenessProbe
+  value:
+    httpGet:
+      path: /readyz
+      port: readyz
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+- op: add
   path: /spec/template/spec/restartPolicy
   value: Always
 - op: add
