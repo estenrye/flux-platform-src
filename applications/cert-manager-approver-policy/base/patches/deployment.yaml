@@ -1,0 +1,13 @@
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: Always
+- op: add
+  path: /spec/template/spec/containers/0/livenessProbe
+  value:
+    httpGet:
+      path: /readyz
+      port: 6060
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
