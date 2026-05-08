@@ -528,9 +528,10 @@ This avoids applying the exception to all Crossplane ClusterRoles.
 | `CKV_K8S_35` (secrets as files vs env vars) | 1 | 0 (1 skip) |
 | `CKV_K8S_8` (liveness probes) | 4 | 0 (4 skips) |
 | `CKV_K8S_157` (RBAC bind permissions) | 2 | 0 (2 skips) |
-| All other checks | ~45 | 13 |
-| **Total failures** | **133** | **13** |
-| Skipped | 0 | 62 |
+| `CKV_K8S_9` (readiness probes) | 4 | 0 (4 skips) |
+| All other checks | ~41 | 9 |
+| **Total failures** | **133** | **9** |
+| Skipped | 0 | 66 |
 
 ## Key Decisions
 
@@ -553,3 +554,46 @@ This avoids applying the exception to all Crossplane ClusterRoles.
 9. **Short-lived hooks and CSI helper sidecars are valid no-probe exceptions** — Helm test hook Pods (`restartPolicy: Never`) and certain CSI helper sidecars are not equivalent to long-running service containers. For these cases, use explicit checkov skip annotations with justification and keep them aligned with existing kube-linter exception rationale.
 
 10. **Prefer name-scoped patch targets for high-risk RBAC exceptions** — For checks like CKV_K8S_157, adding a dedicated patch file and targeting only the exact role names avoids broad exception blast radius and keeps exception intent auditable.
+
+---
+
+## Part 12: CKV_K8S_9 — Readiness Probe Should Be Configured
+
+**Check:** `CKV_K8S_9` — Containers should have readiness probes configured.
+
+**Count:** 4 failures across 2 applications.
+
+### Failing Resources
+
+| Resource | Application |
+|---|---|
+| `DaemonSet.cert-manager.cert-manager-csi-driver-spiffe-driver` | `cert-manager-spiffe-csi-driver/base` |
+| `Pod.opentelemetry-operator-system.opentelemetry-operator-cert-manager` | `opentelemetry-operator/base` |
+| `Pod.opentelemetry-operator-system.opentelemetry-operator-metrics` | `opentelemetry-operator/base` |
+| `Pod.opentelemetry-operator-system.opentelemetry-operator-webhook` | `opentelemetry-operator/base` |
+
+### Findings and Decision
+
+These are the same two resources that triggered CKV_K8S_8 (liveness probes), for the same underlying reasons:
+
+- The SPIFFE CSI DaemonSet's `node-driver-registrar` sidecar does not serve pod traffic and is not a readiness gate. The kube-linter annotation `no-readiness-probe` already documents this.
+- The opentelemetry-opera- The opentelemetry-opera- The opentelemetry-opera- The ope Neve- The opentelemetry-opera- The opentelemetry-opera- The opentelemetry-operaade
+
+
+ The opentelemetry-opera- The opentelemetrexi The opentelemetry-oready carrying the matching kube-linter exceptions:
+
+```
+applications/cert-manager-spiffe-csi-driver/base/patches/daemonset.yaml
+applications/opentelemetry-operator/base/patches/pod.yaml
+```
+
+Patch ops added:
+
+```yaml
+# daemonset.yaml — skip4
+- op: add
+- op: add
+t.yaml — skip4
+operator/base/patches/pod.yaml
+aemonset.yaml
+arrying the matching kube-linregistrar) intentionally omit readiness probes; they do not serve pod traffic and readiness is not a functional gate for these sidecaarrying the matching kube-linregistrar) intentionally omit readiness probes; they do not serve pod traffic"CKV_arrying the matching kube-linregistrar) intentionally omit readiness probes; they do not serve pod traffic and readiness is not a functional gate for these sidecaarrying the matching kubed scan: **Passed: 21, Failed: 0, Skipped: 5**. Overall scan: **Passed: 2847, Failed: 9, Skipped: 66**.
