@@ -38,3 +38,6 @@
 - op: add
   path: /metadata/annotations/checkov.io~1skip4
   value: "CKV_K8S_9=CSI helper sidecars (node-driver-registrar) intentionally omit readiness probes; they do not serve pod traffic and readiness is not a functional gate for these sidecars."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip5
+  value: "CKV_K8S_20=The cert-manager-csi-driver-spiffe container requires privileged: true for bidirectional mount propagation; Kubernetes implicitly sets allowPrivilegeEscalation: true for privileged containers and the setting cannot be overridden."

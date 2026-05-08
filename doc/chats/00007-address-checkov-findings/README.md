@@ -531,9 +531,10 @@ This avoids applying the exception to all Crossplane ClusterRoles.
 | `CKV_K8S_9` (readiness probes) | 4 | 0 (4 skips) |
 | `CKV_K8S_29` (pod-level security context) | 2 | 0 |
 | `CKV_K8S_158` (escalate verb in ClusterRoles) | 1 | 0 (1 skip) |
-| All other checks | ~41 | 4 |
-| **Total failures** | **133** | **4** |
-| Skipped | 0 | 68 |
+| `CKV_K8S_20` (allowPrivilegeEscalation) | 1 | 0 (1 skip) |
+| All other checks | ~41 | 3 |
+| **Total failures** | **133** | **3** |
+| Skipped | 0 | 69 |
 
 ## Key Decisions
 
@@ -684,3 +685,39 @@ The existing patch file `cluster-role-ckv-k8s-157.yaml` already targets `crosspl
 ### Result
 
 Scoped scan: **Passed: 53, Failed: 0, Skipped: 2**. Overall scan: **Passed: 2850, Failed: 4, Skipped: 68**.
+
+---
+
+## Part 15: CKV_K8S_20 — Containers Should Not Run With allowPrivilegeEscalation
+
+**Check:** `CKV_K8S_20` — Each container's `securityContext.allowPrivilegeEscalation` must be explicitly set to `false`.
+
+**Count:** 1 failure.
+
+### Failing Resource
+
+| Resource | Application |
+|---|---|
+| `DaemonSet.cert-manager.cert-manager-csi-driver-spiffe-driver` | `cert-manager-spiffe-csi-driver/base` |
+
+### Findings and Decision
+
+The `cert-manager-csi-driver-spiffe` container requires `privileged: true` for bidirectional mount propagation to the kubelet pods directory. Kubernetes mandates that privileged containers have `allowPrivilegeEscalation: true` — the field cannot be set to `false` on a privileged container (the API server will reject it or the runtime will override it).
+
+The DaemonSet already carries a kube-linter `privilege-escalation-container` exception documenting this exact constraint. This is an unavoidable CSI driver requirement.
+
+A checkov skip annotation is the correct resolution, consistent with the pattern used for the other CSI-driver exceptions on this same DaemonSet.
+
+### Fix
+
+**File:** `applications/cert-manager-spiffe-csi-driver/base/patches/daemonset.yaml`
+
+```yaml
+- op: add
+  path: /metadata/annotations/checkov.io~1skip5
+  value: "CKV_K8S_20=The cert-manager-csi-driver-spiffe container requires privileged: true for bidirectional mount propagation; Kubernetes implicitly sets allowPrivilegeEscalation: true for privileged containers and the setting cannot be overridden."
+```
+
+### Result
+
+Scoped scan: **Passed: 25, Failed: 0, Skipped: 1**. Overall scan: **Passed: 2850, Failed: 3, Skipped: 69**.
