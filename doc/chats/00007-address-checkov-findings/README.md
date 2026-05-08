@@ -162,6 +162,40 @@ The NetworkPolicy:
 
 ---
 
+## Part 5: CKV_K8S_49 — Minimize Wildcard Use in Roles and ClusterRoles
+
+**Check:** `CKV_K8S_49` — Roles and ClusterRoles must not use `*` in `resources` or `verbs`.
+
+**Count:** 3 failures, all in `applications/flux/base`.
+
+### Failing Resources
+
+| Resource | Wildcard Usage |
+|---|---|
+| `ClusterRole.default.crd-controller` | `resources: ['*']` and `verbs: ['*']` across all Flux toolkit API groups (`source.toolkit.fluxcd.io`, `kustomize.toolkit.fluxcd.io`, `helm.toolkit.fluxcd.io`, `notification.toolkit.fluxcd.io`, `image.toolkit.fluxcd.io`, `source.extensions.fluxcd.io`) |
+| `ClusterRole.default.flux-edit` | `resources: ['*']` with write verbs across all Flux toolkit API groups |
+| `ClusterRole.default.flux-view` | `resources: ['*']` with read verbs across all Flux toolkit API groups |
+
+### Why Wildcards Are Intentional Here
+
+These are upstream Flux ClusterRoles from `https://github.com/fluxcd/flux2/releases/download/v2.7.5/install.yaml`. Flux controllers must reconcile any resource under their own CRD groups — the full set of resource types evolves with each Flux release and cannot be enumerated in a ClusterRole without breaking upgrades. These roles already carried a kube-linter skip annotation (`ignore-check.kube-linter.io/wildcard-in-rules`) from earlier session work, which documents the same intent.
+
+### Fix
+
+Added a `checkov.io/skip1` JSON patch op to the existing `patches/clusterRole.yaml`, which is already applied to all ClusterRoles in the Flux base kustomization. This co-locates the checkov justification with the kube-linter justification in the same patch file.
+
+**File changed:** `applications/flux/base/patches/clusterRole.yaml`
+
+```yaml
+- op: add
+  path: /metadata/annotations/checkov.io~1skip1
+  value: "CKV_K8S_49=Flux controllers require wildcard resource permissions to reconcile their own CRD types across the cluster without enumerating every resource."
+```
+
+**Result:** 0 `CKV_K8S_49` failures, 3 additional skips. `flux/base` scan: **Passed: 567, Failed: 6, Skipped: 3**.
+
+---
+
 ## Final State
 
 | Check | Before | After |
@@ -169,9 +203,10 @@ The NetworkPolicy:
 | `CKV_K8S_43` (image digest) | 26 | 0 |
 | `CKV_K8S_40` (high UID) | 13 | 0 (1 skip) |
 | `my-csi-app` failures (Part 4) | 9 | 0 (2 skips) |
-| All other checks | ~85 | 65 |
-| **Total failures** | **133** | **65** |
-| Skipped | 0 | 3 |
+| `CKV_K8S_49` (wildcards in roles) | 3 | 0 (3 skips) |
+| All other checks | ~82 | 62 |
+| **Total failures** | **133** | **62** |
+| Skipped | 0 | 6 |
 
 ## Key Decisions
 
@@ -184,3 +219,5 @@ The NetworkPolicy:
 4. **UID `65532`** — Used consistently across all changes. This is the GID/UID used by Google's distroless images and is widely adopted in the Kubernetes ecosystem (used by Crossplane, cert-manager upstream, and others).
 
 5. **Checkov skip annotation for CSI DaemonSet** — The annotation approach (`checkov.io/skip1`) keeps the justification co-located with the resource definition. An alternative would be a `.checkov.yaml` baseline file, but annotation is preferred because it makes the exception visible to anyone reading the patch.
+
+6. **Checkov skip via existing kustomize patch** — When a kustomize patch already applies annotations to a class of resources (e.g. `clusterRole.yaml` targeting all Flux ClusterRoles), adding a new `op: add` entry to that patch is the correct approach. This avoids creating a separate patch file for a single annotation and keeps all skip justifications in one place.
