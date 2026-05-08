@@ -529,8 +529,9 @@ This avoids applying the exception to all Crossplane ClusterRoles.
 | `CKV_K8S_8` (liveness probes) | 4 | 0 (4 skips) |
 | `CKV_K8S_157` (RBAC bind permissions) | 2 | 0 (2 skips) |
 | `CKV_K8S_9` (readiness probes) | 4 | 0 (4 skips) |
-| All other checks | ~41 | 9 |
-| **Total failures** | **133** | **9** |
+| `CKV_K8S_29` (pod-level security context) | 2 | 0 |
+| All other checks | ~41 | 5 |
+| **Total failures** | **133** | **5** |
 | Skipped | 0 | 66 |
 
 ## Key Decisions
@@ -577,10 +578,9 @@ This avoids applying the exception to all Crossplane ClusterRoles.
 These are the same two resources that triggered CKV_K8S_8 (liveness probes), for the same underlying reasons:
 
 - The SPIFFE CSI DaemonSet's `node-driver-registrar` sidecar does not serve pod traffic and is not a readiness gate. The kube-linter annotation `no-readiness-probe` already documents this.
-- The opentelemetry-opera- The opentelemetry-opera- The opentelemetry-opera- The ope Neve- The opentelemetry-opera- The opentelemetry-opera- The opentelemetry-operaade
+- The opentelemetry-operator Helm chart generates short-lived Helm test hook Pods (`restartPolicy: Never`). These are validation jobs, not long-running services, and readiness probes are not applicable.
 
-
- The opentelemetry-opera- The opentelemetrexi The opentelemetry-oready carrying the matching kube-linter exceptions:
+Both were already carrying the matching kube-linter exceptions. Checkov skip annotations were added to the same patch files:
 
 ```
 applications/cert-manager-spiffe-csi-driver/base/patches/daemonset.yaml
@@ -592,8 +592,58 @@ Patch ops added:
 ```yaml
 # daemonset.yaml — skip4
 - op: add
+  path: /metadata/annotations/checkov.io~1skip4
+  value: "CKV_K8S_9=CSI helper sidecars (node-driver-registrar) intentionally omit readiness probes; they do not serve pod traffic and readiness is not a functional gate for these sidecars."
+
+# pod.yaml — skip3
 - op: add
-t.yaml — skip4
-operator/base/patches/pod.yaml
-aemonset.yaml
-arrying the matching kube-linregistrar) intentionally omit readiness probes; they do not serve pod traffic and readiness is not a functional gate for these sidecaarrying the matching kube-linregistrar) intentionally omit readiness probes; they do not serve pod traffic"CKV_arrying the matching kube-linregistrar) intentionally omit readiness probes; they do not serve pod traffic and readiness is not a functional gate for these sidecaarrying the matching kubed scan: **Passed: 21, Failed: 0, Skipped: 5**. Overall scan: **Passed: 2847, Failed: 9, Skipped: 66**.
+  path: /metadata/annotations/checkov.io~1skip3
+  value: "CKV_K8S_9=Helm test hook Pods are short-lived validation jobs with restartPolicy Never and intentionally do not use readiness probes."
+```
+
+### Result
+
+Scoped scan: **Passed: 21, Failed: 0, Skipped: 5**. Overall scan: **Passed: 2847, Failed: 9, Skipped: 66**.
+
+---
+
+## Part 13: CKV_K8S_29 — Apply Security Context to Pods and Containers
+
+**Check:** `CKV_K8S_29` — A pod-level security context should be defined (`spec.template.spec.securityContext` must be non-empty).
+
+**Count:** 2 failures.
+
+### Failing Resources
+
+| Resource | Application |
+|---|---|
+| `Deployment.crossplane-system.crossplane` | `crossplane/base` |
+| `Deployment.crossplane-system.crossplane-rbac-manager` | `crossplane/base` |
+
+### Findings and Decision
+
+Both crossplane deployments had container-level security contexts set (`securityContextCrossplane` / `securityContextRBACManager`) but their pod-level counterparts (`podSecurityContextCrossplane` / `podSecurityContextRBACManager`) were left as `{}`. The check only inspects `spec.template.spec.securityContext`; an empty map does not satisfy it.
+
+The crossplane Helm chart exposes explicit values for pod-level security context. This was a pure Helm values fix — no kustomize patch required.
+
+### Fix
+
+**File:** `applications/crossplane/base/values.yaml`
+
+```yaml
+podSecurityContextCrossplane:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+podSecurityContextRBACManager:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+```
+
+Both fields were previously `{}`.
+
+### Result
+
+Scoped scan: **Passed: 26, Failed: 0, Skipped: 0**. Overall scan: **Passed: 2851, Failed: 5, Skipped: 66**.

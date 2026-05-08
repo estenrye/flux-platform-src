@@ -241,10 +241,16 @@ extraEnvVarsCrossplane: {}
 extraEnvVarsRBACManager: {}
 
 # -- Add a custom `securityContext` to the Crossplane pod.
-podSecurityContextCrossplane: {}
+podSecurityContextCrossplane:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
 
 # -- Add a custom `securityContext` to the RBAC Manager pod.
-podSecurityContextRBACManager: {}
+podSecurityContextRBACManager:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
 
 # -- Add custom `volumes` to the Crossplane pod. Supports template expressions.
 extraVolumesCrossplane:
