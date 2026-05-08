@@ -248,6 +248,83 @@ applications/opentelemetry-operator/base/patches/pod.yaml
 
 ---
 
+## Part 7: CKV_K8S_37 — Minimize Containers with Assigned Capabilities
+
+**Check:** `CKV_K8S_37` — Container `securityContext` must include `capabilities.drop: [ALL]` to minimize the Linux capabilities available to the process.
+
+**Count:** 3 failures across 2 applications.
+
+### Failing Resources
+
+| Resource | Application |
+|---|---|
+| `Deployment.reloader.reloader-reloader` | `reloader/base` |
+| `Deployment.crossplane-system.crossplane` | `crossplane/base` |
+| `Deployment.crossplane-system.crossplane-rbac-manager` | `crossplane/base` |
+
+### Approach
+
+For each resource the first step was to check whether the upstream Helm chart exposed `capabilities` in its security context values. The two charts behave differently:
+
+**Reloader** — `helm show values stakater/reloader` shows a `deployment.containerSecurityContext` block (commented out by default) that supports `capabilities.drop` and `allowPrivilegeEscalation`. This is chart-native configuration, so Helm values is the correct layer.
+
+**Crossplane** — The chart exposes `securityContextCrossplane` and `securityContextRBACManager` values for `runAsUser`, `runAsGroup`, `allowPrivilegeEscalation`, and `readOnlyRootFilesystem`, but **not** `capabilities`. A kustomize JSON patch is required. The crossplane main deployment also has an init container (`crossplane-init`) which requires its own capabilities patch.
+
+### Changes Made
+
+#### `applications/reloader/base/values.yaml`
+
+Added `containerSecurityContext` under `reloader.deployment` using chart-native Helm values:
+
+```yaml
+reloader:
+  deployment:
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+```
+
+Note: `allowPrivilegeEscalation: false` was added here as well since it was already commented out in the chart's default values alongside `capabilities`, making this a natural grouping. The `readOnlyRootFilesystem: true` setting is configured separately at the top level (`reloader.readOnlyRootFileSystem`) which the chart maps to the container security context.
+
+#### `applications/crossplane/base/patches/deployment.yaml`
+
+Added two `op: add` JSON patch ops — one for the main container and one for the init container:
+
+```yaml
+- op: add
+  path: /spec/template/spec/containers/0/securityContext/capabilities
+  value:
+    drop:
+      - ALL
+- op: add
+  path: /spec/template/spec/initContainers/0/securityContext/capabilities
+  value:
+    drop:
+      - ALL
+```
+
+This patch targets all `kind: Deployment` resources in the crossplane kustomization (both `crossplane` and `crossplane-rbac-manager`). The crossplane main deployment has an init container (`crossplane-init`) that also needs capabilities dropped; the init container patch op is in this generic file.
+
+#### `applications/crossplane/base/patches/deployment-rbac-manager.yaml`
+
+Added an `op: add` for the rbac-manager container's capabilities:
+
+```yaml
+- op: add
+  path: /spec/template/spec/containers/0/securityContext/capabilities
+  value:
+    drop:
+      - ALL
+```
+
+The rbac-manager has no init container, so only the main container needs this patch. The named target selector on this file (`name: crossplane-rbac-manager`) ensures it applies only to the rbac-manager deployment.
+
+**Result:** 0 `CKV_K8S_37` failures, no new skips. Overall scan: **Passed: 2869, Failed: 22, Skipped: 31**.
+
+---
+
 ## Final State
 
 | Check | Before | After |
@@ -257,8 +334,9 @@ applications/opentelemetry-operator/base/patches/pod.yaml
 | `my-csi-app` failures (Part 4) | 9 | 0 (2 skips) |
 | `CKV_K8S_49` (wildcards in roles) | 3 | 0 (3 skips) |
 | `CKV_K8S_38` (SA token automount) | 25 | 0 (25 skips) |
-| All other checks | ~57 | 29 |
-| **Total failures** | **133** | **29** |
+| `CKV_K8S_37` (capabilities drop) | 3 | 0 |
+| All other checks | ~54 | 22 |
+| **Total failures** | **133** | **22** |
 | Skipped | 0 | 31 |
 
 ## Key Decisions

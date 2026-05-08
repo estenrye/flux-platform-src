@@ -8,3 +8,8 @@
   value:
     name: readyz
     containerPort: 8081
+- op: add
+  path: /spec/template/spec/containers/0/securityContext/capabilities
+  value:
+    drop:
+      - ALL

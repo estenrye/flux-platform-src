@@ -7,6 +7,11 @@ reloader:
   deployment:
     priorityClassName: cicd
     replicas: 3
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
     resources:
       limits:
         cpu: 150m
