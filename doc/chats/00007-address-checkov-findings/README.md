@@ -196,6 +196,58 @@ Added a `checkov.io/skip1` JSON patch op to the existing `patches/clusterRole.ya
 
 ---
 
+## Part 6: CKV_K8S_38 — Ensure Service Account Tokens Are Only Mounted Where Necessary
+
+**Check:** `CKV_K8S_38` — Pods and Deployments must explicitly disable service account token automounting (`automountServiceAccountToken: false`) unless the token is actively required.
+
+**Count:** 25 failures across 10 applications (13 distinct patch files).
+
+### Decision: Skip vs. Disable
+
+Unlike the demo app (`my-csi-app`, Part 4) where `automountServiceAccountToken: false` was the correct fix because the pod container never calls the Kubernetes API, all 25 failing resources are **operator/controller workloads that actively require the token**. Each one calls the Kubernetes API as a core part of its function. Disabling the token would break the controller. The correct remediation is a `checkov.io/skip` annotation with a justification string.
+
+### Failing Resources and Justifications
+
+| Application | Resource | Reason token is required |
+|---|---|---|
+| `cert-manager-trust-manager/base` | `Deployment.trust-manager` | Distributes CA bundles as ConfigMaps across namespaces |
+| `reloader/base` | `Deployment.reloader-reloader` | Watches ConfigMaps and Secrets to trigger pod restarts |
+| `flux/base` | `Deployment.helm-controller` + 5 others | Flux controllers reconcile Flux resources and manage cluster state |
+| `external-dns/cloudflare/base` | `Deployment.external-dns` | Watches Services and Ingresses to manage Cloudflare DNS records |
+| `external-dns/aws/base` | `Deployment.external-dns` | Same for AWS Route 53; fix propagates to `irsa-role` and `iam-access-keys` overlays |
+| `cert-manager/base` | `Deployment.cert-manager` + cainjector + webhook | Manages Certificates, CertificateRequests, and CA injection |
+| `cert-manager-spiffe-csi-driver/base` | `Deployment.cert-manager-csi-driver-spiffe-approver` | Approves CertificateRequests for SPIFFE identities |
+| `cert-manager-spiffe-csi-driver/base` | `DaemonSet.cert-manager-csi-driver-spiffe-driver` | CSI node plugin provisions SPIFFE SVIDs into pod volumes; used `skip2` since `skip1` is taken by CKV_K8S_40 |
+| `crossplane/base` | `Deployment.crossplane` + `crossplane-rbac-manager` | Manages infrastructure resources via Crossplane CRDs |
+| `flux-monitoring/base` | `Deployment.flux-state-metrics-kube-state-metrics` | Reads cluster state across all namespaces for metrics |
+| `cert-manager-approver-policy/base` | `Deployment.cert-manager-approver-policy` | Approves or denies CertificateRequests via cert-manager APIs |
+| `opentelemetry-operator/base` | `Deployment.opentelemetry-operator` | Manages OpenTelemetryCollector and Instrumentation resources |
+| `opentelemetry-operator/base` | `Pod.*` (helm test pods) | Helm test Pods interact with the cluster during test execution |
+
+### Changes Made
+
+A `checkov.io/skip1` (or `skip2`) JSON patch op was added to each application's existing deployment/daemonset/pod patch file. In every case, the patch file already existed and was already applied to the relevant resource via the kustomization — no new patch files or kustomization entries were needed.
+
+```
+applications/cert-manager-trust-manager/base/patches/deployment.yaml
+applications/reloader/base/patches/deployment.yaml
+applications/flux/base/patches/deployment.yaml
+applications/external-dns/cloudflare/base/patches/deployment.yaml
+applications/external-dns/aws/base/patches/deployment.yaml         (also covers irsa-role and iam-access-keys overlays)
+applications/cert-manager/base/patches/deployment.yaml
+applications/cert-manager-spiffe-csi-driver/base/patches/deployment.yaml
+applications/cert-manager-spiffe-csi-driver/base/patches/daemonset.yaml
+applications/crossplane/base/patches/deployment.yaml
+applications/flux-monitoring/base/patches/deployment.yaml
+applications/cert-manager-approver-policy/base/patches/deployment.yaml
+applications/opentelemetry-operator/base/patches/deployment.yaml
+applications/opentelemetry-operator/base/patches/pod.yaml
+```
+
+**Result:** 0 `CKV_K8S_38` failures, 25 additional skips. Overall scan: **Passed: 2862, Failed: 29, Skipped: 31**.
+
+---
+
 ## Final State
 
 | Check | Before | After |
@@ -204,9 +256,10 @@ Added a `checkov.io/skip1` JSON patch op to the existing `patches/clusterRole.ya
 | `CKV_K8S_40` (high UID) | 13 | 0 (1 skip) |
 | `my-csi-app` failures (Part 4) | 9 | 0 (2 skips) |
 | `CKV_K8S_49` (wildcards in roles) | 3 | 0 (3 skips) |
-| All other checks | ~82 | 62 |
-| **Total failures** | **133** | **62** |
-| Skipped | 0 | 6 |
+| `CKV_K8S_38` (SA token automount) | 25 | 0 (25 skips) |
+| All other checks | ~57 | 29 |
+| **Total failures** | **133** | **29** |
+| Skipped | 0 | 31 |
 
 ## Key Decisions
 
