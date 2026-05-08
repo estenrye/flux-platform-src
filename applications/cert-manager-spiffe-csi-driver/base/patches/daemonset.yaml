@@ -32,3 +32,6 @@
 - op: add
   path: /metadata/annotations/checkov.io~1skip2
   value: "CKV_K8S_38=The SPIFFE CSI driver DaemonSet requires the service account token to provision SPIFFE SVID certificates into pod volumes via the CSI node plugin."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip3
+  value: "CKV_K8S_8=CSI helper sidecars intentionally omit liveness probes; the main cert-manager-csi-driver-spiffe container already exposes and uses /healthz."

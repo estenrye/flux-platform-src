@@ -372,6 +372,99 @@ Both kustomizations target `kind: ClusterRole` for these patch files, so the ski
 
 ---
 
+## Part 9: CKV_K8S_35 — Prefer Secrets as Files Over Environment Variables
+
+**Check:** `CKV_K8S_35` — Prefer mounting secret data as files rather than exposing it via environment variables.
+
+**Count:** 1 failure in 1 application.
+
+### Failing Resource
+
+| Resource | Application |
+|---|---|
+| `Deployment.external-dns.external-dns` | `external-dns/cloudflare/base` |
+
+### Findings and Decision
+
+The Cloudflare external-dns deployment consumes credentials from `dns-credentials` using env vars:
+
+- `CF_API_TOKEN`
+- `EXTERNAL_DNS_DOMAIN_FILTER`
+- `EXTERNAL_DNS_ZONE_ID_FILTER`
+
+These values are sourced via `valueFrom.secretKeyRef` (not hardcoded), but still trigger CKV_K8S_35 because they are injected as environment variables.
+
+For this workload, env-var based provider configuration is an upstream controller pattern and already documented in kube-linter annotations for the same resource (`read-secret-from-env-var` and `env-value-from`). The remediation chosen was a checkov skip annotation with explicit rationale, co-located in the existing deployment patch.
+
+### Changes Made
+
+Added `checkov.io/skip2` to:
+
+```
+applications/external-dns/cloudflare/base/patches/deployment.yaml
+```
+
+Patch op added:
+
+```yaml
+- op: add
+  path: /metadata/annotations/checkov.io~1skip2
+  value: "CKV_K8S_35=external-dns cloudflare provider consumes API credentials via environment variables sourced from a Kubernetes Secret (dns-credentials). This is an upstream controller pattern and credentials are not hardcoded in manifests."
+```
+
+**Result:** 0 `CKV_K8S_35` failures. CKV_K8S_35 scoped scan: **Passed: 25, Failed: 0, Skipped: 1**.
+
+---
+
+## Part 10: CKV_K8S_8 — Liveness Probe Should Be Configured
+
+**Check:** `CKV_K8S_8` — Containers should have liveness probes configured.
+
+**Count:** 4 failures across 2 applications.
+
+### Failing Resources
+
+| Resource | Application |
+|---|---|
+| `DaemonSet.cert-manager.cert-manager-csi-driver-spiffe-driver` | `cert-manager-spiffe-csi-driver/base` |
+| `Pod.opentelemetry-operator-system.opentelemetry-operator-cert-manager` | `opentelemetry-operator/base` |
+| `Pod.opentelemetry-operator-system.opentelemetry-operator-metrics` | `opentelemetry-operator/base` |
+| `Pod.opentelemetry-operator-system.opentelemetry-operator-webhook` | `opentelemetry-operator/base` |
+
+### Findings and Decision
+
+- The SPIFFE CSI driver DaemonSet includes helper sidecars (`node-driver-registrar`, `liveness-probe`) where probe semantics differ from long-running application containers. Existing kube-linter annotations already document this exception.
+- The opentelemetry-operator Pod resources are Helm test hook Pods (`helm.sh/hook: test`) with `restartPolicy: Never`, intended as short-lived validation jobs rather than continuously running workloads.
+
+Given those semantics, these were handled as justified checkov skips in existing patch files rather than adding synthetic liveness probes.
+
+### Changes Made
+
+Added `checkov.io/skip` annotations:
+
+```
+applications/cert-manager-spiffe-csi-driver/base/patches/daemonset.yaml
+applications/opentelemetry-operator/base/patches/pod.yaml
+```
+
+Patch ops added:
+
+```yaml
+- op: add
+  path: /metadata/annotations/checkov.io~1skip3
+  value: "CKV_K8S_8=CSI helper sidecars intentionally omit liveness probes; the main cert-manager-csi-driver-spiffe container already exposes and uses /healthz."
+```
+
+```yaml
+- op: add
+  path: /metadata/annotations/checkov.io~1skip2
+  value: "CKV_K8S_8=Helm test hook Pods are short-lived validation jobs with restartPolicy Never and intentionally do not use liveness probes."
+```
+
+**Result:** 0 `CKV_K8S_8` failures. CKV_K8S_8 scoped scan: **Passed: 2, Failed: 0, Skipped: 1**.
+
+---
+
 ## Final State
 
 | Check | Before | After |
@@ -383,9 +476,11 @@ Both kustomizations target `kind: ClusterRole` for these patch files, so the ski
 | `CKV_K8S_38` (SA token automount) | 25 | 0 (25 skips) |
 | `CKV_K8S_37` (capabilities drop) | 3 | 0 |
 | `CKV_K8S_155` (webhook config control in ClusterRoles) | 2 | 0 |
-| All other checks | ~52 | 20 |
-| **Total failures** | **133** | **20** |
-| Skipped | 0 | 55 |
+| `CKV_K8S_35` (secrets as files vs env vars) | 1 | 0 (1 skip) |
+| `CKV_K8S_8` (liveness probes) | 4 | 0 (4 skips) |
+| All other checks | ~47 | 15 |
+| **Total failures** | **133** | **15** |
+| Skipped | 0 | 60 |
 
 ## Key Decisions
 
@@ -402,3 +497,7 @@ Both kustomizations target `kind: ClusterRole` for these patch files, so the ski
 6. **Checkov skip via existing kustomize patch** — When a kustomize patch already applies annotations to a class of resources (e.g. `clusterRole.yaml` targeting all Flux ClusterRoles), adding a new `op: add` entry to that patch is the correct approach. This avoids creating a separate patch file for a single annotation and keeps all skip justifications in one place.
 
 7. **Patch target scope affects skip cardinality** — A patch target of only `kind: ClusterRole` applies to all ClusterRoles in that kustomization. This is efficient for broad policy exceptions but may increase skip counts unexpectedly. Use name-scoped targets when per-resource exception boundaries are required.
+
+8. **Controller credential patterns may require env-var exceptions** — Some upstream controllers (e.g. external-dns provider configuration) consume secret values through environment variables. When moving to file mounts is non-trivial and the secret is already sourced via `secretKeyRef`, a checkov skip annotation with clear justification is the pragmatic approach.
+
+9. **Short-lived hooks and CSI helper sidecars are valid no-probe exceptions** — Helm test hook Pods (`restartPolicy: Never`) and certain CSI helper sidecars are not equivalent to long-running service containers. For these cases, use explicit checkov skip annotations with justification and keep them aligned with existing kube-linter exception rationale.
