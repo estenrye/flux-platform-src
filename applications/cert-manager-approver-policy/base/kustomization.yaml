@@ -21,3 +21,9 @@ patches:
   - target:
       kind: RoleBinding
     path: patches/rolebinding.yaml
+
+images:
+  - name: quay.io/jetstack/cert-manager-approver-policy
+    digest: sha256:31848b57a13aa6692fc55e75da6944e80124817e058bd5a14ba37f7f25370066
+  - name: quay.io/brancz/kube-rbac-proxy
+    digest: sha256:147cb28fea35473b2cf8697892d375bbe0aec237c5740b0368719b4c0d71b290

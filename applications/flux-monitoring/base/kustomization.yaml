@@ -18,3 +18,7 @@ patches:
   - target:
       kind: Deployment
     path: patches/deployment.yaml
+
+images:
+  - name: registry.k8s.io/kube-state-metrics/kube-state-metrics
+    digest: sha256:1545919b72e3ae035454fc054131e8d0f14b42ef6fc5b2ad5c751cafa6b2130e

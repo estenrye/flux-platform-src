@@ -43,3 +43,11 @@ patchesJson6902:
       name: cert-manager
       namespace: cert-manager
     path: patches/controller-health-probes.yaml
+
+images:
+  - name: quay.io/jetstack/cert-manager-controller
+    digest: sha256:9f9556b4b131554694c67c8229d231b1f7d69b882b5f061a56bafa465f3b22fc
+  - name: quay.io/jetstack/cert-manager-cainjector
+    digest: sha256:a3ff773a577d8ff6ad1fe9ab4ea0b74873e0341e0aac5d9411f3fc235f51bdf8
+  - name: quay.io/jetstack/cert-manager-webhook
+    digest: sha256:b876bcaf46ace2a5e860e8371539a6e1c8ccca54b1988a97c8a7483b3815d985
