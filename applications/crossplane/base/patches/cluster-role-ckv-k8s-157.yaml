@@ -1,0 +1,3 @@
+- op: add
+  path: /metadata/annotations/checkov.io~1skip2
+  value: "CKV_K8S_157=Crossplane rbac-manager and aggregate-to-admin ClusterRoles intentionally require bind/escalate capabilities to manage and aggregate RBAC for Crossplane core and installed providers."

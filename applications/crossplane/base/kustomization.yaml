@@ -32,6 +32,14 @@ patches:
   - target:
       kind: ClusterRole
     path: patches/cluster-role.yaml
+  - target:
+      kind: ClusterRole
+      name: crossplane-rbac-manager
+    path: patches/cluster-role-ckv-k8s-157.yaml
+  - target:
+      kind: ClusterRole
+      name: crossplane:aggregate-to-admin
+    path: patches/cluster-role-ckv-k8s-157.yaml
 
 images:
   - name: xpkg.crossplane.io/crossplane/crossplane

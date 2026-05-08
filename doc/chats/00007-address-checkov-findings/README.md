@@ -465,6 +465,55 @@ Patch ops added:
 
 ---
 
+## Part 11: CKV_K8S_157 — Minimize RBAC Permissions to Bind RoleBindings/ClusterRoleBindings
+
+**Check:** `CKV_K8S_157` — Roles and ClusterRoles granting permissions to bind RoleBindings or ClusterRoleBindings should be minimized.
+
+**Count:** 2 failures in 1 application.
+
+### Failing Resources
+
+| Resource | Application |
+|---|---|
+| `ClusterRole.default.crossplane-rbac-manager` | `crossplane/base` |
+| `ClusterRole.default.crossplane:aggregate-to-admin` | `crossplane/base` |
+
+### Findings and Decision
+
+Both failing ClusterRoles are upstream Crossplane RBAC roles with intentionally broad RBAC management permissions:
+
+- `crossplane-rbac-manager` includes `bind`/`escalate` related capabilities for managing Crossplane RBAC artifacts.
+- `crossplane:aggregate-to-admin` is an aggregate admin role that includes binding privileges as part of role aggregation and admin delegation behavior.
+
+These are not safe to narrow without risking controller/RBAC-manager functionality. The chosen remediation was targeted checkov skip annotations.
+
+### Changes Made
+
+Added a dedicated patch file:
+
+```
+applications/crossplane/base/patches/cluster-role-ckv-k8s-157.yaml
+```
+
+Patch content:
+
+```yaml
+- op: add
+  path: /metadata/annotations/checkov.io~1skip2
+  value: "CKV_K8S_157=Crossplane rbac-manager and aggregate-to-admin ClusterRoles intentionally require bind/escalate capabilities to manage and aggregate RBAC for Crossplane core and installed providers."
+```
+
+Wired this patch to **name-scoped** targets in `applications/crossplane/base/kustomization.yaml`:
+
+- `kind: ClusterRole`, `name: crossplane-rbac-manager`
+- `kind: ClusterRole`, `name: crossplane:aggregate-to-admin`
+
+This avoids applying the exception to all Crossplane ClusterRoles.
+
+**Result:** 0 `CKV_K8S_157` failures. CKV_K8S_157 scoped scan: **Passed: 53, Failed: 0, Skipped: 2**.
+
+---
+
 ## Final State
 
 | Check | Before | After |
@@ -478,9 +527,10 @@ Patch ops added:
 | `CKV_K8S_155` (webhook config control in ClusterRoles) | 2 | 0 |
 | `CKV_K8S_35` (secrets as files vs env vars) | 1 | 0 (1 skip) |
 | `CKV_K8S_8` (liveness probes) | 4 | 0 (4 skips) |
-| All other checks | ~47 | 15 |
-| **Total failures** | **133** | **15** |
-| Skipped | 0 | 60 |
+| `CKV_K8S_157` (RBAC bind permissions) | 2 | 0 (2 skips) |
+| All other checks | ~45 | 13 |
+| **Total failures** | **133** | **13** |
+| Skipped | 0 | 62 |
 
 ## Key Decisions
 
@@ -501,3 +551,5 @@ Patch ops added:
 8. **Controller credential patterns may require env-var exceptions** — Some upstream controllers (e.g. external-dns provider configuration) consume secret values through environment variables. When moving to file mounts is non-trivial and the secret is already sourced via `secretKeyRef`, a checkov skip annotation with clear justification is the pragmatic approach.
 
 9. **Short-lived hooks and CSI helper sidecars are valid no-probe exceptions** — Helm test hook Pods (`restartPolicy: Never`) and certain CSI helper sidecars are not equivalent to long-running service containers. For these cases, use explicit checkov skip annotations with justification and keep them aligned with existing kube-linter exception rationale.
+
+10. **Prefer name-scoped patch targets for high-risk RBAC exceptions** — For checks like CKV_K8S_157, adding a dedicated patch file and targeting only the exact role names avoids broad exception blast radius and keeps exception intent auditable.
