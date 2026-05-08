@@ -534,9 +534,10 @@ This avoids applying the exception to all Crossplane ClusterRoles.
 | `CKV_K8S_20` (allowPrivilegeEscalation) | 1 | 0 (1 skip) |
 | `CKV_K8S_16` (privileged container) | 1 | 0 (1 skip) |
 | `CKV_K8S_23` (root containers) | 1 | 0 (1 skip) |
-| All other checks | ~41 | 1 |
-| **Total failures** | **133** | **1** |
-| Skipped | 0 | 71 |
+| `CKV2_K8S_5` (service account secret-read breadth) | 1 | 0 (2 skips) |
+| All other checks | ~41 | 0 |
+| **Total failures** | **133** | **0** |
+| Skipped | 0 | 73 |
 
 ## Key Decisions
 
@@ -791,3 +792,37 @@ The DaemonSet already carried a kube-linter `run-as-non-root` exception with mat
 ### Result
 
 Scoped scan: **Passed: 25, Failed: 0, Skipped: 1**. Overall scan: **Passed: 2850, Failed: 1, Skipped: 71**.
+
+---
+
+## Part 18: CKV2_K8S_5 — No ServiceAccount/Node Should Be Able to Read All Secrets
+
+**Check:** `CKV2_K8S_5` — Service accounts and nodes should not have broad secret read access.
+
+**Count:** 1 failure.
+
+### Failing Resource
+
+| Resource | Application |
+|---|---|
+| `RoleBinding.cert-manager.trust-manager` | `cert-manager-trust-manager/base` |
+
+### Findings and Decision
+
+The trust-manager chart creates a namespaced `Role` and `RoleBinding` in `cert-manager` granting `get/list/watch` on Secrets. This access is required for trust-manager to reconcile Bundle sources and distribute trust data. Although checkov flags this pattern, the permission is already bounded to a single namespace and does not grant cluster-wide secrets access.
+
+The repository already had a matching kube-linter exception on this same RoleBinding. A checkov skip annotation is therefore the consistent and explicit exception mechanism.
+
+### Fix
+
+**File:** `applications/cert-manager-trust-manager/base/patches/role-binding.yaml`
+
+```yaml
+- op: add
+  path: /metadata/annotations/checkov.io~1skip1
+  value: "CKV2_K8S_5=trust-manager must list/watch secrets in its own namespace to reconcile Bundle sources; access is namespace-scoped via a namespaced Role and RoleBinding."
+```
+
+### Result
+
+Scoped scan: **Passed: 41, Failed: 0, Skipped: 2**. Overall scan: **Passed: 2849, Failed: 0, Skipped: 73**.
