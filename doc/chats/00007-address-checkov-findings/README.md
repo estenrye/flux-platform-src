@@ -124,15 +124,54 @@ applications/example-app-spiffe-csi/resources/deployment.yaml       runAsUser: 2
 
 ---
 
+---
+
+## Part 4: Remaining Checkov Failures — `my-csi-app` Demo Application
+
+**Count:** 9 failures specific to `Deployment.sandbox.my-csi-app` and pod-level security policies.
+
+### Failures and Fixes
+
+| Check | Issue | Fix | File |
+|---|---|---|---|
+| `CKV_K8S_29` | No pod-level `securityContext` | Added pod SC with `runAsNonRoot: true`, `runAsUser: 65532`, `runAsGroup: 2000`, `seccompProfile: {type: RuntimeDefault}` | `resources/deployment.yaml` |
+| `CKV_K8S_30` | No seccomp profile | Resolved by pod SC above (includes `seccompProfile`) | `resources/deployment.yaml` |
+| `CKV_K8S_31` | No `seccompProfile` | Resolved by pod SC above | `resources/deployment.yaml` |
+| `CKV_K8S_20` | `allowPrivilegeEscalation` not set to `false` | Added `allowPrivilegeEscalation: false` to container `securityContext` | `resources/deployment.yaml` |
+| `CKV_K8S_28` | `NET_RAW` capability not dropped | Added `capabilities: {drop: [ALL]}` to container `securityContext` | `resources/deployment.yaml` |
+| `CKV_K8S_8` | No liveness probe | Added `checkov.io/skip1` annotation with justification: demo app running `busybox sleep` has no HTTP endpoint to probe | `resources/deployment.yaml` |
+| `CKV_K8S_9` | No readiness probe | Added `checkov.io/skip2` annotation with justification: same as above | `resources/deployment.yaml` |
+| `CKV_K8S_38` | `automountServiceAccountToken` not disabled | Set `automountServiceAccountToken: false` on both the ServiceAccount and pod spec; the CSI driver node plugin (not the pod) impersonates the SA for API calls | `resources/service-account.yaml` + `resources/deployment.yaml` |
+| `CKV2_K8S_6` | No NetworkPolicy covering the pod | Created `resources/network-policy.yaml` denying all ingress, allowing DNS egress (UDP/TCP port 53) | `resources/network-policy.yaml` (new) + `kustomization.yaml` |
+
+### Rationale for Skip Annotations
+
+The example-app-spiffe-csi deployment already had kube-linter skip annotations for probes (`ignore-check.kube-linter.io/no-readiness-probe` and `/no-liveness-probe`) with justification "This is a demo application and does not require readiness/liveness probes." The corresponding checkov skip annotations use the same logic: a `busybox sleep` container has no application endpoint to probe and is intentionally a simple demonstration workload. Both linters now reflect the same design intent.
+
+### ServiceAccount Token Automounting
+
+The ServiceAccount and role allow the pod to call cert-manager APIs, but the actual API calls are made by the CSI driver node plugin (running as a DaemonSet) when provisioning certificates. The pod container (`busybox sleep`) never calls the Kubernetes API, so mounting the token is unnecessary and violates the least-privilege principle. Setting `automountServiceAccountToken: false` at both the ServiceAccount (default for all pods) and pod spec (explicit override to `false`) ensures the token is never mounted.
+
+### NetworkPolicy Design
+
+The NetworkPolicy:
+- **Ingress:** Explicitly denies all ingress (empty `ingress: []` rule).
+- **Egress:** Allows DNS traffic (UDP and TCP port 53) to enable hostname resolution. The SPIFFE CSI driver runs as a sidecar on the node and doesn't require egress from the pod container itself.
+
+**Result:** 0 failures for `*.sandbox.my-csi-app` resources. Final checkov scan: **Passed: 100, Failed: 0, Skipped: 2**.
+
+---
+
 ## Final State
 
 | Check | Before | After |
 |---|---|---|
 | `CKV_K8S_43` (image digest) | 26 | 0 |
 | `CKV_K8S_40` (high UID) | 13 | 0 (1 skip) |
-| All other checks | ~94 | 65 |
+| `my-csi-app` failures (Part 4) | 9 | 0 (2 skips) |
+| All other checks | ~85 | 65 |
 | **Total failures** | **133** | **65** |
-| Skipped | 0 | 1 |
+| Skipped | 0 | 3 |
 
 ## Key Decisions
 
