@@ -37,7 +37,7 @@ spec:
             readOnlyRootFilesystem: true
             runAsGroup: 2000
             runAsNonRoot: true
-            runAsUser: 2000
+            runAsUser: 65532
           resources:
             limits:
               cpu: 10m

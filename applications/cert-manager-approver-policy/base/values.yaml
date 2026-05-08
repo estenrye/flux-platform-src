@@ -358,7 +358,7 @@ strategy:
 # +docs:property
 securityContext:
   runAsNonRoot: true
-  runAsUser: 999
+  runAsUser: 65532
   seccompProfile:
     type: RuntimeDefault
 
@@ -371,4 +371,4 @@ containerSecurityContext:
     drop:
     - ALL
   readOnlyRootFilesystem: true
-  runAsUser: 999
+  runAsUser: 65532

@@ -41,3 +41,9 @@
                 values:
                   - flux-system
           topologyKey: "kubernetes.io/hostname"
+- op: add
+  path: /spec/template/spec/securityContext/runAsUser
+  value: 65532
+- op: add
+  path: /spec/template/spec/containers/0/securityContext/runAsUser
+  value: 65532

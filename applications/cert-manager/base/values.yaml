@@ -423,7 +423,7 @@ resources:
 # +docs:property
 securityContext:
   runAsNonRoot: true
-  runAsUser: 999
+  runAsUser: 65532
   seccompProfile:
     type: RuntimeDefault
 
@@ -436,7 +436,7 @@ containerSecurityContext:
     drop:
     - ALL
   readOnlyRootFilesystem: true
-  runAsUser: 999
+  runAsUser: 65532
 
 # Additional volumes to add to the cert-manager controller pod.
 volumes: []
@@ -838,7 +838,7 @@ webhook:
   # +docs:property
   securityContext:
     runAsNonRoot: true
-    runAsUser: 999
+    runAsUser: 65532
     seccompProfile:
       type: RuntimeDefault
 
@@ -851,7 +851,7 @@ webhook:
       drop:
       - ALL
     readOnlyRootFilesystem: true
-    runAsUser: 999
+    runAsUser: 65532
 
   podDisruptionBudget:
     # Enable or disable the PodDisruptionBudget resource.
@@ -1249,7 +1249,7 @@ cainjector:
   # +docs:property
   securityContext:
     runAsNonRoot: true
-    runAsUser: 999
+    runAsUser: 65532
     seccompProfile:
       type: RuntimeDefault
 
@@ -1262,7 +1262,7 @@ cainjector:
       drop:
       - ALL
     readOnlyRootFilesystem: true
-    runAsUser: 999
+    runAsUser: 65532
 
   # Enables default network policies for cainjector.
   # This provides a way for you to restrict network traffic
@@ -1552,7 +1552,7 @@ startupapicheck:
   # +docs:property
   securityContext:
     runAsNonRoot: true
-    runAsUser: 999
+    runAsUser: 65532
     seccompProfile:
       type: RuntimeDefault
 
@@ -1565,7 +1565,7 @@ startupapicheck:
       drop:
       - ALL
     readOnlyRootFilesystem: true
-    runAsUser: 999
+    runAsUser: 65532
 
   # Timeout for 'kubectl check api' command.
   timeout: 1m

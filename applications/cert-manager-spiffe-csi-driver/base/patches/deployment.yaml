@@ -23,3 +23,9 @@
     rollingUpdate:
       maxSurge: 1
       maxUnavailable: 1
+- op: add
+  path: /spec/template/spec/securityContext/runAsUser
+  value: 65532
+- op: add
+  path: /spec/template/spec/containers/0/securityContext/runAsUser
+  value: 65532
