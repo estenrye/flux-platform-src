@@ -530,9 +530,10 @@ This avoids applying the exception to all Crossplane ClusterRoles.
 | `CKV_K8S_157` (RBAC bind permissions) | 2 | 0 (2 skips) |
 | `CKV_K8S_9` (readiness probes) | 4 | 0 (4 skips) |
 | `CKV_K8S_29` (pod-level security context) | 2 | 0 |
-| All other checks | ~41 | 5 |
-| **Total failures** | **133** | **5** |
-| Skipped | 0 | 66 |
+| `CKV_K8S_158` (escalate verb in ClusterRoles) | 1 | 0 (1 skip) |
+| All other checks | ~41 | 4 |
+| **Total failures** | **133** | **4** |
+| Skipped | 0 | 68 |
 
 ## Key Decisions
 
@@ -647,3 +648,39 @@ Both fields were previously `{}`.
 ### Result
 
 Scoped scan: **Passed: 26, Failed: 0, Skipped: 0**. Overall scan: **Passed: 2851, Failed: 5, Skipped: 66**.
+
+---
+
+## Part 14: CKV_K8S_158 — Minimize Roles and ClusterRoles That Grant Permissions to Escalate Roles or ClusterRoles
+
+**Check:** `CKV_K8S_158` — Roles and ClusterRoles should not grant the `escalate` verb on `roles` or `clusterroles`.
+
+**Count:** 1 failure.
+
+### Failing Resource
+
+| Resource | Application |
+|---|---|
+| `ClusterRole.default.crossplane-rbac-manager` | `crossplane/base` |
+
+### Findings and Decision
+
+The `crossplane-rbac-manager` ClusterRole requires `escalate` on `roles`/`clusterroles` as a core part of Crossplane's RBAC management design. When Crossplane installs a provider, the rbac-manager must be able to create and escalate RBAC roles on behalf of that provider. This is intentional and documented upstream.
+
+This is the same resource that already carries a `CKV_K8S_157` skip (bind permissions) for identical reasons. CKV_K8S_158 is the companion check targeting the `escalate` verb specifically.
+
+The existing patch file `cluster-role-ckv-k8s-157.yaml` already targets `crossplane-rbac-manager` by name — adding the new skip op there keeps all RBAC-permission exceptions for this role co-located.
+
+### Fix
+
+**File:** `applications/crossplane/base/patches/cluster-role-ckv-k8s-157.yaml`
+
+```yaml
+- op: add
+  path: /metadata/annotations/checkov.io~1skip3
+  value: "CKV_K8S_158=Crossplane rbac-manager intentionally requires the escalate verb on Roles/ClusterRoles to manage RBAC for installed Crossplane providers."
+```
+
+### Result
+
+Scoped scan: **Passed: 53, Failed: 0, Skipped: 2**. Overall scan: **Passed: 2850, Failed: 4, Skipped: 68**.
