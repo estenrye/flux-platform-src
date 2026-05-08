@@ -532,9 +532,10 @@ This avoids applying the exception to all Crossplane ClusterRoles.
 | `CKV_K8S_29` (pod-level security context) | 2 | 0 |
 | `CKV_K8S_158` (escalate verb in ClusterRoles) | 1 | 0 (1 skip) |
 | `CKV_K8S_20` (allowPrivilegeEscalation) | 1 | 0 (1 skip) |
-| All other checks | ~41 | 3 |
-| **Total failures** | **133** | **3** |
-| Skipped | 0 | 69 |
+| `CKV_K8S_16` (privileged container) | 1 | 0 (1 skip) |
+| All other checks | ~41 | 2 |
+| **Total failures** | **133** | **2** |
+| Skipped | 0 | 70 |
 
 ## Key Decisions
 
@@ -721,3 +722,37 @@ A checkov skip annotation is the correct resolution, consistent with the pattern
 ### Result
 
 Scoped scan: **Passed: 25, Failed: 0, Skipped: 1**. Overall scan: **Passed: 2850, Failed: 3, Skipped: 69**.
+
+---
+
+## Part 16: CKV_K8S_16 — Container Should Not Be Privileged
+
+**Check:** `CKV_K8S_16` — Containers must not set `securityContext.privileged: true`.
+
+**Count:** 1 failure.
+
+### Failing Resource
+
+| Resource | Application |
+|---|---|
+| `DaemonSet.cert-manager.cert-manager-csi-driver-spiffe-driver` | `cert-manager-spiffe-csi-driver/base` |
+
+### Findings and Decision
+
+This is the same container and same root cause as CKV_K8S_20 (Part 15). The `cert-manager-csi-driver-spiffe` container requires `privileged: true` to enable bidirectional mount propagation to the kubelet pods directory, as mandated by the CSI specification. This cannot be avoided without breaking the CSI driver's core function.
+
+The DaemonSet already carries a kube-linter `privileged-container` exception documenting this requirement. CKV_K8S_16 is the checkov counterpart to that same annotation.
+
+### Fix
+
+**File:** `applications/cert-manager-spiffe-csi-driver/base/patches/daemonset.yaml`
+
+```yaml
+- op: add
+  path: /metadata/annotations/checkov.io~1skip6
+  value: "CKV_K8S_16=The cert-manager-csi-driver-spiffe container requires privileged: true for bidirectional mount propagation to the kubelet pods directory, as required by the CSI specification."
+```
+
+### Result
+
+Scoped scan: **Passed: 25, Failed: 0, Skipped: 1**. Overall scan: **Passed: 2850, Failed: 2, Skipped: 70**.
