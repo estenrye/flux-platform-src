@@ -17,7 +17,7 @@ push: lint
 	.bin/render/render-put-target-repository-push.sh
 
 lint-checkov: lint-deps
-	.venv-checkov/bin/checkov -d .render/ --framework kubernetes --quiet --compact --skip-results-upload
+	.venv/bin/checkov -d .render/ --framework kubernetes --quiet --compact --skip-results-upload
 
 lint-kube-linter: lint-deps
 	find .render -type f -name "*.yaml" -o -name "*.yml" \
