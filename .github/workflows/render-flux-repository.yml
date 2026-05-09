@@ -32,3 +32,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
         RENDER_GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
+
+    - name: Lint with checkov
+      run: make lint-checkov
+    
+    - name: Lint with kube-linter
+      run: make lint-kube-linter
