@@ -13,7 +13,7 @@ render: render-deps
 	export RENDER_GITHUB_TOKEN=$${RENDER_GITHUB_TOKEN:-$$(gh auth token)}; \
 	.bin/render.sh
 
-push: render lint
+push: lint
 	.bin/render/render-put-target-repository-push.sh
 
 lint-checkov: lint-deps
