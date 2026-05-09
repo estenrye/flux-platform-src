@@ -1,0 +1,53 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wildbitca-provider-cloudflare-dns-allow-egress
+  namespace: crossplane-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This policy addresses a pod that is dynamically created by the provider and cannot be referenced by a static analysis of the NetworkPolicy."
+spec:
+  podSelector:
+    matchLabels:
+      pkg.crossplane.io/provider: wildbitca-provider-cloudflare-dns
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: default
+    ports:
+    - protocol: TCP
+      port: 443
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  - ports:
+    - protocol: TCP
+      port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wildbitca-provider-cloudflare-dns-allow-ingress
+  namespace: crossplane-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This policy addresses a pod that is dynamically created by the provider and cannot be referenced by a static analysis of the NetworkPolicy."
+spec:
+  ingress:
+  - ports:
+    - port: webhook
+      protocol: TCP
+    - port: metrics
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      pkg.crossplane.io/provider: wildbitca-provider-cloudflare-dns
+  policyTypes:
+  - Ingress

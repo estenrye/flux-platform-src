@@ -13,3 +13,21 @@ helmCharts:
     namespace: cert-manager
     includeCRDs: true
     valuesFile: values.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+  - target:
+      kind: Deployment
+      name: trust-manager
+    path: patches/deployment.trust-manager.yaml
+  - target:
+      kind: RoleBinding
+    path: patches/role-binding.yaml
+
+images:
+  - name: quay.io/jetstack/trust-manager
+    digest: sha256:16f8ad469b944f1b060d5fc2d391672d76ac0b11717d4af27f7dc0e7cf145066
+  - name: quay.io/jetstack/trust-pkg-debian-bookworm
+    digest: sha256:3d75dbefafa1d32a262078eadcab0c2e58621c3ac7ef2ea070bc83f9dc234cb6

@@ -11,3 +11,18 @@ helmCharts:
     includeCRDs: true
     valuesInline: {}
     valuesFile: values.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+  - target:
+      kind: ClusterRole
+    path: patches/cluster-role.yaml
+
+resources:
+  - resources/network-policy.yaml
+
+images:
+  - name: registry.k8s.io/external-dns/external-dns
+    digest: sha256:ddc7f4212ed09a21024deb1f470a05240837712e74e4b9f6d1f2632ff10672e7

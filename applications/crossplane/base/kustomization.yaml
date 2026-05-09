@@ -17,3 +17,30 @@ helmCharts:
     namespace: crossplane-system
     includeCRDs: true
     valuesFile: values.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+  - target:
+      kind: Deployment
+      name: crossplane-rbac-manager
+    path: patches/deployment-rbac-manager.yaml
+  - target:
+      kind: ClusterRoleBinding
+    path: patches/cluster-role-binding.yaml
+  - target:
+      kind: ClusterRole
+    path: patches/cluster-role.yaml
+  - target:
+      kind: ClusterRole
+      name: crossplane-rbac-manager
+    path: patches/cluster-role-ckv-k8s-157.yaml
+  - target:
+      kind: ClusterRole
+      name: crossplane:aggregate-to-admin
+    path: patches/cluster-role-ckv-k8s-157.yaml
+
+images:
+  - name: xpkg.crossplane.io/crossplane/crossplane
+    digest: sha256:bd54cb812893ee28b8c4d8a486c89c06c9b1df11dc6ffa1b405e53a996fed128

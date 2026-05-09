@@ -6,5 +6,5 @@ resources:
   - ./resources/service-account.yaml
   - ./resources/role-binding.yaml
   - ./resources/deployment-runtime-config.yaml
-  - ./resources/providerconfig.yaml
+  - ./resources/cluster-provider-config.yaml
   - ./resources/network-policy.yaml

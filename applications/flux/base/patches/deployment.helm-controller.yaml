@@ -1,0 +1,7 @@
+- op: add
+  path: /spec/template/spec/affinity/podAntiAffinity/preferredDuringSchedulingIgnoredDuringExecution/0/podAffinityTerm/labelSelector/matchExpressions/-
+  value:
+    key: "app.kubernetes.io/component"
+    operator: In
+    values:
+      - helm-controller

@@ -1,0 +1,40 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: opentelemetry-operator-system
+
+helmCharts:
+  - name: opentelemetry-operator
+    repo: https://open-telemetry.github.io/opentelemetry-helm-charts
+    version: 0.109.0
+    releaseName: opentelemetry-operator
+    namespace: opentelemetry-operator-system
+    includeCRDs: true
+    valuesFile: values.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+  - target:
+      kind: Pod
+      annotationSelector: "helm.sh/hook=test"
+    path: patches/pod.yaml
+  - target:
+      kind: ClusterRoleBinding
+    path: patches/clusterRoleBinding.yaml
+  - target:
+      kind: RoleBinding
+    path: patches/clusterRoleBinding.yaml
+
+resources:
+  - resources/networkpolicy.test-pods.yaml
+  - resources/networkpolicy.deployment.yaml
+  - resources/serviceaccount.test.yaml
+
+images:
+  - name: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator
+    digest: sha256:590e50477b76702b6b630cf047e4f712cb5bf37f064ce6f8d08758d7437f56ab
+  - name: quay.io/brancz/kube-rbac-proxy
+    digest: sha256:147cb28fea35473b2cf8697892d375bbe0aec237c5740b0368719b4c0d71b290
+  - name: busybox
+    digest: sha256:1487d0af5f52b4ba31c7e465126ee2123fe3f2305d638e7827681e7cf6c83d5e

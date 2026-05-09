@@ -1,0 +1,17 @@
+apiVersion: dns.platform.rye.ninja/v1alpha1
+kind: XDelegatedHostedZoneAWS
+metadata:
+  name: crossplane-rye-ninja
+  namespace: crossplane-controlplane-cluster
+spec:
+  subdomain: crossplane
+  zoneName: rye.ninja
+  zoneId: 186a0fa51e8dd54ee6910d0f35d5f0c8
+  delegatedZoneProviderConfigRef:
+    apiVersion: aws.m.upbound.io/v1beta1
+    kind: ClusterProviderConfig
+    name: dns-admin
+  cloudflareProviderConfigRef:
+    apiVersion: upjet-cloudflare.m.upbound.io/v1beta1
+    kind: ClusterProviderConfig
+    name: cloudflare-provider-config

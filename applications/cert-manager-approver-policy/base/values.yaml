@@ -28,7 +28,7 @@ crds:
 #   replicaCount: ${REPLICAS_OVERRIDE:=3}
 #
 # +docs:type=number,string,null
-replicaCount: 1
+replicaCount: 3
 
 # The container registry used for approver-policy images by default.
 # This can include path prefixes (e.g. "artifactory.example.com/docker").
@@ -202,7 +202,25 @@ priorityClassName: "platform-critical"
 #            operator: In
 #            values:
 #            - master
-affinity: {}
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 1
+        preference:
+          matchExpressions:
+            - key: servers.ngpc.rxt.io/type
+              operator: In
+              values:
+                - ondemand
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: cert-manager-approver-policy
+              app.kubernetes.io/instance: cert-manager-approver-policy
+          topologyKey: kubernetes.io/hostname
+        weight: 100
 
 # The nodeSelector on Pods tells Kubernetes to schedule Pods on the nodes with
 # matching labels.
@@ -282,7 +300,13 @@ volumes: []
 #    requests:
 #      cpu: 100m
 #      memory: 128Mi
-resources: {}
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
 
 # Allow custom labels to be placed on resources - optional.
 commonLabels: {}
@@ -308,7 +332,11 @@ podAnnotations: {}
 #      maxUnavailable: 1
 #
 # For more information, see the [Kubernetes documentation](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy).
-strategy: {}
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 1
 
 # Use these variables to configure the HTTP_PROXY environment variables.
 
@@ -330,7 +358,7 @@ strategy: {}
 # +docs:property
 securityContext:
   runAsNonRoot: true
-  runAsUser: 999
+  runAsUser: 65532
   seccompProfile:
     type: RuntimeDefault
 
@@ -343,4 +371,4 @@ containerSecurityContext:
     drop:
     - ALL
   readOnlyRootFilesystem: true
-  runAsUser: 999
+  runAsUser: 65532

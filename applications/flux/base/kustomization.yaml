@@ -1,0 +1,61 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: flux-system
+
+resources:
+  - https://github.com/fluxcd/flux2/releases/download/v2.7.5/install.yaml
+  - resources/network-policy.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+  - target:
+      kind: Deployment
+      name: helm-controller
+    path: patches/deployment.helm-controller.yaml
+  - target:
+      kind: Deployment
+      name: image-automation-controller
+    path: patches/deployment.image-automation-controller.yaml
+  - target:
+      kind: Deployment
+      name: image-reflector-controller
+    path: patches/deployment.image-reflector-controller.yaml
+  - target:
+      kind: Deployment
+      name: kustomize-controller
+    path: patches/deployment.kustomize-controller.yaml
+  - target:
+      kind: Deployment
+      name: notification-controller
+    path: patches/deployment.notification-controller.yaml
+  - target:
+      kind: Deployment
+      name: source-controller
+    path: patches/deployment.source-controller.yaml
+  - target:
+      kind: ClusterRoleBinding
+      name: crd-controller
+    path: patches/clusterRoleBinding.crd-controller.yaml
+  - target:
+      kind: ClusterRoleBinding
+      name: cluster-reconciler
+    path: patches/clusterRoleBinding.cluster-reconciler.yaml
+  - target:
+      kind: ClusterRole
+    path: patches/clusterRole.yaml
+
+images:
+  - name: ghcr.io/fluxcd/helm-controller
+    digest: sha256:d8d8fc2fb46c554e28071f1e4879be33491e71fdd3e0e41f61bb494a72c6dffc
+  - name: ghcr.io/fluxcd/image-automation-controller
+    digest: sha256:f9383dccb80ec65e274648941af623ce74084d25026e14389111c14b630efece
+  - name: ghcr.io/fluxcd/image-reflector-controller
+    digest: sha256:0bdc30aea2b7cdfea02d0f6d53c06b9df0ea1c6516b85ed523792e222329c039
+  - name: ghcr.io/fluxcd/kustomize-controller
+    digest: sha256:e8ca82d66dafdd8ef77e0917f4adec53478075130ac61264dc0f91eb0f8cb6ce
+  - name: ghcr.io/fluxcd/notification-controller
+    digest: sha256:ba723a55f7c7c7feedd50bb5db0ff2dd9a3b0ae85b50f61a0457184025b38c54
+  - name: ghcr.io/fluxcd/source-controller
+    digest: sha256:16f21ac1795528df80ddef51ccbb14a57b78ea26e66dc8551636ef9a3cec71b3

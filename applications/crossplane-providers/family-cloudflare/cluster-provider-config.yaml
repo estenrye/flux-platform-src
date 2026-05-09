@@ -1,0 +1,11 @@
+apiVersion: upjet-cloudflare.m.upbound.io/v1beta1
+kind: ClusterProviderConfig
+metadata:
+  name: cloudflare-provider-config
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      name: cloudflare-creds
+      namespace: crossplane-system
+      key: credentials

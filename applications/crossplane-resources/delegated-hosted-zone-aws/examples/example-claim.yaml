@@ -1,0 +1,20 @@
+apiVersion: dns.platform.rye.ninja/v1alpha1
+kind: XDelegatedHostedZoneAWS
+metadata:
+  name: crossplane-rye-ninja
+  namespace: crossplane-system
+  labels:
+    rye.ninja/flux-src-repository: estenrye/flux-platform-src
+    rye.ninja/flux-src-commit-hash: 6ede3848c41900a30f075195992057df671e3019
+    rye.ninja/component: cert-manager
+    rye.ninja/owner: platform-engineering
+spec:
+  subdomain: crossplane
+  zoneName: rye.ninja
+  zoneId: 186a0fa51e8dd54ee6910d0f35d5f0c8
+  delegatedZoneProviderConfigRef:
+    kind: ProviderConfig
+    name: dns-admin
+  cloudflareProviderConfigRef:
+    kind: ProviderConfig
+    name: default

@@ -23,12 +23,36 @@ jobs:
       env:
         OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         RENDER_GITHUB_TOKEN: "op://wvraeffbmpocy5jpzwgyerj3qi/4gs3fu4ul3ei2wrbgmw36c3kbu/token"
-    
+
+    - name: Get branch name
+      id: get-branch
+      run: |
+        if [ "${{ github.event_name }}" == "pull_request" ]; then
+          # For PRs, use the source branch (head)
+          echo "BRANCH_NAME=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+        else
+          # For pushes, extract the short name from GITHUB_REF
+          echo "BRANCH_NAME=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
+        fi
+
     - name: Install dependencies
       run: make render-deps
 
     - name: Run make render
       run: make render
+      env:
+        GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
+        RENDER_GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
+        SOURCE_BRANCH_NAME: ${{ steps.get-branch.outputs.BRANCH_NAME }}
+
+    - name: Lint with checkov
+      run: make lint-checkov
+      env:
+        GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
+        RENDER_GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
+    
+    - name: Lint with kube-linter
+      run: make lint-kube-linter
       env:
         GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
         RENDER_GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}

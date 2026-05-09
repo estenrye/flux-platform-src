@@ -1,0 +1,35 @@
+checks:
+  addAllBuiltIn: true
+  ignorePaths:
+    - ".bin/**"
+    - ".github/**"
+    - ".kube-linter/**"
+    - ".venv/**"
+    - ".vscode/**"
+    - "doc/**"
+    - "images/**"
+    - "providers/**"
+    - "**/catalog.yaml"
+    - "**/labels.yaml"
+  exclude:
+    - "dnsconfig-options"
+    - "priority-class-name"
+    - "required-label-owner"
+    - "required-annotation-email"
+
+customChecks:
+  - name: "platform-priority-class-name"
+    template: "priority-class-name"
+    params:
+      acceptedPriorityClassNames:
+        - always-preempted
+        - application-best-effort
+        - application-critical
+        - application
+        - cicd
+        - datastore
+        - never-preempted
+        - opentelemetry
+        - platform-best-effort
+        - platform-critical
+        - platform

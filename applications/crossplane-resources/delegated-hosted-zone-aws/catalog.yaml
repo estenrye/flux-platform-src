@@ -1,0 +1,36 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: delegated-hosted-zone-aws
+  description: |-
+    This is a Crossplane composition for delegating a hosted 
+    zone in AWS Route53 from a parent zone in Cloudflare. It 
+    includes a composite resource definition (XRD) that defines
+    the schema for the composite resource, and a composition that
+    defines how to create the necessary AWS Route53 resources and
+    Cloudflare NS records to achieve the delegation. The
+    composition uses Go templating functions to dynamically 
+    generate the names and configurations of the resources based
+    on the fields specified in the composite resource. 
+
+  tags:
+    - crossplane
+    - crossplane-provider
+    - dns
+    - cloudflare
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://marketplace.upbound.io/providers/wildbitca/provider-cloudflare-dns
+      title: Upjet-based Crossplane provider for Cloudflare
+      icon: docs
+      type: documentation
+    - url: https://github.com/wildbitca/provider-upjet-cloudflare
+      title: GitHub repository for the Upjet-based Crossplane provider for Cloudflare
+      icon: github
+      type: source
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   

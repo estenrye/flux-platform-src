@@ -1,0 +1,3 @@
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-secrets
+  value: "cert-manager controller requires secret access for certificate key and CA bundle management."

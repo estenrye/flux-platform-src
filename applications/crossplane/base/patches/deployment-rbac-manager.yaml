@@ -1,0 +1,15 @@
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: HEALTH_PROBE_PORT
+    value: "8081"
+- op: add
+  path: /spec/template/spec/containers/0/ports/-
+  value:
+    name: readyz
+    containerPort: 8081
+- op: add
+  path: /spec/template/spec/containers/0/securityContext/capabilities
+  value:
+    drop:
+      - ALL

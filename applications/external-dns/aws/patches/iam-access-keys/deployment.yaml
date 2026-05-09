@@ -13,3 +13,9 @@
 - op: add
   path: /spec/template/spec/containers/0/args/-
   value: --zone-id-filter=${route53_zone_id:-not-set}
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1read-secret-from-env-var
+  value: "This is not a custom application."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1env-var-secret
+  value: "Secret comes from an external source."

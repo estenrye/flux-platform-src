@@ -1,0 +1,6 @@
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-secrets
+  value: "cert-manager needs access to secrets to manage certificates and related resources."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-create-pods
+  value: "cert-manager needs access to create pods to perform certificate management operations."

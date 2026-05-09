@@ -2,7 +2,7 @@
 # appropiate.
 #
 # -- The number of Crossplane pod `replicas` to deploy.
-replicas: 1
+replicas: 3
 
 # -- The number of Crossplane ReplicaSets to retain.
 revisionHistoryLimit: null
@@ -25,7 +25,25 @@ nodeSelector: {}
 # -- Add `tolerations` to the Crossplane pod deployment.
 tolerations: []
 # -- Add `affinities` to the Crossplane pod deployment.
-affinity: {}
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: role
+              operator: In
+              values:
+              - system-critical
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: crossplane
+              app.kubernetes.io/instance: crossplane
+          topologyKey: kubernetes.io/hostname
+        weight: 100
+
 # -- Add `topologySpreadConstraints` to the Crossplane pod deployment.
 topologySpreadConstraints: []
 
@@ -39,7 +57,8 @@ dnsPolicy: ""
 customLabels: {}
 
 # -- Add custom `annotations` to the Crossplane pod deployment.
-customAnnotations: {}
+customAnnotations:
+  ignore-check.kube-linter.io/env-var-secret: "This secret comes from an external source and should be ignored."
 
 serviceAccount:
   # -- Specifies whether Crossplane ServiceAccount should be created
@@ -97,7 +116,7 @@ rbacManager:
   # -- Don't install aggregated Crossplane ClusterRoles.
   skipAggregatedClusterRoles: false
   # -- The number of RBAC Manager pod `replicas` to deploy.
-  replicas: 1
+  replicas: 3
   # -- The number of RBAC Manager ReplicaSets to retain.
   revisionHistoryLimit: null
   # -- Enable [leader election](https://docs.crossplane.io/latest/guides/pods/#leader-election) for the RBAC Manager pod.
@@ -109,7 +128,25 @@ rbacManager:
   # -- Add `tolerations` to the RBAC Manager pod deployment.
   tolerations: []
   # -- Add `affinities` to the RBAC Manager pod deployment.
-  affinity: {}
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: role
+                operator: In
+                values:
+                - system-critical
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app: crossplane-rbac-manager
+                app.kubernetes.io/instance: crossplane
+            topologyKey: kubernetes.io/hostname
+          weight: 100
+
   # -- Add `topologySpreadConstraints` to the RBAC Manager pod deployment.
   topologySpreadConstraints: []
 
@@ -204,10 +241,16 @@ extraEnvVarsCrossplane: {}
 extraEnvVarsRBACManager: {}
 
 # -- Add a custom `securityContext` to the Crossplane pod.
-podSecurityContextCrossplane: {}
+podSecurityContextCrossplane:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
 
 # -- Add a custom `securityContext` to the RBAC Manager pod.
-podSecurityContextRBACManager: {}
+podSecurityContextRBACManager:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
 
 # -- Add custom `volumes` to the Crossplane pod. Supports template expressions.
 extraVolumesCrossplane:

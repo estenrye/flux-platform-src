@@ -15,3 +15,27 @@ helmCharts:
     namespace: cert-manager
     includeCRDs: true
     valuesFile: values.yaml
+
+patches:
+  - target:
+      kind: DaemonSet
+    path: patches/daemonset.yaml
+  - target:
+      kind: DaemonSet
+    path: patches/daemonset-sidecar-resources.yaml
+  - target:
+      kind: DaemonSet
+    path: patches/daemonset-liveness-probe-sidecar-readiness.yaml
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+
+images:
+  - name: quay.io/jetstack/cert-manager-csi-driver-spiffe
+    digest: sha256:fde54241841c3ab285b9ae3b32a1dedb981647f327c24a58faf1aebe922ec056
+  - name: quay.io/jetstack/cert-manager-csi-driver-spiffe-approver
+    digest: sha256:8d7d4a924d74abdc659e5329af11a8a3fe5a067d435a6a7873e62e6a949b0ca0
+  - name: quay.io/jetstack/csi-node-driver-registrar
+    digest: sha256:ab482308a4921e28a6df09a16ab99a457e9af9641ff44fb1be1a690d07ce8b70
+  - name: quay.io/jetstack/livenessprobe
+    digest: sha256:c4cc074199c045dd73ab85f28897e2a32f4d6f38ffdba4f3b13b8007ccbd3570

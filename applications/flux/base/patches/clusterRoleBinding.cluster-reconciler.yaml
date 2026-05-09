@@ -1,0 +1,3 @@
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1cluster-admin-role-binding
+  value: "This deployment needs a cluster-admin role binding to reconcile resources across the cluster."

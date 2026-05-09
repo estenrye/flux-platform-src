@@ -5,6 +5,16 @@ metadata:
   namespace: sandbox
   labels:
     app: my-csi-app
+  annotations:
+    ignore-check.kube-linter.io/minimum-three-replicas: "This is a demo application and does not require high availability."
+    ignore-check.kube-linter.io/no-rolling-update-strategy: "This is a demo application and does not require high availability."
+    ignore-check.kube-linter.io/no-readiness-probe: "This is a demo application and does not require readiness probes."
+    ignore-check.kube-linter.io/no-liveness-probe: "This is a demo application and does not require liveness probes."
+    ignore-check.kube-linter.io/non-isolated-pod: "This is a demo application and does not require isolated pods."
+    ignore-check.kube-linter.io/no-node-affinity: "This is a demo application and does not require isolated pods."
+    ignore-check.kube-linter.io/latest-tag: "This is a demo application and should run latest."
+    checkov.io/skip1: "CKV_K8S_8=This is a demo application running busybox sleep; there is no HTTP endpoint to probe."
+    checkov.io/skip2: "CKV_K8S_9=This is a demo application running busybox sleep; there is no HTTP endpoint to probe."
 spec:
   replicas: 1
   selector:
@@ -15,15 +25,32 @@ spec:
       labels:
         app: my-csi-app
     spec:
+      restartPolicy: Always
       serviceAccountName: example-app
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: my-frontend
-          image: busybox
+          image: busybox:1.37.0@sha256:1487d0af5f52b4ba31c7e465126ee2123fe3f2305d638e7827681e7cf6c83d5e
           imagePullPolicy: IfNotPresent
           command: [ "sleep", "1000000" ]
           volumeMounts:
           - mountPath: "/var/run/secrets/spiffe.io"
             name: spiffe
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsGroup: 2000
+            runAsNonRoot: true
+            runAsUser: 65532
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           resources:
             limits:
               cpu: 10m

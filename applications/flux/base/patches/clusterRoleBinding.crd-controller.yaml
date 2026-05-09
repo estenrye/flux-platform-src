@@ -1,0 +1,6 @@
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-secrets
+  value: "This deployment needs access to watch secrets."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-create-pods
+  value: "This deployment needs the ability to create pods."

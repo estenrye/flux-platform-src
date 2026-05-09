@@ -3,6 +3,7 @@ kind: Kustomization
 namespace: sandbox
 resources:
 - resources/namespace.yaml
+- resources/network-policy.yaml
 - resources/role.yaml
 - resources/role-binding.yaml
 - resources/service-account.yaml
