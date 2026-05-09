@@ -22,13 +22,13 @@ customChecks:
     template: "priority-class-name"
     params:
       acceptedPriorityClassNames:
-        - always-prempted
+        - always-preempted
         - application-best-effort
         - application-critical
         - application
         - cicd
         - datastore
-        - never-prempted
+        - never-preempted
         - opentelemetry
         - platform-best-effort
         - platform-critical
