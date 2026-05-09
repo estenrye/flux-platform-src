@@ -9,8 +9,8 @@ lint-deps:
 	.bin/install-checkov.sh
 
 render: render-deps
-	export GITHUB_TOKEN=$${GITHUB_TOKEN:-$$(gh auth token)};
-	export RENDER_GITHUB_TOKEN=$${RENDER_GITHUB_TOKEN:-$$(gh auth token)};
+	export GITHUB_TOKEN=$${GITHUB_TOKEN:-$$(gh auth token)}; \
+	export RENDER_GITHUB_TOKEN=$${RENDER_GITHUB_TOKEN:-$$(gh auth token)}; \
 	.bin/render.sh
 
 push: render lint
