@@ -27,8 +27,6 @@ patches:
   - target:
       kind: ClusterRole
     path: patches/cluster-role.yaml
-
-patchesJson6902:
   - target:
       group: apps
       version: v1
