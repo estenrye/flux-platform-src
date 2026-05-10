@@ -27,13 +27,14 @@ tolerations: []
 # -- Add `affinities` to the Crossplane pod deployment.
 affinity:
   nodeAffinity:
-    requiredDuringSchedulingIgnoredDuringExecution:
-      nodeSelectorTerms:
-        - matchExpressions:
-            - key: role
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 1
+        preference:
+          matchExpressions:
+            - key: servers.ngpc.rxt.io/type
               operator: In
               values:
-              - system-critical
+                - ondemand
   podAntiAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:
       - podAffinityTerm:
@@ -130,13 +131,14 @@ rbacManager:
   # -- Add `affinities` to the RBAC Manager pod deployment.
   affinity:
     nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: role
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 1
+          preference:
+            matchExpressions:
+              - key: servers.ngpc.rxt.io/type
                 operator: In
                 values:
-                - system-critical
+                  - ondemand
     podAntiAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
         - podAffinityTerm:
