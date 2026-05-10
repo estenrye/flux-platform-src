@@ -148,7 +148,7 @@ Use dedicated health endpoints specifically designed for Kubernetes lifecycle ma
 **File:** `applications/cert-manager/base/kustomization.yaml`
 
 ```yaml
-patchesJson6902:
+patches:
   - target:
       group: apps
       version: v1

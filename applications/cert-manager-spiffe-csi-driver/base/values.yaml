@@ -316,7 +316,7 @@ app:
         memory: "128Mi"
         cpu: "200m"
 # Optional priority class to be used for the csi-driver pods.
-priorityClassName: "platform-critical"
+priorityClassName: "never-preempted"
 # Labels to apply to all resources
 commonLabels: {}
 # Kubernetes node selector: node labels for pod assignment.

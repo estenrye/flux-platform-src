@@ -27,7 +27,6 @@
   value:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 25%
       maxUnavailable: 25%
 - op: add
   path: /metadata/annotations/checkov.io~1skip2
