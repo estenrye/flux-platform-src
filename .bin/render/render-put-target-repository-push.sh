@@ -32,6 +32,12 @@ fi
 git config user.name "${GIT_USER_NAME}"
 git config user.email "${GIT_USER_EMAIL}"
 
+if [ -n "${RENDER_GITHUB_TOKEN:-}" ]; then
+  git config --local credential.helper store
+  echo "https://x-access-token:${RENDER_GITHUB_TOKEN}@github.com" > ~/.git-credentials
+  chmod 600 ~/.git-credentials
+fi
+
 git add .
 git commit \
   -m "Render ${SOURCE_REPO_NAME}/${SOURCE_REPO_BRANCH}" \
