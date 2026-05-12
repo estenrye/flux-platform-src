@@ -63,3 +63,5 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
         RENDER_GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
+        RENDER_GIT_USER_NAME: ${{ vars.RENDER_GIT_USER_NAME }}
+        RENDER_GIT_USER_EMAIL: ${{ vars.RENDER_GIT_USER_EMAIL }}
