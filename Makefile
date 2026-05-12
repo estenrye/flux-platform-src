@@ -13,8 +13,10 @@ render: render-deps
 	export RENDER_GITHUB_TOKEN=$${RENDER_GITHUB_TOKEN:-$$(gh auth token)}; \
 	.bin/render.sh
 
-push: lint
+push-branch:
 	.bin/render/render-put-target-repository-push.sh
+
+push: lint push-branch
 
 lint-checkov: lint-deps
 	.venv/bin/checkov -d .render/ --framework kubernetes --quiet --compact --skip-results-upload
