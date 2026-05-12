@@ -56,3 +56,10 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
         RENDER_GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
+    
+    - name: Push rendered changes
+      if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+      run: make push-branch
+      env:
+        GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
+        RENDER_GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
