@@ -10,10 +10,13 @@ TARGET_REPO_OWNER=${TARGET_REPO_OWNER:-$(${SCRIPTS_DIR}/render/render-get-source
 TARGET_REPO_NAME=${TARGET_REPO_NAME:-flux-platform-rendered}
 
 cp -r ${SCRIPTS_DIR} ${RENDER_DIR}/${TARGET_REPO_NAME}/.bin
+cp -r ${BASE_DIR}/Makefile ${RENDER_DIR}/${TARGET_REPO_NAME}/Makefile
 cp -r ${BASE_DIR}/.vscode ${RENDER_DIR}/${TARGET_REPO_NAME}/.vscode
 
 mkdir -p ${RENDER_DIR}/${TARGET_REPO_NAME}/.venv
+mkdir -p ${RENDER_DIR}/${TARGET_REPO_NAME}/.venv-checkov
 cp ${BASE_DIR}/.venv/.gitignore ${RENDER_DIR}/${TARGET_REPO_NAME}/.venv/.gitignore
+cp ${BASE_DIR}/.venv-checkov/.gitignore ${RENDER_DIR}/${TARGET_REPO_NAME}/.venv-checkov/.gitignore
 
 mkdir -p ${RENDER_DIR}/${TARGET_REPO_NAME}/doc/adr
 cp ${BASE_DIR}/doc/adr/0001-record-architecture-decisions.md ${RENDER_DIR}/${TARGET_REPO_NAME}/doc/adr/

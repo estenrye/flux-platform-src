@@ -16,7 +16,10 @@ render: render-deps
 push-branch:
 	.bin/render/render-put-target-repository-push.sh
 
-push: lint push-branch
+push-pr: push-branch
+	bash .bin/render/render-put-target-repository-pr.sh
+
+push: lint push-pr
 
 lint-checkov: lint-deps
 	.venv/bin/checkov -d .render/ --framework kubernetes --quiet --compact --skip-results-upload

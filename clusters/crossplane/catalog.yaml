@@ -1,0 +1,8 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: crossplane
+  description: Crossplane system for managing cloud resources
+spec:
+  owner: platform-engineering
+  domain: controlplane
