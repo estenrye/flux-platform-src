@@ -21,5 +21,6 @@ resources:
   - ../../applications/crossplane-functions/function-go-templating
   - ../../applications/crossplane-resources/delegated-hosted-zone-aws
   - ../../applications/flux/base
+  - ../../applications/external-secrets-operator/base
   - resources/namespace.crossplane-controlplane-cluster.yaml
   - resources/delegated-hosted-zone-aws.crossplane-rye-ninja.yaml

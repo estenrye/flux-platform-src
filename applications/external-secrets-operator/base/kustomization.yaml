@@ -20,6 +20,14 @@ patches:
       kind: Deployment
     path: patches/deployment.yaml
   - target:
+      kind: Deployment
+      name: external-secrets-webhook
+    path: patches/deployment-webhook-liveness.yaml
+  - target:
+      kind: Deployment
+      name: external-secrets-cert-controller
+    path: patches/deployment-cert-controller-liveness.yaml
+  - target:
       kind: ClusterRole
       name: external-secrets-cert-controller
     path: patches/cluster-role.yaml
