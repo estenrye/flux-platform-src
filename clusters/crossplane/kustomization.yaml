@@ -24,3 +24,5 @@ resources:
   - ../../applications/external-secrets-operator/base
   - resources/namespace.crossplane-controlplane-cluster.yaml
   - resources/delegated-hosted-zone-aws.crossplane-rye-ninja.yaml
+  - resources/flux.ssh-key-generator.yaml
+  - resources/flux.ssh-key-secret.yaml
