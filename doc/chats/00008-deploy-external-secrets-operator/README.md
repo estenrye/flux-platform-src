@@ -1,8 +1,8 @@
 # Deploy External Secrets Operator with Security Hardening
 
-**Date**: May 13, 2026  
+**Date**: May 13–14, 2026  
 **Objective**: Deploy external-secrets v2.4.1 via Helm through Kustomize with complete security policy compliance (Checkov + kube-linter)  
-**Status**: ✅ Complete - All security checks passing
+**Status**: ✅ Complete - All security checks passing, pods stable in cluster
 
 ## Executive Summary
 
@@ -231,7 +231,51 @@ Using `preferredDuringSchedulingIgnoredDuringExecution` allows graceful degradat
 
 ---
 
-### 11. Network Policy Isolation
+### 11. Liveness Probe Fix: Webhook & Cert-Controller (Post-Deployment)
+
+**Date**: May 14, 2026  
+**Problem**: After deploying to cluster, webhook and cert-controller pods entered restart loops with ~5 restarts each  
+**Symptom**: `Liveness probe failed: HTTP probe failed with statuscode: 404`
+
+**Investigation**:
+1. Initial hypothesis: cert-manager approver-policy blocking CertificateRequests — **rejected**: all CertificateRequests showed `APPROVED=True, READY=True`
+2. Checked events: `Warning Unhealthy ... Liveness probe failed: HTTP probe failed with statuscode: 404`
+3. Root cause: The chart enables liveness probes with an HTTP path (`/healthz`) for webhook and cert-controller, but those containers bind their health server on `:8081` and **do not** serve that HTTP path at the expected route at runtime
+
+**Fix Attempts**:
+- Attempt 1: Changed liveness probe path from `/healthz` to `/livez` via JSON6902 patch → still 404
+- Attempt 2: Switched to TCP socket probe on port 8081 → ✅ stable
+
+**Solution**: Added TCP socket liveness probes for webhook and cert-controller via new patches
+```yaml
+# patches/deployment-webhook-liveness.yaml
+# patches/deployment-cert-controller-liveness.yaml
+- op: replace
+  path: /spec/template/spec/containers/0/livenessProbe
+  value:
+    tcpSocket:
+      port: 8081
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 5
+    successThreshold: 1
+```
+
+**Probe Architecture by Deployment**:
+| Deployment | Liveness Probe Type | Port | Notes |
+|-----------|-------------------|------|-------|
+| operator | HTTP GET `/healthz` | 8082 | Works — chart configures via `livenessProbe.spec` |
+| webhook | TCP socket | 8081 | HTTP path returns 404; TCP confirms port is open |
+| cert-controller | TCP socket | 8081 | HTTP path returns 404; TCP confirms port is open |
+
+**Why Patch vs Values**: The chart's `webhook.livenessProbe` and `certController.livenessProbe` values control probe enablement and timing but hard-code the HTTP path in the template. Switching to TCP socket requires replacing the full probe spec via JSON6902 patch.
+
+**Validation**: All 9 pods (3 per deployment) reached Running/Ready with 0 restarts on new ReplicaSets after fix applied.
+
+---
+
+### 12. Network Policy Isolation
 
 **Problem**: Pods lack network segmentation; traffic unrestricted  
 **Impact**: Potential lateral movement; no ingress/egress control
@@ -273,7 +317,7 @@ spec:
 
 ---
 
-### 12. High Availability Configuration
+### 13. High Availability Configuration
 
 **Decision**: Set `replicaCount: 3` for all deployments
 
@@ -295,9 +339,11 @@ applications/external-secrets-operator/base/
 ├── charts/
 │   └── external-secrets-2.4.1/  # Upstream chart
 └── patches/
-    ├── deployment.yaml       # Restart policy + CKV_K8S_38 skip
-    ├── cluster-role.yaml     # CKV_K8S_155 skip (cert-controller)
-    └── cluster-role-binding.yaml  # kube-linter access-to-secrets skip
+    ├── deployment.yaml                      # Restart policy + CKV_K8S_38 skip
+    ├── cluster-role.yaml                    # CKV_K8S_155 skip (cert-controller)
+    ├── cluster-role-binding.yaml            # kube-linter access-to-secrets skip
+    ├── deployment-webhook-liveness.yaml     # TCP socket liveness (post-deploy fix)
+    └── deployment-cert-controller-liveness.yaml  # TCP socket liveness (post-deploy fix)
 └── resources/
     ├── namespace.yaml        # external-secrets-operator namespace
     └── network-policy.yaml   # Ingress/egress rules
@@ -338,6 +384,14 @@ patches:
   - target:
       kind: ClusterRoleBinding
     path: patches/cluster-role-binding.yaml
+  - target:
+      kind: Deployment
+      name: external-secrets-webhook
+    path: patches/deployment-webhook-liveness.yaml
+  - target:
+      kind: Deployment
+      name: external-secrets-cert-controller
+    path: patches/deployment-cert-controller-liveness.yaml
 
 images:
   - name: ghcr.io/external-secrets/external-secrets
@@ -417,6 +471,16 @@ Skipped checks: 4 (intentional policy exceptions with annotations)
 - Treated functional requirements as immutable constraints
 - Used policy exceptions for necessary operations, not careless configuration
 
+### 6. Verify Liveness Probes at Runtime (Not Just at Render Time)
+
+**Lesson**: A liveness probe can render correctly in YAML and pass all linting tools while still failing at runtime if the container doesn't serve the expected HTTP path.
+
+**Application**:
+- After initial deployment, webhook and cert-controller restarted due to `/healthz` returning 404
+- The chart exposes `webhook.livenessProbe.port` but hard-codes the HTTP path in the template
+- Switching to TCP socket probes (which only verify the port is accepting connections) resolved the issue
+- **Takeaway**: When a chart enables probes but pods restart immediately, check `kubectl describe pod` events and `kubectl logs --previous` before assuming a network/policy issue
+
 ---
 
 ## Deployment Readiness
@@ -433,6 +497,8 @@ Skipped checks: 4 (intentional policy exceptions with annotations)
 - ✅ Pod security context hardened (non-root UID, capability dropping)
 - ✅ Restart policies configured (automatic recovery)
 - ✅ Functional requirements documented (policy exceptions justified)
+- ✅ Deployed to cluster - all 9 pods Running/Ready with 0 restarts (May 14, 2026)
+- ✅ Liveness probe restart loop identified and resolved (TCP socket probes)
 
 ### Post-Deployment Considerations
 

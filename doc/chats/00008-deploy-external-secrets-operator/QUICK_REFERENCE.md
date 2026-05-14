@@ -6,6 +6,7 @@
 |--------|--------|
 | Checkov Security Checks | ✅ 319/319 passed |
 | kube-linter Critical Checks | ✅ All passing |
+| Cluster Pods | ✅ 9/9 Running/Ready, 0 restarts (May 14, 2026) |
 | Replicas | 3 (HA) |
 | Image Digest | sha256:9440a40b394791a5e93f3f7e1b33399ecbdc0e38273de1d69ed83fe12936fc09 |
 | Container UID | 65532 (distroless standard) |
@@ -19,6 +20,7 @@
 | Helm Values | `base/values.yaml` | PRIMARY: All hardening config |
 | Deployment Patches | `base/patches/deployment.yaml` | Restart policy + CKV_K8S_38 skip |
 | RBAC Patches | `base/patches/cluster-*.yaml` | Webhook/secret access exceptions |
+| Liveness Patches | `base/patches/deployment-*-liveness.yaml` | TCP socket probes (webhook + cert-controller) |
 | Network Policy | `base/resources/network-policy.yaml` | Ingress/egress rules |
 | Build Orchestration | `base/kustomization.yaml` | Image digest + patch/resource inclusion |
 
@@ -57,6 +59,8 @@ base/patches/deployment.yaml
 base/patches/cluster-role.yaml
 base/patches/cluster-role-binding.yaml
 base/resources/network-policy.yaml
+base/patches/deployment-webhook-liveness.yaml       # Post-deploy: TCP socket liveness for webhook
+base/patches/deployment-cert-controller-liveness.yaml  # Post-deploy: TCP socket liveness for cert-controller
 ```
 
 ## Validation Commands (One-Liners)
@@ -89,6 +93,20 @@ make render && find .render/flux-platform-rendered/applications/external-secrets
 | access-to-secrets | Functional requirement | `ignore-check.kube-linter.io/access-to-secrets` on ClusterRoleBinding |
 
 **Policy**: Only use exceptions for unavoidable functional requirements, documented with rationale.
+
+## Liveness Probe Configuration
+
+The operator, webhook, and cert-controller use **different** liveness probe strategies:
+
+| Deployment | Probe Type | Port | Why |
+|-----------|-----------|------|-----|
+| `external-secrets` (operator) | HTTP GET `/healthz` | 8082 | Chart template supports HTTP; path is served |
+| `external-secrets-webhook` | TCP socket | 8081 | HTTP `/healthz` returns 404 at runtime; TCP confirms port open |
+| `external-secrets-cert-controller` | TCP socket | 8081 | Same as webhook |
+
+**The readiness probe** (HTTP GET `/readyz`) works correctly for all three deployments.
+
+---
 
 ## Common Updates
 

@@ -171,6 +171,87 @@ grep -B 5 "replicas:" \
 
 ---
 
+## Cluster Deployment
+
+### Apply to Cluster (Server-Side Apply)
+
+```bash
+export KUBECONFIG=/Users/esten/.kube/crossplane-controlplane-cluster.yaml
+kustomize build --enable-helm clusters/crossplane/ | kubectl apply --server-side -f -
+```
+
+### Verify Rollout
+
+```bash
+kubectl rollout status -n external-secrets-operator deployment/external-secrets --timeout=180s
+kubectl rollout status -n external-secrets-operator deployment/external-secrets-webhook --timeout=180s
+kubectl rollout status -n external-secrets-operator deployment/external-secrets-cert-controller --timeout=180s
+```
+
+**Expected**: `deployment "<name>" successfully rolled out` for each
+
+### Check All Pods Healthy
+
+```bash
+kubectl get pods -n external-secrets-operator \
+  -o custom-columns='NAME:.metadata.name,READY:.status.containerStatuses[0].ready,RESTARTS:.status.containerStatuses[0].restartCount,RS:.metadata.ownerReferences[0].name'
+```
+
+**Expected**: All pods READY=true, RESTARTS=0
+
+### Check for Warning Events
+
+```bash
+kubectl get events -n external-secrets-operator \
+  --field-selector type=Warning \
+  --sort-by='.lastTimestamp' | tail -20
+```
+
+**Expected after fix**: No liveness/readiness probe failures on current ReplicaSet pods
+
+---
+
+## Post-Deployment Investigation: Liveness Probe Restart Loop
+
+_These commands were used on May 14, 2026 to diagnose and fix webhook/cert-controller pod restart loops._
+
+### Identify Restarting Pods
+
+```bash
+kubectl get pods -n external-secrets-operator
+# Look for RESTARTS > 0 in the output
+```
+
+### Check Pod Events for Probe Failures
+
+```bash
+kubectl describe pod -n external-secrets-operator <pod-name>
+# Look for: "Liveness probe failed: HTTP probe failed with statuscode: 404"
+```
+
+### Read Logs from Previous (Failed) Container
+
+```bash
+kubectl logs -n external-secrets-operator <pod-name> --previous
+```
+
+### Check CertificateRequests (Rule Out Approver Issues)
+
+```bash
+kubectl get certificaterequests -A
+# APPROVED=True, READY=True confirms approver-policy is not the issue
+```
+
+### Verify TCP Liveness Probe Active After Fix
+
+```bash
+kubectl get deployment -n external-secrets-operator external-secrets-webhook \
+  -o jsonpath='{.spec.template.spec.containers[0].livenessProbe}'
+# Expected: {"failureThreshold":5,"initialDelaySeconds":10,"periodSeconds":10,...,"tcpSocket":{"port":8081},...}
+```
+
+---
+
 ## Troubleshooting
 
 ### If Checkov fails after changes
