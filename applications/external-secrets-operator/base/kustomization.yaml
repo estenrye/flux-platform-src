@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
 - resources/namespace.yaml
+- resources/network-policy.yaml
 
 helmCharts:
   - name: external-secrets
@@ -13,3 +14,19 @@ helmCharts:
     includeCRDs: true
     valuesInline: {}
     valuesFile: values.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+  - target:
+      kind: ClusterRole
+      name: external-secrets-cert-controller
+    path: patches/cluster-role.yaml
+  - target:
+      kind: ClusterRoleBinding
+    path: patches/cluster-role-binding.yaml
+
+images:
+  - name: ghcr.io/external-secrets/external-secrets
+    digest: sha256:9440a40b394791a5e93f3f7e1b33399ecbdc0e38273de1d69ed83fe12936fc09

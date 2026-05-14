@@ -13,7 +13,15 @@ global:
   #    whenUnsatisfiable: DoNotSchedule
   #    matchLabelKeys:
   #      - pod-template-hash
-  affinity: {}
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                  - linux
   # -- Global hostAliases to be applied to all deployments
   hostAliases: []
   # -- Global pod labels to be applied to all deployments
@@ -33,7 +41,7 @@ global:
       # disabled - No modification applied.
       adaptSecurityContext: auto
 
-replicaCount: 1
+replicaCount: 3
 
 bitwarden-sdk-server:
   enabled: false
@@ -44,7 +52,7 @@ revisionHistoryLimit: 10
 
 image:
   repository: ghcr.io/external-secrets/external-secrets
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   # -- The image tag to use. The default is the chart appVersion.
   tag: ""
   # -- The flavour of tag you want to use
@@ -232,7 +240,8 @@ extraContainers: []
 deploymentAnnotations: {}
 
  # -- Set deployment strategy
-strategy: {}
+strategy:
+  type: RollingUpdate
 
 # -- Annotations to add to Pod
 podAnnotations: {}
@@ -241,7 +250,7 @@ podLabels: {}
 
 podSecurityContext:
   enabled: true
-  # fsGroup: 2000
+  fsGroup: 2000
 
 securityContext:
   allowPrivilegeEscalation: false
@@ -251,14 +260,17 @@ securityContext:
   enabled: true
   readOnlyRootFilesystem: true
   runAsNonRoot: true
-  runAsUser: 1000
+  runAsUser: 65532
   seccompProfile:
     type: RuntimeDefault
 
-resources: {}
-  # requests:
-  #   cpu: 10m
-  #   memory: 32Mi
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
 
 serviceMonitor:
   # -- Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics
@@ -356,7 +368,7 @@ grafanaDashboard:
 
 livenessProbe:
   # -- Enabled determines if the liveness probe should be used or not. By default it's disabled.
-  enabled: false
+  enabled: true
   # -- The body of the liveness probe settings.
   spec:
     # -- Bind address for the health server used by both liveness and readiness probes (--live-addr flag).
@@ -383,7 +395,7 @@ livenessProbe:
 
 readinessProbe:
   # -- Determines whether the readiness probe is enabled. Disabled by default. Enabling this will auto-start the health server (--live-addr) even if livenessProbe is disabled. Health server address/port are configured via livenessProbe.spec.address and livenessProbe.spec.port.
-  enabled: false
+  enabled: true
   # -- The body of the readiness probe settings (standard Kubernetes probe spec).
   spec:
     # -- Specify the maximum amount of time to wait for a probe to respond before considering it fails.
@@ -410,7 +422,18 @@ tolerations: []
 
 topologySpreadConstraints: []
 
-affinity: {}
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - external-secrets
+          topologyKey: kubernetes.io/hostname
 
 # -- Pod priority class name.
 priorityClassName: "platform"
@@ -438,7 +461,7 @@ webhook:
   certCheckInterval: "5m"
   # -- Specifies the lookaheadInterval for certificate validity
   lookaheadInterval: ""
-  replicaCount: 1
+  replicaCount: 3
   # -- Specifies Log Params to the Webhook
   log:
     level: info
@@ -456,7 +479,7 @@ webhook:
   hostUsers:
   image:
     repository: ghcr.io/external-secrets/external-secrets
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
     # -- The image tag to use. The default is the chart appVersion.
     tag: ""
     # -- The flavour of tag you want to use
@@ -532,10 +555,22 @@ webhook:
 
   topologySpreadConstraints: []
 
-  affinity: {}
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - external-secrets-webhook
+            topologyKey: kubernetes.io/hostname
 
   # -- Set deployment strategy
-  strategy: {}
+  strategy:
+    type: RollingUpdate
 
     # -- Pod priority class name.
   priorityClassName: ""
@@ -564,7 +599,7 @@ webhook:
 
 
   livenessProbe:
-    enabled: false
+    enabled: true
     # -- Set this value to 'live' (for named port) or an integer for liveness probes.
     # @schema type: [string, integer]
     port: 8081
@@ -615,7 +650,7 @@ webhook:
 
   podSecurityContext:
     enabled: true
-      # fsGroup: 2000
+    fsGroup: 2000
 
   securityContext:
     allowPrivilegeEscalation: false
@@ -625,14 +660,17 @@ webhook:
     enabled: true
     readOnlyRootFilesystem: true
     runAsNonRoot: true
-    runAsUser: 1000
+    runAsUser: 65532
     seccompProfile:
       type: RuntimeDefault
 
-  resources: {}
-      # requests:
-      #   cpu: 10m
-      #   memory: 32Mi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
 
   # -- Manage the service through which the webhook is reached.
   service:
@@ -652,7 +690,7 @@ certController:
   # -- Specifies whether a certificate controller deployment be created.
   create: true
   requeueInterval: "5m"
-  replicaCount: 1
+  replicaCount: 3
   # -- Specifies Log Params to the Certificate Controller
   log:
     level: info
@@ -662,7 +700,7 @@ certController:
 
   image:
     repository: ghcr.io/external-secrets/external-secrets
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
     tag: ""
     flavour: ""
   imagePullSecrets: []
@@ -690,10 +728,22 @@ certController:
 
   topologySpreadConstraints: []
 
-  affinity: {}
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - external-secrets-cert-controller
+            topologyKey: kubernetes.io/hostname
 
   # -- Set deployment strategy
-  strategy: {}
+  strategy:
+    type: RollingUpdate
 
   # -- Run the certController on the host network
   hostNetwork: false
@@ -727,7 +777,7 @@ certController:
       annotations: {}
 
   livenessProbe:
-    enabled: false
+    enabled: true
     # -- Set this value to 'live' (for named port) or an integer for liveness probes.
     # @schema type: [string, integer]
     port: 8081
@@ -782,7 +832,7 @@ certController:
 
   podSecurityContext:
     enabled: true
-      # fsGroup: 2000
+    fsGroup: 2000
 
   securityContext:
     allowPrivilegeEscalation: false
@@ -792,14 +842,17 @@ certController:
     enabled: true
     readOnlyRootFilesystem: true
     runAsNonRoot: true
-    runAsUser: 1000
+    runAsUser: 65532
     seccompProfile:
       type: RuntimeDefault
 
-  resources: {}
-      # requests:
-      #   cpu: 10m
-      #   memory: 32Mi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
 
 # -- Specifies `dnsPolicy` to deployment
 dnsPolicy: ClusterFirst
