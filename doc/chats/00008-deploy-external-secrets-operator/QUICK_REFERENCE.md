@@ -176,5 +176,5 @@ images:
 
 - **Main Doc**: [README.md](./README.md)
 - **Validation Commands**: [VALIDATION.md](./VALIDATION.md)
-- **Helm Values Pattern**: [../../kubernetes-helm-patterns.md](../../kubernetes-helm-patterns.md)
+- **Helm Values Pattern**: See the repository Helm patterns documentation (current relative link removed because the previous target was missing)
 - **External Secrets**: https://external-secrets.io/
