@@ -5,7 +5,8 @@ This document captures the exact commands used to validate the external-secrets-
 ## Environment Setup
 
 ```bash
-cd /Users/esten/src/flux-platform-src
+REPO_ROOT="$(pwd)"
+cd "$REPO_ROOT"
 source .venv/bin/activate
 ```
 
