@@ -177,8 +177,8 @@ grep -B 5 "replicas:" \
 ### Apply to Cluster (Server-Side Apply)
 
 ```bash
-export KUBECONFIG=/Users/esten/.kube/crossplane-controlplane-cluster.yaml
-kustomize build --enable-helm clusters/crossplane/ | kubectl apply --server-side -f -
+# Ensure KUBECONFIG points to the target cluster kubeconfig before running this command.
+kustomize build --enable-helm clusters/crossplane/ | KUBECONFIG="$KUBECONFIG" kubectl apply --server-side -f -
 ```
 
 ### Verify Rollout
