@@ -102,4 +102,9 @@ No implementation decision has been made yet, but the following options are bein
 
 ## Consequences
 
-What becomes easier or more difficult to do and any risks introduced by the change that will need to be mitigated.
+- We have identified the primary categories of consumption that any showback solution must measure across clusters: compute, storage, and network.
+- This makes it easier to evaluate OpenCost, Kubecost, and other implementations against a common set of multi-cloud Kubernetes requirements.
+- No implementation has been selected yet, so delivery of cross-cloud showback remains blocked until tool evaluation and rollout decisions are completed.
+- There is a risk that different cloud providers and Kubernetes environments will expose cost and usage data with different levels of fidelity, which may reduce accuracy or comparability of reports.
+- There is a risk that integrating cost data into existing operational workflows will require additional engineering effort and process changes; mitigation is TBD pending tool selection.
+- There is a risk that network and shared resource allocation may be difficult to attribute consistently across clusters, namespaces, and teams; acceptable allocation rules are TBD.
