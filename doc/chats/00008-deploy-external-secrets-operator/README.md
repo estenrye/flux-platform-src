@@ -140,8 +140,8 @@ securityContext:
 
 ### 7. Restart Policy (kube-linter restart-policy)
 
-**Problem**: Deployments use default restart policy (None); failed pods don't restart  
-**Impact**: Single pod failure causes partial outages; requires manual intervention
+**Problem**: Deployment pod templates did not explicitly set `restartPolicy`, which triggered kube-linter and left the intended behavior implicit in rendered manifests  
+**Impact**: Restart behavior for Deployments should be explicit for policy compliance and readability; for Deployments, Kubernetes only permits `Always`
 
 **Solution**: Added JSON6902 patch to all Deployments
 ```yaml
