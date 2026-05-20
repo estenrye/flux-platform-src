@@ -337,4 +337,4 @@ validate-external-secrets:
 
 - [Architecture Decision - values-first approach](./README.md#architecture-decision-record)
 - [Problem Analysis - detailed solutions for each check](./README.md#problem-analysis--solutions)
-- [Kubernetes Helm Patterns - when to use values vs patches](../../kubernetes-helm-patterns.md)
+- Kubernetes Helm Patterns - when to use values vs patches
