@@ -96,7 +96,7 @@ commonLabels: {}
 
 # -- If true, external-secrets will perform leader election between instances to ensure no more
 # than one instance of external-secrets operates at a time.
-leaderElect: false
+leaderElect: true
 
 # -- ID of the lease object used for leader election.
 # Leave empty to use the default ('external-secrets-controller').
