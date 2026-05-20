@@ -12,7 +12,7 @@ Deployed and hardened the external-secrets-operator Helm chart (v2.4.1) in a Kus
 
 ### Key Constraint: Values-First Configuration
 
-The primary architectural decision was to prioritize Helm chart configuration values (`values.yaml`) over custom patches, following the principle documented in `kubernetes-helm-patterns.md`:
+The primary architectural decision was to prioritize Helm chart configuration values (`values.yaml`) over custom patches, following a values-first principle for Helm-based deployments:
 
 1. **Always use Helm values first**: Chart authors expose safe configuration surfaces; patches should be exceptions
 2. **Patch only unavoidable conflicts**: Policy violations that cannot be resolved through values require annotation-based exceptions
