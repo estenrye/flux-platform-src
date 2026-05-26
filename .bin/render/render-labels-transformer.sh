@@ -27,10 +27,10 @@ kind: LabelTransformer
 metadata:
   name: global-labels
 labels:
-  ${LABEL_ZONE}/flux-src-repository: ${REPO}
-  ${LABEL_ZONE}/flux-src-commit-hash: ${COMMIT_HASH}
-  ${LABEL_ZONE}/component: ${COMPONENT_NAME}
-  ${LABEL_ZONE}/owner: ${COMPONENT_OWNER}
+  flux-src-repository: ${REPO}
+  flux-src-commit-hash: ${COMMIT_HASH}
+  platform-component: ${COMPONENT_NAME}
+  platform-owner: ${COMPONENT_OWNER}
 fieldSpecs:
 - path: metadata/labels
   create: true

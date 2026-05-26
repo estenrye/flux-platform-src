@@ -1,0 +1,13 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: flux-platform
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./clusters/crossplane
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-platform-rendered
+  wait: false
