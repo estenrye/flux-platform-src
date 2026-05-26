@@ -1,0 +1,16 @@
+apiVersion: repo.github.m.upbound.io/v1alpha1
+kind: DeployKey
+metadata:
+  name: crossplane-flux-ssh-deploykey
+  namespace: flux-system
+spec:
+  providerConfigRef:
+    name: default
+    kind: ClusterProviderConfig
+  forProvider:
+    repository: flux-platform-rendered
+    title: crossplane-flux-ssh-deploykey
+    readOnly: true
+    keySecretRef:
+      name: flux-ssh-key-secret
+      key: identity.pub

@@ -17,12 +17,17 @@ resources:
   - ../../applications/crossplane-providers/family-cloudflare
   - ../../applications/crossplane-providers/provider-cloudflare-dns
   - ../../applications/crossplane-providers/provider-cloudflare-zone
+  - ../../applications/crossplane-providers/provider-github
   - ../../applications/crossplane-providers/provider-kubernetes
   - ../../applications/crossplane-functions/function-go-templating
   - ../../applications/crossplane-resources/delegated-hosted-zone-aws
   - ../../applications/flux/base
   - ../../applications/external-secrets-operator/base
+  - resources/eso.cluster-secret-store.yaml
+  - resources/eso.external-secret.github.yaml
   - resources/namespace.crossplane-controlplane-cluster.yaml
   - resources/delegated-hosted-zone-aws.crossplane-rye-ninja.yaml
   - resources/flux.ssh-key-generator.yaml
   - resources/flux.ssh-key-secret.yaml
+  - resources/github.deploykey.crossplane.yaml
+  - resources/flux.source.git.yaml

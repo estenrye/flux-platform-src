@@ -1,0 +1,35 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-provider-github
+  description: |-
+    This component installs the Crossplane GitHub provider,
+    which allows you to manage GitHub resources using Crossplane.
+
+    When deploying this component, you need to create a secret on the cluster
+    with a GitHub API Key.
+
+  tags:
+    - crossplane
+    - crossplane-provider
+    - github
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://marketplace.upbound.io/providers/wildbitca/provider-github
+      title: Upjet-based Crossplane provider for GitHub
+      icon: docs
+      type: documentation
+    - url: https://registry.terraform.io/providers/integrations/github/latest/docs
+      title: Terraform provider for GitHub documentation (the Upjet-based Crossplane provider is based on this)
+      icon: docs
+      type: documentation
+    - url: https://github.com/wildbitca/provider-upjet-github
+      title: GitHub repository for the Upjet-based Crossplane provider for GitHub
+      icon: github
+      type: source
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   
