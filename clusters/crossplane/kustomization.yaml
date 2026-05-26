@@ -25,6 +25,7 @@ resources:
   - ../../applications/external-secrets-operator/base
   - resources/eso.cluster-secret-store.yaml
   - resources/eso.external-secret.github.yaml
+  - resources/eso.external-secret.cloudflare.yaml
   - resources/namespace.crossplane-controlplane-cluster.yaml
   - resources/delegated-hosted-zone-aws.crossplane-rye-ninja.yaml
   - resources/flux.ssh-key-generator.yaml
