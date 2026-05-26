@@ -29,6 +29,10 @@ patches:
   - target:
       kind: Deployment
     path: patches/deployment.yaml
+  - target:
+      kind: ServiceMonitor
+      name: cert-manager-csi-driver-spiffe-approver
+    path: patches/service-monitor-namespace.yaml
 
 images:
   - name: quay.io/jetstack/cert-manager-csi-driver-spiffe
