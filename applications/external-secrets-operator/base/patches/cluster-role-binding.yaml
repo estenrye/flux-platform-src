@@ -1,0 +1,3 @@
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-secrets
+  value: "External Secrets requires secret read and write access to reconcile ExternalSecret resources."
