@@ -3,7 +3,7 @@ set -e
 SCRIPTS_DIR=${SCRIPTS_DIR:-$(cd "$(dirname "$0")/.." && pwd)}
 REPO=${1:-$REPO}
 COMMIT_HASH=${2:-$COMMIT_HASH}
-LABEL_ZONE=${3:-$LABEL_ZONE}
+LABEL_ZONE=${3:-rye.ninja}
 
 COMPONENT_NAME="unknown"
 COMPONENT_OWNER="unknown"
@@ -23,18 +23,18 @@ fi
 
 cat <<EOF
 apiVersion: builtin
-kind: LabelTransformer
+kind: AnnotationsTransformer
 metadata:
-  name: global-labels
-labels:
-  flux-src-repository: ${REPO}
-  flux-src-commit-hash: ${COMMIT_HASH}
-  platform-component: ${COMPONENT_NAME}
-  platform-owner: ${COMPONENT_OWNER}
+  name: global-annotations
+annotations:
+  ${LABEL_ZONE}/flux-src-repository: ${REPO}
+  ${LABEL_ZONE}/flux-src-commit-hash: ${COMMIT_HASH}
+  ${LABEL_ZONE}/component: ${COMPONENT_NAME}
+  ${LABEL_ZONE}/owner: ${COMPONENT_OWNER}
 fieldSpecs:
-- path: metadata/labels
+- path: metadata/annotations
   create: true
-- path: spec/template/metadata/labels
+- path: spec/template/metadata/annotations
   create: true
   kind: Deployment
 EOF
