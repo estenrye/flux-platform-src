@@ -85,7 +85,7 @@ resource "aws_rolesanywhere_trust_anchor" "test" {
 resource "aws_iam_policy" "ExternalDNSRoute53Access" {
   name        = "AllowExternalDNSRoute53Access"
   path        = "/"
-  description = "Allow ExternalDNS to access Route53 hosted zones and manage DNS records"
+  description = "Allow ExternalDNS to manage DNS records in one delegated hosted zone"
 
   # Terraform's "jsonencode" function converts a
   # Terraform expression result to valid JSON syntax.
@@ -100,7 +100,7 @@ resource "aws_iam_policy" "ExternalDNSRoute53Access" {
           "route53:ListTagsForResources"
         ],
         "Resource": [
-          "arn:aws:route53:::hostedzone/*"
+          "arn:aws:route53:::hostedzone/${var.delegated_hosted_zone_id}"
         ],
         "Condition": {
           "ForAllValues:StringLike": {
@@ -108,15 +108,6 @@ resource "aws_iam_policy" "ExternalDNSRoute53Access" {
             "route53:ChangeResourceRecordSetsRecordTypes": ["A", "AAAA", "CNAME", "TXT"]
           }
         }
-      },
-      {
-        "Effect": "Allow",
-        "Action": [
-          "route53:ListHostedZones"
-        ],
-        "Resource": [
-          "*"
-        ]
       }
     ]
   })
