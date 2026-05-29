@@ -315,10 +315,22 @@ The implementation will follow these decisions:
    - Route53 `ListHostedZones` will not be required for steady-state
      operation when the hosted zone identifier is known.
 
-2. One workload identity per role
-   - ExternalDNS and CertManager will each have a dedicated IAM Role,
-     Roles Anywhere Profile, and SPIFFE URI condition in the role trust policy.
-   - Shared IAM principals between controllers are not allowed.
+2. Per-workload permission scoping, enforced by SPIFFE URI
+   - ExternalDNS and CertManager require different Route53 action scopes:
+     cert-manager restricts `ChangeResourceRecordSets` to TXT records only
+     (ACME DNS01 challenges), while ExternalDNS requires A, AAAA, CNAME,
+     and TXT for full DNS lifecycle management.
+   - Two role-layout options are supported; the choice is made at composition
+     time (see "IAM policy design" in Limitations):
+       a. Separate roles (high-isolation environments): one IAM Role, Policy,
+          and Roles Anywhere Profile per workload per cluster.
+       b. ABAC single role (quota-conscious deployments): one shared IAM Role
+          and Profile per cluster, with a single policy whose statements are
+          conditioned on `aws:PrincipalTag/x509SAN/URI` to enforce per-workload
+          action boundaries.
+   - In both options, neither workload session can access the other workload's
+     permitted actions. The SPIFFE URI SAN is the authoritative identity
+     boundary.
 
 3. Crossplane is the source of truth for AWS identity resources
    - The composition will manage Role, Policy, RolePolicyAttachment, Profile,
@@ -337,6 +349,25 @@ The implementation will follow these decisions:
      security and operations trade-offs before changing defaults.
    - No duration change will be merged without a documented rotation and
      emergency rollover runbook.
+
+6. SPIFFE trust domain uniqueness for shared trust anchor patterns
+   - Clusters using Pattern B, C, or D must configure a cluster-unique SPIFFE
+     trust domain. With a shared trust anchor, IAM Roles Anywhere only validates
+     that a certificate chains to the trusted root; it does not record which
+     cluster's intermediate CA signed it. If all clusters use the default
+     `cluster.local` trust domain, their SPIFFE URIs are identical and IAM
+     role trust policy conditions cannot distinguish between clusters.
+   - The default trust domain `cluster.local` is prohibited for any cluster
+     participating in a shared trust anchor design.
+   - The Crossplane composition will accept the cluster trust domain as a
+     required input and template it into all IAM role trust policy conditions
+     and ABAC permission policy statements.
+   - Recommended format: `spiffe://<cluster-name>.<platform-domain>`, where
+     `<cluster-name>` is a stable unique identifier assigned at provisioning
+     time (e.g. `prod-us-east-1.platform.example.com`).
+   - Pattern A is exempt: the per-cluster trust anchor provides cluster
+     isolation independently of the trust domain value. Unique trust domains
+     are still recommended for operational clarity.
 
 ## Limitations
 
@@ -408,6 +439,10 @@ Cons:
 - Shared trust root increases blast radius if anchor material is compromised.
 - Rotation and rollover procedures become more coordination-heavy.
 - Requires tighter controls on SPIFFE identity issuance and verification.
+- **Requires cluster-unique SPIFFE trust domains.** All clusters sharing this
+  trust anchor must be configured with distinct trust domains (not `cluster.local`)
+  to prevent cross-cluster role assumption via identical SPIFFE URI conditions.
+  See "Trust domain uniqueness requirement" in the IAM policy design section.
 
 When to choose:
 - Platform environments targeting moderate/high cluster counts in a single account/Region.
@@ -593,22 +628,229 @@ Key operational notes:
 cert-manager remains the in-cluster lifecycle manager for SVIDs; step-ca handles intermediate CA issuance and
 CRL generation on the crossplane cluster.
 
+### IAM policy design: separate roles vs. ABAC single role
+
+IAM Roles Anywhere sets the certificate's URI SAN as a session tag on the
+temporary credentials it issues, exposed as `aws:PrincipalTag/x509SAN/URI`
+during IAM policy condition evaluation. This allows a single policy document
+to contain multiple statements each conditioned on a specific SPIFFE URI,
+enforcing per-workload permission boundaries even when both workloads share
+a single IAM role.
+
+**Permission comparison between the two workloads:**
+
+| Action | cert-manager | ExternalDNS | Resource scope |
+|---|---|---|---|
+| `route53:ChangeResourceRecordSets` | Yes — **TXT only** | Yes — A, AAAA, CNAME, TXT | `hostedzone/<id>` |
+| `route53:ListResourceRecordSets` | Yes | Yes | `hostedzone/<id>` |
+| `route53:GetChange` | Yes (change propagation polling) | No | `change/*` |
+| `route53:ListHostedZonesByName` | Yes (zone discovery) | No | `*` |
+| `route53:ListHostedZones` | No | Yes (zone discovery) | `*` |
+| `route53:ListTagsForResources` | No | Yes (TXT ownership tracking) | `hostedzone/<id>` |
+
+The record-type scope difference on `ChangeResourceRecordSets` is the key reason
+a single unconditioned policy cannot cover both workloads without violating PoLP.
+ABAC conditions resolve this within a single policy document.
+
+#### Option A: Separate roles (high-isolation default)
+
+Two IAM roles, two policies, two profiles per cluster. Each role's trust policy
+restricts assumption to exactly one SPIFFE URI. A misconfigured SPIFFE CSI policy
+that issues the wrong URI to a pod is rejected at role-assumption time.
+
+#### Option B: ABAC single role (quota-efficient default)
+
+One IAM role, one policy, one profile per cluster. The role trust policy lists
+both SPIFFE URIs; IAM `StringEquals` with a list value evaluates as set membership
+(matches if the tag equals any listed value). The single policy document contains
+five statements, each conditioned on `aws:PrincipalTag/x509SAN/URI`.
+
+The `sts:SetSourceIdentity` and `sts:TagSession` actions must remain in the
+trust policy to allow IAM Roles Anywhere to stamp the session identity and tags;
+ABAC conditions in the permission policy will not function without these.
+
+**Shared role trust policy condition:**
+
+```json
+"Condition": {
+  "StringEquals": {
+    "aws:PrincipalTag/x509SAN/URI": [
+      "spiffe://cluster.local/ns/cert-manager/sa/cert-manager",
+      "spiffe://cluster.local/ns/external-dns/sa/external-dns"
+    ]
+  }
+}
+```
+
+**Merged ABAC permission policy:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ExternalDNSRecordManagement",
+      "Effect": "Allow",
+      "Action": [
+        "route53:ChangeResourceRecordSets",
+        "route53:ListResourceRecordSets",
+        "route53:ListTagsForResources"
+      ],
+      "Resource": "arn:aws:route53:::hostedzone/${var.delegated_hosted_zone_id}",
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalTag/x509SAN/URI":
+            "spiffe://cluster.local/ns/external-dns/sa/external-dns"
+        },
+        "ForAllValues:StringLike": {
+          "route53:ChangeResourceRecordSetsActions": ["CREATE", "UPSERT", "DELETE"],
+          "route53:ChangeResourceRecordSetsRecordTypes": ["A", "AAAA", "CNAME", "TXT"]
+        }
+      }
+    },
+    {
+      "Sid": "ExternalDNSZoneDiscovery",
+      "Effect": "Allow",
+      "Action": "route53:ListHostedZones",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalTag/x509SAN/URI":
+            "spiffe://cluster.local/ns/external-dns/sa/external-dns"
+        }
+      }
+    },
+    {
+      "Sid": "CertManagerACMEDNS01",
+      "Effect": "Allow",
+      "Action": [
+        "route53:ChangeResourceRecordSets",
+        "route53:ListResourceRecordSets"
+      ],
+      "Resource": "arn:aws:route53:::hostedzone/${var.delegated_hosted_zone_id}",
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalTag/x509SAN/URI":
+            "spiffe://cluster.local/ns/cert-manager/sa/cert-manager",
+          "route53:ChangeResourceRecordSetsRecordTypes": ["TXT"]
+        }
+      }
+    },
+    {
+      "Sid": "CertManagerChangePolling",
+      "Effect": "Allow",
+      "Action": "route53:GetChange",
+      "Resource": "arn:aws:route53:::change/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalTag/x509SAN/URI":
+            "spiffe://cluster.local/ns/cert-manager/sa/cert-manager"
+        }
+      }
+    },
+    {
+      "Sid": "CertManagerZoneDiscovery",
+      "Effect": "Allow",
+      "Action": "route53:ListHostedZonesByName",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalTag/x509SAN/URI":
+            "spiffe://cluster.local/ns/cert-manager/sa/cert-manager"
+        }
+      }
+    }
+  ]
+}
+```
+
+**Trade-offs:**
+
+| | Option A: Separate roles | Option B: ABAC single role |
+|---|---|---|
+| Roles per cluster | 2 | 1 |
+| Policies per cluster | 2 | 1 |
+| Profiles per cluster | 2 | 1 |
+| PoLP boundary | Role assumption (strongest) | Policy statement condition |
+| Misconfigured SPIFFE URI | Rejected at role assumption | Rejected at API authorization |
+| CloudTrail attribution | Role name distinguishes workload | Must inspect `x509SAN/URI` session tag |
+| Object count saving | Baseline | 50% reduction in roles, policies, profiles |
+
+#### Trust domain uniqueness requirement for shared trust anchors
+
+This requirement applies to **both** Option A and Option B when used with
+Patterns B, C, or D — any design where multiple clusters share a trust anchor.
+
+**The problem**: The default SPIFFE trust domain is `cluster.local`. All
+clusters using this default produce identical SPIFFE URIs, for example
+`spiffe://cluster.local/ns/external-dns/sa/external-dns`. With a shared
+trust anchor, IAM Roles Anywhere validates only that the certificate chains
+to the trusted root CA — it does not identify which cluster's intermediate
+CA signed it. The IAM role trust policy condition then evaluates
+`aws:PrincipalTag/x509SAN/URI`, which is the same value across all clusters.
+A workload on any cluster in the fleet could present a valid certificate and
+pass the condition check on any other cluster's IAM role.
+
+**The fix**: Each cluster must be configured with a unique SPIFFE trust
+domain via the `--trust-domain` flag on cert-manager-spiffe-csi-driver
+(Helm value: `app.trustDomain`). The Crossplane composition must:
+
+1. Accept the cluster trust domain as a required composition input.
+2. Template it into the SPIFFE URI strings used in IAM role trust policy
+   conditions and ABAC permission policy `aws:PrincipalTag/x509SAN/URI`
+   condition values.
+
+**Recommended trust domain format**: `spiffe://<cluster-name>.<platform-domain>`
+
+For example, a cluster named `prod-us-east-1` on `platform.example.com` produces:
+
+```
+spiffe://prod-us-east-1.platform.example.com/ns/external-dns/sa/external-dns
+spiffe://prod-us-east-1.platform.example.com/ns/cert-manager/sa/cert-manager
+```
+
+The role trust policy condition for this cluster becomes:
+
+```json
+"Condition": {
+  "StringEquals": {
+    "aws:PrincipalTag/x509SAN/URI": [
+      "spiffe://prod-us-east-1.platform.example.com/ns/cert-manager/sa/cert-manager",
+      "spiffe://prod-us-east-1.platform.example.com/ns/external-dns/sa/external-dns"
+    ]
+  }
+}
+```
+
+**Pattern A exemption**: Each cluster has its own independent trust anchor;
+IAM Roles Anywhere validates the full chain to that specific cluster's CA.
+A certificate from another cluster cannot pass a different cluster's trust
+anchor validation, so `cluster.local` does not create a cross-cluster
+impersonation risk in Pattern A. Unique trust domains are still recommended
+for operational consistency and forward compatibility if the design later
+migrates to a shared trust anchor pattern.
+
 ### Trust anchor design comparison
 
 | | Pattern A | Pattern B | Pattern C | Pattern D |
 |---|---|---|---|---|
 | Trust anchors | 1 per cluster | 1 per environment | **1 total** | **1 total** |
-| Profiles | 2 per cluster | 2 per cluster | 2 per cluster | 2 per cluster |
-| Roles | 2 per cluster | 2 per cluster | 2 per cluster | 2 per cluster |
+| Profiles (Option A) | 2 per cluster | 2 per cluster | 2 per cluster | 2 per cluster |
+| Profiles (Option B ABAC) | 1 per cluster | 1 per cluster | 1 per cluster | 1 per cluster |
+| Roles (Option A) | 2 per cluster | 2 per cluster | 2 per cluster | 2 per cluster |
+| Roles (Option B ABAC) | 1 per cluster | 1 per cluster | 1 per cluster | 1 per cluster |
 | Blast radius | Per cluster | Per environment | **All clusters** | **All clusters** |
 | Key hygiene | Strong (self-signed per cluster) | Strong | Weaker (central key gen) | **Strongest (key never leaves cluster)** |
 | Operational complexity | Low | Low | Medium | High |
-| First quota bottleneck | Trust anchors (50) | Trust anchors (50) | Profiles (250) | Profiles (250) |
+| First quota bottleneck (Option A) | Trust anchors (50) | Trust anchors (50) | Profiles (250) | Profiles (250) |
+| First quota bottleneck (Option B ABAC) | Trust anchors (50) | Trust anchors (50) | Profiles (250, doubled capacity) | Profiles (250, doubled capacity) |
 
 ### Recommended default
 
-- Default to Pattern B for platform scale, while keeping one role and one policy per workload identity and cluster.
-- Escalate specific clusters to Pattern A where stricter isolation requirements justify the additional object overhead.
+- Default to Pattern B for platform scale.
+- Use the ABAC single-role option (Option B) for new compositions to halve IAM object count per cluster and double effective profile capacity before hitting the 250-profile quota.
+- Escalate specific clusters to Option A (separate roles) where role-assumption-time identity rejection is a hard requirement.
+- Escalate specific clusters to Pattern A where stricter cluster-level trust isolation requirements justify the additional trust-anchor object overhead.
 - Adopt Pattern C or D if trust-anchor quota pressure is encountered or a single-root-of-trust design is required.
 - Prefer Pattern D over Pattern C when adopting the single trust anchor model, accepting the additional bootstrap complexity in exchange for stronger key hygiene.
 - Implement Pattern D using step-ca (X5C provisioner) + step-issuer on the crossplane cluster, with cert-manager as the in-cluster lifecycle manager on workload clusters.
