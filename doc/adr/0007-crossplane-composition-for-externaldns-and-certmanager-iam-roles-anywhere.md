@@ -485,6 +485,114 @@ When to choose:
 - High-assurance environments where private key hygiene is a hard requirement.
 - Teams willing to invest in a robust bootstrap and signing workflow.
 
+#### Pattern D deep-dive: cert-manager alone vs. step-ca
+
+**Can cert-manager implement Pattern D without additional tooling?**
+
+No. cert-manager is an in-cluster operator. Its `CertificateRequest` and `Certificate` resources are cluster-scoped
+and have no native mechanism for cross-cluster CSR submission or signing. To implement Pattern D with cert-manager
+alone, a custom external issuer controller would need to be written to:
+- accept CSRs from workload clusters over a secure channel
+- authenticate the identity of the requesting cluster before signing
+- return only the signed certificate to the workload cluster
+
+In addition, cert-manager does not generate Certificate Revocation Lists (CRLs) and has no built-in OCSP
+responder. Implementing CRL-based revocation of intermediate CAs would require entirely separate tooling. For
+these reasons, cert-manager alone is not sufficient for Pattern D.
+
+**step-ca as the signing authority**
+
+[step-ca](https://github.com/smallstep/certificates) is a purpose-built certificate authority server with native
+support for the cross-cluster signing flow Pattern D requires. Key capabilities relevant to this design:
+
+- **X5C provisioner**: a client authenticates a CSR by presenting an existing X.509 certificate that chains to a
+  root trusted by step-ca. Crossplane can issue a short-lived bootstrap certificate to a new workload cluster
+  during provisioning; the cluster presents this certificate to step-ca to authenticate its CSR for the
+  intermediate CA. The private key is generated on the workload cluster and the bootstrap certificate expires
+  after use.
+- **K8sSA provisioner**: a client authenticates using a Kubernetes ServiceAccount token. step-ca is configured
+  with the public key of the workload cluster's K8s API server to validate the token. This removes the need for
+  a separate bootstrap certificate, but the K8sSA token is effectively a bearer token and provides minimal
+  constraint on the CSR subject — it requires careful policy configuration to prevent over-issuance.
+- **Certificate templates**: step-ca uses Go templates to control the content of issued certificates. Templates
+  can enforce `isCA: true`, `maxPathLen: 0`, desired URI SANs, and CRL distribution point (CDP) extensions on
+  intermediate CA certificates.
+- **Built-in CRL server**: step-ca hosts a CRL at the `/1.0/crl` endpoint. The CRL is updated on every
+  revocation. CDPs are embedded in issued certificates via templates, pointing to this endpoint.
+- **cert-manager integration**: the [step-issuer](https://github.com/smallstep/step-issuer) external issuer
+  allows cert-manager to remain the in-cluster certificate lifecycle manager while step-ca acts as the signing
+  authority. On the workload cluster, cert-manager requests the intermediate CA certificate from step-ca via
+  step-issuer; the keypair is generated locally by cert-manager.
+
+**Recommended bootstrap flow for Pattern D using step-ca X5C provisioner**
+
+```
+Cluster provisioning (Crossplane)
+  1. Crossplane issues a short-lived (e.g. 1h) bootstrap certificate to the new
+     workload cluster, signed by the root CA. This cert contains the cluster's
+     unique identity as a URI SAN or CN.
+  2. Crossplane stores the bootstrap cert and configures step-ca with an X5C
+     provisioner that trusts the root CA.
+
+Workload cluster bootstrap (cert-manager + step-issuer)
+  3. cert-manager generates an intermediate CA keypair on the workload cluster.
+     The private key never leaves the cluster.
+  4. cert-manager submits a CertificateRequest to step-issuer, including the CSR
+     and the bootstrap certificate as the X5C authentication token.
+  5. step-ca validates:
+       a. the X5C certificate chains to the trusted root CA
+       b. the X5C certificate is within its validity period
+       c. the CSR subject/SAN matches the expected cluster identity (via template
+          policy)
+  6. step-ca signs the intermediate CA certificate with the CDP embedded and
+     returns only the signed certificate.
+  7. cert-manager-spiffe-issuer uses the signed intermediate CA + local keypair
+     to issue SVIDs to workloads.
+  8. The bootstrap certificate expires and is discarded.
+```
+
+**CRL distribution and IAM Roles Anywhere revocation**
+
+To revoke a workload cluster's intermediate CA:
+1. Run `step ca revoke <serial>` on step-ca. The CRL at `/1.0/crl` is immediately updated.
+2. IAM Roles Anywhere checks CRL distribution points embedded in the intermediate CA certificate during
+   session validation if the trust anchor has CRL checking enabled.
+
+Two mechanisms exist for CRL delivery to IAM Roles Anywhere:
+
+- **CDP-based checking (preferred)**: the intermediate CA certificate contains a `crlDistributionPoints`
+  extension pointing to step-ca's `/1.0/crl` HTTP endpoint. IAM Roles Anywhere fetches and caches this CRL
+  when validating certificate chains. **Requirement**: step-ca's CRL endpoint must be reachable from AWS over
+  HTTP. This typically means exposing step-ca's insecure address (CRL is served over HTTP by design, as CDPs
+  must be unauthenticated) via a load balancer or ingress.
+- **Imported CRL (fallback)**: IAM Roles Anywhere allows importing a CRL file directly to a trust anchor
+  (limit: 2 CRLs per trust anchor, not adjustable). A controller can watch step-ca for revocation events,
+  fetch the updated CRL, and re-import it to IAM Roles Anywhere via the `ImportCrl` / `UpdateCrl` API. This
+  avoids exposing step-ca to the internet but introduces a sync delay between revocation and enforcement.
+
+Key operational notes:
+- CRL checking in IAM Roles Anywhere is opt-in per trust anchor and must be explicitly enabled.
+- CDP-based checking requires HTTP (not HTTPS) access to the CRL endpoint per RFC 5280.
+- The 2 CRL slots per trust anchor limit applies to imported CRLs only; CDP-based checking is unlimited.
+- OCSP is not available in step-ca open source; it is a commercial-only feature. CDP-based CRL is the
+  recommended open source revocation mechanism.
+
+**Summary: cert-manager alone vs. step-ca for Pattern D**
+
+| Capability | cert-manager alone | step-ca + step-issuer |
+|---|---|---|
+| Cross-cluster CSR signing | Not supported natively | Native (X5C, K8sSA provisioners) |
+| Key stays on workload cluster | Yes (with custom controller) | Yes (by design) |
+| CRL generation | Not supported | Built-in (`/1.0/crl`) |
+| CDP embedding in certs | Not supported | Via certificate templates |
+| OCSP | Not supported | Commercial only |
+| cert-manager integration | Native (in-cluster only) | Via step-issuer external issuer |
+| Bootstrap complexity | Very high (custom controller needed) | Medium (X5C provisioner) |
+
+**Conclusion**: step-ca with the X5C provisioner and step-issuer is the recommended implementation for Pattern D.
+cert-manager remains the in-cluster lifecycle manager for SVIDs; step-ca handles intermediate CA issuance and
+CRL generation on the crossplane cluster.
+
 ### Trust anchor design comparison
 
 | | Pattern A | Pattern B | Pattern C | Pattern D |
@@ -503,10 +611,15 @@ When to choose:
 - Escalate specific clusters to Pattern A where stricter isolation requirements justify the additional object overhead.
 - Adopt Pattern C or D if trust-anchor quota pressure is encountered or a single-root-of-trust design is required.
 - Prefer Pattern D over Pattern C when adopting the single trust anchor model, accepting the additional bootstrap complexity in exchange for stronger key hygiene.
+- Implement Pattern D using step-ca (X5C provisioner) + step-issuer on the crossplane cluster, with cert-manager as the in-cluster lifecycle manager on workload clusters.
 
 References:
 - IAM quotas: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_iam-quotas.html
 - IAM Roles Anywhere quotas: https://docs.aws.amazon.com/rolesanywhere/latest/userguide/quotas.html
+- step-ca (smallstep): https://github.com/smallstep/certificates
+- step-ca provisioners: https://smallstep.com/docs/step-ca/provisioners/
+- step-issuer (cert-manager external issuer for step-ca): https://github.com/smallstep/step-issuer
+- step-ca CRL / active revocation: https://smallstep.com/docs/step-ca/certificate-authority-server-production/#consider-active-revocation
 
 ## Open Questions
 - [x] Can we limit the scope of the resources made accessible to cert-manager and ExternalDNS to only the specific Route53 hosted zone that is provisioned by the XDelegatedHostedZoneAWS composition?
