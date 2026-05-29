@@ -338,6 +338,176 @@ The implementation will follow these decisions:
    - No duration change will be merged without a documented rotation and
      emergency rollover runbook.
 
+## Limitations
+
+The following AWS service quotas and limits constrain the long-term scaling
+shape of this design. Values are defaults unless otherwise noted.
+
+### IAM Roles Anywhere object and API limits (per account, per Region)
+
+- Trust anchors: 50
+- Profiles: 250
+- Roles per profile: 250
+- Certificates per trust anchor: 2 (not adjustable)
+- CRLs per trust anchor: 2 (not adjustable)
+- CreateSession rate: 10 TPS (adjustable)
+- Control-plane API rate buckets (for trust anchor/profile/subject/tagging/CRL APIs): 1 TPS each combined bucket (adjustable)
+
+### IAM limits that affect this implementation
+
+- Roles per account: 1000 default, up to 10000
+- Customer managed policies per account: 1500 default, up to 10000
+- Managed policies attached per role: 10 default, up to 25
+- Role trust policy length: 2048 characters default, up to 8192
+- Managed policy document size: 6144 characters
+- Aggregate inline policy size on a role: 10240 characters
+
+### Practical scaling implications
+
+- Trust anchors are typically the first hard object limit encountered in a strict per-cluster trust model.
+- Profiles are typically the next limiting object when each workload identity receives a dedicated profile.
+- Shared-role designs reduce object count but increase trust-policy complexity and blast radius.
+- CreateSession throttling can become a runtime bottleneck during large synchronized restarts.
+
+### Pattern A: Per-cluster trust anchor with per-workload role/profile
+
+Summary:
+- Each cluster has its own trust anchor.
+- Each workload identity (ExternalDNS and CertManager) has a dedicated IAM Role, Policy, and Roles Anywhere Profile.
+
+Pros:
+- Strongest isolation boundary between clusters.
+- Clear least-privilege and ownership boundaries.
+- Straightforward incident containment and cluster-specific revocation.
+
+Cons:
+- Highest object growth rate.
+- Trust anchors (50/account/Region) are the first scaling bottleneck.
+- More reconciliation objects and operational overhead.
+
+When to choose:
+- High-assurance environments with strict tenant or cluster isolation requirements.
+- Environments where independent emergency rollback per cluster is mandatory.
+
+Quota shape:
+- Roughly linear growth per cluster across trust anchors, profiles, roles, and policies.
+- With two workload identities per cluster, trust anchors usually cap before IAM role/policy quotas.
+
+### Pattern B: Shared trust anchor per environment with per-cluster role/profile
+
+Summary:
+- One trust anchor is shared by multiple clusters in an environment (for example, dev or prod).
+- Each cluster/workload identity still gets dedicated IAM Role, Policy, and Profile.
+
+Pros:
+- Significantly reduces trust-anchor object pressure.
+- Retains role-level least privilege for hosted-zone access.
+- Better account-level scalability while preserving workload separation.
+
+Cons:
+- Shared trust root increases blast radius if anchor material is compromised.
+- Rotation and rollover procedures become more coordination-heavy.
+- Requires tighter controls on SPIFFE identity issuance and verification.
+
+When to choose:
+- Platform environments targeting moderate/high cluster counts in a single account/Region.
+- Teams that can operate disciplined trust-anchor lifecycle management.
+
+Quota shape:
+- Trust anchors grow by environment, while profiles/roles/policies still grow by cluster/workload.
+- Profile quotas may become the first object bottleneck after trust anchors are flattened.
+
+### Pattern C: Single trust anchor (crossplane root CA) with per-cluster intermediate CA — centrally issued
+
+Summary:
+- The crossplane cluster hosts the root CA (`csi-driver-spiffe-ca`) as the single IAM Roles Anywhere trust anchor.
+- When provisioning a workload cluster, Crossplane issues an intermediate CA `Certificate` resource against the root CA
+  on the crossplane cluster.
+- The resulting intermediate CA cert and private key Secret is distributed to the workload cluster via
+  External Secrets Operator or a Crossplane managed Kubernetes Secret.
+- On the workload cluster, `cert-manager-spiffe-issuer` uses the delivered intermediate CA instead of a self-signed root.
+- SVIDs issued on the workload cluster chain as: root CA → intermediate CA → SVID.
+- IAM Roles Anywhere validates the full chain against the single trust anchor (root CA).
+
+Pros:
+- Single trust anchor eliminates the trust-anchor quota bottleneck entirely.
+- Profiles (250 limit) become the first constraint, supporting ~125 clusters before quota increase is needed.
+- Cluster-level revocation is still possible by revoking the intermediate CA.
+- Simpler to implement with Crossplane — no bootstrap channel required between clusters.
+
+Cons:
+- Intermediate CA private key is generated on the crossplane cluster and transmitted to the workload cluster.
+- The private key exists in two places (crossplane cluster Secret and workload cluster Secret), increasing the attack surface.
+- Compromise of the root CA private key on the crossplane cluster compromises all workload clusters simultaneously.
+- Rotation and revocation procedures must account for all clusters sharing the root trust.
+- CRL support is limited to 2 CRLs per trust anchor (not adjustable); OCSP must be evaluated for timely revocation.
+
+Key risks:
+- Centralized key generation and distribution is the primary security concern.
+- A decommissioned cluster whose intermediate CA is not explicitly revoked retains a valid credential path until
+  the intermediate CA expires.
+
+When to choose:
+- Platform environments prioritizing operational simplicity and scale over strict key hygiene.
+- Teams that accept centralized key management and have strong Secret encryption and access controls in place.
+
+### Pattern D: Single trust anchor (crossplane root CA) with per-cluster intermediate CA — CSR-based
+
+Summary:
+- The crossplane cluster hosts the root CA as the single IAM Roles Anywhere trust anchor, same as Pattern C.
+- The workload cluster generates its own intermediate CA keypair locally and submits a
+  `CertificateSigningRequest` to the crossplane cluster for signing.
+- The crossplane cluster (or a dedicated controller) signs the CSR against the root CA and returns only the
+  signed certificate — the private key never leaves the workload cluster.
+- On the workload cluster, `cert-manager-spiffe-issuer` uses the locally generated keypair and the
+  signed intermediate CA certificate.
+- SVIDs chain as: root CA → intermediate CA → SVID, same as Pattern C.
+
+Pros:
+- Strongest key hygiene: the intermediate CA private key is generated and stays on the workload cluster.
+- Compromise of the crossplane cluster does not expose workload cluster private keys.
+- Single trust anchor retains all quota benefits of Pattern C.
+- Cluster-level revocation is still possible by revoking the intermediate CA certificate.
+
+Cons:
+- Requires a bootstrap channel between the workload cluster and the crossplane cluster before cert-manager is
+  fully operational — a chicken-and-egg bootstrapping problem.
+- More complex to implement: needs a controller or workflow to accept CSRs from workload clusters, verify
+  their identity, sign with the root CA, and return the certificate.
+- The bootstrap identity used to authenticate the CSR request must itself be secured independently.
+- Higher operational complexity for the signing workflow and its failure modes.
+
+Key risks:
+- The bootstrapping identity and channel are a new trust root that must be carefully secured.
+- If the signing workflow is unavailable, new workload clusters cannot become operational.
+
+When to choose:
+- High-assurance environments where private key hygiene is a hard requirement.
+- Teams willing to invest in a robust bootstrap and signing workflow.
+
+### Trust anchor design comparison
+
+| | Pattern A | Pattern B | Pattern C | Pattern D |
+|---|---|---|---|---|
+| Trust anchors | 1 per cluster | 1 per environment | **1 total** | **1 total** |
+| Profiles | 2 per cluster | 2 per cluster | 2 per cluster | 2 per cluster |
+| Roles | 2 per cluster | 2 per cluster | 2 per cluster | 2 per cluster |
+| Blast radius | Per cluster | Per environment | **All clusters** | **All clusters** |
+| Key hygiene | Strong (self-signed per cluster) | Strong | Weaker (central key gen) | **Strongest (key never leaves cluster)** |
+| Operational complexity | Low | Low | Medium | High |
+| First quota bottleneck | Trust anchors (50) | Trust anchors (50) | Profiles (250) | Profiles (250) |
+
+### Recommended default
+
+- Default to Pattern B for platform scale, while keeping one role and one policy per workload identity and cluster.
+- Escalate specific clusters to Pattern A where stricter isolation requirements justify the additional object overhead.
+- Adopt Pattern C or D if trust-anchor quota pressure is encountered or a single-root-of-trust design is required.
+- Prefer Pattern D over Pattern C when adopting the single trust anchor model, accepting the additional bootstrap complexity in exchange for stronger key hygiene.
+
+References:
+- IAM quotas: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_iam-quotas.html
+- IAM Roles Anywhere quotas: https://docs.aws.amazon.com/rolesanywhere/latest/userguide/quotas.html
+
 ## Open Questions
 - [x] Can we limit the scope of the resources made accessible to cert-manager and ExternalDNS to only the specific Route53 hosted zone that is provisioned by the XDelegatedHostedZoneAWS composition?
   - Answer: Yes. We will scope permissions to the specific delegated hosted
