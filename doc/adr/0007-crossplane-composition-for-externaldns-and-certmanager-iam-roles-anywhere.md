@@ -313,20 +313,196 @@ The `cert-manager-spiffe-issuer` module provisions a `Role` resource named
 
 ## Decision
 
-The change that we're proposing or have agreed to implement.
+We will implement IAM Roles Anywhere for ExternalDNS and CertManager using
+Crossplane-managed AWS resources and SPIFFE identities issued by cert-manager.
+
+The implementation will follow these decisions:
+
+1. Least privilege by default
+   - IAM policies for ExternalDNS and CertManager will be scoped to the
+     delegated hosted zone ARN only, not all hosted zones in the account.
+   - Route53 `ListHostedZones` will not be required for steady-state
+     operation when the hosted zone identifier is known.
+
+2. One workload identity per role
+   - ExternalDNS and CertManager will each have a dedicated IAM Role,
+     Roles Anywhere Profile, and SPIFFE URI condition in the role trust policy.
+   - Shared IAM principals between controllers are not allowed.
+
+3. Crossplane is the source of truth for AWS identity resources
+   - The composition will manage Role, Policy, RolePolicyAttachment, Profile,
+     and TrustAnchor.
+   - The delegated hosted zone identifier from `XDelegatedHostedZoneAWS`
+     status will be used to template zone-scoped IAM policy documents.
+
+4. Trust anchor distribution is API-based with verification
+   - We will build a service that publishes the trust anchor certificate from
+     the workload cluster.
+   - The service must support strong authentication and response integrity
+     verification before the crossplane cluster can consume the certificate.
+
+5. Certificate lifetime strategy
+   - We will evaluate a 5-year trust anchor certificate duration against
+     security and operations trade-offs before changing defaults.
+   - No duration change will be merged without a documented rotation and
+     emergency rollover runbook.
 
 ## Open Questions
-- [ ] Can we limit the scope of the resources made accsssible to cert-manager and ExternalDNS to only the specific Route53 hosted zone that is provisioned by the XDelegatedHostedZoneAWS composition, rather than granting permissions to all hosted zones in the AWS account?  This would follow the principle of least privilege and enhance the security of our AWS environment by minimizing the permissions granted to cert-manager and ExternalDNS.
+- [x] Can we limit the scope of the resources made accessible to cert-manager and ExternalDNS to only the specific Route53 hosted zone that is provisioned by the XDelegatedHostedZoneAWS composition?
+  - Answer: Yes. We will scope permissions to the specific delegated hosted
+    zone ARN and remove wildcard hosted zone access from controller policies.
 
-## Action Items
-- [ ] Evaluate the pros/cons of increasing the `.spec.duration` field of the [csi-driver-spiffe-ca](../../applications/cert-manager-spiffe-issuer/base/resources/csi-driver-spiffe-ca.certificate.yaml) `Certificate` resource to 5 years to ensure that the trust anchor certificate has a long validity period, which is important for the stability of the IAM Roles Anywhere trust relationship and minimize the need for frequent certificate rotations.
-- [ ] Build a service that can be used to retrieve the trunst anchor certificate from the cluster via a public API endpoint.  This will allow our crossplane cluster to have a controller that can retrieve the trust anchor certificate and use it to provision IAM Roles Anywhere trust relationships.
-- [ ] Build a Crossplane Composition that provisions the necessary AWS resources for IAM Roles Anywhere, which may include the following:
+- [ ] What authentication and integrity mechanism should the trust anchor API
+  enforce?
+  - Candidates: mTLS between clusters, signed JWT with short TTL, and signed
+    certificate payload with key rotation.
+
+### Open Question Deep Dive: Trust Anchor API Authentication and Integrity
+
+Options considered:
+
+1. mTLS only
+   - Pros: strong transport security and workload identity-based authentication.
+   - Cons: does not provide standalone payload provenance if responses are
+     forwarded through intermediaries.
+
+2. JWT only
+   - Pros: simple to integrate with API gateway authn/authz.
+   - Cons: introduces token issuance and rotation dependencies; weaker
+     cryptographic binding to the transport workload identity unless carefully
+     designed.
+
+3. mTLS + signed response payload (selected)
+   - Pros: defense in depth with workload identity authentication and explicit
+     response integrity verification.
+   - Pros: allows strict replay protection and auditable verification failures.
+   - Cons: additional signing key lifecycle management.
+
+4. Network allowlist only
+   - Pros: simple operationally.
+   - Cons: insufficient for trust-anchor distribution and not acceptable as the
+     primary control.
+
+Selected approach (v1):
+- Require SPIFFE-based mTLS between caller and trust-anchor API.
+- Restrict caller identities to an allowlist of SPIFFE IDs for the crossplane
+  controller workload.
+- Return trust anchor payload with signed metadata:
+  - `certificatePem`
+  - `serialNumber`
+  - `notBefore`
+  - `notAfter`
+  - `sha256Fingerprint`
+  - `issuedAt`
+  - `expiresAt`
+  - `version`
+  - `nonce`
+- Include signature headers:
+  - `signatureKeyId`
+  - `signatureAlgorithm`
+  - `payloadSignature`
+- Client verification order:
+  1. verify mTLS server identity and trust chain
+  2. verify payload signature against trusted key set
+  3. enforce freshness (`issuedAt`/`expiresAt`) with bounded clock skew
+  4. reject replayed `nonce`/`version` responses
+
+Acceptance criteria for closing this open question:
+- [ ] Trust-anchor API rejects unauthenticated or unauthorized callers.
+- [ ] Crossplane-side controller verifies signature and freshness before using
+  returned certificate data.
+- [ ] Replay and tampered response tests fail closed.
+- [ ] Signing key rotation procedure is documented and tested.
+
+Remaining sub-decisions:
+- [ ] Choose signing key backend (KMS asymmetric key vs in-cluster key pair).
+- [ ] Define allowed caller SPIFFE IDs and ownership model.
+- [ ] Define freshness and cache policy (max skew and TTL).
+- [ ] Define key rotation overlap window and rollback behavior.
+
+## Implementation Plan
+
+### Phase 0: Documentation and design baseline
+- [ ] Replace wildcard IAM policy examples with zone-scoped examples in this
+  ADR and related implementation docs.
+- [ ] Add a sequence diagram for certificate issuance, trust anchor retrieval,
+  Roles Anywhere credential exchange, and Route53 API access.
+- [ ] Define explicit rollback strategy for each phase.
+
+### Phase 1: Certificate duration decision
+- [ ] Evaluate 90-day vs 1-year vs 5-year trust anchor duration for
+  `csi-driver-spiffe-ca`.
+- [ ] Document decision criteria:
+  - compromise window
+  - operational overhead of rotations
+  - blast radius of failed rollout
+- [ ] Publish runbooks for:
+  - scheduled rotation
+  - emergency key compromise rollover
+- [ ] Update certificate duration only after runbooks are approved.
+
+Acceptance criteria:
+- [ ] The chosen duration and rationale are documented.
+- [ ] A tested rotation procedure exists and is linked from this ADR.
+
+### Phase 2: Trust anchor retrieval service
+- [ ] Build a service that exposes the trust anchor certificate and metadata
+  (`serial`, `notBefore`, `notAfter`, `sha256`).
+- [ ] Add authentication and authorization for cross-cluster callers.
+- [ ] Add integrity controls (payload signing and key rotation process).
+- [ ] Emit audit logs for all retrieval requests and validation failures.
+
+Acceptance criteria:
+- [ ] Crossplane cluster can retrieve and validate the trust anchor without
+  manual steps.
+- [ ] Unauthorized and tampered responses are rejected in tests.
+
+### Phase 3: Crossplane composition for IAM Roles Anywhere resources
+- [ ] Create a new XRD for workload IAM Roles Anywhere access.
+- [ ] Implement composition resources:
   - [ ] Role
   - [ ] Policy
   - [ ] RolePolicyAttachment
   - [ ] Profile
   - [ ] TrustAnchor
+- [ ] Inputs include:
+  - SPIFFE URI
+  - hosted zone ID
+  - AWS account ID
+  - region
+  - trust anchor certificate reference
+- [ ] Outputs include:
+  - role ARN
+  - profile ARN
+  - trust anchor ARN
+
+Acceptance criteria:
+- [ ] Composition reconciles end-to-end in a test environment.
+- [ ] Produced IAM policy is scoped to one hosted zone ARN.
+
+### Phase 4: Workload integration (ExternalDNS and CertManager)
+- [ ] Configure ExternalDNS to target known hosted zone identifiers and avoid
+  account-wide zone discovery in steady state.
+- [ ] Configure CertManager Route53 solver to use hosted zone identifiers for
+  delegated zones.
+- [ ] Inject IAM Roles Anywhere credential helper sidecar and SPIFFE CSI volume
+  using chart-native values when available.
+
+Acceptance criteria:
+- [ ] ExternalDNS can create/update/delete records only in delegated zones.
+- [ ] CertManager DNS01 challenges succeed only in delegated zones.
+
+### Phase 5: Validation and release
+- [ ] Add conformance tests for:
+  - positive flow in delegated zone
+  - negative flow in non-delegated zone
+  - trust anchor retrieval failure modes
+- [ ] Run render and policy lint checks before merge.
+- [ ] Promote through environments with canary rollout and documented rollback.
+
+Acceptance criteria:
+- [ ] Security and functionality tests pass in CI.
+- [ ] Operational handoff documentation is complete.
 
 ## References
 - [AWS IAM Access for non-AWS workloads](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_common-scenarios_non-aws.html)
