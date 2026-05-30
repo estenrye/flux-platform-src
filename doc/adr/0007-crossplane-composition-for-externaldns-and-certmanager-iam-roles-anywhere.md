@@ -904,6 +904,15 @@ References:
 
 - [ ] What authentication and integrity mechanism should the trust anchor API
   enforce?
+  - **Scope note**: This question only applies to Pattern A/B where each
+    workload cluster hosts its own CA and the crossplane cluster must retrieve
+    it cross-cluster. With Pattern C/D (single root CA on the crossplane
+    cluster), the trust anchor certificate is available locally as a Secret and
+    no retrieval service is required — the `TrustAnchor` resource can be
+    managed directly by `provider-aws-rolesanywhere`. The current Pattern A
+    implementation accepts the trust anchor as a manually provisioned
+    prerequisite (`spec.trustAnchorArn`), making this question optional for
+    full automation of Pattern A.
   - Candidates: mTLS between clusters, signed JWT with short TTL, and signed
     certificate payload with key rotation.
 
@@ -996,8 +1005,18 @@ Acceptance criteria:
 - [ ] A tested rotation procedure exists and is linked from this ADR.
 
 ### Phase 2: Trust anchor retrieval service
+
+> **Scope**: Required only for full automation of Pattern A/B (per-cluster
+> self-signed CAs). The current implementation accepts the trust anchor as a
+> manually provisioned prerequisite via `spec.trustAnchorArn`, so Phase 2 is
+> not on the critical path. If the design migrates to Pattern C/D (single root
+> CA on the crossplane cluster), this phase is **not needed** — the
+> `TrustAnchor` resource can be managed directly from the local
+> `csi-driver-spiffe-ca` Secret using `provider-aws-rolesanywhere`.
+
 - [ ] Build a service that exposes the trust anchor certificate and metadata
-  (`serial`, `notBefore`, `notAfter`, `sha256`).
+  (`serial`, `notBefore`, `notAfter`, `sha256`), deployed on each workload
+  cluster whose CA must be registered with IAM Roles Anywhere.
 - [ ] Add authentication and authorization for cross-cluster callers.
 - [ ] Add integrity controls (payload signing and key rotation process).
 - [ ] Emit audit logs for all retrieval requests and validation failures.
