@@ -882,12 +882,23 @@ migrates to a shared trust anchor pattern.
 
 ### Recommended default
 
-- The `XDelegatedHostedZoneAWS` composition implements **Pattern A + Option B (ABAC single role)** by default: each cluster has its own trust anchor, and a single IAM role per cluster with ABAC-conditioned permission statements covers both ExternalDNS and cert-manager.
-- Escalate specific clusters to Option A (separate roles per workload) where role-assumption-time rejection of incorrect SPIFFE URIs is a hard requirement.
-- Migrate to Pattern B if trust-anchor quota pressure (50/account/Region) is encountered, accepting the additional requirement for cluster-unique SPIFFE trust domains (already satisfied by `status.trustDomain`).
-- Adopt Pattern C or D if a single-root-of-trust design is required.
-- Prefer Pattern D over Pattern C when adopting the single trust anchor model, accepting the additional bootstrap complexity in exchange for stronger key hygiene.
-- Implement Pattern D using step-ca (X5C provisioner) + step-issuer on the crossplane cluster, with cert-manager as the in-cluster lifecycle manager on workload clusters.
+- The platform adopts **Pattern D + Option B (ABAC single role)**: a single IAM
+  Roles Anywhere trust anchor backed by the crossplane cluster's root CA
+  (`csi-driver-spiffe-ca`); per-cluster intermediate CAs generated locally on
+  each workload cluster and signed by step-ca via the X5C provisioner; one IAM
+  role per cluster with ABAC-conditioned permission statements covering both
+  ExternalDNS and cert-manager.
+- The `XDelegatedHostedZoneAWS` composition provisions the IAM Role, Policy,
+  RolePolicyAttachment, and Roles Anywhere Profile for each cluster. The
+  `TrustAnchor` is a singleton managed resource on the crossplane cluster,
+  provisioned once in Phase 2.
+- Escalate specific clusters to Option A (separate roles per workload) where
+  role-assumption-time rejection of incorrect SPIFFE URIs is a hard requirement.
+- Adopt Pattern A if a cluster requires strict trust isolation independent of
+  the shared root CA (e.g., tenant isolation with a dedicated CA).
+- Implement Pattern D using step-ca (X5C provisioner) + step-issuer on the
+  crossplane cluster, with cert-manager as the in-cluster lifecycle manager on
+  workload clusters.
 
 References:
 - IAM quotas: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_iam-quotas.html
@@ -902,90 +913,28 @@ References:
   - Answer: Yes. We will scope permissions to the specific delegated hosted
     zone ARN and remove wildcard hosted zone access from controller policies.
 
-- [ ] What authentication and integrity mechanism should the trust anchor API
+- [x] What authentication and integrity mechanism should the trust anchor API
   enforce?
-  - **Scope note**: This question only applies to Pattern A/B where each
-    workload cluster hosts its own CA and the crossplane cluster must retrieve
-    it cross-cluster. With Pattern C/D (single root CA on the crossplane
-    cluster), the trust anchor certificate is available locally as a Secret and
-    no retrieval service is required — the `TrustAnchor` resource can be
-    managed directly by `provider-aws-rolesanywhere`. The current Pattern A
-    implementation accepts the trust anchor as a manually provisioned
-    prerequisite (`spec.trustAnchorArn`), making this question optional for
-    full automation of Pattern A.
-  - Candidates: mTLS between clusters, signed JWT with short TTL, and signed
-    certificate payload with key rotation.
-
-### Open Question Deep Dive: Trust Anchor API Authentication and Integrity
-
-Options considered:
-
-1. mTLS only
-   - Pros: strong transport security and workload identity-based authentication.
-   - Cons: does not provide standalone payload provenance if responses are
-     forwarded through intermediaries.
-
-2. JWT only
-   - Pros: simple to integrate with API gateway authn/authz.
-   - Cons: introduces token issuance and rotation dependencies; weaker
-     cryptographic binding to the transport workload identity unless carefully
-     designed.
-
-3. mTLS + signed response payload (selected)
-   - Pros: defense in depth with workload identity authentication and explicit
-     response integrity verification.
-   - Pros: allows strict replay protection and auditable verification failures.
-   - Cons: additional signing key lifecycle management.
-
-4. Network allowlist only
-   - Pros: simple operationally.
-   - Cons: insufficient for trust-anchor distribution and not acceptable as the
-     primary control.
-
-Selected approach (v1):
-- Require SPIFFE-based mTLS between caller and trust-anchor API.
-- Restrict caller identities to an allowlist of SPIFFE IDs for the crossplane
-  controller workload.
-- Return trust anchor payload with signed metadata:
-  - `certificatePem`
-  - `serialNumber`
-  - `notBefore`
-  - `notAfter`
-  - `sha256Fingerprint`
-  - `issuedAt`
-  - `expiresAt`
-  - `version`
-  - `nonce`
-- Include signature headers:
-  - `signatureKeyId`
-  - `signatureAlgorithm`
-  - `payloadSignature`
-- Client verification order:
-  1. verify mTLS server identity and trust chain
-  2. verify payload signature against trusted key set
-  3. enforce freshness (`issuedAt`/`expiresAt`) with bounded clock skew
-  4. reject replayed `nonce`/`version` responses
-
-Acceptance criteria for closing this open question:
-- [ ] Trust-anchor API rejects unauthenticated or unauthorized callers.
-- [ ] Crossplane-side controller verifies signature and freshness before using
-  returned certificate data.
-- [ ] Replay and tampered response tests fail closed.
-- [ ] Signing key rotation procedure is documented and tested.
-
-Remaining sub-decisions:
-- [ ] Choose signing key backend (KMS asymmetric key vs in-cluster key pair).
-- [ ] Define allowed caller SPIFFE IDs and ownership model.
-- [ ] Define freshness and cache policy (max skew and TTL).
-- [ ] Define key rotation overlap window and rollback behavior.
+  - **Closed — not applicable for Pattern D.** With Pattern D the trust anchor
+    is the crossplane cluster's own `csi-driver-spiffe-ca` root CA, available
+    as a local Secret. No cross-cluster retrieval service is required. The
+    `TrustAnchor` resource is created once as a Crossplane managed resource
+    directly from that Secret. The workload cluster bootstrap channel is
+    instead authenticated via step-ca's X5C provisioner (see Phase 2).
 
 ## Implementation Plan
 
 ### Phase 0: Documentation and design baseline
 - [x] Replace wildcard IAM policy examples with zone-scoped examples in this
   ADR and related implementation docs.
-- [ ] Add a sequence diagram for certificate issuance, trust anchor retrieval,
-  Roles Anywhere credential exchange, and Route53 API access.
+- [ ] Add a sequence diagram covering the Pattern D flows:
+  - Crossplane provisions short-lived bootstrap certificate for new workload cluster
+  - Workload cluster generates intermediate CA keypair; cert-manager submits CSR
+    to step-ca via step-issuer using bootstrap certificate (X5C provisioner)
+  - step-ca signs intermediate CA certificate; private key never leaves workload cluster
+  - SPIFFE CSI driver issues SVIDs chained to intermediate CA
+  - `aws_signing_helper` presents SVID to IAM Roles Anywhere; exchanges for
+    temporary credentials; ExternalDNS/cert-manager access Route53
 - [ ] Define explicit rollback strategy for each phase.
 
 ### Phase 1: Certificate duration decision
@@ -1004,27 +953,45 @@ Acceptance criteria:
 - [ ] The chosen duration and rationale are documented.
 - [ ] A tested rotation procedure exists and is linked from this ADR.
 
-### Phase 2: Trust anchor retrieval service
+### Phase 2: Single trust anchor provisioning and step-ca deployment
 
-> **Scope**: Required only for full automation of Pattern A/B (per-cluster
-> self-signed CAs). The current implementation accepts the trust anchor as a
-> manually provisioned prerequisite via `spec.trustAnchorArn`, so Phase 2 is
-> not on the critical path. If the design migrates to Pattern C/D (single root
-> CA on the crossplane cluster), this phase is **not needed** — the
-> `TrustAnchor` resource can be managed directly from the local
-> `csi-driver-spiffe-ca` Secret using `provider-aws-rolesanywhere`.
+> **Pattern D**: The crossplane cluster's `csi-driver-spiffe-ca` root CA is
+> the single IAM Roles Anywhere trust anchor for all workload clusters. No
+> retrieval service is needed. The `TrustAnchor` ARN from this phase is
+> the shared value supplied as `spec.trustAnchorArn` in all
+> `XDelegatedHostedZoneAWS` claims.
 
-- [ ] Build a service that exposes the trust anchor certificate and metadata
-  (`serial`, `notBefore`, `notAfter`, `sha256`), deployed on each workload
-  cluster whose CA must be registered with IAM Roles Anywhere.
-- [ ] Add authentication and authorization for cross-cluster callers.
-- [ ] Add integrity controls (payload signing and key rotation process).
-- [ ] Emit audit logs for all retrieval requests and validation failures.
+- [ ] Create a `rolesanywhere.aws.m.upbound.io/v1beta1` `TrustAnchor` Crossplane
+  managed resource sourced from the `csi-driver-spiffe-ca` Secret in the
+  `cert-manager` namespace. Manage as a singleton on the crossplane cluster.
+- [ ] Deploy [step-ca](https://github.com/smallstep/certificates) on the
+  crossplane cluster:
+  - Configure the root CA using the `csi-driver-spiffe-ca` keypair.
+  - Enable the **X5C provisioner**: clients authenticate CSRs by presenting a
+    short-lived bootstrap certificate signed by the root CA.
+  - Configure **certificate templates** to enforce `isCA: true`,
+    `maxPathLen: 0`, and the cluster trust domain as a URI SAN on all issued
+    intermediate CA certificates.
+  - Expose the CRL endpoint (`/1.0/crl`) via an ingress or LoadBalancer so
+    IAM Roles Anywhere can perform CDP-based revocation checking.
+- [ ] Deploy [step-issuer](https://github.com/smallstep/step-issuer) on the
+  crossplane cluster as the external cert-manager issuer that bridges
+  cert-manager `CertificateRequest` resources to step-ca.
+- [ ] Document the intermediate CA revocation procedure:
+  - `step ca revoke <serial>` updates the CRL immediately.
+  - IAM Roles Anywhere enforces revocation on next `CreateSession` once the
+    cached CRL expires (enable CRL checking on the trust anchor).
+- [ ] Document the root CA emergency rollover procedure (prerequisite for
+  Phase 1 acceptance criteria).
 
 Acceptance criteria:
-- [ ] Crossplane cluster can retrieve and validate the trust anchor without
-  manual steps.
-- [ ] Unauthorized and tampered responses are rejected in tests.
+- [ ] `TrustAnchor` Crossplane resource reconciles and its ARN is retrievable.
+- [ ] step-ca X5C provisioner rejects CSRs not authenticated by a valid
+  bootstrap certificate.
+- [ ] A test intermediate CA certificate issued by step-ca chains to
+  `csi-driver-spiffe-ca` and is accepted by IAM Roles Anywhere.
+- [ ] CRL endpoint is reachable from AWS and revoked intermediate CA
+  certificates fail `CreateSession`.
 
 ### Phase 3: Crossplane composition for IAM Roles Anywhere resources
 
@@ -1044,8 +1011,11 @@ Acceptance criteria:
   - [x] `iam.aws.m.upbound.io/v1beta1` Policy
   - [x] `iam.aws.m.upbound.io/v1beta1` RolePolicyAttachment
   - [x] `rolesanywhere.aws.m.upbound.io/v1beta1` Profile
-  - **Out of scope**: TrustAnchor is a pre-provisioned prerequisite; its ARN
-    is provided via `spec.trustAnchorArn` and not managed by the composition.
+  - **Out of scope**: The `TrustAnchor` AWS resource is a singleton provisioned
+    in Phase 2, not per-claim. With Pattern D, `spec.trustAnchorArn` is the
+    same shared value for all `XDelegatedHostedZoneAWS` claims. Consider
+    sourcing it from a platform-level Crossplane `EnvironmentConfig` in a
+    future iteration to avoid repeating it in every claim.
 - [x] Inputs derived from existing composition fields (no additional manual
   inputs beyond the three fields above):
   - SPIFFE URIs derived from `spec.subdomain` + `spec.zoneName`
@@ -1077,16 +1047,34 @@ Acceptance criteria:
   tested.
 - [ ] Composition reconciles end-to-end in a test environment.
 
-### Phase 4: Workload integration (ExternalDNS and CertManager)
+### Phase 4: Workload cluster bootstrap and workload integration
+
+#### Per-cluster intermediate CA bootstrap (Pattern D)
+- [ ] Crossplane issues a short-lived (e.g., 1h) X5C bootstrap certificate to
+  the new workload cluster, signed by `csi-driver-spiffe-ca`, containing the
+  cluster's trust domain as a URI SAN.
+- [ ] Deploy step-issuer on the workload cluster, configured to reach step-ca
+  on the crossplane cluster.
+- [ ] cert-manager generates an intermediate CA keypair on the workload cluster
+  (private key never leaves the cluster) and submits a `CertificateRequest`
+  to step-issuer, presenting the bootstrap certificate as the X5C
+  authentication token.
+- [ ] step-ca validates the X5C token and signs the intermediate CA certificate
+  with `maxPathLen: 0` and the cluster trust domain embedded.
+- [ ] `cert-manager-spiffe-issuer` is configured to use the locally generated
+  keypair and the signed intermediate CA to issue SVIDs to workloads.
+- [ ] Bootstrap certificate expires and is discarded after signing.
+
+#### Workload integration (ExternalDNS and cert-manager)
 - [ ] Configure `cert-manager-spiffe-csi-driver` on each workload cluster
   with `app.trustDomain: <XDelegatedHostedZoneAWS.status.trustDomain>` to
   ensure SPIFFE SVIDs match the URIs in the IAM role trust policy.
 - [ ] Configure ExternalDNS to target known hosted zone identifiers and avoid
   account-wide zone discovery in steady state.
-- [ ] Configure CertManager Route53 solver to use hosted zone identifiers for
+- [ ] Configure cert-manager Route53 solver to use hosted zone identifiers for
   delegated zones.
-- [ ] Inject IAM Roles Anywhere credential helper sidecar and SPIFFE CSI volume
-  into ExternalDNS and CertManager using the `aws_signing_helper` image
+- [ ] Inject `aws_signing_helper` sidecar and SPIFFE CSI volume into
+  ExternalDNS and cert-manager
   (`public.ecr.aws/rolesanywhere/credential-helper:1.8.1-2026.04.09.16.01`).
   Configure with ARNs from `XDelegatedHostedZoneAWS.status`:
   - `--trust-anchor-arn` ← `status.trustAnchorArn`
@@ -1096,12 +1084,16 @@ Acceptance criteria:
 Acceptance criteria:
 - [ ] ExternalDNS can create/update/delete records only in delegated zones.
 - [ ] CertManager DNS01 challenges succeed only in delegated zones.
+- [ ] Intermediate CA on workload cluster chains to `csi-driver-spiffe-ca`.
+- [ ] Bootstrap certificate is single-use and expires before the intermediate
+  CA certificate does.
 
 ### Phase 5: Validation and release
 - [ ] Add conformance tests for:
   - positive flow in delegated zone
   - negative flow in non-delegated zone
-  - trust anchor retrieval failure modes
+  - step-ca signing failure modes (unavailable, rejected X5C token)
+  - revoked intermediate CA certificate fails IAM Roles Anywhere `CreateSession`
 - [ ] Run render and policy lint checks before merge.
 - [ ] Promote through environments with canary rollout and documented rollback.
 
