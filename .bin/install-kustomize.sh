@@ -187,6 +187,10 @@ setup_binary() {
 }
 
 {
+    if [ -x "${BIN_DIR}/kustomize" ]; then
+        info "kustomize already installed at ${BIN_DIR}/kustomize, skipping"
+        exit 0
+    fi
     setup_verify_os
     setup_verify_arch
     verify_downloader curl || verify_downloader wget || fatal 'Can not find curl or wget for downloading files'

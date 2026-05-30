@@ -144,6 +144,10 @@ setup_binary() {
 }
 
 {
+    if [ -x "${BIN_DIR}/adr" ]; then
+        info "adr already installed at ${BIN_DIR}/adr, skipping"
+        exit 0
+    fi
     setup_verify_os
     setup_verify_arch
     verify_downloader curl || verify_downloader wget || fatal 'Can not find curl or wget for downloading files'
