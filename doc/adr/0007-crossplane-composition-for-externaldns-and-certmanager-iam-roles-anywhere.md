@@ -32,14 +32,17 @@ necessary trust anchors, profiles, IAM roles and policies that are
 required for the IAM Roles Anywhere trust relationship to function properly
 and grant the necessary permissions to ExternalDNS and CertManager.
 
-This composition will be deployed along side the
+The IAM Roles Anywhere identity resources (IAM Role, Policy, RolePolicyAttachment, and
+Roles Anywhere Profile) are provisioned directly within the
 [XDelegatedHostedZoneAWS](applications/crossplane-resources/delegated-hosted-zone-aws)
-composition that provisions the necessary AWS and
-Cloudflare resources required for AWS Route53 to provide DNS services for a subdomain
-that is delegated from Cloudflare to AWS Route53.  ExternalDNS and CertManager will
-need permission to securely access the delegated hosted zone in AWS Route53, which is
-provisioned by the XDelegatedHostedZoneAWS composition, in order to manage DNS records
-and TLS certificates for the subdomain.
+composition. Because every delegated zone instance always has a corresponding workload
+identity, coupling them in a single composition eliminates cross-resource references,
+guarantees lifecycle coupling (IAM resources are deleted when the zone claim is deleted),
+and reduces the number of claims an operator must create from two to one. All IAM
+values are derived from existing composition inputs — no additional IAM-specific inputs
+are needed beyond `spec.trustAnchorArn` (the ARN of the pre-existing workload cluster
+trust anchor) and two provider config references (`spec.iamProviderConfigRef` and
+`spec.rolesAnywhereProviderConfigRef`) for least-privilege credential separation.
 
 IAM permissions for ExternalDNS to access Route53 hosted zones are documented [here](https://raw.githubusercontent.com/kubernetes-sigs/external-dns/refs/heads/master/docs/tutorials/aws.md), and IAM permissions for CertManager to access Route53 hosted zones are documented [here](https://cert-manager.io/docs/configuration/acme/dns01/route53/).
 
@@ -320,17 +323,17 @@ The implementation will follow these decisions:
      cert-manager restricts `ChangeResourceRecordSets` to TXT records only
      (ACME DNS01 challenges), while ExternalDNS requires A, AAAA, CNAME,
      and TXT for full DNS lifecycle management.
-   - Two role-layout options are supported; the choice is made at composition
-     time (see "IAM policy design" in Limitations):
-       a. Separate roles (high-isolation environments): one IAM Role, Policy,
-          and Roles Anywhere Profile per workload per cluster.
-       b. ABAC single role (quota-conscious deployments): one shared IAM Role
-          and Profile per cluster, with a single policy whose statements are
-          conditioned on `aws:PrincipalTag/x509SAN/URI` to enforce per-workload
-          action boundaries.
-   - In both options, neither workload session can access the other workload's
-     permitted actions. The SPIFFE URI SAN is the authoritative identity
-     boundary.
+   - The composition implements the ABAC single-role design (Option B): one
+     IAM Role, one Policy, one RolePolicyAttachment, and one Roles Anywhere
+     Profile per cluster. The policy contains five statements, each conditioned
+     on `aws:PrincipalTag/x509SAN/URI`, enforcing per-workload action boundaries
+     within a single role.
+   - Neither workload session can access the other workload's permitted actions.
+     The SPIFFE URI SAN is the authoritative identity boundary.
+   - Option A (separate roles per workload) remains a valid escalation path for
+     environments where role-assumption-time rejection of incorrect SPIFFE URIs
+     is a hard requirement; it is not currently implemented in the composition.
+     See "IAM policy design" in Limitations for a full comparison.
 
 3. Crossplane is the source of truth for AWS identity resources
    - The `XDelegatedHostedZoneAWS` composition manages all AWS resources for
@@ -344,6 +347,12 @@ The implementation will follow these decisions:
      in status (`status.trustAnchorArn`, `status.iamRoleArn`, `status.profileArn`,
      `status.trustDomain`) so downstream automation can configure cert-manager
      and ExternalDNS without reading from multiple resources.
+   - IAM resources (`Role`, `Policy`, `RolePolicyAttachment`) are managed via
+     `provider-aws-iam` using `spec.iamProviderConfigRef` → `iam-admin`.
+     Roles Anywhere resources (`Profile`) are managed via `provider-aws-rolesanywhere`
+     using `spec.rolesAnywhereProviderConfigRef` → `rolesanywhere-admin`. The two
+     provider configs reference distinct IAM roles with narrowly scoped permissions,
+     consistent with the least-privilege principle in Decision 1.
    - The TrustAnchor itself is provisioned separately as a prerequisite (it
      depends on the workload cluster's CA certificate, which must exist before
      the claim is created). Its ARN is provided via `spec.trustAnchorArn`.
@@ -682,20 +691,23 @@ The `sts:SetSourceIdentity` and `sts:TagSession` actions must remain in the
 trust policy to allow IAM Roles Anywhere to stamp the session identity and tags;
 ABAC conditions in the permission policy will not function without these.
 
-**Shared role trust policy condition:**
+**Shared role trust policy condition** (trust domain derived from `${spec.subdomain}.${spec.zoneName}`):
 
 ```json
 "Condition": {
   "StringEquals": {
     "aws:PrincipalTag/x509SAN/URI": [
-      "spiffe://cluster.local/ns/cert-manager/sa/cert-manager",
-      "spiffe://cluster.local/ns/external-dns/sa/external-dns"
+      "spiffe://${subdomain}.${zoneName}/ns/cert-manager/sa/cert-manager",
+      "spiffe://${subdomain}.${zoneName}/ns/external-dns/sa/external-dns"
     ]
+  },
+  "ArnEquals": {
+    "aws:SourceArn": "${spec.trustAnchorArn}"
   }
 }
 ```
 
-**Merged ABAC permission policy:**
+**Merged ABAC permission policy** (zone ARN and trust domain derived from composition inputs):
 
 ```json
 {
@@ -709,15 +721,14 @@ ABAC conditions in the permission policy will not function without these.
         "route53:ListResourceRecordSets",
         "route53:ListTagsForResources"
       ],
-      "Resource": "arn:aws:route53:::hostedzone/${var.delegated_hosted_zone_id}",
+      "Resource": "arn:aws:route53:::hostedzone/${status.zoneId}",
       "Condition": {
         "StringEquals": {
           "aws:PrincipalTag/x509SAN/URI":
-            "spiffe://cluster.local/ns/external-dns/sa/external-dns"
+            "spiffe://${subdomain}.${zoneName}/ns/external-dns/sa/external-dns"
         },
         "ForAllValues:StringLike": {
-          "route53:ChangeResourceRecordSetsActions": ["CREATE", "UPSERT", "DELETE"],
-          "route53:ChangeResourceRecordSetsRecordTypes": ["A", "AAAA", "CNAME", "TXT"]
+          "route53:ChangeResourceRecordSetsRecordTypes": ["A", "AAAA", "CNAME", "TXT", "SRV"]
         }
       }
     },
@@ -729,7 +740,7 @@ ABAC conditions in the permission policy will not function without these.
       "Condition": {
         "StringEquals": {
           "aws:PrincipalTag/x509SAN/URI":
-            "spiffe://cluster.local/ns/external-dns/sa/external-dns"
+            "spiffe://${subdomain}.${zoneName}/ns/external-dns/sa/external-dns"
         }
       }
     },
@@ -740,11 +751,11 @@ ABAC conditions in the permission policy will not function without these.
         "route53:ChangeResourceRecordSets",
         "route53:ListResourceRecordSets"
       ],
-      "Resource": "arn:aws:route53:::hostedzone/${var.delegated_hosted_zone_id}",
+      "Resource": "arn:aws:route53:::hostedzone/${status.zoneId}",
       "Condition": {
         "StringEquals": {
           "aws:PrincipalTag/x509SAN/URI":
-            "spiffe://cluster.local/ns/cert-manager/sa/cert-manager",
+            "spiffe://${subdomain}.${zoneName}/ns/cert-manager/sa/cert-manager",
           "route53:ChangeResourceRecordSetsRecordTypes": ["TXT"]
         }
       }
@@ -757,7 +768,7 @@ ABAC conditions in the permission policy will not function without these.
       "Condition": {
         "StringEquals": {
           "aws:PrincipalTag/x509SAN/URI":
-            "spiffe://cluster.local/ns/cert-manager/sa/cert-manager"
+            "spiffe://${subdomain}.${zoneName}/ns/cert-manager/sa/cert-manager"
         }
       }
     },
@@ -769,7 +780,7 @@ ABAC conditions in the permission policy will not function without these.
       "Condition": {
         "StringEquals": {
           "aws:PrincipalTag/x509SAN/URI":
-            "spiffe://cluster.local/ns/cert-manager/sa/cert-manager"
+            "spiffe://${subdomain}.${zoneName}/ns/cert-manager/sa/cert-manager"
         }
       }
     }
@@ -839,6 +850,9 @@ The role trust policy condition for this cluster becomes:
       "spiffe://crossplane.rye.ninja/ns/cert-manager/sa/cert-manager",
       "spiffe://crossplane.rye.ninja/ns/external-dns/sa/external-dns"
     ]
+  },
+  "ArnEquals": {
+    "aws:SourceArn": "<spec.trustAnchorArn>"
   }
 }
 ```
@@ -868,11 +882,10 @@ migrates to a shared trust anchor pattern.
 
 ### Recommended default
 
-- Default to Pattern B for platform scale.
-- Use the ABAC single-role option (Option B) for new compositions to halve IAM object count per cluster and double effective profile capacity before hitting the 250-profile quota.
-- Escalate specific clusters to Option A (separate roles) where role-assumption-time identity rejection is a hard requirement.
-- Escalate specific clusters to Pattern A where stricter cluster-level trust isolation requirements justify the additional trust-anchor object overhead.
-- Adopt Pattern C or D if trust-anchor quota pressure is encountered or a single-root-of-trust design is required.
+- The `XDelegatedHostedZoneAWS` composition implements **Pattern A + Option B (ABAC single role)** by default: each cluster has its own trust anchor, and a single IAM role per cluster with ABAC-conditioned permission statements covers both ExternalDNS and cert-manager.
+- Escalate specific clusters to Option A (separate roles per workload) where role-assumption-time rejection of incorrect SPIFFE URIs is a hard requirement.
+- Migrate to Pattern B if trust-anchor quota pressure (50/account/Region) is encountered, accepting the additional requirement for cluster-unique SPIFFE trust domains (already satisfied by `status.trustDomain`).
+- Adopt Pattern C or D if a single-root-of-trust design is required.
 - Prefer Pattern D over Pattern C when adopting the single trust anchor model, accepting the additional bootstrap complexity in exchange for stronger key hygiene.
 - Implement Pattern D using step-ca (X5C provisioner) + step-issuer on the crossplane cluster, with cert-manager as the in-cluster lifecycle manager on workload clusters.
 
@@ -960,7 +973,7 @@ Remaining sub-decisions:
 ## Implementation Plan
 
 ### Phase 0: Documentation and design baseline
-- [ ] Replace wildcard IAM policy examples with zone-scoped examples in this
+- [x] Replace wildcard IAM policy examples with zone-scoped examples in this
   ADR and related implementation docs.
 - [ ] Add a sequence diagram for certificate issuance, trust anchor retrieval,
   Roles Anywhere credential exchange, and Route53 API access.
@@ -995,35 +1008,71 @@ Acceptance criteria:
 - [ ] Unauthorized and tampered responses are rejected in tests.
 
 ### Phase 3: Crossplane composition for IAM Roles Anywhere resources
-- [ ] Create a new XRD for workload IAM Roles Anywhere access.
-- [ ] Implement composition resources:
-  - [ ] Role
-  - [ ] Policy
-  - [ ] RolePolicyAttachment
-  - [ ] Profile
-  - [ ] TrustAnchor
-- [ ] Inputs include:
-  - SPIFFE URI
-  - hosted zone ID
-  - AWS account ID
-  - region
-  - trust anchor certificate reference
-- [ ] Outputs include:
-  - role ARN
-  - profile ARN
-  - trust anchor ARN
+
+> **Design note**: The original plan described a separate XRD for IAM Roles
+> Anywhere resources. In practice, IAM and Roles Anywhere resources were
+> integrated directly into `XDelegatedHostedZoneAWS` (see Decision 3). The
+> items below reflect the updated scope.
+
+- [x] Extend `XDelegatedHostedZoneAWS` XRD with IAM Roles Anywhere fields:
+  - `spec.trustAnchorArn` (required) — ARN of the pre-provisioned workload
+    cluster trust anchor
+  - `spec.iamProviderConfigRef` (required) — provider config for IAM resources
+  - `spec.rolesAnywhereProviderConfigRef` (required) — provider config for
+    Roles Anywhere resources
+- [x] Implement composition pipeline step `create-iam-resources`:
+  - [x] `iam.aws.m.upbound.io/v1beta1` Role
+  - [x] `iam.aws.m.upbound.io/v1beta1` Policy
+  - [x] `iam.aws.m.upbound.io/v1beta1` RolePolicyAttachment
+  - [x] `rolesanywhere.aws.m.upbound.io/v1beta1` Profile
+  - **Out of scope**: TrustAnchor is a pre-provisioned prerequisite; its ARN
+    is provided via `spec.trustAnchorArn` and not managed by the composition.
+- [x] Inputs derived from existing composition fields (no additional manual
+  inputs beyond the three fields above):
+  - SPIFFE URIs derived from `spec.subdomain` + `spec.zoneName`
+  - Hosted zone ARN derived from observed Route53 zone status
+  - Region and account implicit in provider config
+- [x] Outputs emitted in `status`:
+  - `status.iamRoleArn`
+  - `status.profileArn`
+  - `status.trustAnchorArn` (passthrough from spec)
+  - `status.trustDomain` (derived as `${spec.subdomain}.${spec.zoneName}`)
+- [x] Deploy `provider-aws-iam` package (`upbound/provider-aws-iam:v2.5.2`)
+  with dedicated runtime config, service account, and `iam-admin`
+  ClusterProviderConfig.
+- [x] Deploy `provider-aws-rolesanywhere` package
+  (`upbound/provider-aws-rolesanywhere:v2.5.2`) with dedicated runtime config,
+  service account, and `rolesanywhere-admin` ClusterProviderConfig.
+- [x] IAM permission policy scoped to single hosted zone ARN.
+- [ ] Bootstrap `crossplane-provider-iam-admin` IAM role and Roles Anywhere
+  profile; fill ARN placeholders in `provider-aws-iam` deployment runtime
+  config.
+- [ ] Bootstrap `crossplane-provider-rolesanywhere-admin` IAM role and Roles
+  Anywhere profile; fill ARN placeholders in `provider-aws-rolesanywhere`
+  deployment runtime config.
+- [ ] Composition reconciles end-to-end in a test environment.
 
 Acceptance criteria:
+- [x] Produced IAM policy is scoped to one hosted zone ARN.
+- [ ] Bootstrap runbooks for both Crossplane provider IAM roles exist and are
+  tested.
 - [ ] Composition reconciles end-to-end in a test environment.
-- [ ] Produced IAM policy is scoped to one hosted zone ARN.
 
 ### Phase 4: Workload integration (ExternalDNS and CertManager)
+- [ ] Configure `cert-manager-spiffe-csi-driver` on each workload cluster
+  with `app.trustDomain: <XDelegatedHostedZoneAWS.status.trustDomain>` to
+  ensure SPIFFE SVIDs match the URIs in the IAM role trust policy.
 - [ ] Configure ExternalDNS to target known hosted zone identifiers and avoid
   account-wide zone discovery in steady state.
 - [ ] Configure CertManager Route53 solver to use hosted zone identifiers for
   delegated zones.
 - [ ] Inject IAM Roles Anywhere credential helper sidecar and SPIFFE CSI volume
-  using chart-native values when available.
+  into ExternalDNS and CertManager using the `aws_signing_helper` image
+  (`public.ecr.aws/rolesanywhere/credential-helper:1.8.1-2026.04.09.16.01`).
+  Configure with ARNs from `XDelegatedHostedZoneAWS.status`:
+  - `--trust-anchor-arn` ← `status.trustAnchorArn`
+  - `--profile-arn` ← `status.profileArn`
+  - `--role-arn` ← `status.iamRoleArn`
 
 Acceptance criteria:
 - [ ] ExternalDNS can create/update/delete records only in delegated zones.
@@ -1060,3 +1109,5 @@ Acceptance criteria:
 
 - [provider-aws-route53](../../applications/crossplane-providers/provider-aws-route53)
 - [provider-aws-iam](../../applications/crossplane-providers/provider-aws-iam)
+- [provider-aws-rolesanywhere](../../applications/crossplane-providers/provider-aws-rolesanywhere)
+- [delegated-hosted-zone-aws](../../applications/crossplane-resources/delegated-hosted-zone-aws)
