@@ -42,13 +42,14 @@ spec:
                 - --trust-anchor-arn
                 - arn:aws:rolesanywhere:us-east-2:832767337994:trust-anchor/1433b5ab-1a7a-4134-9d84-baa79f94d093
                 - --profile-arn
-                # Bootstrap required: use the same IAM admin profile created for the IAM provider,
-                # or create a dedicated profile for the Roles Anywhere provider.
-                # Replace the placeholder below after bootstrapping.
-                - arn:aws:rolesanywhere:us-east-2:832767337994:profile/REPLACE-WITH-IAM-ADMIN-PROFILE-ARN
+                # Bootstrap required: create an IAM Roles Anywhere profile that references
+                # the crossplane-provider-rolesanywhere-admin role, then replace the placeholder below.
+                - arn:aws:rolesanywhere:us-east-2:832767337994:profile/REPLACE-WITH-ROLESANYWHERE-ADMIN-PROFILE-ARN
                 - --role-arn
-                # Bootstrap required: same crossplane-provider-iam-admin role used by the IAM provider.
-                - arn:aws:iam::832767337994:role/crossplane-provider-iam-admin
+                # Bootstrap required: create an IAM role named crossplane-provider-rolesanywhere-admin
+                # with permissions to create and manage Roles Anywhere profiles,
+                # then replace the placeholder below.
+                - arn:aws:iam::832767337994:role/crossplane-provider-rolesanywhere-admin
               imagePullPolicy: IfNotPresent
               ports:
                 - containerPort: 9911

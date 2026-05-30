@@ -65,12 +65,50 @@ spec:
                 required:
                 - kind
                 - name
+              trustAnchorArn:
+                type: string
+                description: "The ARN of the IAM Roles Anywhere trust anchor that signs workload SPIFFE certificates on the target cluster. Used in the IAM role trust policy to scope assumption to this trust anchor."
+              iamProviderConfigRef:
+                type: object
+                description: "ProviderConfigReference for the IAM provider. The referenced role must have permissions to create and manage IAM roles, policies, and role-policy attachments."
+                properties:
+                  apiVersion:
+                    type: string
+                    description: "API version of the referenced object."
+                  kind:
+                    type: string
+                    description: "Kind of the referenced object."
+                  name:
+                    type: string
+                    description: "Name of the referenced object."
+                required:
+                - kind
+                - name
+              rolesAnywhereProviderConfigRef:
+                type: object
+                description: "ProviderConfigReference for the Roles Anywhere provider. The referenced role must have permissions to create and manage Roles Anywhere profiles."
+                properties:
+                  apiVersion:
+                    type: string
+                    description: "API version of the referenced object."
+                  kind:
+                    type: string
+                    description: "Kind of the referenced object."
+                  name:
+                    type: string
+                    description: "Name of the referenced object."
+                required:
+                - kind
+                - name
             required:
             - zoneId
             - zoneName
             - subdomain
+            - trustAnchorArn
             - delegatedZoneProviderConfigRef
             - cloudflareProviderConfigRef
+            - iamProviderConfigRef
+            - rolesAnywhereProviderConfigRef
           status:
             type: object
             properties:
@@ -85,3 +123,12 @@ spec:
               trustDomain:
                 type: string
                 description: "The SPIFFE trust domain for this delegation, derived as '${spec.subdomain}.${spec.zoneName}'. Use as the --trust-domain flag value for cert-manager-spiffe-csi-driver and as the basis for IAM Roles Anywhere SPIFFE URI conditions."
+              trustAnchorArn:
+                type: string
+                description: "Passthrough of spec.trustAnchorArn. Included in status so downstream consumers can read all IAM Roles Anywhere credential-helper inputs from a single status block."
+              iamRoleArn:
+                type: string
+                description: "The ARN of the IAM role created for ExternalDNS and cert-manager to assume via IAM Roles Anywhere."
+              profileArn:
+                type: string
+                description: "The ARN of the IAM Roles Anywhere profile created for this delegation."
