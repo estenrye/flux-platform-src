@@ -103,6 +103,8 @@ spec:
       source: Inline
       inline:
         template: |
+          {{ $subdomain := .observed.composite.resource.spec.subdomain }}
+          {{ $zoneName := .observed.composite.resource.spec.zoneName }}
           {{ $nameServers := list }}
           {{ $zoneId := "" }}
           
@@ -127,6 +129,7 @@ spec:
             annotations:
               gotemplating.fn.crossplane.io/ready: "True"
           status:
+            trustDomain: {{ printf "%s.%s" $subdomain $zoneName }}
             nameServers:
             {{ range $nameServers }}
             - {{ . }}

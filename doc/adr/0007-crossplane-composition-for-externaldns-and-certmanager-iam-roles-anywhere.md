@@ -359,12 +359,15 @@ The implementation will follow these decisions:
      role trust policy conditions cannot distinguish between clusters.
    - The default trust domain `cluster.local` is prohibited for any cluster
      participating in a shared trust anchor design.
-   - The Crossplane composition will accept the cluster trust domain as a
-     required input and template it into all IAM role trust policy conditions
-     and ABAC permission policy statements.
-   - Recommended format: `spiffe://<cluster-name>.<platform-domain>`, where
-     `<cluster-name>` is a stable unique identifier assigned at provisioning
-     time (e.g. `prod-us-east-1.platform.example.com`).
+   - The trust domain is derived from `XDelegatedHostedZoneAWS` as
+     `${spec.subdomain}.${spec.zoneName}` and surfaced in `status.trustDomain`.
+     The IAM Roles Anywhere composition consumes this value via cross-resource
+     reference — no additional trust domain input is required.
+   - Example: `subdomain: crossplane`, `zoneName: rye.ninja` → trust domain
+     `crossplane.rye.ninja` → SPIFFE URI
+     `spiffe://crossplane.rye.ninja/ns/external-dns/sa/external-dns`.
+   - DNS names are globally unique by property, satisfying the uniqueness
+     requirement automatically without a separate cluster-identity field.
    - Pattern A is exempt: the per-cluster trust anchor provides cluster
      isolation independently of the trust domain value. Unique trust domains
      are still recommended for operational clarity.
@@ -793,20 +796,28 @@ pass the condition check on any other cluster's IAM role.
 
 **The fix**: Each cluster must be configured with a unique SPIFFE trust
 domain via the `--trust-domain` flag on cert-manager-spiffe-csi-driver
-(Helm value: `app.trustDomain`). The Crossplane composition must:
+(Helm value: `app.trustDomain`). The IAM Roles Anywhere Crossplane composition
+must:
 
-1. Accept the cluster trust domain as a required composition input.
+1. Read `XDelegatedHostedZoneAWS.status.trustDomain` via cross-resource reference.
 2. Template it into the SPIFFE URI strings used in IAM role trust policy
    conditions and ABAC permission policy `aws:PrincipalTag/x509SAN/URI`
    condition values.
 
-**Recommended trust domain format**: `spiffe://<cluster-name>.<platform-domain>`
+**Trust domain source**: `XDelegatedHostedZoneAWS.status.trustDomain` =
+`${spec.subdomain}.${spec.zoneName}`
 
-For example, a cluster named `prod-us-east-1` on `platform.example.com` produces:
+This value is computed by the composition and emitted as a status field. DNS
+names are globally unique by property, so deriving the trust domain from the
+delegated hosted zone domain satisfies the uniqueness requirement automatically
+without a separate cluster-identity input.
+
+For example, the claim with `subdomain: crossplane` and `zoneName: rye.ninja`
+produces `status.trustDomain: crossplane.rye.ninja`, and therefore:
 
 ```
-spiffe://prod-us-east-1.platform.example.com/ns/external-dns/sa/external-dns
-spiffe://prod-us-east-1.platform.example.com/ns/cert-manager/sa/cert-manager
+spiffe://crossplane.rye.ninja/ns/external-dns/sa/external-dns
+spiffe://crossplane.rye.ninja/ns/cert-manager/sa/cert-manager
 ```
 
 The role trust policy condition for this cluster becomes:
@@ -815,8 +826,8 @@ The role trust policy condition for this cluster becomes:
 "Condition": {
   "StringEquals": {
     "aws:PrincipalTag/x509SAN/URI": [
-      "spiffe://prod-us-east-1.platform.example.com/ns/cert-manager/sa/cert-manager",
-      "spiffe://prod-us-east-1.platform.example.com/ns/external-dns/sa/external-dns"
+      "spiffe://crossplane.rye.ninja/ns/cert-manager/sa/cert-manager",
+      "spiffe://crossplane.rye.ninja/ns/external-dns/sa/external-dns"
     ]
   }
 }

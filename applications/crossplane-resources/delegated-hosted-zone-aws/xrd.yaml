@@ -82,3 +82,6 @@ spec:
               zoneId:
                 type: string
                 description: "The zone ID of the created delegated hosted zone."
+              trustDomain:
+                type: string
+                description: "The SPIFFE trust domain for this delegation, derived as '${spec.subdomain}.${spec.zoneName}'. Use as the --trust-domain flag value for cert-manager-spiffe-csi-driver and as the basis for IAM Roles Anywhere SPIFFE URI conditions."
