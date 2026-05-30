@@ -35,6 +35,9 @@ jobs:
           echo "BRANCH_NAME=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
         fi
 
+    - name: Install dependencies
+      run: make render-deps
+
     - name: Run make render
       run: make render
       env:
