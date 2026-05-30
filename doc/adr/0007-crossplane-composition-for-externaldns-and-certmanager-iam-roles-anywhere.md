@@ -908,6 +908,155 @@ References:
 - step-issuer (cert-manager external issuer for step-ca): https://github.com/smallstep/step-issuer
 - step-ca CRL / active revocation: https://smallstep.com/docs/step-ca/certificate-authority-server-production/#consider-active-revocation
 
+## Sequence Diagrams
+
+### Diagram 1: Infrastructure provisioning (Phases 2 and 3)
+
+One-time platform setup and per-zone IAM identity provisioning.
+
+```mermaid
+sequenceDiagram
+    participant CP as Crossplane Cluster
+    participant CM_CP as cert-manager
+    participant StepCA as step-ca
+    participant RAPA as provider-aws-rolesanywhere
+    participant IAMA as provider-aws-iam
+    participant AWS as AWS IAM / Roles Anywhere
+
+    rect rgb(230, 245, 255)
+        Note over CP,AWS: Phase 2 — One-time platform setup
+        CM_CP->>CM_CP: Provision csi-driver-spiffe-ca
+        Note over CM_CP: Root CA cert + private key
+        CP->>StepCA: Deploy step-ca
+        Note over StepCA: Root CA: csi-driver-spiffe-ca
+        Note over StepCA: X5C provisioner enabled
+        Note over StepCA: CRL endpoint exposed via ingress
+        CP->>RAPA: Reconcile TrustAnchor managed resource
+        RAPA->>AWS: CreateTrustAnchor (CERTIFICATE_BUNDLE)
+        Note over RAPA,AWS: source: csi-driver-spiffe-ca cert
+        AWS-->>RAPA: trustAnchorArn
+    end
+
+    rect rgb(230, 255, 230)
+        Note over CP,AWS: Phase 3 — Per XDelegatedHostedZoneAWS claim
+        CP->>IAMA: Reconcile Role
+        Note over IAMA: Trust policy: SPIFFE URIs
+        Note over IAMA: + ArnEquals trustAnchorArn
+        IAMA->>AWS: CreateRole
+        AWS-->>IAMA: roleArn
+        CP->>IAMA: Reconcile Policy
+        Note over IAMA: 5-statement ABAC
+        Note over IAMA: scoped to hostedzone/<zoneId>
+        IAMA->>AWS: CreatePolicy
+        CP->>IAMA: Reconcile RolePolicyAttachment
+        IAMA->>AWS: AttachRolePolicy
+        CP->>RAPA: Reconcile Profile
+        Note over RAPA: roleArns: [roleArn]
+        RAPA->>AWS: CreateProfile
+        AWS-->>RAPA: profileArn
+        CP->>CP: Emit XR status
+        Note over CP: trustDomain, trustAnchorArn
+        Note over CP: iamRoleArn, profileArn
+    end
+```
+
+### Diagram 2: Workload cluster intermediate CA bootstrap (Phase 4a)
+
+Per-cluster, one-time. The intermediate CA private key is generated on the
+workload cluster and never leaves it.
+
+```mermaid
+sequenceDiagram
+    participant CP as Crossplane Cluster
+    participant CM_CP as cert-manager (crossplane)
+    participant StepCA as step-ca (crossplane)
+    participant WC as Workload Cluster
+    participant SI as step-issuer (workload)
+    participant CM_WC as cert-manager (workload)
+    participant CSI as spiffe-csi-driver (workload)
+
+    rect rgb(255, 245, 230)
+        Note over CP,CSI: Phase 4a — Per-cluster bootstrap
+        CP->>CM_CP: Issue bootstrap Certificate
+        Note over CM_CP: 1h TTL, signed by csi-driver-spiffe-ca
+        Note over CM_CP: URI SAN: cluster trust domain
+        CM_CP-->>CP: bootstrap cert Secret
+        CP->>WC: Deliver bootstrap cert
+        Note over WC: via Crossplane Kubernetes provider
+        CM_WC->>CM_WC: Generate intermediate CA keypair
+        Note over CM_WC: Private key stays on workload cluster
+        CM_WC->>SI: CertificateRequest
+        Note over SI: CSR + bootstrap cert as X5C token
+        SI->>StepCA: Forward request (X5C auth)
+        StepCA->>StepCA: Validate X5C token
+        Note over StepCA: 1. chains to csi-driver-spiffe-ca
+        Note over StepCA: 2. within validity period
+        Note over StepCA: 3. trust domain matches template policy
+        StepCA->>StepCA: Sign intermediate CA cert
+        Note over StepCA: maxPathLen: 0
+        Note over StepCA: CDP: step-ca /1.0/crl
+        StepCA-->>SI: signed certificate only
+        Note over StepCA,SI: Private key never transmitted
+        SI-->>CM_WC: signed intermediate CA cert
+        CM_WC->>CSI: Configure csi-driver-spiffe-issuer
+        Note over CSI: signed intermediate CA
+        Note over CSI: + local private key
+        Note over CP: Bootstrap cert TTL expires
+    end
+```
+
+### Diagram 3: Runtime SVID issuance and credential exchange (Phase 4b)
+
+Per-pod SVID issuance and per-session AWS credential exchange at runtime.
+
+```mermaid
+sequenceDiagram
+    participant Pod as ExternalDNS / cert-manager Pod
+    participant CSI as spiffe-csi-driver
+    participant CM_WC as cert-manager (workload)
+    participant Helper as aws_signing_helper sidecar
+    participant RAWS as IAM Roles Anywhere
+    participant StepCA as step-ca (crossplane)
+    participant R53 as Route53
+
+    rect rgb(245, 230, 255)
+        Note over Pod,CM_WC: SVID issuance (per pod, auto-renewed)
+        Pod->>CSI: Mount /var/run/secrets/spiffe.io
+        CSI->>CM_WC: CertificateRequest
+        Note over CM_WC: URI SAN: spiffe://<trustDomain>/ns/<ns>/sa/<sa>
+        CM_WC->>CM_WC: Approve via CertificateRequestPolicy
+        CM_WC->>CM_WC: Sign SVID with intermediate CA
+        CM_WC-->>CSI: cert + private key
+        CSI-->>Pod: tls.crt + tls.key mounted
+    end
+
+    rect rgb(255, 230, 230)
+        Note over Pod,R53: Credential exchange and Route53 access (per session)
+        Pod->>Helper: AWS SDK call
+        Helper->>Helper: Read SPIFFE SVID
+        Note over Helper: /var/run/secrets/spiffe.io/tls.crt
+        Helper->>RAWS: CreateSession
+        Note over Helper,RAWS: certificate chain + signature
+        RAWS->>RAWS: Validate chain against TrustAnchor
+        Note over RAWS: root: csi-driver-spiffe-ca
+        RAWS->>StepCA: Fetch CRL (CDP endpoint)
+        StepCA-->>RAWS: CRL
+        RAWS->>RAWS: Check intermediate CA not revoked
+        RAWS->>RAWS: Set session tag
+        Note over RAWS: x509SAN/URI = SPIFFE URI
+        RAWS->>RAWS: Evaluate IAM trust policy
+        Note over RAWS: StringEquals x509SAN/URI
+        Note over RAWS: ArnEquals aws:SourceArn
+        RAWS-->>Helper: temporary credentials
+        Helper-->>Pod: credentials on http://localhost:9911
+        Pod->>R53: API call with temporary credentials
+        R53->>R53: Evaluate ABAC permission policy
+        Note over R53: StringEquals x509SAN/URI
+        Note over R53: scoped to hostedzone/<zoneId>
+        R53-->>Pod: API response
+    end
+```
+
 ## Open Questions
 - [x] Can we limit the scope of the resources made accessible to cert-manager and ExternalDNS to only the specific Route53 hosted zone that is provisioned by the XDelegatedHostedZoneAWS composition?
   - Answer: Yes. We will scope permissions to the specific delegated hosted
@@ -927,14 +1076,8 @@ References:
 ### Phase 0: Documentation and design baseline
 - [x] Replace wildcard IAM policy examples with zone-scoped examples in this
   ADR and related implementation docs.
-- [ ] Add a sequence diagram covering the Pattern D flows:
-  - Crossplane provisions short-lived bootstrap certificate for new workload cluster
-  - Workload cluster generates intermediate CA keypair; cert-manager submits CSR
-    to step-ca via step-issuer using bootstrap certificate (X5C provisioner)
-  - step-ca signs intermediate CA certificate; private key never leaves workload cluster
-  - SPIFFE CSI driver issues SVIDs chained to intermediate CA
-  - `aws_signing_helper` presents SVID to IAM Roles Anywhere; exchanges for
-    temporary credentials; ExternalDNS/cert-manager access Route53
+- [x] Add a sequence diagram covering the Pattern D flows.
+  See [Sequence Diagrams](#sequence-diagrams).
 - [ ] Define explicit rollback strategy for each phase.
 
 ### Phase 1: Certificate duration decision
