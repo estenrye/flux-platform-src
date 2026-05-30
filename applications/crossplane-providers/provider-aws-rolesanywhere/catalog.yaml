@@ -1,0 +1,28 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-provider-aws-rolesanywhere
+  description: |-
+    This component installs the Crossplane AWS Roles Anywhere provider,
+    which allows Crossplane to manage IAM Roles Anywhere profiles.
+  tags:
+    - crossplane
+    - crossplane-provider
+    - aws
+    - rolesanywhere
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://marketplace.upbound.io/providers/upbound/provider-aws-rolesanywhere/
+      title: Upjet-based Crossplane provider for AWS Roles Anywhere
+      icon: docs
+      type: documentation
+    - url: https://github.com/estenrye/flux-platform-src/blob/main/doc/adr/0007-crossplane-composition-for-externaldns-and-certmanager-iam-roles-anywhere.md
+      title: "ADR 0007: Crossplane Composition for ExternalDNS and cert-manager IAM Roles Anywhere"
+      icon: docs
+      type: documentation
+spec:
+  type: operator
+  lifecycle: production
+  owner: platform-engineering

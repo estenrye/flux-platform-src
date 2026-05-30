@@ -333,10 +333,20 @@ The implementation will follow these decisions:
      boundary.
 
 3. Crossplane is the source of truth for AWS identity resources
-   - The composition will manage Role, Policy, RolePolicyAttachment, Profile,
-     and TrustAnchor.
-   - The delegated hosted zone identifier from `XDelegatedHostedZoneAWS`
-     status will be used to template zone-scoped IAM policy documents.
+   - The `XDelegatedHostedZoneAWS` composition manages all AWS resources for
+     a cluster's delegated DNS zone and workload identity as a single unit:
+     Route53 hosted zone, Cloudflare NS delegation records, IAM Role, IAM
+     Policy, RolePolicyAttachment, and Roles Anywhere Profile.
+   - The IAM Role trust policy and permission policy are fully derived from
+     composition inputs (`spec.subdomain`, `spec.zoneName`, `spec.trustAnchorArn`)
+     — no separate composition or manual IAM authoring is required.
+   - The composition outputs all IAM Roles Anywhere credential-helper inputs
+     in status (`status.trustAnchorArn`, `status.iamRoleArn`, `status.profileArn`,
+     `status.trustDomain`) so downstream automation can configure cert-manager
+     and ExternalDNS without reading from multiple resources.
+   - The TrustAnchor itself is provisioned separately as a prerequisite (it
+     depends on the workload cluster's CA certificate, which must exist before
+     the claim is created). Its ARN is provided via `spec.trustAnchorArn`.
 
 4. Trust anchor distribution is API-based with verification
    - We will build a service that publishes the trust anchor certificate from

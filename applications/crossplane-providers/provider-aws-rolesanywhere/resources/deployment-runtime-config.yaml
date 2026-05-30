@@ -1,0 +1,64 @@
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: aws-rolesanywhere-admin-provider
+  namespace: crossplane-system
+spec:
+  deploymentTemplate:
+    spec:
+      selector:
+        matchLabels:
+          app: upbound-provider-aws-rolesanywhere
+      template:
+        metadata:
+          labels:
+            app: upbound-provider-aws-rolesanywhere
+        spec:
+          securityContext:
+            runAsGroup: 2000
+            runAsNonRoot: true
+            runAsUser: 2000
+            fsGroup: 2000
+          serviceAccountName: aws-rolesanywhere-admin-provider
+          containers:
+            - name: package-runtime
+              env:
+                - name: AWS_REGION
+                  value: us-east-2
+                - name: AWS_EC2_METADATA_SERVICE_ENDPOINT
+                  value: http://localhost:9911
+            - name: aws-signing-helper
+              image: public.ecr.aws/rolesanywhere/credential-helper:1.8.1-2026.04.09.16.01
+              command:
+                - aws_signing_helper
+                - serve
+                - --port
+                - "9911"
+                - --debug
+                - --certificate
+                - /var/run/secrets/spiffe.io/tls.crt
+                - --private-key
+                - /var/run/secrets/spiffe.io/tls.key
+                - --trust-anchor-arn
+                - arn:aws:rolesanywhere:us-east-2:832767337994:trust-anchor/1433b5ab-1a7a-4134-9d84-baa79f94d093
+                - --profile-arn
+                # Bootstrap required: use the same IAM admin profile created for the IAM provider,
+                # or create a dedicated profile for the Roles Anywhere provider.
+                # Replace the placeholder below after bootstrapping.
+                - arn:aws:rolesanywhere:us-east-2:832767337994:profile/REPLACE-WITH-IAM-ADMIN-PROFILE-ARN
+                - --role-arn
+                # Bootstrap required: same crossplane-provider-iam-admin role used by the IAM provider.
+                - arn:aws:iam::832767337994:role/crossplane-provider-iam-admin
+              imagePullPolicy: IfNotPresent
+              ports:
+                - containerPort: 9911
+                  name: imdsv2
+                  protocol: TCP
+              volumeMounts:
+                - mountPath: "/var/run/secrets/spiffe.io"
+                  name: spiffe
+          volumes:
+            - name: spiffe
+              csi:
+                driver: spiffe.csi.cert-manager.io
+                readOnly: true
