@@ -14,6 +14,20 @@
     }
   },
   "chat.tools.terminal.autoApprove": {
-    "make": true
+    "make": true,
+    "kubectl get": true,
+    "kubectl describe": true,
+    "kubectl logs": true,
+    "/^kubectl get daemonset -n cert-manager cert-manager-csi-driver-spiffe-driver -o jsonpath='\\{\\.spec\\.template\\.spec\\.volumes\\}' \\| python3 -m json\\.tool$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^kubectl get daemonset -n cert-manager cert-manager-csi-driver-spiffe-driver -o jsonpath='\\{\\.spec\\.template\\.spec\\.containers\\[\\*\\]\\.args\\}' \\| python3 -m json\\.tool$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "kubectl exec": true,
+    "kubectl debug": true,
+    "kubectl rollout": true
   }
 }
