@@ -3,8 +3,14 @@ name: Render Flux Repository
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'applications/**'
+      - 'clusters/**'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'applications/**'
+      - 'clusters/**'
   workflow_dispatch:
 
 jobs:
