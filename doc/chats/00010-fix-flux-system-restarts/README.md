@@ -17,6 +17,7 @@ Investigate pod restarts observed across the `flux-system` namespace, identify r
 5. Upgrade all Cloudflare providers to latest version and draft an upstream issue.
 6. Dig deeper into Issue 1 (API server connectivity disruptions).
 7. Propose a monitoring strategy using the OpenTelemetry Operator to prove out the Rackspace Spot API instability.
+8. Validate the last 24h for new restart waves and correlate with previous container logs across namespaces.
 
 ## Repository Context
 
@@ -52,7 +53,7 @@ Environment context:
 
 ### Issue 1: Intermittent API Server Connectivity Disruptions
 
-**Root cause: Rackspace Spot managed control plane API server (`10.21.0.1:443`) experienced three separate connectivity disruptions on May 31, 2026.**
+**Root cause: Rackspace Spot managed control plane API server (`10.21.0.1:443`) experienced multiple short connectivity disruptions on May 31, 2026.**
 
 #### Disruption timeline (UTC)
 
@@ -134,6 +135,35 @@ Precise UTC timestamps from `kubectl get pods -o custom-columns` with `lastState
 18:40:30Z  crossplane-rbac-manager-65f4b958c5-l4t7z  (only casualty)
 ```
 
+#### Follow-up validation in the last 24 hours (post-analysis)
+
+A later sweep of the previous 24 hours identified two additional same-day waves,
+both with the same signature (`10.21.0.1:443` lease timeout/context deadline
+errors followed by leader-election loss or graceful manager shutdown):
+
+**Wave 4 (22:00:36Z–22:01:04Z):**
+```
+22:00:36Z  cert-manager-csi-driver-spiffe-approver-7d85bc864b-csqmf (Error, exit 1)
+22:01:02Z  cert-manager-approver-policy-5f47b44bbc-d7rwq            (Completed, exit 0)
+22:01:04Z  kustomize-controller-7f686f547b-lf24g                    (Completed, exit 0)
+```
+
+**Wave 5 (22:04:51Z–22:04:56Z):**
+```
+22:04:51Z  crossplane-rbac-manager-8466b7f78d-xgf9g                 (Error, exit 1)
+22:04:54Z  external-secrets-6cfbd96855-r7jjn                        (Error, exit 1)
+22:04:56Z  cert-manager-csi-driver-spiffe-approver-7d85bc864b-wq8fz (Error, exit 1)
+22:04:56Z  trust-manager-6c9dcf695b-lb4jx                           (Error, exit 1)
+```
+
+Representative log evidence from these waves:
+- `kustomize-controller`: manager exited with `Completed`/`exit 0`, but previous logs show lease/cacher calls to `https://10.21.0.1:443` canceled during startup/leader-election flow.
+- `crossplane-rbac-manager`: `?timeout=5s` lease update timed out to `10.21.0.1:443`, then `leader election lost`.
+- `external-secrets`: lease update and retrieval failed against `10.21.0.1:443` (`Client.Timeout exceeded`), then `Failed to renew lease` and manager shutdown.
+- `cert-manager-csi-driver-spiffe-approver`: lease renew/retrieve failed against `10.21.0.1:443` (`?timeout=5s`) and process exited with `leader election lost`.
+
+These two additional waves strengthen the original conclusion: this is a control-plane/API reachability pattern impacting leader-electing controllers across namespaces, not a Flux- or kustomize-specific defect.
+
 #### What caused this?
 
 `10.21.0.1` is the Kubernetes API server VIP managed by Rackspace Spot's control plane. Worker nodes have no visibility into what happens at this layer. Possible causes:
@@ -143,7 +173,7 @@ Precise UTC timestamps from `kubectl get pods -o custom-columns` with `lastState
 - Transient network disruption between worker nodes and the control plane network segment
 - API server process restart due to OOM, certificate rotation, or config change
 
-All three events were brief (seconds to minutes) and self-healing. There is no evidence of any worker node issue.
+All observed events were brief (seconds to minutes) and self-healing. There is no evidence of any worker node issue.
 
 #### Recovery
 
@@ -289,6 +319,9 @@ The Kubernetes CEL static type environment excludes fields with no explicit `typ
 8. **Persistent pod restart counts mixed with precise `lastState.terminated.finishedAt` timestamps reveal disruption waves.**
    Running `kubectl get pods -o custom-columns=...,LAST-RESTART:.status.containerStatuses[0].lastState.terminated.finishedAt --sort-by=...` groups pods by restart timestamp and immediately reveals concurrent failure clusters — each wave appears as a tight band of timestamps spanning 30–90 seconds.
 
+9. **`Completed` + `exit 0` does not imply a benign restart in controller workloads.**
+   For leader-electing controllers, `Completed` can still mean orderly shutdown triggered by API reachability loss and lease-renew failure. Always correlate termination reason with previous logs before classifying restart cause.
+
 ## Operational Notes
 
 Commands used for verification:
@@ -333,4 +366,30 @@ kubectl logs -n flux-system <pod-name> --previous | tail -30
 
 # Issue 1: Node condition check (confirm nodes stayed healthy)
 kubectl describe nodes | grep -A5 "Conditions:" | grep -v "^--$"
+
+# Follow-up: 24h cross-namespace restart timeline
+since=$(date -u -v-24H +"%Y-%m-%dT%H:%M:%SZ")
+kubectl get pods -A -o json | jq -r --arg since "$since" '
+   .items[]
+   | select(.metadata.namespace=="flux-system" or .metadata.namespace=="crossplane-system" or .metadata.namespace=="cert-manager" or .metadata.namespace=="external-secrets-operator")
+   | . as $p
+   | ($p.status.containerStatuses // [])[]?
+   | select((.restartCount // 0) > 0)
+   | {
+         ns: $p.metadata.namespace,
+         pod: $p.metadata.name,
+         node: $p.spec.nodeName,
+         container: .name,
+         restarts: .restartCount,
+         last_restart: (.lastState.terminated.finishedAt // ""),
+         reason: (.lastState.terminated.reason // ""),
+         exit: ((.lastState.terminated.exitCode|tostring) // "")
+      }
+   | select(.last_restart != "" and .last_restart >= $since)
+   | [.last_restart, .ns, .pod, .container, (.restarts|tostring), .reason, .exit, .node]
+   | @tsv' | sort
+
+# Follow-up: confirm current controller availability
+kubectl get deployments -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,AVAILABLE:.status.availableReplicas,READY:.status.readyReplicas,UP_TO_DATE:.status.updatedReplicas' \
+   | egrep '(^NAMESPACE|flux-system|crossplane-system|cert-manager|external-secrets-operator)'
 ```
