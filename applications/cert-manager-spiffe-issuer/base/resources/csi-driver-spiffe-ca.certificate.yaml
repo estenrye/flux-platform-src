@@ -7,6 +7,9 @@ spec:
   commonName: csi-driver-spiffe-ca
   secretName: csi-driver-spiffe-ca
   duration: 2160h
+  renewBefore: 720h  # renew at day 60; 30-day window for cascade rotation to complete
+  # privateKey.rotationPolicy: Always is deferred until Phase 2 TrustAnchor
+  # overlap automation is validated. Enabling it without automation causes outage.
   isCA: true
   issuerRef:
     name: selfsigned

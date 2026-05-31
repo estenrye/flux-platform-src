@@ -1039,19 +1039,54 @@ sequenceDiagram
 - [ ] Define explicit rollback strategy for each phase.
 
 ### Phase 1: Certificate duration decision
-- [ ] Evaluate 90-day vs 1-year vs 5-year trust anchor duration for
+
+**Decision: 90-day duration, key rotation on every renewal, fully automated.**
+
+The `csi-driver-spiffe-ca` `Certificate` is already configured with
+`duration: 2160h` (90 days). No duration change is needed. The following
+criteria were evaluated:
+
+| Criterion | Decision |
+|---|---|
+| **Compromise window** | ≤90 days for root CA material; ≤intermediate CA TTL for workload SVIDs. Acceptable given SPIFFE SVIDs are typically ≤24h. |
+| **Operational overhead** | Justified only with full automation. The rotation cascade (TrustAnchor bundle update → step-ca restart → intermediate CA re-issue → SVID re-issue) must complete within the `renewBefore` window. |
+| **Blast radius of failed rollout** | Full cascade on each rotation. Mitigated by bundle overlap: both old and new root certs are present in the TrustAnchor bundle during the transition window, so old intermediate CAs remain valid while workload clusters re-issue against the new root. |
+| **Private key rotation** | `rotationPolicy: Always` — the private key rotates on every renewal. This is the highest-security option and ensures that a compromised key has a maximum exposure window equal to one 90-day cert lifetime. It also means every renewal is a full trust anchor replacement rather than a cert-only renewal. |
+
+**Rotation sequence (automated, triggered by cert-manager at ~day 60):**
+
+1. cert-manager renews `csi-driver-spiffe-ca` with a new keypair (day 60).
+2. A controller detects the secret change and adds the new cert to the
+   TrustAnchor CERTIFICATE_BUNDLE (overlap window begins; both old and new
+   root certs are trusted by IAM Roles Anywhere).
+3. step-ca is restarted/reconfigured to use the new root CA keypair.
+4. Each workload cluster's step-issuer detects that its intermediate CA no
+   longer chains to any active root and triggers renewal via step-ca.
+5. cert-manager on each workload cluster issues new SVIDs from the new
+   intermediate CA.
+6. After all workload clusters have completed re-issuance (observable via
+   status conditions), the old root cert is removed from the TrustAnchor
+   bundle.
+
+> **Gate**: `privateKey.rotationPolicy: Always` is deferred until Phase 2
+> automation is in place. Setting it without the TrustAnchor bundle overlap
+> controller would cause an immediate outage. Current cert YAML has implicit
+> `rotationPolicy: Never` (cert-manager default).
+
+- [x] Evaluate 90-day vs 1-year vs 5-year trust anchor duration for
   `csi-driver-spiffe-ca`.
-- [ ] Document decision criteria:
+- [x] Document decision criteria:
   - compromise window
   - operational overhead of rotations
   - blast radius of failed rollout
 - [ ] Publish runbooks for:
-  - scheduled rotation
-  - emergency key compromise rollover
-- [ ] Update certificate duration only after runbooks are approved.
+  - [scheduled rotation](../runbooks/csi-driver-spiffe-ca-scheduled-rotation.md)
+  - [emergency key compromise rollover](../runbooks/csi-driver-spiffe-ca-emergency-rollover.md)
+- [ ] Enable `privateKey.rotationPolicy: Always` on `csi-driver-spiffe-ca`
+  `Certificate` after Phase 2 TrustAnchor overlap automation is validated.
 
 Acceptance criteria:
-- [ ] The chosen duration and rationale are documented.
+- [x] The chosen duration and rationale are documented.
 - [ ] A tested rotation procedure exists and is linked from this ADR.
 
 ### Phase 2: Single trust anchor provisioning and step-ca deployment
