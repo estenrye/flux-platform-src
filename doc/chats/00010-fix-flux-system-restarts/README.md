@@ -2,11 +2,11 @@
 
 Date: May 31, 2026
 Chat ID: 00010
-Status: Completed
+Status: In Progress
 
 ## Objective
 
-Investigate pod restarts observed across the `flux-system` namespace and identify root causes.
+Investigate pod restarts observed across the `flux-system` namespace, identify root causes, and establish ongoing observability to prove out the external API server instability.
 
 ## Prompt Timeline
 
@@ -16,6 +16,7 @@ Investigate pod restarts observed across the `flux-system` namespace and identif
 4. Investigate Issue 3 (Cloudflare CRD CEL bug) and determine if provider update or kustomize can fix it.
 5. Upgrade all Cloudflare providers to latest version and draft an upstream issue.
 6. Dig deeper into Issue 1 (API server connectivity disruptions).
+7. Propose a monitoring strategy using the OpenTelemetry Operator to prove out the Rackspace Spot API instability.
 
 ## Repository Context
 
@@ -24,6 +25,10 @@ Relevant files modified in this session:
 - [applications/crossplane-providers/family-cloudflare/provider.yaml](../../../applications/crossplane-providers/family-cloudflare/provider.yaml)
 - [applications/crossplane-providers/provider-cloudflare-zone/resources/provider.yaml](../../../applications/crossplane-providers/provider-cloudflare-zone/resources/provider.yaml)
 - [applications/crossplane-providers/provider-cloudflare-dns/resources/provider.yaml](../../../applications/crossplane-providers/provider-cloudflare-dns/resources/provider.yaml)
+
+Supporting documents created in this session:
+- [upstream-issue-cloudflare-settings-cel-bug.md](upstream-issue-cloudflare-settings-cel-bug.md) — two-PR plan for the wildbitca/upjet CEL bug fix
+- [monitoring-strategy-api-server-probe.md](monitoring-strategy-api-server-probe.md) — OTel Collector DaemonSet strategy to instrument and alert on API server disruptions
 
 Environment context:
 - Cluster access used with `KUBECONFIG=~/.kube/crossplane-controlplane-cluster.yaml`
