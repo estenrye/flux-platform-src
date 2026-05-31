@@ -1,5 +1,9 @@
 # Monitoring Strategy: Prove Rackspace Spot API Server Instability
 
+Date: May 31, 2026
+Chat ID: 00010
+Status: Draft
+
 ## Objective
 
 Produce timestamped, node-attributed evidence that `10.21.0.1:443` (the managed

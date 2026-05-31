@@ -204,7 +204,7 @@ The key observation: every other Flux controller (helm, kustomize, notification,
 ### Readiness probe override for source-controller
 
 Updated:
-- [applications/flux/base/patches/deployment.source-controller.yaml](applications/flux/base/patches/deployment.source-controller.yaml)
+- [applications/flux/base/patches/deployment.source-controller.yaml](../../../applications/flux/base/patches/deployment.source-controller.yaml)
 
 Added a `replace` JSON patch operation to override the source-controller readiness probe from `GET / :http` to `GET /readyz :healthz`, consistent with all other Flux controllers:
 
