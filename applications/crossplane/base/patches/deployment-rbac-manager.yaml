@@ -1,15 +1,28 @@
 - op: add
-  path: /spec/template/spec/containers/0/env/-
-  value:
-    name: HEALTH_PROBE_PORT
-    value: "8081"
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-liveness-probe
+  value: "crossplane rbac start does not expose a health probe endpoint"
 - op: add
-  path: /spec/template/spec/containers/0/ports/-
-  value:
-    name: readyz
-    containerPort: 8081
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-readiness-probe
+  value: "crossplane rbac start does not expose a health probe endpoint"
+- op: add
+  path: /metadata/annotations/checkov.io~1skip1
+  value: "CKV_K8S_8=crossplane rbac start does not expose a liveness probe endpoint"
+- op: add
+  path: /metadata/annotations/checkov.io~1skip2
+  value: "CKV_K8S_9=crossplane rbac start does not expose a readiness probe endpoint"
+- op: add
+  path: /metadata/annotations/checkov.io~1skip3
+  value: "CKV_K8S_38=crossplane-rbac-manager requires service account token to manage RBAC"
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: Always
 - op: add
   path: /spec/template/spec/containers/0/securityContext/capabilities
+  value:
+    drop:
+      - ALL
+- op: add
+  path: /spec/template/spec/initContainers/0/securityContext/capabilities
   value:
     drop:
       - ALL

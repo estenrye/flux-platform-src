@@ -21,6 +21,7 @@ helmCharts:
 patches:
   - target:
       kind: Deployment
+      name: "^crossplane$"
     path: patches/deployment.yaml
   - target:
       kind: Deployment
