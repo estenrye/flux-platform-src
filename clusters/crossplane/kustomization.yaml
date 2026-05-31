@@ -14,6 +14,8 @@ resources:
   - ../../applications/crossplane/base
   - ../../applications/crossplane-providers/family-aws
   - ../../applications/crossplane-providers/provider-aws-route53
+  - ../../applications/crossplane-providers/provider-aws-iam
+  - ../../applications/crossplane-providers/provider-aws-rolesanywhere
   - ../../applications/crossplane-providers/family-cloudflare
   - ../../applications/crossplane-providers/provider-cloudflare-dns
   - ../../applications/crossplane-providers/provider-cloudflare-zone
