@@ -29,3 +29,46 @@ lint-kube-linter: lint-deps
 	  | xargs .venv/bin/kube-linter lint --config .kube-linter/config.yaml
 
 lint: lint-deps render lint-checkov lint-kube-linter
+
+auth-aws:
+	.venv/bin/awscliv2 sso login \
+		--profile ops-opex-dns-automation \
+		--region us-east-2 \
+		--no-browser \
+		--use-device-code
+
+aws-list-rolesanywhere-trust-anchors:
+	.venv/bin/awscliv2 rolesanywhere list-trust-anchors --profile ops-opex-dns-automation \
+		| jq '.trustAnchors | map({ name:.name, trustAnchorId:.trustAnchorId, trustAnchorArn:.trustAnchorArn,enabled:.enabled })'
+
+aws-list-rolesanywhere-profiles:
+	.venv/bin/awscliv2 rolesanywhere list-profiles --profile ops-opex-dns-automation \
+		| jq '.profiles | map({ name:.name, profileId:.profileId, enabled:.enabled, roleArns:.roleArns })'
+
+aws-disable-rolesanywhere-trust-anchor:
+	@test -n "$(TRUST_ANCHOR_ID)" || (echo "Usage: make aws-disable-rolesanywhere-trust-anchor TRUST_ANCHOR_ID=<id>"; exit 1)
+	.venv/bin/awscliv2 rolesanywhere disable-trust-anchor \
+		--trust-anchor-id $(TRUST_ANCHOR_ID) \
+		--profile ops-opex-dns-automation \
+		--region us-east-2
+
+aws-enable-rolesanywhere-trust-anchor:
+	@test -n "$(TRUST_ANCHOR_ID)" || (echo "Usage: make aws-enable-rolesanywhere-trust-anchor TRUST_ANCHOR_ID=<id>"; exit 1)
+	.venv/bin/awscliv2 rolesanywhere enable-trust-anchor \
+		--trust-anchor-id $(TRUST_ANCHOR_ID) \
+		--profile ops-opex-dns-automation \
+		--region us-east-2
+
+aws-disable-rolesanywhere-profile:
+	@test -n "$(PROFILE_ID)" || (echo "Usage: make aws-disable-rolesanywhere-profile PROFILE_ID=<id>"; exit 1)
+	.venv/bin/awscliv2 rolesanywhere disable-profile \
+		--profile-id $(PROFILE_ID) \
+		--profile ops-opex-dns-automation \
+		--region us-east-2
+
+aws-enable-rolesanywhere-profile:
+	@test -n "$(PROFILE_ID)" || (echo "Usage: make aws-enable-rolesanywhere-profile PROFILE_ID=<id>"; exit 1)
+	.venv/bin/awscliv2 rolesanywhere enable-profile \
+		--profile-id $(PROFILE_ID) \
+		--profile ops-opex-dns-automation \
+		--region us-east-2
