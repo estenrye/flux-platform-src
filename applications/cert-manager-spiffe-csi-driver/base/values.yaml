@@ -155,7 +155,10 @@ app:
     #    mountPath: /var/run/secrets/cert-manager-csi-driver-spiffe
     volumeMounts: []
     # Configures the hostPath directory that the driver will write and mount volumes from.
-    csiDataDir: /tmp/cert-manager-csi-driver
+    # Use /var/lib (not /tmp) to avoid systemd-tmpfiles-clean deleting the directory
+    # on long-lived nodes while the DaemonSet pod is still running. See:
+    # doc/runbooks/spiffe-csi-driver-tmpfiles-cleanup-failure.md
+    csiDataDir: /var/lib/cert-manager-csi-driver
     # Kubernetes pod resource limits for cert-manager-csi-driver-spiffe
     #
     # For example:
