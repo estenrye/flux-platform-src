@@ -16,6 +16,7 @@ checks:
     - "priority-class-name"
     - "required-label-owner"
     - "required-annotation-email"
+    - "no-extensions-v1beta"
 
 customChecks:
   - name: "platform-priority-class-name"

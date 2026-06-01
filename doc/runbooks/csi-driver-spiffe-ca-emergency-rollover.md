@@ -46,7 +46,7 @@ make aws-list-rolesanywhere-profiles
 To get the list of AWS Roles Anywhere TrustAnchors, run:
 
 ```bash
-make aws-list-rolesanywhere-trustanchors
+make aws-list-rolesanywhere-trust-anchors
 ```
 
 ## Step 2: Emergency traffic cutoff (if active exploitation is confirmed)
@@ -55,13 +55,13 @@ If you have confirmed active exploitation, disable the Roles Anywhere profile
 before rotating the CA. This stops new sessions immediately without waiting for
 the full rotation.
 
-```
+```bash
 make aws-disable-rolesanywhere-profile PROFILE_ID=<profileId>
 ```
 
 Or disable the entire TrustAnchor (affects all clusters):
 
-```
+```bash
 make aws-disable-rolesanywhere-trust-anchor TRUST_ANCHOR_ID=<trustAnchorId>
 ```
 
@@ -204,12 +204,10 @@ kubectl delete pod <pod-name> -n <namespace>
 
 After verifying all workload clusters have valid SVIDs chaining to the new root:
 
+```bash
+make aws-enable-rolesanywhere-profile PROFILE_ID=<profileId>
 ```
-aws rolesanywhere update-profile \
-  --profile-id <profileId> \
-  --enabled \
-  --region us-east-2
-```
+
 
 Verify by attempting a `CreateSession` with a freshly issued SVID:
 
