@@ -30,6 +30,12 @@ lint-kube-linter: lint-deps
 
 lint: lint-deps render lint-checkov lint-kube-linter
 
+flux-reconcile-source:
+	flux reconcile source git flux-platform-rendered -n flux-system
+
+flux-reconcile-kustomization:
+	flux reconcile kustomization flux-platform -n flux-system
+
 auth-aws:
 	.venv/bin/awscliv2 sso login \
 		--profile ops-opex-dns-automation \
