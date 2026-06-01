@@ -6,13 +6,13 @@ data:
   spiffeURIPrefix: cluster.local
   trustAnchorArn: arn:aws:rolesanywhere:us-east-2:832767337984:trust-anchor/1433b5ab-1a7a-4134-9d84-baa79f94d093
   delegatedZoneProviderConfigRef:
-    kind: ProviderConfig
+    kind: ClusterProviderConfig
     name: dns-admin
   iamProviderConfigRef:
-    kind: ProviderConfig
+    kind: ClusterProviderConfig
     name: iam-admin
   rolesAnywhereProviderConfigRef:
-    kind: ProviderConfig
+    kind: ClusterProviderConfig
     name: rolesanywhere-admin
 ---
 apiVersion: apiextensions.crossplane.io/v1beta1
@@ -21,7 +21,7 @@ metadata:
   name: platform-cloudflare
 data:
   cloudflareProviderConfigRef:
-    kind: ProviderConfig
+    kind: ClusterProviderConfig
     name: default
   zoneName: rye.ninja
   zoneId: 186a0fa51e8dd54ee6910d0f35d5f0c8
