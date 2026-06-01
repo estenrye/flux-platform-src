@@ -40,8 +40,8 @@ identity, coupling them in a single composition eliminates cross-resource refere
 guarantees lifecycle coupling (IAM resources are deleted when the zone claim is deleted),
 and reduces the number of claims an operator must create from two to one. All IAM
 values are derived from existing composition inputs — no additional IAM-specific inputs
-are needed beyond `spec.trustAnchorArn` (the ARN of the pre-existing workload cluster
-trust anchor) and two provider config references (`spec.iamProviderConfigRef` and
+are needed beyond an optional `spec.trustAnchorArn` override (otherwise defaulted
+from platform configuration) and two provider config references (`spec.iamProviderConfigRef` and
 `spec.rolesAnywhereProviderConfigRef`) for least-privilege credential separation.
 
 IAM permissions for ExternalDNS to access Route53 hosted zones are documented [here](https://raw.githubusercontent.com/kubernetes-sigs/external-dns/refs/heads/master/docs/tutorials/aws.md), and IAM permissions for CertManager to access Route53 hosted zones are documented [here](https://cert-manager.io/docs/configuration/acme/dns01/route53/).
@@ -341,7 +341,8 @@ The implementation will follow these decisions:
      Route53 hosted zone, Cloudflare NS delegation records, IAM Role, IAM
      Policy, RolePolicyAttachment, and Roles Anywhere Profile.
    - The IAM Role trust policy and permission policy are fully derived from
-     composition inputs (`spec.subdomain`, `spec.zoneName`, `spec.trustAnchorArn`)
+     composition inputs (`spec.subdomain`, `spec.zoneName`, and the resolved
+     trust anchor ARN from `spec.trustAnchorArn` or platform configuration)
      — no separate composition or manual IAM authoring is required.
    - The composition outputs all IAM Roles Anywhere credential-helper inputs
      in status (`status.trustAnchorArn`, `status.iamRoleArn`, `status.profileArn`,
@@ -357,15 +358,17 @@ The implementation will follow these decisions:
      depends on the workload cluster's CA certificate, which must exist before
      the claim is created). Because `provider-aws-rolesanywhere` currently
      exposes `Profile` but not `TrustAnchor`, the TrustAnchor is provisioned
-     out-of-band (for example, AWS CLI or Terraform) and its ARN is provided
-     via `spec.trustAnchorArn`.
+     out-of-band (for example, AWS CLI or Terraform) and its ARN is published
+     through platform configuration, with `spec.trustAnchorArn` available as an
+     optional per-claim override.
 
 4. Trust anchor provisioning is out-of-band with verification
    - We will provision the AWS IAM Roles Anywhere TrustAnchor out-of-band
      (for example, AWS CLI or Terraform) using the crossplane cluster root
      certificate (`csi-driver-spiffe-ca`) as the certificate bundle source.
    - The resulting TrustAnchor ARN will be published into platform
-     configuration and consumed by `XDelegatedHostedZoneAWS.spec.trustAnchorArn`.
+     configuration and consumed automatically by `XDelegatedHostedZoneAWS`
+     claims unless a claim explicitly overrides it via `spec.trustAnchorArn`.
    - The bootstrap workflow must verify trust anchor correctness (certificate
      bundle, region/account, and CRL settings) before claims are reconciled.
 
@@ -1122,7 +1125,7 @@ profiles   rolesanywhere.aws.m.upbound.io/v1beta1   true    Profile
   when the resource becomes available.
 - [x] Publish the resulting `trustAnchorArn` to platform configuration
   (for example, Crossplane `EnvironmentConfig`).
-- [ ] Wire claims to consume the shared `trustAnchorArn` automatically from
+- [x] Wire claims to consume the shared `trustAnchorArn` automatically from
   platform configuration instead of requiring manual `spec.trustAnchorArn`
   values.
 - [ ] Deploy [step-ca](https://github.com/smallstep/certificates) on the
@@ -1149,7 +1152,7 @@ Acceptance criteria:
 - [x] The shared `trustAnchorArn` is published to platform configuration.
 - [ ] AWS IAM Roles Anywhere TrustAnchor existence and ARN retrieval are
   validated via AWS API in a test environment.
-- [ ] Claims consume the shared `trustAnchorArn` automatically from platform
+- [x] Claims consume the shared `trustAnchorArn` automatically from platform
   configuration instead of requiring manual `spec.trustAnchorArn` values.
 - [ ] step-ca X5C provisioner rejects CSRs not authenticated by a valid
   bootstrap certificate.
@@ -1166,8 +1169,9 @@ Acceptance criteria:
 > items below reflect the updated scope.
 
 - [x] Extend `XDelegatedHostedZoneAWS` XRD with IAM Roles Anywhere fields:
-  - `spec.trustAnchorArn` (required) — ARN of the pre-provisioned workload
-    cluster trust anchor
+  - `spec.trustAnchorArn` (optional override) — ARN of the pre-provisioned
+    workload cluster trust anchor; defaults from platform configuration when
+    omitted
   - `spec.iamProviderConfigRef` (required) — provider config for IAM resources
   - `spec.rolesAnywhereProviderConfigRef` (required) — provider config for
     Roles Anywhere resources
@@ -1179,9 +1183,9 @@ Acceptance criteria:
   - **Out of scope**: The `TrustAnchor` AWS resource is a singleton provisioned
     in Phase 2, not per-claim. It is provisioned out-of-band because
     `provider-aws-rolesanywhere` currently has no `TrustAnchor` managed
-    resource. With Pattern D, `spec.trustAnchorArn` is the same shared value
-    for all `XDelegatedHostedZoneAWS` claims and should be sourced from a
-    platform-level Crossplane `EnvironmentConfig`.
+    resource. With Pattern D, the trust anchor ARN is normally sourced from a
+    platform-level Crossplane `EnvironmentConfig`, with `spec.trustAnchorArn`
+    retained only as an explicit per-claim override.
 - [x] Inputs derived from existing composition fields (no additional manual
   inputs beyond the three fields above):
   - SPIFFE URIs derived from `spec.subdomain` + `spec.zoneName`
@@ -1190,7 +1194,7 @@ Acceptance criteria:
 - [x] Outputs emitted in `status`:
   - `status.iamRoleArn`
   - `status.profileArn`
-  - `status.trustAnchorArn` (passthrough from spec)
+  - `status.trustAnchorArn` (resolved from spec override or platform config)
   - `status.trustDomain` (derived as `${spec.subdomain}.${spec.zoneName}`)
 - [x] Deploy `provider-aws-iam` package (`upbound/provider-aws-iam:v2.5.2`)
   with dedicated runtime config, service account, and `iam-admin`

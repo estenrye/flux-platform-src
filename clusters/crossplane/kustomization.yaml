@@ -21,6 +21,7 @@ resources:
   - ../../applications/crossplane-providers/provider-cloudflare-zone
   - ../../applications/crossplane-providers/provider-github
   - ../../applications/crossplane-providers/provider-kubernetes
+  - ../../applications/crossplane-functions/function-environment-configs
   - ../../applications/crossplane-functions/function-go-templating
   - ../../applications/crossplane-resources/delegated-hosted-zone-aws
   - ../../applications/flux/base

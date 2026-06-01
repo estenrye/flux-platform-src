@@ -12,6 +12,56 @@ spec:
 
   mode: Pipeline
   pipeline:
+  - step: environmentConfigs
+    functionRef:
+      name: function-environment-configs
+    input:
+      apiVersion: environmentconfigs.fn.crossplane.io/v1beta1
+      kind: Input
+      spec:
+        environmentConfigs:
+        - type: Reference
+          ref:
+            name: platform-iam-rolesanywhere
+
+  - step: validate-trust-anchor
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{ $trustAnchorArn := .observed.composite.resource.spec.trustAnchorArn }}
+          {{ if not $trustAnchorArn }}
+            {{ $environment := index .context "apiextensions.crossplane.io/environment" }}
+            {{ if $environment }}
+              {{ $trustAnchorArn = index $environment "trustAnchorArn" }}
+            {{ end }}
+          {{ end }}
+          {{ if not $trustAnchorArn }}
+          ---
+          apiVersion: meta.gotemplating.fn.crossplane.io/v1alpha1
+          kind: ClaimConditions
+          conditions:
+            - type: TrustAnchorResolved
+              status: "False"
+              reason: MissingTrustAnchorArn
+              message: "No trustAnchorArn was resolved. Set spec.trustAnchorArn on the claim or define data.trustAnchorArn in the platform-iam-rolesanywhere EnvironmentConfig."
+              target: CompositeAndClaim
+          {{ else }}
+          ---
+          apiVersion: meta.gotemplating.fn.crossplane.io/v1alpha1
+          kind: ClaimConditions
+          conditions:
+            - type: TrustAnchorResolved
+              status: "True"
+              reason: ResolvedTrustAnchorArn
+              message: "A trustAnchorArn was resolved for this claim."
+              target: CompositeAndClaim
+          {{ end }}
+
   - step: create-zone
     functionRef:
       name: function-go-templating
@@ -21,6 +71,14 @@ spec:
       source: Inline
       inline:
         template: |
+          {{ $trustAnchorArn := .observed.composite.resource.spec.trustAnchorArn }}
+          {{ if not $trustAnchorArn }}
+            {{ $environment := index .context "apiextensions.crossplane.io/environment" }}
+            {{ if $environment }}
+              {{ $trustAnchorArn = index $environment "trustAnchorArn" }}
+            {{ end }}
+          {{ end }}
+          {{ if $trustAnchorArn }}
           {{ $subdomain := .observed.composite.resource.spec.subdomain }}
           {{ $zoneName := .observed.composite.resource.spec.zoneName }}
           {{ $resourceName := printf "%s-%s" (replace "." "-" $subdomain) (replace "." "-" $zoneName) }}
@@ -41,6 +99,7 @@ spec:
             providerConfigRef:
               kind: {{ .observed.composite.resource.spec.delegatedZoneProviderConfigRef.kind }}
               name: {{ .observed.composite.resource.spec.delegatedZoneProviderConfigRef.name }}
+          {{ end }}
 
   - step: create-iam-resources
     functionRef:
@@ -54,10 +113,17 @@ spec:
           {{ $subdomain := .observed.composite.resource.spec.subdomain }}
           {{ $zoneName := .observed.composite.resource.spec.zoneName }}
           {{ $trustAnchorArn := .observed.composite.resource.spec.trustAnchorArn }}
+          {{ if not $trustAnchorArn }}
+            {{ $environment := index .context "apiextensions.crossplane.io/environment" }}
+            {{ if $environment }}
+              {{ $trustAnchorArn = index $environment "trustAnchorArn" }}
+            {{ end }}
+          {{ end }}
           {{ $iamProviderConfig := .observed.composite.resource.spec.iamProviderConfigRef }}
           {{ $rolesAnywhereProviderConfig := .observed.composite.resource.spec.rolesAnywhereProviderConfigRef }}
           {{ $resourceName := printf "%s-%s" (replace "." "-" $subdomain) (replace "." "-" $zoneName) }}
           {{ $fullZoneName := printf "%s.%s" $subdomain $zoneName }}
+          {{ if $trustAnchorArn }}
 
           {{ $zoneId := "" }}
           {{ $roleArn := "" }}
@@ -228,6 +294,7 @@ spec:
               kind: {{ $rolesAnywhereProviderConfig.kind }}
               name: {{ $rolesAnywhereProviderConfig.name }}
           {{ end }}
+          {{ end }}
 
   - step: create-ns-records
     functionRef:
@@ -238,6 +305,14 @@ spec:
       source: Inline
       inline:
         template: |
+          {{ $trustAnchorArn := .observed.composite.resource.spec.trustAnchorArn }}
+          {{ if not $trustAnchorArn }}
+            {{ $environment := index .context "apiextensions.crossplane.io/environment" }}
+            {{ if $environment }}
+              {{ $trustAnchorArn = index $environment "trustAnchorArn" }}
+            {{ end }}
+          {{ end }}
+          {{ if $trustAnchorArn }}
           {{ $subdomain := .observed.composite.resource.spec.subdomain }}
           {{ $zoneName := .observed.composite.resource.spec.zoneName }}
           {{ $zoneId := .observed.composite.resource.spec.zoneId }}
@@ -280,6 +355,7 @@ spec:
               name: {{ $cfProviderConfig.name }}
           {{ end }}
           {{ end }}
+          {{ end }}
 
   - step: status-update
     functionRef:
@@ -293,10 +369,17 @@ spec:
           {{ $subdomain := .observed.composite.resource.spec.subdomain }}
           {{ $zoneName := .observed.composite.resource.spec.zoneName }}
           {{ $trustAnchorArn := .observed.composite.resource.spec.trustAnchorArn }}
+          {{ if not $trustAnchorArn }}
+            {{ $environment := index .context "apiextensions.crossplane.io/environment" }}
+            {{ if $environment }}
+              {{ $trustAnchorArn = index $environment "trustAnchorArn" }}
+            {{ end }}
+          {{ end }}
           {{ $nameServers := list }}
           {{ $zoneId := "" }}
           {{ $roleArn := "" }}
           {{ $profileArn := "" }}
+          {{ if $trustAnchorArn }}
 
           {{ if .observed.resources }}
             {{ range $name, $resource := .observed.resources }}
@@ -340,4 +423,5 @@ spec:
             {{ if $zoneId }}
             zoneId: {{ $zoneId }}
             {{ end }}
+          {{ end }}
           {{ end }}

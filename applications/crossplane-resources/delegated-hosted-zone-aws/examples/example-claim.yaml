@@ -12,7 +12,6 @@ spec:
   subdomain: crossplane
   zoneName: rye.ninja
   zoneId: 186a0fa51e8dd54ee6910d0f35d5f0c8
-  trustAnchorArn: arn:aws:rolesanywhere:us-east-2:832767337984:trust-anchor/REPLACE-WITH-WORKLOAD-CLUSTER-TRUST-ANCHOR-ARN
   delegatedZoneProviderConfigRef:
     kind: ProviderConfig
     name: dns-admin
