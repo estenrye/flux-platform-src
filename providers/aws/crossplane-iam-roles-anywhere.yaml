@@ -160,6 +160,11 @@ Resources:
                   - 'iam:GetRole'
                   - 'iam:ListRoles'
                 Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'iam:PassRole'
+                Resource:
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/delegated-zone-*'
       Tags:
         - Key: 'Name'
           Value: !Ref RolesAnywhereRoleName
@@ -257,7 +262,8 @@ Resources:
               "Action": [
                 "rolesanywhere:*",
                 "iam:GetRole",
-                "iam:ListRoles"
+                "iam:ListRoles",
+                "iam:PassRole"
               ],
               "Resource": "*"
             }

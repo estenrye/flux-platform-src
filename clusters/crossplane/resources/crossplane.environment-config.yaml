@@ -22,6 +22,6 @@ metadata:
 data:
   cloudflareProviderConfigRef:
     kind: ClusterProviderConfig
-    name: default
+    name: cloudflare-provider-config
   zoneName: rye.ninja
   zoneId: 186a0fa51e8dd54ee6910d0f35d5f0c8
