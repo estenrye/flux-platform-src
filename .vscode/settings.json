@@ -29,6 +29,7 @@
     "kubectl exec": true,
     "kubectl debug": true,
     "kubectl rollout": true,
-    "kubectl api-resources": true
+    "kubectl api-resources": true,
+    "kubectl events": true
   }
 }
