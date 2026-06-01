@@ -42,9 +42,9 @@ spec:
                 - --trust-anchor-arn
                 - arn:aws:rolesanywhere:us-east-2:832767337984:trust-anchor/1433b5ab-1a7a-4134-9d84-baa79f94d093
                 - --profile-arn
-                - arn:aws:rolesanywhere:us-east-2:832767337984:profile/cbe4ff4a-87e4-4635-a08e-ace27111b830
+                - arn:aws:rolesanywhere:us-east-2:832767337984:profile/9b0b8194-30a0-4a44-a53c-8be64d2f821a
                 - --role-arn
-                - arn:aws:iam::832767337984:role/crossplane-provider-dns-admin
+                - arn:aws:iam::832767337984:role/crossplane-provider-route53-admin
               imagePullPolicy: IfNotPresent
               ports:
                 - containerPort: 9911
