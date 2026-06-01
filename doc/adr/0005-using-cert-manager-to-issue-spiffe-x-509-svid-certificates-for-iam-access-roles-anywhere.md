@@ -35,7 +35,20 @@ I want to manage access to AWS resources from Kubernetes workloads using IAM Acc
 
 ## Configuring AWS IAM Access Roles Anywhere to trust cert-manager issued SPIFFE certificates
 
-- Create a trust anchor in IAM Access Roles Anywhere that corresponds to the CA certificate used by cert-manager to issue SPIFFE X.509 SVID certificates.
+Use the existing CloudFormation stack in [providers/aws/crossplane-iam-roles-anywhere.yaml](../../providers/aws/crossplane-iam-roles-anywhere.yaml) to bootstrap the IAM Roles Anywhere trust anchor, IAM role, and profile for cert-manager issued SPIFFE certificates.
+
+The stack provisions the following resources together:
+
+- `AWS::RolesAnywhere::TrustAnchor`
+- `AWS::IAM::Role`
+- `AWS::RolesAnywhere::Profile`
+
+It also exports the outputs needed by downstream bootstrap and composition steps:
+
+- `TrustAnchorArn`
+- `TrustAnchorId`
+- `RoleArn`
+- `ProfileArn`
 
 ```bash
 SPIFFE_CA_NAMESPACE=cert-manager
@@ -43,13 +56,19 @@ SPIFFE_CA_NAME=csi-driver-spiffe-ca
 SPIFFE_CA_SECRET_NAME=`kubectl get certificate -n ${SPIFFE_CA_NAMESPACE} ${SPIFFE_CA_NAME} -o jsonpath='{.spec.secretName}'`
 SPIFFE_CA_CERT=$(kubectl get secret -n ${SPIFFE_CA_NAMESPACE} ${SPIFFE_CA_SECRET_NAME} -o jsonpath='{.data.ca\.crt}' | base64 --decode)
 
-aws cloudformation create-stack \
-  --profile AdministratorAccess-IAMIC-832767337984 \
+aws cloudformation deploy \
+  --profile ops-opex-dns-automation \
   --stack-name crossplane-provider-dns-admin \
-  --template-body file://providers/aws/crossplane-iam-roles-anywhere.yaml \
-  --parameters \
+  --template-file providers/aws/crossplane-iam-roles-anywhere.yaml \
+  --parameter-overrides \
     ParameterKey=RoleName,ParameterValue=crossplane-provider-dns-admin \
     ParameterKey=SpiffeUri,ParameterValue=spiffe://cluster.local/ns/crossplane-system/sa/aws-route53-dns-provider \
     ParameterKey=CaX509Cert,ParameterValue="${SPIFFE_CA_CERT}" \
   --capabilities CAPABILITY_NAMED_IAM
+
+aws cloudformation describe-stacks \
+  --profile ops-opex-dns-automation \
+  --stack-name crossplane-provider-dns-admin \
+  --query 'Stacks[0].Outputs[?starts_with(OutputKey, `TrustAnchor`) || OutputKey==`RoleArn` || OutputKey==`ProfileArn`]' \
+  --output table
 ```

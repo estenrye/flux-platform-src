@@ -35,3 +35,4 @@ resources:
   - resources/github.deploykey.crossplane.yaml
   - resources/flux.source.git.yaml
   - resources/flux.kustomization.yaml
+  - resources/crossplane.environment-config.yaml
