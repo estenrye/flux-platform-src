@@ -8,7 +8,7 @@ resources:
 helmCharts:
   - name: cert-manager-approver-policy
     repo: oci://quay.io/jetstack/charts
-    version: v0.24.0
+    version: v0.25.1
     releaseName: cert-manager-approver-policy
     namespace: cert-manager
     includeCRDs: true
