@@ -1,0 +1,19 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: flux-platform-external-dns-aws-rolesanywhere
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./applications/external-dns/aws/patches/rolesanywhere
+  prune: true
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: external-dns-aws-rolesanywhere
+  dependsOn:
+    - name: flux-platform
+  sourceRef:
+    kind: GitRepository
+    name: flux-platform-rendered
+  wait: false
