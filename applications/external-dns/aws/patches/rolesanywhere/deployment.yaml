@@ -20,7 +20,17 @@
   path: /spec/template/spec/containers/-
   value:
     name: aws-signing-helper
-    image: public.ecr.aws/rolesanywhere/credential-helper:1.8.1-2026.04.09.16.01
+    image: public.ecr.aws/rolesanywhere/credential-helper
+    readinessProbe:
+      tcpSocket:
+        port: 9911
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    livenessProbe:
+      tcpSocket:
+        port: 9911
+      initialDelaySeconds: 10
+      periodSeconds: 20
     command:
       - aws_signing_helper
       - serve
@@ -37,7 +47,23 @@
       - ${external_dns_rolesanywhere_profile_arn:-not-set}
       - --role-arn
       - ${external_dns_rolesanywhere_role_arn:-not-set}
-    imagePullPolicy: IfNotPresent
+    securityContext:
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 65532
+      runAsGroup: 65532
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+    imagePullPolicy: Always
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
     ports:
       - containerPort: 9911
         name: imdsv2
