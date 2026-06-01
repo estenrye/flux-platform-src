@@ -41,8 +41,10 @@ guarantees lifecycle coupling (IAM resources are deleted when the zone claim is 
 and reduces the number of claims an operator must create from two to one. All IAM
 values are derived from existing composition inputs — no additional IAM-specific inputs
 are needed beyond an optional `spec.trustAnchorArn` override (otherwise defaulted
-from platform configuration) and two provider config references (`spec.iamProviderConfigRef` and
-`spec.rolesAnywhereProviderConfigRef`) for least-privilege credential separation.
+from platform configuration) and optional provider config overrides
+(`spec.iamProviderConfigRef` and `spec.rolesAnywhereProviderConfigRef`, both
+defaulted from platform configuration when omitted) for least-privilege
+credential separation.
 
 IAM permissions for ExternalDNS to access Route53 hosted zones are documented [here](https://raw.githubusercontent.com/kubernetes-sigs/external-dns/refs/heads/master/docs/tutorials/aws.md), and IAM permissions for CertManager to access Route53 hosted zones are documented [here](https://cert-manager.io/docs/configuration/acme/dns01/route53/).
 
@@ -341,19 +343,22 @@ The implementation will follow these decisions:
      Route53 hosted zone, Cloudflare NS delegation records, IAM Role, IAM
      Policy, RolePolicyAttachment, and Roles Anywhere Profile.
    - The IAM Role trust policy and permission policy are fully derived from
-     composition inputs (`spec.subdomain`, `spec.zoneName`, and the resolved
-     trust anchor ARN from `spec.trustAnchorArn` or platform configuration)
+     composition inputs (`spec.subdomain`, the resolved parent zone name from
+     `spec.zoneName` or platform configuration, and the resolved trust anchor
+     ARN from `spec.trustAnchorArn` or platform configuration)
      — no separate composition or manual IAM authoring is required.
    - The composition outputs all IAM Roles Anywhere credential-helper inputs
      in status (`status.trustAnchorArn`, `status.iamRoleArn`, `status.profileArn`,
      `status.trustDomain`) so downstream automation can configure cert-manager
      and ExternalDNS without reading from multiple resources.
    - IAM resources (`Role`, `Policy`, `RolePolicyAttachment`) are managed via
-     `provider-aws-iam` using `spec.iamProviderConfigRef` → `iam-admin`.
+     `provider-aws-iam` using `spec.iamProviderConfigRef` when set, otherwise
+     the shared `platform-iam-rolesanywhere` environment default (`iam-admin`).
      Roles Anywhere resources (`Profile`) are managed via `provider-aws-rolesanywhere`
-     using `spec.rolesAnywhereProviderConfigRef` → `rolesanywhere-admin`. The two
-     provider configs reference distinct IAM roles with narrowly scoped permissions,
-     consistent with the least-privilege principle in Decision 1.
+     using `spec.rolesAnywhereProviderConfigRef` when set, otherwise the shared
+     `platform-iam-rolesanywhere` environment default (`rolesanywhere-admin`).
+     The two provider configs reference distinct IAM roles with narrowly scoped
+     permissions, consistent with the least-privilege principle in Decision 1.
    - The TrustAnchor itself is provisioned separately as a prerequisite (it
      depends on the workload cluster's CA certificate, which must exist before
      the claim is created). Because `provider-aws-rolesanywhere` currently
@@ -388,11 +393,14 @@ The implementation will follow these decisions:
    - The default trust domain `cluster.local` is prohibited for any cluster
      participating in a shared trust anchor design.
    - The trust domain is derived from `XDelegatedHostedZoneAWS` as
-     `${spec.subdomain}.${spec.zoneName}` and surfaced in `status.trustDomain`.
-     The IAM Roles Anywhere composition consumes this value via cross-resource
-     reference — no additional trust domain input is required.
-   - Example: `subdomain: crossplane`, `zoneName: rye.ninja` → trust domain
-     `crossplane.rye.ninja` → SPIFFE URI
+     `${spec.subdomain}.${resolvedZoneName}` and surfaced in
+     `status.trustDomain`. The `resolvedZoneName` value comes from
+     `spec.zoneName` when set, otherwise from the shared `platform-cloudflare`
+     `EnvironmentConfig`. The IAM Roles Anywhere composition consumes this
+     value via cross-resource reference — no additional trust domain input is
+     required.
+   - Example: `subdomain: crossplane`, resolved `zoneName: rye.ninja` → trust
+     domain `crossplane.rye.ninja` → SPIFFE URI
      `spiffe://crossplane.rye.ninja/ns/external-dns/sa/external-dns`.
    - DNS names are globally unique by property, satisfying the uniqueness
      requirement automatically without a separate cluster-identity field.
@@ -1172,9 +1180,11 @@ Acceptance criteria:
   - `spec.trustAnchorArn` (optional override) — ARN of the pre-provisioned
     workload cluster trust anchor; defaults from platform configuration when
     omitted
-  - `spec.iamProviderConfigRef` (required) — provider config for IAM resources
-  - `spec.rolesAnywhereProviderConfigRef` (required) — provider config for
-    Roles Anywhere resources
+  - `spec.iamProviderConfigRef` (optional override) — provider config for IAM
+    resources; defaults from `platform-iam-rolesanywhere` when omitted
+  - `spec.rolesAnywhereProviderConfigRef` (optional override) — provider
+    config for Roles Anywhere resources; defaults from
+    `platform-iam-rolesanywhere` when omitted
 - [x] Implement composition pipeline step `create-iam-resources`:
   - [x] `iam.aws.m.upbound.io/v1beta1` Role
   - [x] `iam.aws.m.upbound.io/v1beta1` Policy
@@ -1188,14 +1198,16 @@ Acceptance criteria:
     retained only as an explicit per-claim override.
 - [x] Inputs derived from existing composition fields (no additional manual
   inputs beyond the three fields above):
-  - SPIFFE URIs derived from `spec.subdomain` + `spec.zoneName`
+  - SPIFFE URIs derived from `spec.subdomain` + the resolved parent zone name
+    (`spec.zoneName` override or `platform-cloudflare` default)
   - Hosted zone ARN derived from observed Route53 zone status
   - Region and account implicit in provider config
 - [x] Outputs emitted in `status`:
   - `status.iamRoleArn`
   - `status.profileArn`
   - `status.trustAnchorArn` (resolved from spec override or platform config)
-  - `status.trustDomain` (derived as `${spec.subdomain}.${spec.zoneName}`)
+  - `status.trustDomain` (derived as
+    `${spec.subdomain}.${resolvedZoneName}`)
 - [x] Deploy `provider-aws-iam` package (`upbound/provider-aws-iam:v2.5.2`)
   with dedicated runtime config, service account, and `iam-admin`
   ClusterProviderConfig.
