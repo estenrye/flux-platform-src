@@ -1,0 +1,37 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-function-auto-ready
+  description: |-
+    This component installs the Crossplane Auto Ready Function,
+    which sets the composite resource Ready condition based on
+    composed resource readiness in Pipeline mode compositions.
+
+    The function helps prevent stale or misleading Ready status
+    when composed resources have converged.
+  tags:
+    - crossplane
+    - crossplane-function
+    - auto-ready
+    - composition
+    - pipeline
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://docs.crossplane.io/latest/concepts/composition-functions/
+      title: Crossplane Composition Functions Documentation
+      icon: docs
+      type: documentation
+    - url: https://marketplace.upbound.io/functions/crossplane-contrib/function-auto-ready
+      title: Auto Ready Function on Upbound Marketplace
+      icon: docs
+      type: documentation
+    - url: https://github.com/crossplane-contrib/function-auto-ready
+      title: GitHub repository for the Auto Ready Function
+      icon: github
+      type: source
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

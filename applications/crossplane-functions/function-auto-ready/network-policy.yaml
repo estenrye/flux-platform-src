@@ -1,0 +1,49 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: function-auto-ready-allow-ingress
+  namespace: crossplane-system
+  labels:
+    rye.ninja/component: crossplane-function-auto-ready
+    rye.ninja/owner: platform-engineering
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This policy addresses a pod that is dynamically created by the provider and cannot be referenced by a static analysis of the NetworkPolicy."
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "This policy addresses a pod that is dynamically created by the provider and cannot be referenced by a static analysis of the NetworkPolicy."
+spec:
+  podSelector:
+    matchLabels:
+      pkg.crossplane.io/function: function-auto-ready
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: crossplane
+    ports:
+    - protocol: TCP
+      port: 9443
+  - ports:
+    - protocol: TCP
+      port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: function-auto-ready-allow-egress
+  namespace: crossplane-system
+  labels:
+    rye.ninja/component: crossplane-function-auto-ready
+    rye.ninja/owner: platform-engineering
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This policy addresses a pod that is dynamically created by the provider and cannot be referenced by a static analysis of the NetworkPolicy."
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "This policy addresses a pod that is dynamically created by the provider and cannot be referenced by a static analysis of the NetworkPolicy."
+spec:
+  podSelector:
+    matchLabels:
+      pkg.crossplane.io/function: function-auto-ready
+  policyTypes:
+  - Egress
+  egress:
+  - {}
