@@ -355,13 +355,19 @@ The implementation will follow these decisions:
      consistent with the least-privilege principle in Decision 1.
    - The TrustAnchor itself is provisioned separately as a prerequisite (it
      depends on the workload cluster's CA certificate, which must exist before
-     the claim is created). Its ARN is provided via `spec.trustAnchorArn`.
+     the claim is created). Because `provider-aws-rolesanywhere` currently
+     exposes `Profile` but not `TrustAnchor`, the TrustAnchor is provisioned
+     out-of-band (for example, AWS CLI or Terraform) and its ARN is provided
+     via `spec.trustAnchorArn`.
 
-4. Trust anchor distribution is API-based with verification
-   - We will build a service that publishes the trust anchor certificate from
-     the workload cluster.
-   - The service must support strong authentication and response integrity
-     verification before the crossplane cluster can consume the certificate.
+4. Trust anchor provisioning is out-of-band with verification
+   - We will provision the AWS IAM Roles Anywhere TrustAnchor out-of-band
+     (for example, AWS CLI or Terraform) using the crossplane cluster root
+     certificate (`csi-driver-spiffe-ca`) as the certificate bundle source.
+   - The resulting TrustAnchor ARN will be published into platform
+     configuration and consumed by `XDelegatedHostedZoneAWS.spec.trustAnchorArn`.
+   - The bootstrap workflow must verify trust anchor correctness (certificate
+     bundle, region/account, and CRL settings) before claims are reconciled.
 
 5. Certificate lifetime strategy
    - We will evaluate a 5-year trust anchor certificate duration against
@@ -890,8 +896,8 @@ migrates to a shared trust anchor pattern.
   ExternalDNS and cert-manager.
 - The `XDelegatedHostedZoneAWS` composition provisions the IAM Role, Policy,
   RolePolicyAttachment, and Roles Anywhere Profile for each cluster. The
-  `TrustAnchor` is a singleton managed resource on the crossplane cluster,
-  provisioned once in Phase 2.
+  `TrustAnchor` is a singleton AWS resource provisioned out-of-band once in
+  Phase 2, then referenced by ARN from claims.
 - Escalate specific clusters to Option A (separate roles per workload) where
   role-assumption-time rejection of incorrect SPIFFE URIs is a hard requirement.
 - Adopt Pattern A if a cluster requires strict trust isolation independent of
@@ -919,6 +925,7 @@ sequenceDiagram
     participant CP as Crossplane Cluster
     participant CM_CP as cert-manager
     participant StepCA as step-ca
+    participant Ops as Platform bootstrap
     participant RAPA as provider-aws-rolesanywhere
     participant IAMA as provider-aws-iam
     participant AWS as AWS IAM / Roles Anywhere
@@ -926,9 +933,9 @@ sequenceDiagram
     Note over CP,AWS: Phase 2 - One-time platform setup
     CM_CP->>CM_CP: Provision csi-driver-spiffe-ca (root CA cert + private key)
     CP->>StepCA: Deploy step-ca (root CA: csi-driver-spiffe-ca, X5C provisioner, CRL endpoint)
-    CP->>RAPA: Reconcile TrustAnchor managed resource
-    RAPA->>AWS: CreateTrustAnchor (CERTIFICATE_BUNDLE, source: csi-driver-spiffe-ca cert)
-    AWS-->>RAPA: trustAnchorArn
+    Ops->>AWS: CreateTrustAnchor out-of-band (AWS CLI/Terraform)
+    AWS-->>Ops: trustAnchorArn
+    Ops->>CP: Publish shared trustAnchorArn to platform config
 
     Note over CP,AWS: Phase 3 - Per XDelegatedHostedZoneAWS claim
     CP->>IAMA: Reconcile Role (trust policy: SPIFFE URIs + ArnEquals trustAnchorArn)
@@ -1025,9 +1032,10 @@ sequenceDiagram
   - **Closed — not applicable for Pattern D.** With Pattern D the trust anchor
     is the crossplane cluster's own `csi-driver-spiffe-ca` root CA, available
     as a local Secret. No cross-cluster retrieval service is required. The
-    `TrustAnchor` resource is created once as a Crossplane managed resource
-    directly from that Secret. The workload cluster bootstrap channel is
-    instead authenticated via step-ca's X5C provisioner (see Phase 2).
+    `TrustAnchor` is provisioned once out-of-band (AWS CLI/Terraform) from
+    that certificate bundle because `provider-aws-rolesanywhere` does not yet
+    expose a `TrustAnchor` managed resource. The workload cluster bootstrap
+    channel is authenticated via step-ca's X5C provisioner (see Phase 2).
 
 ## Implementation Plan
 
@@ -1089,17 +1097,31 @@ Acceptance criteria:
 - [x] The chosen duration and rationale are documented.
 - [ ] A tested rotation procedure exists and is linked from this ADR.
 
-### Phase 2: Single trust anchor provisioning and step-ca deployment
+### Phase 2: Single trust anchor bootstrap and step-ca deployment
 
 > **Pattern D**: The crossplane cluster's `csi-driver-spiffe-ca` root CA is
 > the single IAM Roles Anywhere trust anchor for all workload clusters. No
-> retrieval service is needed. The `TrustAnchor` ARN from this phase is
+> retrieval service is needed. The TrustAnchor ARN from this phase is
 > the shared value supplied as `spec.trustAnchorArn` in all
 > `XDelegatedHostedZoneAWS` claims.
 
-- [ ] Create a `rolesanywhere.aws.m.upbound.io/v1beta1` `TrustAnchor` Crossplane
-  managed resource sourced from the `csi-driver-spiffe-ca` Secret in the
-  `cert-manager` namespace. Manage as a singleton on the crossplane cluster.
+Observed provider capability (2026-05-31):
+
+```bash
+kubectl api-resources | grep rolesanywhere
+profiles   rolesanywhere.aws.m.upbound.io/v1beta1   true    Profile
+```
+
+- [ ] Provision one AWS IAM Roles Anywhere TrustAnchor out-of-band
+  (AWS CLI or Terraform) using the `csi-driver-spiffe-ca` certificate bundle.
+- [ ] Follow and validate
+  [trust anchor bootstrap runbook](../runbooks/csi-driver-spiffe-ca-trustanchor-bootstrap.md).
+- [ ] Track upstream feature request
+  [crossplane-contrib/provider-upjet-aws#2092](https://github.com/crossplane-contrib/provider-upjet-aws/issues/2092)
+  for Roles Anywhere TrustAnchor support and revisit this bootstrap workaround
+  when the resource becomes available.
+- [ ] Publish the resulting `trustAnchorArn` to platform configuration
+  (for example, Crossplane `EnvironmentConfig`) and wire claims to consume it.
 - [ ] Deploy [step-ca](https://github.com/smallstep/certificates) on the
   crossplane cluster:
   - Configure the root CA using the `csi-driver-spiffe-ca` keypair.
@@ -1121,7 +1143,8 @@ Acceptance criteria:
   Phase 1 acceptance criteria).
 
 Acceptance criteria:
-- [ ] `TrustAnchor` Crossplane resource reconciles and its ARN is retrievable.
+- [ ] AWS IAM Roles Anywhere TrustAnchor exists and its ARN is retrievable via
+  AWS API, then published to platform configuration for claim consumption.
 - [ ] step-ca X5C provisioner rejects CSRs not authenticated by a valid
   bootstrap certificate.
 - [ ] A test intermediate CA certificate issued by step-ca chains to
@@ -1148,10 +1171,11 @@ Acceptance criteria:
   - [x] `iam.aws.m.upbound.io/v1beta1` RolePolicyAttachment
   - [x] `rolesanywhere.aws.m.upbound.io/v1beta1` Profile
   - **Out of scope**: The `TrustAnchor` AWS resource is a singleton provisioned
-    in Phase 2, not per-claim. With Pattern D, `spec.trustAnchorArn` is the
-    same shared value for all `XDelegatedHostedZoneAWS` claims. Consider
-    sourcing it from a platform-level Crossplane `EnvironmentConfig` in a
-    future iteration to avoid repeating it in every claim.
+    in Phase 2, not per-claim. It is provisioned out-of-band because
+    `provider-aws-rolesanywhere` currently has no `TrustAnchor` managed
+    resource. With Pattern D, `spec.trustAnchorArn` is the same shared value
+    for all `XDelegatedHostedZoneAWS` claims and should be sourced from a
+    platform-level Crossplane `EnvironmentConfig`.
 - [x] Inputs derived from existing composition fields (no additional manual
   inputs beyond the three fields above):
   - SPIFFE URIs derived from `spec.subdomain` + `spec.zoneName`
