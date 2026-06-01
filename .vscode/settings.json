@@ -39,6 +39,7 @@
     "git -C .render/flux-platform-rendered": true,
     "flux": true,
     "kubectl -n external-dns": true,
-    "true": true
+    "true": true,
+    "git remote": true
   }
 }
