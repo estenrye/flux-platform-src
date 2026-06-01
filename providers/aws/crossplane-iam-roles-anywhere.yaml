@@ -165,6 +165,9 @@ Resources:
                   - 'iam:PassRole'
                 Resource:
                   - !Sub 'arn:aws:iam::${AWS::AccountId}:role/delegated-zone-*'
+                Condition:
+                  StringEquals:
+                    'iam:PassedToService': 'rolesanywhere.amazonaws.com'
       Tags:
         - Key: 'Name'
           Value: !Ref RolesAnywhereRoleName
@@ -260,12 +263,29 @@ Resources:
             {
               "Effect": "Allow",
               "Action": [
-                "rolesanywhere:*",
-                "iam:GetRole",
-                "iam:ListRoles",
-                "iam:PassRole"
+                "rolesanywhere:*"
               ],
               "Resource": "*"
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "iam:GetRole",
+                "iam:ListRoles"
+              ],
+              "Resource": "*"
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "iam:PassRole"
+              ],
+              "Resource": "arn:aws:iam::*:role/delegated-zone-*",
+              "Condition": {
+                "StringEquals": {
+                  "iam:PassedToService": "rolesanywhere.amazonaws.com"
+                }
+              }
             }
           ]
         }

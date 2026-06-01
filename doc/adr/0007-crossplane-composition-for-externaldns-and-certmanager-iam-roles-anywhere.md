@@ -1217,10 +1217,10 @@ Acceptance criteria:
   (`upbound/provider-aws-rolesanywhere:v2.5.2`) with dedicated runtime config,
   service account, and `rolesanywhere-admin` ClusterProviderConfig.
 - [x] IAM permission policy scoped to single hosted zone ARN.
-- [ ] Bootstrap `crossplane-provider-iam-admin` IAM role and Roles Anywhere
+- [x] Bootstrap `crossplane-provider-iam-admin` IAM role and Roles Anywhere
   profile; fill ARN placeholders in `provider-aws-iam` deployment runtime
   config.
-- [ ] Bootstrap `crossplane-provider-rolesanywhere-admin` IAM role and Roles
+- [x] Bootstrap `crossplane-provider-rolesanywhere-admin` IAM role and Roles
   Anywhere profile; fill ARN placeholders in `provider-aws-rolesanywhere`
   deployment runtime config.
 - [ ] Composition reconciles end-to-end in a test environment.

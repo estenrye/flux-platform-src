@@ -212,7 +212,6 @@ spec:
             name: {{ $resourceName }}
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: delegated-zone
-              gotemplating.fn.crossplane.io/ready: "True"
           spec:
             forProvider:
               name: {{ $fullZoneName }}
@@ -291,7 +290,6 @@ spec:
             name: delegated-zone-{{ $resourceName }}
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: iam-role
-              gotemplating.fn.crossplane.io/ready: "True"
               crossplane.io/external-name: delegated-zone-{{ $resourceName }}
           spec:
             forProvider:
@@ -328,7 +326,6 @@ spec:
             name: delegated-zone-{{ $resourceName }}
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: iam-policy
-              gotemplating.fn.crossplane.io/ready: "True"
               crossplane.io/external-name: delegated-zone-{{ $resourceName }}
           spec:
             forProvider:
@@ -401,7 +398,6 @@ spec:
             name: delegated-zone-{{ $resourceName }}
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: iam-role-policy-attachment
-              gotemplating.fn.crossplane.io/ready: "True"
           spec:
             forProvider:
               policyArn: {{ $policyArn }}
@@ -419,7 +415,6 @@ spec:
             name: delegated-zone-{{ $resourceName }}
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: rolesanywhere-profile
-              gotemplating.fn.crossplane.io/ready: "True"
           spec:
             forProvider:
               name: delegated-zone-{{ $resourceName }}
@@ -492,7 +487,6 @@ spec:
             name: ns{{ $i }}-{{ $resourceName }}
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: ns-record-{{ $i }}
-              gotemplating.fn.crossplane.io/ready: "True"
           spec:
             forProvider:
               zoneId: {{ $zoneId }}
@@ -568,9 +562,6 @@ spec:
           ---
           apiVersion: dns.platform.rye.ninja/v1alpha1
           kind: XDelegatedHostedZoneAWS
-          metadata:
-            annotations:
-              gotemplating.fn.crossplane.io/ready: "True"
           status:
             trustDomain: {{ $spiffeURIPrefix }}
             trustAnchorArn: {{ $trustAnchorArn }}
