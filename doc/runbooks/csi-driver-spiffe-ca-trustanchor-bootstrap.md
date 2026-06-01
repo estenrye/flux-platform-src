@@ -120,18 +120,37 @@ kubectl get environmentconfig platform-iam-rolesanywhere -o yaml | grep trustAnc
 
 Create or reconcile one `XDelegatedHostedZoneAWS` claim with:
 
-- `spec.trustAnchorArn` set from platform config.
+- `spec.trustAnchorArn` omitted so the value resolves from platform config
+  (or set explicitly to the same ARN for an override-path test).
 - valid `spec.iamProviderConfigRef` and `spec.rolesAnywhereProviderConfigRef`.
 
 Verify:
 
 ```bash
-kubectl get xdelegatedhostedzoneaws <name> -o jsonpath='{.status.trustAnchorArn}'
-kubectl get xdelegatedhostedzoneaws <name> -o jsonpath='{.status.profileArn}'
-kubectl get xdelegatedhostedzoneaws <name> -o jsonpath='{.status.iamRoleArn}'
+kubectl get xdelegatedhostedzoneaws -n <namespace> <name> -o jsonpath='{.status.trustAnchorArn}'
+kubectl get xdelegatedhostedzoneaws -n <namespace> <name> -o jsonpath='{.status.profileArn}'
+kubectl get xdelegatedhostedzoneaws -n <namespace> <name> -o jsonpath='{.status.iamRoleArn}'
 ```
 
 Expected: all ARNs resolve and claim is `Ready=True`.
+
+## Step 7: Record ADR Phase 2 acceptance evidence
+
+Record command output and timestamps for each acceptance criterion before
+marking ADR items complete.
+
+| ADR acceptance criterion | Evidence command(s) | Pass condition |
+|---|---|---|
+| TrustAnchor existence and ARN retrieval validated via AWS API | `make aws-get-cloudformation-stack-outputs-trust-anchor-arn` and `aws rolesanywhere get-trust-anchor --region "$AWS_REGION" --trust-anchor-id "$TRUST_ANCHOR_ID"` | ARN resolves from outputs and `get-trust-anchor` returns the same ARN/ID in target account+region |
+| Claims consume shared `trustAnchorArn` automatically | `kubectl get environmentconfig platform-iam-rolesanywhere -o yaml | grep trustAnchorArn` and `kubectl get xdelegatedhostedzoneaws -n crossplane-controlplane-cluster crossplane-rye-ninja -o jsonpath='{.status.trustAnchorArn}'` | Claim status ARN matches platform config ARN without requiring per-claim override |
+| CRL endpoint reachable from AWS and revocation enforced | `step ca revoke <serial>` then workload `CreateSession` test (for example via `aws_signing_helper`) plus provider events/logs | Session creation fails for revoked chain and evidence shows revocation enforcement after CRL refresh |
+
+For criteria that depend on step-ca and step-issuer rollout, attach test links
+or command transcripts from the environment where those components are enabled.
+
+Use this evidence log template when recording validation output:
+
+- [csi-driver-spiffe-ca-trustanchor-bootstrap.evidence-template.md](./csi-driver-spiffe-ca-trustanchor-bootstrap.evidence-template.md)
 
 ## Rollback
 

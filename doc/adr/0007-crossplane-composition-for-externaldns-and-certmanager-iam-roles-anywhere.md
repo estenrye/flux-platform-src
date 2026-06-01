@@ -1170,6 +1170,12 @@ Acceptance criteria:
 - [ ] CRL endpoint is reachable from AWS and revoked intermediate CA
   certificates fail `CreateSession`.
 
+Validation status note:
+- Checklist closure for this phase requires recorded execution evidence from
+  [trust anchor bootstrap runbook](../runbooks/csi-driver-spiffe-ca-trustanchor-bootstrap.md)
+  Step 7 (commands, outputs, environment, and timestamp), not documentation
+  updates alone.
+
 ### Phase 3: Crossplane composition for IAM Roles Anywhere resources
 
 > **Design note**: The original plan described a separate XRD for IAM Roles

@@ -25,6 +25,7 @@ resources:
   - ../../applications/crossplane-functions/function-go-templating
   - ../../applications/crossplane-functions/function-auto-ready
   - ../../applications/crossplane-resources/delegated-hosted-zone-aws
+  - ../../applications/external-dns/aws/patches/rolesanywhere
   - ../../applications/flux/base
   - ../../applications/external-secrets-operator/base
   - resources/eso.cluster-secret-store.yaml
@@ -36,5 +37,6 @@ resources:
   - resources/flux.ssh-key-secret.yaml
   - resources/github.deploykey.crossplane.yaml
   - resources/flux.source.git.yaml
+  - resources/flux.configmap.external-dns-aws-rolesanywhere.yaml
   - resources/flux.kustomization.yaml
   - resources/crossplane.environment-config.yaml
