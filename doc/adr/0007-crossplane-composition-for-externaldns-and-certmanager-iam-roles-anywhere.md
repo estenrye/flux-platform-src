@@ -1223,13 +1223,17 @@ Acceptance criteria:
 - [x] Bootstrap `crossplane-provider-rolesanywhere-admin` IAM role and Roles
   Anywhere profile; fill ARN placeholders in `provider-aws-rolesanywhere`
   deployment runtime config.
-- [ ] Composition reconciles end-to-end in a test environment.
+- [x] Composition reconciles end-to-end in a test environment.
+
+Evidence (2026-06-01):
+- `xdelegatedhostedzoneaws/crossplane-rye-ninja` reports `Ready=True` and `Synced=True` in `crossplane-controlplane-cluster`.
+- `function-auto-ready` is deployed and healthy, and the composition pipeline includes an `auto-ready` step.
 
 Acceptance criteria:
 - [x] Produced IAM policy is scoped to one hosted zone ARN.
 - [ ] Bootstrap runbooks for both Crossplane provider IAM roles exist and are
   tested.
-- [ ] Composition reconciles end-to-end in a test environment.
+- [x] Composition reconciles end-to-end in a test environment.
 
 ### Phase 4: Workload cluster bootstrap and workload integration
 
