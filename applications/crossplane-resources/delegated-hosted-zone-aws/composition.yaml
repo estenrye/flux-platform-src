@@ -292,11 +292,11 @@ spec:
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: iam-role
               gotemplating.fn.crossplane.io/ready: "True"
+              crossplane.io/external-name: delegated-zone-{{ $resourceName }}
           spec:
             forProvider:
-              name: delegated-zone-{{ $resourceName }}
               description: "IAM Roles Anywhere role for ExternalDNS and cert-manager on {{ $fullZoneName }}"
-              assumeRolePolicyDocument: |-
+              assumeRolePolicy: |-
                 {
                   "Version": "2012-10-17",
                   "Statement": [
@@ -329,9 +329,9 @@ spec:
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: iam-policy
               gotemplating.fn.crossplane.io/ready: "True"
+              crossplane.io/external-name: delegated-zone-{{ $resourceName }}
           spec:
             forProvider:
-              name: delegated-zone-{{ $resourceName }}
               description: "IAM Roles Anywhere policy for ExternalDNS and cert-manager on {{ $fullZoneName }}"
               policy: |-
                 {
@@ -405,7 +405,7 @@ spec:
           spec:
             forProvider:
               policyArn: {{ $policyArn }}
-              roleName: delegated-zone-{{ $resourceName }}
+              role: delegated-zone-{{ $resourceName }}
             providerConfigRef:
               kind: {{ $iamProviderConfig.kind }}
               name: {{ $iamProviderConfig.name }}

@@ -65,6 +65,14 @@ aws-get-cloudformation-stack-outputs-trust-anchor-id:
 		--output json \
 		| jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="TrustAnchorId") | .OutputValue'
 
+aws-get-cloudformation-stack-outputs-profile-arn:
+	.venv/bin/awscliv2 cloudformation describe-stacks \
+		--profile ops-opex-dns-automation \
+		--stack-name crossplane-provider-dns-admin \
+		--output json \
+		| jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="ProfileArn") | .OutputValue'
+
+
 aws-list-rolesanywhere-trust-anchors:
 	.venv/bin/awscliv2 rolesanywhere list-trust-anchors --profile ops-opex-dns-automation \
 		| jq '.trustAnchors | map({ name:.name, trustAnchorId:.trustAnchorId, trustAnchorArn:.trustAnchorArn,enabled:.enabled })'

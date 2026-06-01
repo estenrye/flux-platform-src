@@ -40,16 +40,16 @@ spec:
                 - --private-key
                 - /var/run/secrets/spiffe.io/tls.key
                 - --trust-anchor-arn
-                - arn:aws:rolesanywhere:us-east-2:832767337994:trust-anchor/1433b5ab-1a7a-4134-9d84-baa79f94d093
+                - arn:aws:rolesanywhere:us-east-2:832767337984:trust-anchor/1433b5ab-1a7a-4134-9d84-baa79f94d093
                 - --profile-arn
                 # Bootstrap required: create an IAM Roles Anywhere profile that references
                 # the crossplane-provider-iam-admin role, then replace the placeholder below.
-                - arn:aws:rolesanywhere:us-east-2:832767337994:profile/REPLACE-WITH-IAM-ADMIN-PROFILE-ARN
+                - arn:aws:rolesanywhere:us-east-2:832767337984:profile/45707742-288a-4a1d-86c2-171c8f2ca580
                 - --role-arn
                 # Bootstrap required: create an IAM role named crossplane-provider-iam-admin
                 # with permissions to manage IAM roles/policies and Roles Anywhere profiles,
                 # then replace the placeholder below.
-                - arn:aws:iam::832767337994:role/crossplane-provider-iam-admin
+                - arn:aws:iam::832767337984:role/crossplane-provider-iam-admin
               imagePullPolicy: IfNotPresent
               ports:
                 - containerPort: 9911
