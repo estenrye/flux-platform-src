@@ -392,15 +392,16 @@ The implementation will follow these decisions:
      role trust policy conditions cannot distinguish between clusters.
    - The default trust domain `cluster.local` is prohibited for any cluster
      participating in a shared trust anchor design.
-   - The trust domain is derived from `XDelegatedHostedZoneAWS` as
-     `${spec.subdomain}.${resolvedZoneName}` and surfaced in
-     `status.trustDomain`. The `resolvedZoneName` value comes from
-     `spec.zoneName` when set, otherwise from the shared `platform-cloudflare`
-     `EnvironmentConfig`. The IAM Roles Anywhere composition consumes this
-     value via cross-resource reference — no additional trust domain input is
-     required.
+   - The trust domain is derived from `XDelegatedHostedZoneAWS` as the
+     resolved SPIFFE URI prefix and surfaced in `status.trustDomain`. By
+     default this is `${spec.subdomain}.${resolvedZoneName}`, where
+     `resolvedZoneName` comes from `spec.zoneName` when set, otherwise from
+     the shared `platform-cloudflare` `EnvironmentConfig`. The prefix can be
+     overridden via platform configuration with `spiffeURIPrefix`. The IAM
+     Roles Anywhere composition consumes this value via cross-resource
+     reference — no additional trust domain input is required.
    - Example: `subdomain: crossplane`, resolved `zoneName: rye.ninja` → trust
-     domain `crossplane.rye.ninja` → SPIFFE URI
+     domain `crossplane.rye.ninja` (or an environment override) → SPIFFE URI
      `spiffe://crossplane.rye.ninja/ns/external-dns/sa/external-dns`.
    - DNS names are globally unique by property, satisfying the uniqueness
      requirement automatically without a separate cluster-identity field.
@@ -1198,16 +1199,17 @@ Acceptance criteria:
     retained only as an explicit per-claim override.
 - [x] Inputs derived from existing composition fields (no additional manual
   inputs beyond the three fields above):
-  - SPIFFE URIs derived from `spec.subdomain` + the resolved parent zone name
-    (`spec.zoneName` override or `platform-cloudflare` default)
+  - SPIFFE URIs derived from the resolved SPIFFE URI prefix, which defaults to
+    `spec.subdomain` + the resolved parent zone name (`spec.zoneName` override
+    or `platform-cloudflare` default) and can be overridden via platform
+    configuration with `spiffeURIPrefix`
   - Hosted zone ARN derived from observed Route53 zone status
   - Region and account implicit in provider config
 - [x] Outputs emitted in `status`:
   - `status.iamRoleArn`
   - `status.profileArn`
   - `status.trustAnchorArn` (resolved from spec override or platform config)
-  - `status.trustDomain` (derived as
-    `${spec.subdomain}.${resolvedZoneName}`)
+  - `status.trustDomain` (derived as the resolved SPIFFE URI prefix)
 - [x] Deploy `provider-aws-iam` package (`upbound/provider-aws-iam:v2.5.2`)
   with dedicated runtime config, service account, and `iam-admin`
   ClusterProviderConfig.

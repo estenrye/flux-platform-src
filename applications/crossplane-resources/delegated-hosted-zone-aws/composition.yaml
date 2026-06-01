@@ -255,6 +255,10 @@ spec:
           {{ end }}
           {{ $resourceName := printf "%s-%s" (replace "." "-" $subdomain) (replace "." "-" $zoneName) }}
           {{ $fullZoneName := printf "%s.%s" $subdomain $zoneName }}
+          {{ $spiffeURIPrefix := $fullZoneName }}
+          {{ if and $environment (index $environment "spiffeURIPrefix") }}
+            {{ $spiffeURIPrefix = index $environment "spiffeURIPrefix" }}
+          {{ end }}
           {{ if and $zoneName $trustAnchorArn $delegatedZoneProviderConfigRef $iamProviderConfig $rolesAnywhereProviderConfig }}
 
           {{ $zoneId := "" }}
@@ -303,8 +307,8 @@ spec:
                       "Condition": {
                         "StringEquals": {
                           "aws:PrincipalTag/x509SAN/URI": [
-                            "spiffe://{{ $fullZoneName }}/ns/cert-manager/sa/cert-manager",
-                            "spiffe://{{ $fullZoneName }}/ns/external-dns/sa/external-dns"
+                            "spiffe://{{ $spiffeURIPrefix }}/ns/cert-manager/sa/cert-manager",
+                            "spiffe://{{ $spiffeURIPrefix }}/ns/external-dns/sa/external-dns"
                           ]
                         },
                         "ArnEquals": {"aws:SourceArn": "{{ $trustAnchorArn }}"}
@@ -339,7 +343,7 @@ spec:
                       "Action": ["route53:ChangeResourceRecordSets", "route53:ListResourceRecordSets", "route53:ListTagsForResources"],
                       "Resource": "arn:aws:route53:::hostedzone/{{ $zoneId }}",
                       "Condition": {
-                        "StringEquals": {"aws:PrincipalTag/x509SAN/URI": "spiffe://{{ $fullZoneName }}/ns/external-dns/sa/external-dns"},
+                        "StringEquals": {"aws:PrincipalTag/x509SAN/URI": "spiffe://{{ $spiffeURIPrefix }}/ns/external-dns/sa/external-dns"},
                         "ForAllValues:StringLike": {"route53:ChangeResourceRecordSetsRecordTypes": ["A", "AAAA", "CNAME", "TXT", "SRV"]}
                       }
                     },
@@ -349,7 +353,7 @@ spec:
                       "Action": "route53:ListHostedZones",
                       "Resource": "*",
                       "Condition": {
-                        "StringEquals": {"aws:PrincipalTag/x509SAN/URI": "spiffe://{{ $fullZoneName }}/ns/external-dns/sa/external-dns"}
+                        "StringEquals": {"aws:PrincipalTag/x509SAN/URI": "spiffe://{{ $spiffeURIPrefix }}/ns/external-dns/sa/external-dns"}
                       }
                     },
                     {
@@ -359,7 +363,7 @@ spec:
                       "Resource": "arn:aws:route53:::hostedzone/{{ $zoneId }}",
                       "Condition": {
                         "StringEquals": {
-                          "aws:PrincipalTag/x509SAN/URI": "spiffe://{{ $fullZoneName }}/ns/cert-manager/sa/cert-manager",
+                          "aws:PrincipalTag/x509SAN/URI": "spiffe://{{ $spiffeURIPrefix }}/ns/cert-manager/sa/cert-manager",
                           "route53:ChangeResourceRecordSetsRecordTypes": ["TXT"]
                         }
                       }
@@ -370,7 +374,7 @@ spec:
                       "Action": "route53:GetChange",
                       "Resource": "arn:aws:route53:::change/*",
                       "Condition": {
-                        "StringEquals": {"aws:PrincipalTag/x509SAN/URI": "spiffe://{{ $fullZoneName }}/ns/cert-manager/sa/cert-manager"}
+                        "StringEquals": {"aws:PrincipalTag/x509SAN/URI": "spiffe://{{ $spiffeURIPrefix }}/ns/cert-manager/sa/cert-manager"}
                       }
                     },
                     {
@@ -379,7 +383,7 @@ spec:
                       "Action": "route53:ListHostedZonesByName",
                       "Resource": "*",
                       "Condition": {
-                        "StringEquals": {"aws:PrincipalTag/x509SAN/URI": "spiffe://{{ $fullZoneName }}/ns/cert-manager/sa/cert-manager"}
+                        "StringEquals": {"aws:PrincipalTag/x509SAN/URI": "spiffe://{{ $spiffeURIPrefix }}/ns/cert-manager/sa/cert-manager"}
                       }
                     }
                   ]
@@ -463,6 +467,10 @@ spec:
           {{ $ttl := .observed.composite.resource.spec.ttl | default 1 }}
           {{ $resourceName := printf "%s-%s" (replace "." "-" $subdomain) (replace "." "-" $zoneName) }}
           {{ $fullZoneName := printf "%s.%s" $subdomain $zoneName }}
+          {{ $spiffeURIPrefix := $fullZoneName }}
+          {{ if and $environment (index $environment "spiffeURIPrefix") }}
+            {{ $spiffeURIPrefix = index $environment "spiffeURIPrefix" }}
+          {{ end }}
           
           {{ $nameServers := list }}
           {{ if .observed.resources }}
@@ -527,6 +535,10 @@ spec:
           {{ $zoneId := "" }}
           {{ $roleArn := "" }}
           {{ $profileArn := "" }}
+          {{ $spiffeURIPrefix := printf "%s.%s" $subdomain $zoneName }}
+          {{ if and $environment (index $environment "spiffeURIPrefix") }}
+            {{ $spiffeURIPrefix = index $environment "spiffeURIPrefix" }}
+          {{ end }}
           {{ if and $zoneName $trustAnchorArn $delegatedZoneProviderConfigRef }}
 
           {{ if .observed.resources }}
@@ -560,7 +572,7 @@ spec:
             annotations:
               gotemplating.fn.crossplane.io/ready: "True"
           status:
-            trustDomain: {{ printf "%s.%s" $subdomain $zoneName }}
+            trustDomain: {{ $spiffeURIPrefix }}
             trustAnchorArn: {{ $trustAnchorArn }}
             iamRoleArn: {{ $roleArn }}
             profileArn: {{ $profileArn }}
