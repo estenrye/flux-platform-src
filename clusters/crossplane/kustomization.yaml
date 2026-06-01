@@ -30,7 +30,7 @@ resources:
   - resources/eso.external-secret.github.yaml
   - resources/eso.external-secret.cloudflare.yaml
   - resources/namespace.crossplane-controlplane-cluster.yaml
-  # - resources/delegated-hosted-zone-aws.crossplane-rye-ninja.yaml
+  - resources/delegated-hosted-zone-aws.crossplane-rye-ninja.yaml
   - resources/flux.ssh-key-generator.yaml
   - resources/flux.ssh-key-secret.yaml
   - resources/github.deploykey.crossplane.yaml
