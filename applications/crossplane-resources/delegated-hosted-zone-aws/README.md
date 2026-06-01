@@ -27,19 +27,21 @@ The Composite Resource should take in the following inputs:
 
 ### zoneId
 Description:
-  This is the Cloudflare Zone Id that will be used in the
-  `Record.dns.upjet-cloudflare.m.upbound.io` resource to
-  populate a record of type `NS` for each nameserver in
-  the status fields of the delegated hosted zone.
+  Optional override for the Cloudflare Zone Id that will be used in the
+  `Record.dns.upjet-cloudflare.m.upbound.io` resource to populate records of
+  type `NS` for each nameserver in the status fields of the delegated hosted
+  zone. When omitted, the composition reads `data.zoneId` from the
+  `platform-cloudflare` EnvironmentConfig.
 Data Type: string
-Required: yes
+Required: no
 
 ### zoneName
 Description:
-  This is the DNS Name of the Zone in Cloudflare the delegated hosted zone
-  is delegated from.
+  Optional override for the DNS name of the parent zone in Cloudflare the
+  delegated hosted zone is delegated from. When omitted, the composition reads
+  `data.zoneName` from the `platform-cloudflare` EnvironmentConfig.
 Data Type: string
-Required: yes
+Required: no
 
 ### subdomain
 Description:
@@ -74,9 +76,10 @@ FIELDS:
 FIELD: cloudflareProviderConfigRef <Object>
 
 DESCRIPTION:
-    ProviderConfigReference specifies how the provider that will be used to
-    create, observe, update, and delete this managed resource should be
-    configured.
+  Optional override for the ProviderConfigReference used to create, observe,
+  update, and delete the Cloudflare NS records. When omitted, the
+  composition reads `data.cloudflareProviderConfigRef` from the
+  `platform-cloudflare` EnvironmentConfig.
     
 FIELDS:
   kind  <string> -required-
@@ -101,9 +104,9 @@ Below is a table describing the value mapping for the delegated hosted zone.
 
 | Field in Zone | Value Source |
 | --- | --- |
-| `Zone.metadata.name` | `${inputs.subdomain.replace('.','-')}-${inputs.zoneName.replace('.','-')}` |
-| `Zone.spec.forProvider.name` | `${inputs.subdomain}.${inputs.zoneName}` |
-| `Zone.spec.forProvider.comment` | `Delgated Hosted Zone for ${inputs.subdomain}.${inputs.zoneName} from Cloudflare Zone ${inputs.zoneName}` |
+| `Zone.metadata.name` | `${inputs.subdomain.replace('.','-')}-${resolved.zoneName.replace('.','-')}` |
+| `Zone.spec.forProvider.name` | `${inputs.subdomain}.${resolved.zoneName}` |
+| `Zone.spec.forProvider.comment` | `Delegated Hosted Zone for ${inputs.subdomain}.${resolved.zoneName} from Cloudflare Zone ${resolved.zoneName}` |
 | `Zone.spec.providerConfigRef` | `${inputs.delegatedZoneProviderConfigRef}` |
 
 
@@ -115,14 +118,14 @@ Below is a table describing the value mapping for each `ns,i` in `Zone.status.at
 
 | Field in Record | Value Source |
 | --- | --- |
-| `Record.metadata.name`            | `ns${i}-${inputs.subdomain.replace('.','-')}-${inputs.zoneName.replace('.','-')}` |
-| `Record.spec.forProvider.zoneId`  | `spec.zoneId` |
+| `Record.metadata.name`            | `ns${i}-${inputs.subdomain.replace('.','-')}-${resolved.zoneName.replace('.','-')}` |
+| `Record.spec.forProvider.zoneId`  | `resolved.zoneId` |
 | `Record.spec.forProvider.type`    | `NS` |
 | `Record.spec.forProvider.name`    | `${inputs.subdomain}` |
-| `Record.spec.forProvider.comment` | `Delgated Hosted Zone NS-${i} for ${inputs.subdomain}.${inputs.zoneName} in aws` |
+| `Record.spec.forProvider.comment` | `Delegated Hosted Zone NS-${i} for ${inputs.subdomain}.${resolved.zoneName} in aws` |
 | `Record.spec.forProvider.ttl`     | `${inputs.ttl:-1}` |
 | `Record.spec.forProvider.content` | `${ns}` |
-| `Record.spec.providerConfigRef`   | `${inputs.cloudflareProviderConfigRef}` |
+| `Record.spec.providerConfigRef`   | `${resolved.cloudflareProviderConfigRef}` |
 
 
 ## Example Managed Resources
@@ -140,14 +143,9 @@ metadata:
     rye.ninja/owner: platform-engineering
 spec:
   subdomain: crossplane
-  zoneName: rye.ninja
-  zoneId: 186a0fa51e8dd54ee6910d0f35d5f0c8
   delegatedZoneProviderConfigRef:
     kind: ProviderConfig
     name: dns-admin
-  cloudflareProviderConfigRef:
-    kind: ProviderConfig
-    name: default
 ```
 #### Step 0: Provision the Delegated Hosted Zone Resource
 

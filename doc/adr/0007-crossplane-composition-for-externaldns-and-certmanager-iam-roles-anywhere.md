@@ -40,9 +40,11 @@ identity, coupling them in a single composition eliminates cross-resource refere
 guarantees lifecycle coupling (IAM resources are deleted when the zone claim is deleted),
 and reduces the number of claims an operator must create from two to one. All IAM
 values are derived from existing composition inputs — no additional IAM-specific inputs
-are needed beyond `spec.trustAnchorArn` (the ARN of the pre-existing workload cluster
-trust anchor) and two provider config references (`spec.iamProviderConfigRef` and
-`spec.rolesAnywhereProviderConfigRef`) for least-privilege credential separation.
+are needed beyond an optional `spec.trustAnchorArn` override (otherwise defaulted
+from platform configuration) and optional provider config overrides
+(`spec.iamProviderConfigRef` and `spec.rolesAnywhereProviderConfigRef`, both
+defaulted from platform configuration when omitted) for least-privilege
+credential separation.
 
 IAM permissions for ExternalDNS to access Route53 hosted zones are documented [here](https://raw.githubusercontent.com/kubernetes-sigs/external-dns/refs/heads/master/docs/tutorials/aws.md), and IAM permissions for CertManager to access Route53 hosted zones are documented [here](https://cert-manager.io/docs/configuration/acme/dns01/route53/).
 
@@ -341,31 +343,37 @@ The implementation will follow these decisions:
      Route53 hosted zone, Cloudflare NS delegation records, IAM Role, IAM
      Policy, RolePolicyAttachment, and Roles Anywhere Profile.
    - The IAM Role trust policy and permission policy are fully derived from
-     composition inputs (`spec.subdomain`, `spec.zoneName`, `spec.trustAnchorArn`)
+     composition inputs (`spec.subdomain`, the resolved parent zone name from
+     `spec.zoneName` or platform configuration, and the resolved trust anchor
+     ARN from `spec.trustAnchorArn` or platform configuration)
      — no separate composition or manual IAM authoring is required.
    - The composition outputs all IAM Roles Anywhere credential-helper inputs
      in status (`status.trustAnchorArn`, `status.iamRoleArn`, `status.profileArn`,
      `status.trustDomain`) so downstream automation can configure cert-manager
      and ExternalDNS without reading from multiple resources.
    - IAM resources (`Role`, `Policy`, `RolePolicyAttachment`) are managed via
-     `provider-aws-iam` using `spec.iamProviderConfigRef` → `iam-admin`.
+     `provider-aws-iam` using `spec.iamProviderConfigRef` when set, otherwise
+     the shared `platform-iam-rolesanywhere` environment default (`iam-admin`).
      Roles Anywhere resources (`Profile`) are managed via `provider-aws-rolesanywhere`
-     using `spec.rolesAnywhereProviderConfigRef` → `rolesanywhere-admin`. The two
-     provider configs reference distinct IAM roles with narrowly scoped permissions,
-     consistent with the least-privilege principle in Decision 1.
+     using `spec.rolesAnywhereProviderConfigRef` when set, otherwise the shared
+     `platform-iam-rolesanywhere` environment default (`rolesanywhere-admin`).
+     The two provider configs reference distinct IAM roles with narrowly scoped
+     permissions, consistent with the least-privilege principle in Decision 1.
    - The TrustAnchor itself is provisioned separately as a prerequisite (it
      depends on the workload cluster's CA certificate, which must exist before
      the claim is created). Because `provider-aws-rolesanywhere` currently
      exposes `Profile` but not `TrustAnchor`, the TrustAnchor is provisioned
-     out-of-band (for example, AWS CLI or Terraform) and its ARN is provided
-     via `spec.trustAnchorArn`.
+     out-of-band (for example, AWS CLI or Terraform) and its ARN is published
+     through platform configuration, with `spec.trustAnchorArn` available as an
+     optional per-claim override.
 
 4. Trust anchor provisioning is out-of-band with verification
    - We will provision the AWS IAM Roles Anywhere TrustAnchor out-of-band
      (for example, AWS CLI or Terraform) using the crossplane cluster root
      certificate (`csi-driver-spiffe-ca`) as the certificate bundle source.
    - The resulting TrustAnchor ARN will be published into platform
-     configuration and consumed by `XDelegatedHostedZoneAWS.spec.trustAnchorArn`.
+     configuration and consumed automatically by `XDelegatedHostedZoneAWS`
+     claims unless a claim explicitly overrides it via `spec.trustAnchorArn`.
    - The bootstrap workflow must verify trust anchor correctness (certificate
      bundle, region/account, and CRL settings) before claims are reconciled.
 
@@ -384,12 +392,16 @@ The implementation will follow these decisions:
      role trust policy conditions cannot distinguish between clusters.
    - The default trust domain `cluster.local` is prohibited for any cluster
      participating in a shared trust anchor design.
-   - The trust domain is derived from `XDelegatedHostedZoneAWS` as
-     `${spec.subdomain}.${spec.zoneName}` and surfaced in `status.trustDomain`.
-     The IAM Roles Anywhere composition consumes this value via cross-resource
+   - The trust domain is derived from `XDelegatedHostedZoneAWS` as the
+     resolved SPIFFE URI prefix and surfaced in `status.trustDomain`. By
+     default this is `${spec.subdomain}.${resolvedZoneName}`, where
+     `resolvedZoneName` comes from `spec.zoneName` when set, otherwise from
+     the shared `platform-cloudflare` `EnvironmentConfig`. The prefix can be
+     overridden via platform configuration with `spiffeURIPrefix`. The IAM
+     Roles Anywhere composition consumes this value via cross-resource
      reference — no additional trust domain input is required.
-   - Example: `subdomain: crossplane`, `zoneName: rye.ninja` → trust domain
-     `crossplane.rye.ninja` → SPIFFE URI
+   - Example: `subdomain: crossplane`, resolved `zoneName: rye.ninja` → trust
+     domain `crossplane.rye.ninja` (or an environment override) → SPIFFE URI
      `spiffe://crossplane.rye.ninja/ns/external-dns/sa/external-dns`.
    - DNS names are globally unique by property, satisfying the uniqueness
      requirement automatically without a separate cluster-identity field.
@@ -1087,7 +1099,7 @@ criteria were evaluated:
   - compromise window
   - operational overhead of rotations
   - blast radius of failed rollout
-- [ ] Publish runbooks for:
+- [x] Publish runbooks for:
   - [scheduled rotation](../runbooks/csi-driver-spiffe-ca-scheduled-rotation.md)
   - [emergency key compromise rollover](../runbooks/csi-driver-spiffe-ca-emergency-rollover.md)
 - [ ] Enable `privateKey.rotationPolicy: Always` on `csi-driver-spiffe-ca`
@@ -1112,16 +1124,19 @@ kubectl api-resources | grep rolesanywhere
 profiles   rolesanywhere.aws.m.upbound.io/v1beta1   true    Profile
 ```
 
-- [ ] Provision one AWS IAM Roles Anywhere TrustAnchor out-of-band
+- [x] Provision one AWS IAM Roles Anywhere TrustAnchor out-of-band
   (AWS CLI or Terraform) using the `csi-driver-spiffe-ca` certificate bundle.
 - [ ] Follow and validate
   [trust anchor bootstrap runbook](../runbooks/csi-driver-spiffe-ca-trustanchor-bootstrap.md).
-- [ ] Track upstream feature request
+- [x] Track upstream feature request
   [crossplane-contrib/provider-upjet-aws#2092](https://github.com/crossplane-contrib/provider-upjet-aws/issues/2092)
   for Roles Anywhere TrustAnchor support and revisit this bootstrap workaround
   when the resource becomes available.
-- [ ] Publish the resulting `trustAnchorArn` to platform configuration
-  (for example, Crossplane `EnvironmentConfig`) and wire claims to consume it.
+- [x] Publish the resulting `trustAnchorArn` to platform configuration
+  (for example, Crossplane `EnvironmentConfig`).
+- [x] Wire claims to consume the shared `trustAnchorArn` automatically from
+  platform configuration instead of requiring manual `spec.trustAnchorArn`
+  values.
 - [ ] Deploy [step-ca](https://github.com/smallstep/certificates) on the
   crossplane cluster:
   - Configure the root CA using the `csi-driver-spiffe-ca` keypair.
@@ -1135,16 +1150,19 @@ profiles   rolesanywhere.aws.m.upbound.io/v1beta1   true    Profile
 - [ ] Deploy [step-issuer](https://github.com/smallstep/step-issuer) on the
   crossplane cluster as the external cert-manager issuer that bridges
   cert-manager `CertificateRequest` resources to step-ca.
-- [ ] Document the intermediate CA revocation procedure:
+- [x] Document the intermediate CA revocation procedure:
   - `step ca revoke <serial>` updates the CRL immediately.
   - IAM Roles Anywhere enforces revocation on next `CreateSession` once the
     cached CRL expires (enable CRL checking on the trust anchor).
-- [ ] Document the root CA emergency rollover procedure (prerequisite for
+- [x] Document the root CA emergency rollover procedure (prerequisite for
   Phase 1 acceptance criteria).
 
 Acceptance criteria:
-- [ ] AWS IAM Roles Anywhere TrustAnchor exists and its ARN is retrievable via
-  AWS API, then published to platform configuration for claim consumption.
+- [x] The shared `trustAnchorArn` is published to platform configuration.
+- [ ] AWS IAM Roles Anywhere TrustAnchor existence and ARN retrieval are
+  validated via AWS API in a test environment.
+- [x] Claims consume the shared `trustAnchorArn` automatically from platform
+  configuration instead of requiring manual `spec.trustAnchorArn` values.
 - [ ] step-ca X5C provisioner rejects CSRs not authenticated by a valid
   bootstrap certificate.
 - [ ] A test intermediate CA certificate issued by step-ca chains to
@@ -1160,11 +1178,14 @@ Acceptance criteria:
 > items below reflect the updated scope.
 
 - [x] Extend `XDelegatedHostedZoneAWS` XRD with IAM Roles Anywhere fields:
-  - `spec.trustAnchorArn` (required) — ARN of the pre-provisioned workload
-    cluster trust anchor
-  - `spec.iamProviderConfigRef` (required) — provider config for IAM resources
-  - `spec.rolesAnywhereProviderConfigRef` (required) — provider config for
-    Roles Anywhere resources
+  - `spec.trustAnchorArn` (optional override) — ARN of the pre-provisioned
+    workload cluster trust anchor; defaults from platform configuration when
+    omitted
+  - `spec.iamProviderConfigRef` (optional override) — provider config for IAM
+    resources; defaults from `platform-iam-rolesanywhere` when omitted
+  - `spec.rolesAnywhereProviderConfigRef` (optional override) — provider
+    config for Roles Anywhere resources; defaults from
+    `platform-iam-rolesanywhere` when omitted
 - [x] Implement composition pipeline step `create-iam-resources`:
   - [x] `iam.aws.m.upbound.io/v1beta1` Role
   - [x] `iam.aws.m.upbound.io/v1beta1` Policy
@@ -1173,19 +1194,22 @@ Acceptance criteria:
   - **Out of scope**: The `TrustAnchor` AWS resource is a singleton provisioned
     in Phase 2, not per-claim. It is provisioned out-of-band because
     `provider-aws-rolesanywhere` currently has no `TrustAnchor` managed
-    resource. With Pattern D, `spec.trustAnchorArn` is the same shared value
-    for all `XDelegatedHostedZoneAWS` claims and should be sourced from a
-    platform-level Crossplane `EnvironmentConfig`.
+    resource. With Pattern D, the trust anchor ARN is normally sourced from a
+    platform-level Crossplane `EnvironmentConfig`, with `spec.trustAnchorArn`
+    retained only as an explicit per-claim override.
 - [x] Inputs derived from existing composition fields (no additional manual
   inputs beyond the three fields above):
-  - SPIFFE URIs derived from `spec.subdomain` + `spec.zoneName`
+  - SPIFFE URIs derived from the resolved SPIFFE URI prefix, which defaults to
+    `spec.subdomain` + the resolved parent zone name (`spec.zoneName` override
+    or `platform-cloudflare` default) and can be overridden via platform
+    configuration with `spiffeURIPrefix`
   - Hosted zone ARN derived from observed Route53 zone status
   - Region and account implicit in provider config
 - [x] Outputs emitted in `status`:
   - `status.iamRoleArn`
   - `status.profileArn`
-  - `status.trustAnchorArn` (passthrough from spec)
-  - `status.trustDomain` (derived as `${spec.subdomain}.${spec.zoneName}`)
+  - `status.trustAnchorArn` (resolved from spec override or platform config)
+  - `status.trustDomain` (derived as the resolved SPIFFE URI prefix)
 - [x] Deploy `provider-aws-iam` package (`upbound/provider-aws-iam:v2.5.2`)
   with dedicated runtime config, service account, and `iam-admin`
   ClusterProviderConfig.
@@ -1229,10 +1253,17 @@ Acceptance criteria:
 - [ ] Configure `cert-manager-spiffe-csi-driver` on each workload cluster
   with `app.trustDomain: <XDelegatedHostedZoneAWS.status.trustDomain>` to
   ensure SPIFFE SVIDs match the URIs in the IAM role trust policy.
-- [ ] Configure ExternalDNS to target known hosted zone identifiers and avoid
-  account-wide zone discovery in steady state.
-- [ ] Configure cert-manager Route53 solver to use hosted zone identifiers for
-  delegated zones.
+- [x] ExternalDNS AWS overlays support hosted-zone targeting via
+  `--zone-id-filter`.
+- [ ] Wire ExternalDNS to consume delegated hosted zone identifiers in the
+  IAM Roles Anywhere path and avoid account-wide zone discovery in steady
+  state.
+- [x] cert-manager Route53 solver schema supports `hostedZoneID` for
+  delegated-zone targeting.
+- [ ] Configure cert-manager Route53 solver to use delegated hosted zone
+  identifiers.
+- [x] Repository contains an `aws_signing_helper` + SPIFFE CSI reference
+  pattern in Crossplane provider runtime configs.
 - [ ] Inject `aws_signing_helper` sidecar and SPIFFE CSI volume into
   ExternalDNS and cert-manager
   (`public.ecr.aws/rolesanywhere/credential-helper:1.8.1-2026.04.09.16.01`).
@@ -1242,6 +1273,12 @@ Acceptance criteria:
   - `--role-arn` ← `status.iamRoleArn`
 
 Acceptance criteria:
+- [x] ExternalDNS repository configuration supports hosted-zone targeting via
+  `--zone-id-filter`.
+- [x] cert-manager repository configuration supports Route53
+  `hostedZoneID`-based targeting.
+- [x] The repository contains an `aws_signing_helper` + SPIFFE CSI reference
+  pattern that workload integrations can follow.
 - [ ] ExternalDNS can create/update/delete records only in delegated zones.
 - [ ] CertManager DNS01 challenges succeed only in delegated zones.
 - [ ] Intermediate CA on workload cluster chains to `csi-driver-spiffe-ca`.
@@ -1254,7 +1291,7 @@ Acceptance criteria:
   - negative flow in non-delegated zone
   - step-ca signing failure modes (unavailable, rejected X5C token)
   - revoked intermediate CA certificate fails IAM Roles Anywhere `CreateSession`
-- [ ] Run render and policy lint checks before merge.
+- [x] Run render and policy lint checks before merge.
 - [ ] Promote through environments with canary rollout and documented rollback.
 
 Acceptance criteria:

@@ -1,0 +1,44 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-function-environment-configs
+  description: |-
+    This component installs the Crossplane Environment Configs Function,
+    which loads EnvironmentConfig resources into the composition pipeline
+    context for use by later function steps.
+
+    The function supports:
+    - Loading shared platform configuration into composition context
+    - Resolving singleton or referenced EnvironmentConfig resources
+    - Reusing common provider and platform inputs across claims
+    - Reducing repeated claim inputs by centralizing defaults
+
+    This is required for compositions that default claim fields from
+    shared EnvironmentConfig objects instead of requiring every input
+    to be provided explicitly on each claim.
+  tags:
+    - crossplane
+    - crossplane-function
+    - environment-configs
+    - composition
+    - pipeline
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://docs.crossplane.io/latest/composition/environment-configs/
+      title: Crossplane Environment Config Documentation
+      icon: docs
+      type: documentation
+    - url: https://marketplace.upbound.io/functions/crossplane-contrib/function-environment-configs
+      title: Environment Configs Function on Upbound Marketplace
+      icon: docs
+      type: documentation
+    - url: https://github.com/crossplane-contrib/function-environment-configs
+      title: GitHub repository for the Environment Configs Function
+      icon: github
+      type: source
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

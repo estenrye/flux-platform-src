@@ -20,10 +20,10 @@ spec:
             properties:
               zoneId:
                 type: string
-                description: "This is the Cloudflare Zone Id that will be used in the Record.dns.upjet-cloudflare.m.upbound.io resource to populate a record of type NS for each nameserver in the status fields of the delegated hosted zone."
+                description: "Optional override for the Cloudflare Zone ID used in the Record.dns.upjet-cloudflare.m.upbound.io resources that publish NS records. When omitted, the composition reads the shared value from the platform-cloudflare EnvironmentConfig."
               zoneName:
                 type: string
-                description: "This is the DNS Name of the Zone in Cloudflare the delegated hosted zone is delegated from."
+                description: "Optional override for the DNS name of the parent Cloudflare zone the delegated hosted zone is delegated from. When omitted, the composition reads the shared value from the platform-cloudflare EnvironmentConfig."
               subdomain:
                 type: string
                 description: "This is the subdomain under the Cloudflare Zone being delegated to the delegated hosted zone."
@@ -35,7 +35,7 @@ spec:
                 maximum: 86400
               delegatedZoneProviderConfigRef:
                 type: object
-                description: "ProviderConfigReference specifies how the provider that will be used to create, observe, update, and delete the delegated hosted zone should be configured."
+                description: "Optional override for the ProviderConfigReference used to create, observe, update, and delete the delegated hosted zone. When omitted, the composition reads the shared value from the platform-iam-rolesanywhere EnvironmentConfig."
                 properties:
                   apiVersion:
                     type: string
@@ -51,7 +51,7 @@ spec:
                 - name
               cloudflareProviderConfigRef:
                 type: object
-                description: "ProviderConfigReference specifies how the provider that will be used to create, observe, update, and delete the Cloudflare NS records should be configured."
+                description: "Optional override for the Cloudflare provider ProviderConfigReference used to create, observe, update, and delete the Cloudflare NS records. When omitted, the composition reads the shared value from the platform-cloudflare EnvironmentConfig."
                 properties:
                   apiVersion:
                     type: string
@@ -67,10 +67,10 @@ spec:
                 - name
               trustAnchorArn:
                 type: string
-                description: "The ARN of the IAM Roles Anywhere trust anchor that signs workload SPIFFE certificates on the target cluster. Used in the IAM role trust policy to scope assumption to this trust anchor."
+                description: "Optional override for the IAM Roles Anywhere trust anchor ARN. When omitted, the composition reads the shared value from the platform-iam-rolesanywhere EnvironmentConfig. Used in the IAM role trust policy to scope assumption to this trust anchor."
               iamProviderConfigRef:
                 type: object
-                description: "ProviderConfigReference for the IAM provider. The referenced role must have permissions to create and manage IAM roles, policies, and role-policy attachments."
+                description: "Optional override for the IAM provider ProviderConfigReference. When omitted, the composition reads the shared value from the platform-iam-rolesanywhere EnvironmentConfig. The referenced role must have permissions to create and manage IAM roles, policies, and role-policy attachments."
                 properties:
                   apiVersion:
                     type: string
@@ -86,7 +86,7 @@ spec:
                 - name
               rolesAnywhereProviderConfigRef:
                 type: object
-                description: "ProviderConfigReference for the Roles Anywhere provider. The referenced role must have permissions to create and manage Roles Anywhere profiles."
+                description: "Optional override for the Roles Anywhere provider ProviderConfigReference. When omitted, the composition reads the shared value from the platform-iam-rolesanywhere EnvironmentConfig. The referenced role must have permissions to create and manage Roles Anywhere profiles."
                 properties:
                   apiVersion:
                     type: string
@@ -101,14 +101,7 @@ spec:
                 - kind
                 - name
             required:
-            - zoneId
-            - zoneName
             - subdomain
-            - trustAnchorArn
-            - delegatedZoneProviderConfigRef
-            - cloudflareProviderConfigRef
-            - iamProviderConfigRef
-            - rolesAnywhereProviderConfigRef
           status:
             type: object
             properties:
@@ -122,10 +115,10 @@ spec:
                 description: "The zone ID of the created delegated hosted zone."
               trustDomain:
                 type: string
-                description: "The SPIFFE trust domain for this delegation, derived as '${spec.subdomain}.${spec.zoneName}'. Use as the --trust-domain flag value for cert-manager-spiffe-csi-driver and as the basis for IAM Roles Anywhere SPIFFE URI conditions."
+                description: "The SPIFFE trust domain for this delegation, derived from the resolved SPIFFE URI prefix. By default this is '${spec.subdomain}.${zoneName}', where zoneName is resolved from spec.zoneName when set, otherwise from the platform-cloudflare EnvironmentConfig. The prefix can be overridden via platform configuration with spiffeURIPrefix. Use as the --trust-domain flag value for cert-manager-spiffe-csi-driver and as the basis for IAM Roles Anywhere SPIFFE URI conditions."
               trustAnchorArn:
                 type: string
-                description: "Passthrough of spec.trustAnchorArn. Included in status so downstream consumers can read all IAM Roles Anywhere credential-helper inputs from a single status block."
+                description: "Resolved IAM Roles Anywhere trust anchor ARN. Sourced from spec.trustAnchorArn when set, otherwise from the platform-iam-rolesanywhere EnvironmentConfig. Included in status so downstream consumers can read all IAM Roles Anywhere credential-helper inputs from a single status block."
               iamRoleArn:
                 type: string
                 description: "The ARN of the IAM role created for ExternalDNS and cert-manager to assume via IAM Roles Anywhere."
