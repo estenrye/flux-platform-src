@@ -4,6 +4,8 @@ namespace: external-dns
 
 resources:
   - ../../base
+  - ./role.yaml
+  - ./role-binding.yaml
 
 patches:
   - target:

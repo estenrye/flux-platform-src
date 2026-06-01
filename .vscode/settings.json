@@ -34,6 +34,11 @@
     "/^python - <<'PY'\nfrom pathlib import Path\np=Path\\('doc/adr/0007-crossplane-composition-for-externaldns-and-certmanager-iam-roles-anywhere\\.md'\\)\ns=p\\.read_text\\(\\)\nprint\\('checked', s\\.count\\('- \\[x\\]'\\)\\)\nprint\\('open', s\\.count\\('- \\[ \\]'\\)\\)\nPY$/": {
       "approve": true,
       "matchCommandLine": true
-    }
+    },
+    "kubectl -n flux-system": true,
+    "git -C .render/flux-platform-rendered": true,
+    "flux": true,
+    "kubectl -n external-dns": true,
+    "true": true
   }
 }
