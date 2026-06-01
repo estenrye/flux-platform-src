@@ -7,6 +7,11 @@ spec:
   interval: 10m0s
   path: ./clusters/crossplane
   prune: true
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: external-dns-aws-rolesanywhere
+        optional: true
   sourceRef:
     kind: GitRepository
     name: flux-platform-rendered

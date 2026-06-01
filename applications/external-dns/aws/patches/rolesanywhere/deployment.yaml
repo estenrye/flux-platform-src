@@ -1,0 +1,54 @@
+- op: add
+  path: /spec/template/spec/containers/0/env
+  value:
+    - name: AWS_REGION
+      value: ${external_dns_aws_region:-not-set}
+    - name: AWS_EC2_METADATA_SERVICE_ENDPOINT
+      value: http://localhost:9911
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --txt-owner-id=${external_dns_txt_owner_id:-not-set}
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --zone-id-filter=${external_dns_route53_zone_id:-not-set}
+- op: add
+  path: /spec/template/spec/containers/0/volumeMounts
+  value:
+    - mountPath: /var/run/secrets/spiffe.io
+      name: spiffe
+- op: add
+  path: /spec/template/spec/containers/-
+  value:
+    name: aws-signing-helper
+    image: public.ecr.aws/rolesanywhere/credential-helper:1.8.1-2026.04.09.16.01
+    command:
+      - aws_signing_helper
+      - serve
+      - --port
+      - "9911"
+      - --debug
+      - --certificate
+      - /var/run/secrets/spiffe.io/tls.crt
+      - --private-key
+      - /var/run/secrets/spiffe.io/tls.key
+      - --trust-anchor-arn
+      - ${external_dns_rolesanywhere_trust_anchor_arn:-not-set}
+      - --profile-arn
+      - ${external_dns_rolesanywhere_profile_arn:-not-set}
+      - --role-arn
+      - ${external_dns_rolesanywhere_role_arn:-not-set}
+    imagePullPolicy: IfNotPresent
+    ports:
+      - containerPort: 9911
+        name: imdsv2
+        protocol: TCP
+    volumeMounts:
+      - mountPath: /var/run/secrets/spiffe.io
+        name: spiffe
+- op: add
+  path: /spec/template/spec/volumes
+  value:
+    - name: spiffe
+      csi:
+        driver: spiffe.csi.cert-manager.io
+        readOnly: true
