@@ -6,8 +6,8 @@ registry: txt
 txtPrefix: edns.
 extraArgs:
   - --aws-zone-type=public
-  - --aws-prefer-cname
-  - --leader-election
+  # - --aws-prefer-cname
+  - --enable-leader-election
 serviceAccount:
   # Reuse existing service account created by Terragrunt.
   # Toggle to true once external-dns is fully managed by ArgoCD.
@@ -46,10 +46,7 @@ podDisruptionBudget:
   minAvailable: 1
   unhealthyPodEvictionPolicy: AlwaysAllow
 
-tolerations:
-- key: "system-critical"
-  operator: "Exists"
-  effect: "NoSchedule"
+tolerations: []
 
 affinity:
   nodeAffinity:
