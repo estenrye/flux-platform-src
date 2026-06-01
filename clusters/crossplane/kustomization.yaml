@@ -23,6 +23,7 @@ resources:
   - ../../applications/crossplane-providers/provider-kubernetes
   - ../../applications/crossplane-functions/function-environment-configs
   - ../../applications/crossplane-functions/function-go-templating
+  - ../../applications/crossplane-functions/function-auto-ready
   - ../../applications/crossplane-resources/delegated-hosted-zone-aws
   - ../../applications/flux/base
   - ../../applications/external-secrets-operator/base
