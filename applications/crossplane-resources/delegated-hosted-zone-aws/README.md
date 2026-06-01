@@ -122,7 +122,7 @@ Below is a table describing the value mapping for each `ns,i` in `Zone.status.at
 | `Record.spec.forProvider.zoneId`  | `resolved.zoneId` |
 | `Record.spec.forProvider.type`    | `NS` |
 | `Record.spec.forProvider.name`    | `${inputs.subdomain}` |
-| `Record.spec.forProvider.comment` | `Delgated Hosted Zone NS-${i} for ${inputs.subdomain}.${resolved.zoneName} in aws` |
+| `Record.spec.forProvider.comment` | `Delegated Hosted Zone NS-${i} for ${inputs.subdomain}.${resolved.zoneName} in aws` |
 | `Record.spec.forProvider.ttl`     | `${inputs.ttl:-1}` |
 | `Record.spec.forProvider.content` | `${ns}` |
 | `Record.spec.providerConfigRef`   | `${resolved.cloudflareProviderConfigRef}` |
