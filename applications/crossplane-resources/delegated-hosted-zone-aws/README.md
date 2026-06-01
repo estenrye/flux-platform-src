@@ -106,7 +106,7 @@ Below is a table describing the value mapping for the delegated hosted zone.
 | --- | --- |
 | `Zone.metadata.name` | `${inputs.subdomain.replace('.','-')}-${resolved.zoneName.replace('.','-')}` |
 | `Zone.spec.forProvider.name` | `${inputs.subdomain}.${resolved.zoneName}` |
-| `Zone.spec.forProvider.comment` | `Delgated Hosted Zone for ${inputs.subdomain}.${resolved.zoneName} from Cloudflare Zone ${resolved.zoneName}` |
+| `Zone.spec.forProvider.comment` | `Delegated Hosted Zone for ${inputs.subdomain}.${resolved.zoneName} from Cloudflare Zone ${resolved.zoneName}` |
 | `Zone.spec.providerConfigRef` | `${inputs.delegatedZoneProviderConfigRef}` |
 
 
