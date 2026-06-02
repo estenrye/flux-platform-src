@@ -34,7 +34,8 @@ flux-reconcile-source:
 	flux reconcile source git flux-platform-rendered -n flux-system
 
 flux-reconcile-kustomization:
-	flux reconcile kustomization flux-platform -n flux-system
+	flux reconcile kustomization flux-platform -n flux-system --with-source
+	flux reconcile kustomization flux-platform-external-dns-aws-rolesanywhere -n flux-system --with-source
 
 auth-aws:
 	.venv/bin/awscliv2 sso login \
