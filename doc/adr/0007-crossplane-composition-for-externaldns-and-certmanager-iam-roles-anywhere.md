@@ -918,6 +918,56 @@ migrates to a shared trust anchor pattern.
   crossplane cluster, with cert-manager as the in-cluster lifecycle manager on
   workload clusters.
 
+### Minimum security profile for Pattern D (single trust root)
+
+The controls below are mandatory for any deployment using Pattern D with a
+shared root trust anchor. Their purpose is to reduce cross-cluster impersonation
+and limit fleet-wide blast radius.
+
+MUST controls:
+- Unique trust domain per cluster.
+  - Every workload cluster must set `cert-manager-spiffe-csi-driver` `app.trustDomain`
+    to a cluster-unique DNS-derived value (for example,
+    `${subdomain}.${resolvedZoneName}`), never `cluster.local`.
+  - IAM policy rendering must consume `XDelegatedHostedZoneAWS.status.trustDomain`
+    as the source of truth for all `aws:PrincipalTag/x509SAN/URI` condition values.
+- Trust policy pinning to trust anchor.
+  - Every role trust policy must include both:
+    - `StringEquals` on `aws:PrincipalTag/x509SAN/URI`
+    - `ArnEquals` on `aws:SourceArn` equal to the expected trust anchor ARN.
+- Intermediate CA issuance constraints.
+  - step-ca certificate templates for intermediate CAs must enforce:
+    - `isCA: true`
+    - `maxPathLen: 0`
+    - URI SAN constrained to the requesting cluster trust domain
+    - CDP extension pointing to the step-ca CRL endpoint.
+- Revocation enforcement.
+  - IAM Roles Anywhere trust anchor must have CRL checking enabled.
+  - step-ca `/1.0/crl` must be reachable from AWS (for CDP-based checking), or
+    a tested imported-CRL sync process must exist.
+- Bootstrap token hardening.
+  - X5C bootstrap certificates must be short-lived (<= 1 hour), single-use,
+    and bound to the requesting cluster identity.
+  - Bootstrap credentials must be deleted immediately after intermediate CA issuance.
+
+SHOULD controls:
+- Use short intermediate CA lifetimes (for example, 7 to 30 days) with automated
+  renewal to limit compromise windows.
+- Restrict step-ca admin/API access with dedicated RBAC, network policy, and
+  auditable change controls.
+- Escalate selected high-assurance clusters to Pattern A (dedicated trust
+  anchor) where blast radius reduction outweighs object quota pressure.
+
+Verification gates (required evidence before production):
+- A cross-cluster negative test proves a certificate from Cluster A cannot
+  satisfy Cluster B IAM conditions (`CreateSession` denied).
+- A revoked intermediate CA certificate fails new `CreateSession` attempts
+  after CRL propagation.
+- Trust policy conformance check confirms all roles include both
+  `aws:PrincipalTag/x509SAN/URI` and `aws:SourceArn` conditions.
+- Bootstrap certificate lifecycle evidence confirms issuance TTL <= 1 hour,
+  single-use behavior, and post-issuance deletion.
+
 References:
 - IAM quotas: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_iam-quotas.html
 - IAM Roles Anywhere quotas: https://docs.aws.amazon.com/rolesanywhere/latest/userguide/quotas.html

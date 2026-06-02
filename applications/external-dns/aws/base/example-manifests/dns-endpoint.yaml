@@ -1,0 +1,12 @@
+apiVersion: externaldns.k8s.io/v1alpha1
+kind: DNSEndpoint
+metadata:
+  name: foo-crossplane-rye-ninja
+  namespace: external-dns
+spec:
+  endpoints:
+    - dnsName: foo.crossplane.rye.ninja
+      recordType: A
+      recordTTL: 300
+      targets:
+        - 10.5.10.10
