@@ -668,6 +668,46 @@ Key operational notes:
 cert-manager remains the in-cluster lifecycle manager for SVIDs; step-ca handles intermediate CA issuance and
 CRL generation on the crossplane cluster.
 
+#### Pattern D refinement: controlplane-hosted intermediate authorities
+
+To reduce key distribution and simplify revocation operations, we refine the
+Pattern D implementation profile so per-cluster intermediate CAs are hosted in
+step-ca on the crossplane controlplane cluster.
+
+Refined model:
+- step-ca creates and stores one intermediate CA per workload cluster in the
+  controlplane environment (intermediate private keys do not leave step-ca).
+- Workload clusters do not store intermediate CA private keys.
+- Workload clusters request workload leaf certificates (SVIDs) from step-ca via
+  step-issuer using authenticated bootstrap identity.
+- IAM Roles Anywhere continues to validate root -> intermediate -> SVID chains
+  against the shared root trust anchor.
+
+Required SPIFFE URI issuance controls for this profile:
+- step-ca authority/provisioner policy must enforce URI SAN allow-lists for
+  each cluster trust domain (no wildcard trust domains).
+- Issued workload SVIDs must match only approved SPIFFE path patterns:
+  - `spiffe://<trustDomain>/ns/external-dns/sa/external-dns`
+  - `spiffe://<trustDomain>/ns/cert-manager/sa/cert-manager`
+- Intermediate CA certificates must include URI name constraints that permit
+  only the cluster's SPIFFE URI subtree (`spiffe://<trustDomain>/`).
+- Requests outside the trust domain or outside approved namespace/serviceaccount
+  paths must be denied by step-ca policy.
+
+Migration note (from prior Pattern D wording):
+- Previous wording described workload-cluster-generated intermediate CA keys and
+  a CSR signing flow where only the intermediate certificate was returned.
+- The refined profile now hosts intermediate CAs in step-ca on the controlplane;
+  workload clusters request only leaf SVID issuance.
+- Implementation changes required for migration:
+  - Remove any workflow that exports or stores intermediate CA private keys on
+    workload clusters.
+  - Create one step-ca intermediate authority per cluster trust domain.
+  - Enforce URI name constraints on each intermediate (`spiffe://<trustDomain>/`).
+  - Enforce exact URI SAN allow-list policy for issued workload SVIDs.
+  - Update validation tests to include negative SAN tests and proof that
+    intermediate private keys are never present on workload clusters.
+
 ### IAM policy design: separate roles vs. ABAC single role
 
 IAM Roles Anywhere sets the certificate's URI SAN as a session tag on the
@@ -940,7 +980,13 @@ MUST controls:
     - `isCA: true`
     - `maxPathLen: 0`
     - URI SAN constrained to the requesting cluster trust domain
+    - URI name constraints permitting only `spiffe://<trustDomain>/` subtree
     - CDP extension pointing to the step-ca CRL endpoint.
+- SPIFFE URI allow-list enforcement.
+  - step-ca provisioner/authority policy must restrict issued workload URIs to:
+    - `spiffe://<trustDomain>/ns/external-dns/sa/external-dns`
+    - `spiffe://<trustDomain>/ns/cert-manager/sa/cert-manager`
+  - Any SAN request outside these exact paths must be rejected.
 - Revocation enforcement.
   - IAM Roles Anywhere trust anchor must have CRL checking enabled.
   - step-ca `/1.0/crl` must be reachable from AWS (for CDP-based checking), or
@@ -1015,8 +1061,9 @@ sequenceDiagram
 
 ### Diagram 2: Workload cluster intermediate CA bootstrap (Phase 4a)
 
-Per-cluster, one-time. The intermediate CA private key is generated on the
-workload cluster and never leaves it.
+Per-cluster, one-time. The intermediate CA is hosted in step-ca on the
+crossplane controlplane cluster. Workload clusters never receive intermediate
+CA private keys.
 
 ```mermaid
 sequenceDiagram
@@ -1026,7 +1073,7 @@ sequenceDiagram
     participant WC as Workload Cluster
     participant SI as step-issuer (workload)
     participant CM_WC as cert-manager (workload)
-    participant CSI as spiffe-csi-driver (workload)
+  participant CSI as spiffe-csi-driver (workload)
 
     Note over CP,CSI: Phase 4a - Per-cluster intermediate CA bootstrap
     CP->>CM_CP: Issue bootstrap Certificate (1h TTL, URI SAN: cluster trust domain)
@@ -1034,14 +1081,13 @@ sequenceDiagram
     CM_CP-->>CP: bootstrap cert Secret
     CP->>WC: Deliver bootstrap cert (via Crossplane Kubernetes provider)
     Note over WC: step-issuer deployed, pointing to step-ca
-    CM_WC->>CM_WC: Generate intermediate CA keypair (private key stays on workload cluster)
-    CM_WC->>SI: CertificateRequest (CSR + bootstrap cert as X5C token)
-    SI->>StepCA: Forward request with X5C authentication
-    StepCA->>StepCA: Validate X5C token (chain, validity period, trust domain policy)
-    StepCA->>StepCA: Sign intermediate CA cert (maxPathLen: 0, CDP: /1.0/crl)
-    StepCA-->>SI: signed certificate only (private key never transmitted)
-    SI-->>CM_WC: signed intermediate CA cert
-    CM_WC->>CSI: Configure csi-driver-spiffe-issuer (signed CA + local keypair)
+  SI->>StepCA: Enrollment request (bootstrap cert as X5C token)
+  StepCA->>StepCA: Validate X5C token (chain, validity period, trust domain policy)
+  StepCA->>StepCA: Create/store cluster intermediate CA (isCA=true, maxPathLen=0, nameConstraints)
+  StepCA->>StepCA: Configure URI allow-list for workload SVIDs in trust domain
+  StepCA-->>SI: Enrollment success (no intermediate private key returned)
+  SI->>CM_WC: Configure issuer reference to step-ca for workload leaf SVIDs
+  CM_WC->>CSI: Configure spiffe-csi-driver to request leaf certs via step-issuer
     Note over CP: Bootstrap cert TTL expires and is discarded
 ```
 
@@ -1053,6 +1099,7 @@ Per-pod SVID issuance and per-session AWS credential exchange at runtime.
 sequenceDiagram
     participant Pod as ExternalDNS / cert-manager Pod
     participant CSI as spiffe-csi-driver
+  participant SI as step-issuer (workload)
     participant CM_WC as cert-manager (workload)
     participant Helper as aws_signing_helper sidecar
     participant RAWS as IAM Roles Anywhere
@@ -1063,7 +1110,12 @@ sequenceDiagram
     Pod->>CSI: Mount /var/run/secrets/spiffe.io
     CSI->>CM_WC: CertificateRequest (URI SAN: spiffe://trustDomain/ns/namespace/sa/sa)
     CM_WC->>CM_WC: Approve via CertificateRequestPolicy
-    CM_WC->>CM_WC: Sign SVID with intermediate CA
+    CM_WC->>SI: Submit issuance request
+    SI->>StepCA: Request leaf SVID issuance
+    StepCA->>StepCA: Enforce URI allow-list + trust-domain policy
+    StepCA->>StepCA: Sign leaf SVID with cluster intermediate CA (hosted in step-ca)
+    StepCA-->>SI: signed leaf cert chain
+    SI-->>CM_WC: signed leaf cert chain
     CM_WC-->>CSI: cert + private key
     CSI-->>Pod: tls.crt + tls.key mounted
 
@@ -1083,6 +1135,48 @@ sequenceDiagram
     R53->>R53: Evaluate ABAC permission policy (StringEquals x509SAN/URI, scoped to hostedzone/zoneId)
     R53-->>Pod: API response
 ```
+
+### Example step-ca SPIFFE URI restriction profile (implementation guide)
+
+The examples below are normative for this ADR but intentionally simplified.
+Translate them into the exact step-ca configuration format used by your
+deployment tooling.
+
+Per-cluster authority requirements:
+- One intermediate authority per cluster trust domain.
+- Intermediate is a CA certificate with:
+  - `isCA: true`
+  - `maxPathLen: 0`
+  - URI name constraints permitting only `spiffe://<trustDomain>/`.
+
+Per-cluster SAN allow-list requirements:
+- Permit only these exact URI SAN values for workload SVID issuance:
+  - `spiffe://<trustDomain>/ns/external-dns/sa/external-dns`
+  - `spiffe://<trustDomain>/ns/cert-manager/sa/cert-manager`
+- Deny all other URI SAN requests.
+
+Illustrative policy intent (pseudo-configuration):
+
+```yaml
+clusterAuthorities:
+  - trustDomain: "<trustDomain>"
+    intermediate:
+      isCA: true
+      maxPathLen: 0
+      nameConstraints:
+        permittedURI:
+          - "spiffe://<trustDomain>/"
+    issuancePolicy:
+      allowedURISANs:
+        - "spiffe://<trustDomain>/ns/external-dns/sa/external-dns"
+        - "spiffe://<trustDomain>/ns/cert-manager/sa/cert-manager"
+      denyUnknownURISANs: true
+```
+
+Validation requirements:
+- A request for `spiffe://<trustDomain>/ns/default/sa/default` is rejected.
+- A request for `spiffe://other-domain/ns/external-dns/sa/external-dns` is rejected.
+- Requests matching the two approved URI SAN values succeed.
 
 ## Open Questions
 - [x] Can we limit the scope of the resources made accessible to cert-manager and ExternalDNS to only the specific Route53 hosted zone that is provisioned by the XDelegatedHostedZoneAWS composition?
@@ -1174,6 +1268,85 @@ kubectl api-resources | grep rolesanywhere
 profiles   rolesanywhere.aws.m.upbound.io/v1beta1   true    Profile
 ```
 
+Step-ca deployment plan (Helm chart inflated by Kustomize, controlplane HA):
+
+Database decision:
+- The step-ca persistence backend will be PostgreSQL deployed via
+  CloudNativePG (CNPG) on the controlplane cluster.
+- Managed external PostgreSQL remains an emergency fallback, but CNPG is the
+  default implementation target for this ADR.
+
+Repository structure:
+- Add `applications/cnpg/base/` to deploy the CNPG operator (Helm inflated by
+  Kustomize) and required namespace/policies.
+- Add `applications/step-ca-db/base/` for the CNPG `Cluster` resource,
+  bootstrap database/user/secret wiring, backup policy, and PDB.
+- Add `applications/step-ca/base/` with:
+  - `kustomization.yaml` using `helmCharts` to inflate the step-ca chart.
+  - `values.yaml` with production defaults and HA settings.
+  - `resources/namespace.yaml` for a dedicated namespace (`step-ca`).
+  - `patches/deployment.yaml` for fields not exposed by chart values.
+  - `patches/pod-disruption-budget.yaml` if PDB settings are not fully chart-configurable.
+- Add these resources to controlplane aggregation in
+  `clusters/crossplane/kustomization.yaml` in dependency order:
+  1. `../../applications/cnpg/base`
+  2. `../../applications/step-ca-db/base`
+  3. `../../applications/step-ca/base`
+
+Helm inflation requirements:
+- Use Kustomize `helmCharts` (same pattern used by other applications in this
+  repository) with pinned chart version.
+- Keep chart values in `values.yaml`; reserve Kustomize patches only for
+  settings not exposed by chart values.
+- Pin container images by digest where supported by chart values or via
+  Kustomize `images` overrides.
+
+High availability requirements:
+- Run step-ca with at least 3 replicas across failure domains.
+- Configure required pod anti-affinity and topology spread constraints so two
+  replicas do not co-locate on one node when alternatives exist.
+- Enforce a PodDisruptionBudget with `minAvailable: 2`.
+- Configure rolling update strategy with `maxUnavailable: 1`.
+- Configure startup, readiness, and liveness probes for all step-ca pods.
+- Use CNPG PostgreSQL as the HA shared state backend (no node-local storage).
+- CNPG cluster baseline:
+  - 3 PostgreSQL instances across failure domains.
+  - synchronous replication configured to tolerate one instance loss.
+  - backup policy enabled with tested restore path.
+- Store CA key material in Kubernetes secrets encrypted at rest and restrict
+  access via namespace-scoped RBAC and default-deny network policy.
+
+Operational hardening requirements:
+- Set resource requests/limits for deterministic scheduling.
+- Add `priorityClassName` aligned with controlplane criticality.
+- Expose metrics and logs for:
+  - certificate issuance success/failure rates
+  - provisioner authorization denials
+  - CRL generation/serve errors
+- Add alerting for quorum degradation (`availableReplicas < 2`) and repeated
+  issuance failures.
+
+Phased rollout:
+1. Deploy CNPG operator and validate CRDs/controllers healthy in test.
+2. Deploy `step-ca-db` CNPG `Cluster` and validate primary/replica readiness.
+3. Bootstrap namespace, secret material, and step-ca-to-PostgreSQL connectivity.
+4. Deploy step-ca with one replica and validate root/provisioner configuration.
+5. Scale step-ca to 3 replicas and validate HA behavior during pod/node disruption.
+6. Enable step-issuer integration from a workload cluster and validate allowed and denied URI SAN requests.
+7. Promote to production with canary cluster first, then fleet rollout.
+
+Definition of done for this plan:
+- Kustomize render includes step-ca manifests from Helm inflation with pinned
+  chart version and reviewed values.
+- Kustomize render includes CNPG operator, `step-ca-db` CNPG cluster, and
+  step-ca manifests in dependency order.
+- A disruption test demonstrates no issuance outage during single pod restart
+  and single node drain.
+- A CNPG failover test demonstrates step-ca remains available through primary
+  PostgreSQL failover.
+- Negative URI SAN tests are enforced by policy (out-of-allow-list requests denied).
+- CRL endpoint remains reachable during rolling updates.
+
 - [x] Provision one AWS IAM Roles Anywhere TrustAnchor out-of-band
   (AWS CLI or Terraform) using the `csi-driver-spiffe-ca` certificate bundle.
 - [ ] Follow and validate
@@ -1187,14 +1360,23 @@ profiles   rolesanywhere.aws.m.upbound.io/v1beta1   true    Profile
 - [x] Wire claims to consume the shared `trustAnchorArn` automatically from
   platform configuration instead of requiring manual `spec.trustAnchorArn`
   values.
+- [ ] Deploy CloudNativePG (CNPG) operator on the controlplane cluster using
+  Kustomize Helm chart inflation.
+- [ ] Deploy a dedicated CNPG PostgreSQL cluster for step-ca (`step-ca-db`)
+  with HA replication and backup policy.
 - [ ] Deploy [step-ca](https://github.com/smallstep/certificates) on the
   crossplane cluster:
   - Configure the root CA using the `csi-driver-spiffe-ca` keypair.
   - Enable the **X5C provisioner**: clients authenticate CSRs by presenting a
     short-lived bootstrap certificate signed by the root CA.
   - Configure **certificate templates** to enforce `isCA: true`,
-    `maxPathLen: 0`, and the cluster trust domain as a URI SAN on all issued
+    `maxPathLen: 0`, the cluster trust domain as a URI SAN, and URI name
+    constraints permitting only `spiffe://<trustDomain>/` on all issued
     intermediate CA certificates.
+  - Configure provisioner/authority policy to allow only approved workload
+    URI SANs per cluster trust domain:
+    - `spiffe://<trustDomain>/ns/external-dns/sa/external-dns`
+    - `spiffe://<trustDomain>/ns/cert-manager/sa/cert-manager`
   - Expose the CRL endpoint (`/1.0/crl`) via an ingress or LoadBalancer so
     IAM Roles Anywhere can perform CDP-based revocation checking.
 - [ ] Deploy [step-issuer](https://github.com/smallstep/step-issuer) on the
@@ -1213,6 +1395,8 @@ Acceptance criteria:
   validated via AWS API in a test environment.
 - [x] Claims consume the shared `trustAnchorArn` automatically from platform
   configuration instead of requiring manual `spec.trustAnchorArn` values.
+- [ ] CNPG operator and step-ca PostgreSQL cluster are healthy in test and
+  satisfy HA baseline (3 instances, one-instance disruption tolerated).
 - [ ] step-ca X5C provisioner rejects CSRs not authenticated by a valid
   bootstrap certificate.
 - [ ] A test intermediate CA certificate issued by step-ca chains to
@@ -1293,21 +1477,23 @@ Acceptance criteria:
 
 ### Phase 4: Workload cluster bootstrap and workload integration
 
-#### Per-cluster intermediate CA bootstrap (Pattern D)
+#### Per-cluster intermediate CA bootstrap (Pattern D, refined controlplane-hosted profile)
 - [ ] Crossplane issues a short-lived (e.g., 1h) X5C bootstrap certificate to
   the new workload cluster, signed by `csi-driver-spiffe-ca`, containing the
   cluster's trust domain as a URI SAN.
 - [ ] Deploy step-issuer on the workload cluster, configured to reach step-ca
   on the crossplane cluster.
-- [ ] cert-manager generates an intermediate CA keypair on the workload cluster
-  (private key never leaves the cluster) and submits a `CertificateRequest`
-  to step-issuer, presenting the bootstrap certificate as the X5C
-  authentication token.
-- [ ] step-ca validates the X5C token and signs the intermediate CA certificate
-  with `maxPathLen: 0` and the cluster trust domain embedded.
-- [ ] `cert-manager-spiffe-issuer` is configured to use the locally generated
-  keypair and the signed intermediate CA to issue SVIDs to workloads.
-- [ ] Bootstrap certificate expires and is discarded after signing.
+- [ ] step-ca provisions and stores one intermediate CA per workload cluster in
+  the controlplane environment (intermediate private key remains in step-ca).
+- [ ] step-ca intermediate template enforces `isCA: true`, `maxPathLen: 0`,
+  cluster trust domain URI SAN, and URI name constraints for
+  `spiffe://<trustDomain>/`.
+- [ ] step-ca provisioner/authority policy enforces exact workload URI SAN
+  allow-list for cert-manager and ExternalDNS service accounts within the
+  cluster trust domain.
+- [ ] Workload clusters request leaf SVIDs through step-issuer; step-ca denies
+  URI SANs outside approved trust domain and serviceaccount paths.
+- [ ] Bootstrap certificate expires and is discarded after enrollment.
 
 #### Workload integration (ExternalDNS and cert-manager)
 - [ ] Configure `cert-manager-spiffe-csi-driver` on each workload cluster
@@ -1341,9 +1527,12 @@ Acceptance criteria:
   pattern that workload integrations can follow.
 - [ ] ExternalDNS can create/update/delete records only in delegated zones.
 - [ ] CertManager DNS01 challenges succeed only in delegated zones.
-- [ ] Intermediate CA on workload cluster chains to `csi-driver-spiffe-ca`.
+- [ ] Intermediate CA hosted in step-ca chains to `csi-driver-spiffe-ca` and
+  is not exported to workload clusters.
 - [ ] Bootstrap certificate is single-use and expires before the intermediate
   CA certificate does.
+- [ ] step-ca rejects certificate requests whose URI SAN is outside the
+  approved SPIFFE URI allow-list for the cluster.
 
 ### Phase 5: Validation and release
 - [ ] Add conformance tests for:
