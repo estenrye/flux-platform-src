@@ -40,6 +40,8 @@
     "flux": true,
     "kubectl -n external-dns": true,
     "true": true,
-    "git remote": true
+    "git remote": true,
+    "git rev-parse": true,
+    "gh": true
   }
 }
