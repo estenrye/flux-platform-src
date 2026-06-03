@@ -1,17 +1,29 @@
 {
-  "terminal.integrated.defaultProfile.linux": "bash (venv)",
+  "terminal.integrated.defaultProfile.linux": "bash",
   "terminal.integrated.profiles.linux": {
     "bash (venv)": {
       "path": "bash",
       "args": ["--init-file", "./.bin/.bashrc"]
+    },
+    "zsh": {
+      "path": "zsh",
+      "env": {
+        "ZDOTDIR": "${workspaceFolder}/.bin"
+      }
     }
   },
-  "terminal.integrated.defaultProfile.osx": "bash (venv)",
+  "terminal.integrated.defaultProfile.osx": "zsh",
   "terminal.integrated.profiles.osx": {
+    "zsh": {
+      "path": "zsh",
+      "env": {
+        "ZDOTDIR": "${workspaceFolder}/.bin"
+      }
+    },
     "bash (venv)": {
       "path": "bash",
       "args": ["--init-file", "./.bin/.bashrc"]
-    }
+    },
   },
   "chat.tools.terminal.autoApprove": {
     "make": true,
