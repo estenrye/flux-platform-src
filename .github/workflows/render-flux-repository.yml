@@ -166,6 +166,8 @@ jobs:
     needs: [push-cluster]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
