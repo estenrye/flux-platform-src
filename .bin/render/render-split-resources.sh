@@ -43,11 +43,14 @@ for raw_doc in raw_docs:
 
     kind_lower = kind.lower()
 
+    # Sanitize name: colons and other filesystem-invalid chars break artifact uploads
+    safe_name = re.sub(r'[:"<>|*?\r\n]', '_', name)
+
     # Build filename: omit apiGroup for core API resources (no group)
     if api_group:
-        filename = f"{api_group}_{api_ver}_{kind_lower}_{name}.yaml"
+        filename = f"{api_group}_{api_ver}_{kind_lower}_{safe_name}.yaml"
     else:
-        filename = f"{api_ver}_{kind_lower}_{name}.yaml"
+        filename = f"{api_ver}_{kind_lower}_{safe_name}.yaml"
 
     # Namespaced vs cluster-scoped path
     if namespace:

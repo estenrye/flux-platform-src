@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make render-deps *)",
+      "Bash(gh auth *)",
+      "Bash(GITHUB_TOKEN=$\\(gh auth token\\) make render-manifests)",
+      "Bash(make lint-deps *)",
+      "Bash(make lint-checkov *)",
+      "Bash(make lint-kube-linter *)",
+      "Bash(gh run *)",
+      "Bash(git check-ignore *)"
+    ]
+  }
+}
