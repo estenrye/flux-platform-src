@@ -4,6 +4,10 @@ metadata:
   name: flux-platform
   namespace: flux-system
 spec:
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
   interval: 10m0s
   path: ./clusters/crossplane
   prune: true
