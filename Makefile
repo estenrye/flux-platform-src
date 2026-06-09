@@ -128,3 +128,6 @@ bootstrap-github-app:
 bootstrap-ci:
 	.bin/bootstrap-ci.sh
 
+bootstrap-cluster-catalog:
+	CLUSTER=$(CLUSTER) KUBECONFIG=$(KUBECONFIG) .bin/bootstrap-cluster-catalog.sh
+
