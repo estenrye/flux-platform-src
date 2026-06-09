@@ -131,3 +131,6 @@ bootstrap-ci:
 bootstrap-cluster-catalog:
 	CLUSTER=$(CLUSTER) KUBECONFIG=$(KUBECONFIG) .bin/bootstrap-cluster-catalog.sh
 
+bootstrap-cluster-environment:
+	CLUSTER=$(CLUSTER) .bin/bootstrap-cluster-environment.sh
+
