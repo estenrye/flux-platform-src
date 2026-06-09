@@ -1,3 +1,6 @@
+# Prevent gh CLI from opening a pager (less/more) for API responses
+export GH_PAGER=cat
+
 render-deps:
 	mkdir -p .venv/bin
 	.bin/install-adr.sh
@@ -115,3 +118,10 @@ aws-enable-rolesanywhere-profile:
 		--profile-id $(PROFILE_ID) \
 		--profile ops-opex-dns-automation \
 		--region us-east-2
+
+bootstrap-access:
+	.bin/bootstrap-access.sh
+
+bootstrap-github-app:
+	.bin/bootstrap-github-app.sh
+
