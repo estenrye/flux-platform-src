@@ -125,3 +125,6 @@ bootstrap-access:
 bootstrap-github-app:
 	.bin/bootstrap-github-app.sh
 
+bootstrap-ci:
+	.bin/bootstrap-ci.sh
+
