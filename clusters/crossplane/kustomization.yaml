@@ -27,6 +27,7 @@ resources:
   - ../../applications/crossplane-resources/delegated-hosted-zone-aws
   - ../../applications/flux/base
   - ../../applications/external-secrets-operator/base
+  - resources/eso.service-account-secret.yaml
   - resources/eso.cluster-secret-store.yaml
   - resources/eso.external-secret.github.yaml
   - resources/eso.external-secret.cloudflare.yaml

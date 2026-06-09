@@ -140,6 +140,7 @@ setup_binary() {
     info "Extracting tarball to ${TMP_DIR}"
     tar -xzvf "${TMP_BIN}" -C "${TMP_DIR}"
     info "Installing adr to ${BIN_DIR}"
+    mkdir -p "${BIN_DIR}"
     cp ${TMP_DIR}/npryce-adr-tools-*/src/* "${BIN_DIR}/"
 }
 

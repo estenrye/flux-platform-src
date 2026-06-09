@@ -2,72 +2,185 @@ name: Render Flux Repository
 
 on:
   push:
-    branches: [ main ]
     paths:
       - 'applications/**'
       - 'clusters/**'
   pull_request:
-    branches: [ main ]
+    types: [opened, synchronize, reopened]
     paths:
       - 'applications/**'
       - 'clusters/**'
-  workflow_dispatch:
 
 jobs:
-  render:
+  discover:
     runs-on: ubuntu-latest
-    
+    outputs:
+      clusters: ${{ steps.discover.outputs.clusters }}
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Configure 1Password Service Account
-      uses: 1password/load-secrets-action@v2
-      id: load-secrets
-      with:
-        export-env: true
-      env:
-        OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-        RENDER_GITHUB_TOKEN: "op://wvraeffbmpocy5jpzwgyerj3qi/4gs3fu4ul3ei2wrbgmw36c3kbu/token"
+      - uses: actions/checkout@v4
 
-    - name: Get branch name
-      id: get-branch
-      run: |
-        if [ "${{ github.event_name }}" == "pull_request" ]; then
-          # For PRs, use the source branch (head)
-          echo "BRANCH_NAME=${{ github.head_ref }}" >> $GITHUB_OUTPUT
-        else
-          # For pushes, extract the short name from GITHUB_REF
-          echo "BRANCH_NAME=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
-        fi
+      - name: Discover clusters
+        id: discover
+        run: |
+          clusters=$(bash .bin/render/render-discover-clusters.sh | jq -c .)
+          echo "clusters=${clusters}" >> "$GITHUB_OUTPUT"
 
-    - name: Install dependencies
-      run: make render-deps
+  render-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Run make render
-      run: make render
-      env:
-        GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
-        RENDER_GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
-        SOURCE_BRANCH_NAME: ${{ steps.get-branch.outputs.BRANCH_NAME }}
+      - name: Install render deps
+        run: make render-deps
 
-    - name: Lint with checkov
-      run: make lint-checkov
-      env:
-        GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
-        RENDER_GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
-    
-    - name: Lint with kube-linter
-      run: make lint-kube-linter
-      env:
-        GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
-        RENDER_GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
-    
-    - name: Push rendered changes and create PR
-      if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
-      run: make push-pr
-      env:
-        GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
-        RENDER_GITHUB_TOKEN: ${{ env.RENDER_GITHUB_TOKEN }}
-        RENDER_GIT_USER_NAME: ${{ vars.RENDER_GIT_USER_NAME }}
-        RENDER_GIT_USER_EMAIL: ${{ vars.RENDER_GIT_USER_EMAIL }}
+      - name: Render manifests
+        run: make render-manifests
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Lint with checkov
+        run: make lint-checkov
+
+      - name: Lint with kube-linter
+        run: make lint-kube-linter
+
+      - name: Stage rendered manifests for upload
+        run: cp -r .render/flux-platform-rendered/ /tmp/rendered-manifests/
+
+      - name: Upload rendered manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-manifests
+          path: /tmp/rendered-manifests/
+          retention-days: 1
+
+  push-cluster:
+    needs: [discover, render-and-lint]
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    strategy:
+      matrix:
+        cluster: ${{ fromJSON(needs.discover.outputs.clusters) }}
+      fail-fast: false
+    environment: ${{ matrix.cluster.environment }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure 1Password Service Account
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          RENDER_APP_PRIVATE_KEY: "op://flux-platform-src/render-flux-platform-src-app/private-key"
+          RENDER_APP_ID: "op://flux-platform-src/render-flux-platform-src-app/app-id"
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ env.RENDER_APP_ID }}
+          private-key: ${{ env.RENDER_APP_PRIVATE_KEY }}
+          owner: ${{ matrix.cluster.rendered_repo_owner }}
+          repositories: ${{ matrix.cluster.rendered_repo_name }}
+
+      - name: Download rendered manifests
+        uses: actions/download-artifact@v4
+        with:
+          name: rendered-manifests
+          path: .render/source-manifests/
+
+      - name: Clone rendered repository
+        run: bash .bin/render/render-put-target-repository-clone.sh
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RENDER_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          TARGET_REPO_OWNER: ${{ matrix.cluster.rendered_repo_owner }}
+          TARGET_REPO_NAME: ${{ matrix.cluster.rendered_repo_name }}
+
+      - name: Create render branch
+        run: bash .bin/render/render-put-target-repository-branch.sh
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TARGET_REPO_OWNER: ${{ matrix.cluster.rendered_repo_owner }}
+          TARGET_REPO_NAME: ${{ matrix.cluster.rendered_repo_name }}
+
+      - name: Install adr-tools
+        run: .bin/install-adr.sh
+
+      - name: Copy tooling into rendered repository
+        run: bash .bin/render/render-bin.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          TARGET_REPO_OWNER: ${{ matrix.cluster.rendered_repo_owner }}
+          TARGET_REPO_NAME: ${{ matrix.cluster.rendered_repo_name }}
+
+      - name: Copy rendered content into rendered repository
+        run: bash .bin/render/render-put-target-repository-content.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          RENDER_SOURCE_NAME: source-manifests
+          TARGET_REPO_NAME: ${{ matrix.cluster.rendered_repo_name }}
+          CLUSTER_NAME: ${{ matrix.cluster.name }}
+
+      - name: Commit and push to rendered repository
+        run: bash .bin/render/render-put-target-repository-push.sh
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RENDER_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          TARGET_REPO_OWNER: ${{ matrix.cluster.rendered_repo_owner }}
+          TARGET_REPO_NAME: ${{ matrix.cluster.rendered_repo_name }}
+          RENDER_GIT_USER_NAME: ${{ vars.RENDER_GIT_USER_NAME }}
+          RENDER_GIT_USER_EMAIL: ${{ vars.RENDER_GIT_USER_EMAIL }}
+
+      - name: Create or update rendered PR
+        id: create-pr
+        run: bash .bin/render/render-put-target-repository-pr.sh
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RENDER_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          TARGET_REPO_OWNER: ${{ matrix.cluster.rendered_repo_owner }}
+          TARGET_REPO_NAME: ${{ matrix.cluster.rendered_repo_name }}
+          SOURCE_PR_URL: ${{ github.event.pull_request.html_url }}
+          SOURCE_PR_TITLE: ${{ github.event.pull_request.title }}
+          AUTO_MERGE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+      - name: Save rendered PR URL
+        run: |
+          mkdir -p /tmp/rendered-prs
+          printf '%s|%s' \
+            "${{ matrix.cluster.name }}" \
+            "${{ steps.create-pr.outputs.rendered_pr_url }}" \
+            > "/tmp/rendered-prs/${{ matrix.cluster.name }}.txt"
+
+      - name: Upload rendered PR URL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-pr-${{ matrix.cluster.name }}
+          path: /tmp/rendered-prs/${{ matrix.cluster.name }}.txt
+          retention-days: 1
+
+  update-source-pr:
+    needs: [push-cluster]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all rendered PR artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: rendered-pr-*
+          path: /tmp/rendered-prs/
+          merge-multiple: true
+
+      - name: Update source PR with rendered PR links
+        run: bash .bin/render/render-put-source-repository-pr-links.sh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_PR_NUMBER: ${{ github.event.pull_request.number }}
+          RENDERED_PRS_DIR: /tmp/rendered-prs/
