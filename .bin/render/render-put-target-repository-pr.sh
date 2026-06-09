@@ -11,6 +11,9 @@ TARGET_REPO_OWNER=${TARGET_REPO_OWNER:-$(${SCRIPTS_DIR}/render/render-get-source
 TARGET_REPO_NAME=${TARGET_REPO_NAME:-flux-platform-rendered}
 TARGET_REPO_BASE_BRANCH=${TARGET_REPO_BASE_BRANCH:-main}
 GH_TOKEN=${RENDER_GITHUB_TOKEN:-${GITHUB_TOKEN:-$(gh auth token)}}
+SOURCE_PR_URL=${SOURCE_PR_URL:-}
+SOURCE_PR_TITLE=${SOURCE_PR_TITLE:-}
+AUTO_MERGE=${AUTO_MERGE:-false}
 
 BRANCH_NAME="rendered/${SOURCE_REPO_OWNER}/${SOURCE_REPO_NAME}/${SOURCE_REPO_BRANCH}"
 PR_TITLE=${PR_TITLE:-"Render ${SOURCE_REPO_NAME}/${SOURCE_REPO_BRANCH}"}
@@ -24,36 +27,25 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 1
 fi
 
-generate_copilot_summary() {
-  local prompt
-
-  prompt=$(cat <<EOF
-Summarize the rendered changes in this repository for a pull request body.
-Use only the current git diff versus origin/${TARGET_REPO_BASE_BRANCH}.
-Return markdown only as 3 to 6 concise bullet points.
-Do not include a title, intro sentence, code fences, or the source commit link.
-EOF
-)
-
-  gh copilot -p "${prompt}" --allow-tool 'shell(git)'
-}
-
 echo "Creating Pull Request for branch: ${BRANCH_NAME}"
 
 pushd "${RENDER_DIR}/${TARGET_REPO_NAME}" > /dev/null || exit 1
 git fetch origin "${TARGET_REPO_BASE_BRANCH}" --depth 1
 
 PR_BODY_FILE=$(mktemp)
-cleanup() {
-  rm -f "${PR_BODY_FILE}"
-}
+cleanup() { rm -f "${PR_BODY_FILE}"; }
 trap cleanup EXIT
 
-COPILOT_SUMMARY=$(generate_copilot_summary)
-
 {
-  printf 'Source commit: [%s](%s)\n\n' "${SOURCE_COMMIT_LABEL}" "${SOURCE_COMMIT_URL}"
-  printf '%s\n' "${COPILOT_SUMMARY}"
+  if [ -n "${SOURCE_PR_URL}" ]; then
+    SOURCE_PR_NUMBER=$(echo "${SOURCE_PR_URL}" | grep -oE '[0-9]+$')
+    if [ -n "${SOURCE_PR_TITLE}" ]; then
+      printf 'Source PR: [#%s %s](%s)\n' "${SOURCE_PR_NUMBER}" "${SOURCE_PR_TITLE}" "${SOURCE_PR_URL}"
+    else
+      printf 'Source PR: [#%s](%s)\n' "${SOURCE_PR_NUMBER}" "${SOURCE_PR_URL}"
+    fi
+  fi
+  printf 'Source commit: [%s](%s)\n' "${SOURCE_COMMIT_LABEL}" "${SOURCE_COMMIT_URL}"
 } > "${PR_BODY_FILE}"
 
 EXISTING_PR_NUMBER=$(gh pr list \
@@ -68,14 +60,26 @@ if [ -n "${EXISTING_PR_NUMBER}" ]; then
     --repo "${TARGET_REPO_OWNER}/${TARGET_REPO_NAME}" \
     --title "${PR_TITLE}" \
     --body-file "${PR_BODY_FILE}"
-  gh pr view "${EXISTING_PR_NUMBER}" --repo "${TARGET_REPO_OWNER}/${TARGET_REPO_NAME}" --json url --jq '.url'
+  PR_URL=$(gh pr view "${EXISTING_PR_NUMBER}" \
+    --repo "${TARGET_REPO_OWNER}/${TARGET_REPO_NAME}" \
+    --json url --jq '.url')
 else
-  gh pr create \
+  PR_URL=$(gh pr create \
     --repo "${TARGET_REPO_OWNER}/${TARGET_REPO_NAME}" \
     --base "${TARGET_REPO_BASE_BRANCH}" \
     --head "${BRANCH_NAME}" \
     --title "${PR_TITLE}" \
-    --body-file "${PR_BODY_FILE}"
+    --body-file "${PR_BODY_FILE}")
+fi
+
+echo "rendered_pr_url=${PR_URL}" >> "${GITHUB_OUTPUT:-/dev/null}"
+
+if [ "${AUTO_MERGE}" = "true" ]; then
+  PR_NUMBER=$(echo "${PR_URL}" | grep -oE '[0-9]+$')
+  gh pr merge "${PR_NUMBER}" \
+    --repo "${TARGET_REPO_OWNER}/${TARGET_REPO_NAME}" \
+    --squash \
+    --auto
 fi
 
 popd > /dev/null || exit 1

@@ -22,8 +22,8 @@ mkdir -p ${RENDER_DIR}/${TARGET_REPO_NAME}/doc/adr
 cp ${BASE_DIR}/doc/adr/0001-record-architecture-decisions.md ${RENDER_DIR}/${TARGET_REPO_NAME}/doc/adr/
 
 pushd ${SCRIPTS_DIR}
-adr generate toc \
-  | sed 's#](#](https://github.com/estenrye/flux-platform-src/blob/main/doc/adr/#g' \
+PATH="${BASE_DIR}/.venv/bin:${PATH}" adr generate toc \
+  | sed "s#](#](https://github.com/${SOURCE_REPO}/blob/main/doc/adr/#g" \
   | sed "1s|^# |# ${SOURCE_REPO} |" \
   > ${RENDER_DIR}/${TARGET_REPO_NAME}/doc/adr/0002-source-repo-adr-index.md
 popd

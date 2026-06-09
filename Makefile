@@ -11,6 +11,9 @@ lint-deps:
 	.bin/install-kube-linter.sh
 	.bin/install-checkov.sh
 
+render-manifests: render-deps
+	.bin/render-manifests.sh
+
 render: render-deps
 	export GITHUB_TOKEN=$${GITHUB_TOKEN:-$$(gh auth token)}; \
 	export RENDER_GITHUB_TOKEN=$${RENDER_GITHUB_TOKEN:-$$(gh auth token)}; \
@@ -137,3 +140,37 @@ bootstrap-cluster-environment:
 bootstrap-cluster-rendered-repo:
 	CLUSTER=$(CLUSTER) .bin/bootstrap-cluster-rendered-repo.sh
 
+bootstrap-cluster-sops-key:
+	CLUSTER=$(CLUSTER) .bin/bootstrap-cluster-sops-key.sh
+
+bootstrap-cluster-deploy-key:
+	CLUSTER=$(CLUSTER) .bin/bootstrap-cluster-deploy-key.sh
+
+deploy-cluster:
+	CLUSTER=$(CLUSTER) .bin/deploy-cluster.sh
+
+bootstrap-cluster: bootstrap-cluster-catalog bootstrap-cluster-environment bootstrap-cluster-rendered-repo bootstrap-cluster-sops-key
+
+oci-kubeconfig:
+	@.bin/oci-kubeconfig.sh
+
+teardown-cluster:
+	CLUSTER=$(CLUSTER) SKIP_K8S=$(SKIP_K8S) .bin/teardown-cluster.sh
+
+teardown-cluster-full:
+	CLUSTER=$(CLUSTER) SKIP_K8S=$(SKIP_K8S) .bin/teardown-cluster.sh --full
+
+rotate-cluster-deploy-key:
+	CLUSTER=$(CLUSTER) .bin/rotate-cluster-deploy-key.sh
+
+rotate-cluster-service-account-token:
+	CLUSTER=$(CLUSTER) .bin/rotate-cluster-service-account-token.sh
+
+rotate-cluster-sops-key:
+	CLUSTER=$(CLUSTER) .bin/rotate-cluster-sops-key.sh
+
+rotate-github-app-credentials:
+	.bin/rotate-github-app-credentials.sh
+
+rotate-ci-service-account:
+	.bin/rotate-ci-service-account.sh

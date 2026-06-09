@@ -43,8 +43,6 @@ git commit \
   -m "Render ${SOURCE_REPO_NAME}/${SOURCE_REPO_BRANCH}" \
   -m "Commit: ${SOURCE_REPO_COMMIT_HASH}"
 
-# This branch is automation-owned and can be rewritten between runs.
-# Fetch first so --force-with-lease validates we are not clobbering an unseen update.
-git fetch origin ${BRANCH_NAME} --depth 1 >/dev/null 2>&1 || true
-git push --force-with-lease origin ${BRANCH_NAME}
+# This branch is automation-owned and is always rewritten from scratch each run.
+git push --force origin ${BRANCH_NAME}
 popd > /dev/null || exit 1
