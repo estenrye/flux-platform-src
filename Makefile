@@ -134,3 +134,6 @@ bootstrap-cluster-catalog:
 bootstrap-cluster-environment:
 	CLUSTER=$(CLUSTER) .bin/bootstrap-cluster-environment.sh
 
+bootstrap-cluster-rendered-repo:
+	CLUSTER=$(CLUSTER) .bin/bootstrap-cluster-rendered-repo.sh
+
