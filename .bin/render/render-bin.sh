@@ -18,12 +18,13 @@ mkdir -p ${RENDER_DIR}/${TARGET_REPO_NAME}/.venv-checkov
 cp ${BASE_DIR}/.venv/.gitignore ${RENDER_DIR}/${TARGET_REPO_NAME}/.venv/.gitignore
 cp ${BASE_DIR}/.venv-checkov/.gitignore ${RENDER_DIR}/${TARGET_REPO_NAME}/.venv-checkov/.gitignore
 
-mkdir -p ${RENDER_DIR}/${TARGET_REPO_NAME}/doc/adr
-cp ${BASE_DIR}/doc/adr/0001-record-architecture-decisions.md ${RENDER_DIR}/${TARGET_REPO_NAME}/doc/adr/
+mkdir -p ${RENDER_DIR}/${TARGET_REPO_NAME}/docs/adr
+cp ${BASE_DIR}/docs/adr/0001-record-architecture-decisions.md ${RENDER_DIR}/${TARGET_REPO_NAME}/docs/adr/
+cp ${BASE_DIR}/.adr-dir ${RENDER_DIR}/${TARGET_REPO_NAME}/.adr-dir
 
 pushd ${SCRIPTS_DIR}
 PATH="${BASE_DIR}/.venv/bin:${PATH}" adr generate toc \
-  | sed "s#](#](https://github.com/${SOURCE_REPO}/blob/main/doc/adr/#g" \
+  | sed "s#](#](https://github.com/${SOURCE_REPO}/blob/main/docs/adr/#g" \
   | sed "1s|^# |# ${SOURCE_REPO} |" \
-  > ${RENDER_DIR}/${TARGET_REPO_NAME}/doc/adr/0002-source-repo-adr-index.md
+  > ${RENDER_DIR}/${TARGET_REPO_NAME}/docs/adr/0002-source-repo-adr-index.md
 popd
