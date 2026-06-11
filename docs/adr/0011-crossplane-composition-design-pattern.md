@@ -71,6 +71,9 @@ Every composition must surface the values downstream automation needs in
 ```yaml
 status:
   iamRoleArn: arn:aws:iam::123456789:role/crossplane-<subdomain>
+  nameServers:
+    - ns-1.awsdns-01.org
+    - ns-2.awsdns-02.co.uk
   profileArn: arn:aws:rolesanywhere::123456789:profile/<uuid>
   trustAnchorArn: arn:aws:rolesanywhere::123456789:trust-anchor/<uuid>
   trustDomain: <subdomain>.<zoneName>
