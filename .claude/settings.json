@@ -8,7 +8,11 @@
       "Bash(make lint-checkov *)",
       "Bash(make lint-kube-linter *)",
       "Bash(gh run *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(xargs ls -la)",
+      "Bash(xargs cat)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
