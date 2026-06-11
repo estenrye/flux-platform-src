@@ -1,6 +1,6 @@
 # 1. Record architecture decisions
 
-Date: 2026-01-19
+Date: 2026-06-10
 
 ## Status
 
