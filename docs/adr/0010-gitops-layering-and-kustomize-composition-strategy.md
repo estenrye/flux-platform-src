@@ -38,11 +38,18 @@ applications/
       base/
         kustomization.yaml   # patches or additions specific to that provider
     catalog.yaml             # required — Backstage component metadata (see ADR-18)
+                             # Place at the application root, or in base/ if the
+                             # application uses no provider variants
 ```
 
 Provider variants are peer directories to `base/`, not nested inside it. A
 `base/` overlay applies everywhere; a provider variant applies only when
 explicitly included by a cluster kustomization.
+
+Simple applications with no provider variants may omit `base/` and place
+`kustomization.yaml` directly in the application root (e.g., `priority-classes/`).
+Use `base/` when the application has provider-specific variants or multiple
+overlay targets.
 
 ### Cluster entry point
 
@@ -50,6 +57,28 @@ explicitly included by a cluster kustomization.
 It lists each component's `applications/<name>/base` (and any provider variants
 appropriate to that cluster) as a resource. Flux reconciles this file as the
 root `Kustomization` for the cluster.
+
+### Grouping related providers
+
+When multiple tightly related components share the same configuration pattern
+(e.g., Crossplane provider packages), they may be grouped under a single parent
+directory without a top-level `base/`. Each sub-component has its own
+`kustomization.yaml` at its root. Example:
+
+```
+applications/
+  crossplane-providers/
+    provider-aws-route53/
+      kustomization.yaml
+      resources/
+    provider-aws-iam/
+      kustomization.yaml
+      resources/
+```
+
+The parent directory (`crossplane-providers/`) does not need its own
+`kustomization.yaml`; the cluster kustomization references each sub-component
+directly.
 
 ### Naming conventions
 
@@ -63,7 +92,8 @@ root `Kustomization` for the cluster.
 
 ### Adding a new application
 
-1. Create `applications/<name>/base/kustomization.yaml` listing all resources.
+1. Create `applications/<name>/base/kustomization.yaml` listing all resources,
+   or `applications/<name>/kustomization.yaml` for simple single-variant applications.
 2. Add `applications/<name>/catalog.yaml` with required Backstage metadata
    (see ADR-18).
 3. Add a network policy exception for the component (see ADR-17).
