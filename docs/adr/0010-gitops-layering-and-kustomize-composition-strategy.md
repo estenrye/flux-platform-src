@@ -105,8 +105,7 @@ directly.
 
 ## Consequences
 
-- Every component must have a `base/` directory with a `kustomization.yaml`.
-  Components without one will be silently ignored by Kustomize.
+- Every component must have a `kustomization.yaml` — either at `base/kustomization.yaml` for multi-variant applications or at the application root for simple single-variant applications. Components without one will be silently ignored by Kustomize.
 - A component added to `applications/` but not listed in any
   `clusters/*/kustomization.yaml` is never deployed. This is intentional for
   components that are work-in-progress.
