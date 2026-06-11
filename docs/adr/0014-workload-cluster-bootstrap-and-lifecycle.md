@@ -28,53 +28,86 @@ infrastructure provisioned by the control plane cluster.
 We bootstrap workload clusters using a defined sequence executed via scripts
 in the `.bin/` directory. The sequence is:
 
-### Phase 1: Cluster provisioning
+### Phase 1: Cluster provisioning and initial deployment
 
 Provision the Kubernetes cluster using the appropriate provider tooling
 (e.g., `spotctl` for Rackspace Spot, `eksctl` for AWS EKS, `talosctl` for
 Talos Linux). The cluster must be reachable via `kubectl` before proceeding.
 
-Key scripts:
-- `.bin/bootstrap-cluster.sh` — interactive bootstrap wizard
-- `.bin/deploy-cluster.sh` — non-interactive deployment for known cluster configs
+Deploy the cluster configuration (Kustomize manifests) to establish platform
+baseline components:
+
+```bash
+.bin/deploy-cluster.sh
+```
+
+This script:
+- Uses `kustomize build` to render manifests from the cluster directory
+- Applies them server-side to the cluster using `kubectl apply --server-side`
+- Installs Flux via the `applications/flux/base/kustomization.yaml` resource,
+  which references the official Flux v2 release manifest
+- Retries with configurable timeout and interval until all resources are
+  deployed successfully
+
+At this point, the `flux-system` namespace is created and Flux controllers
+are running.
 
 ### Phase 2: SOPS key delivery
 
 Each cluster needs the age private key to decrypt SOPS-encrypted secrets
-committed to the rendered repository:
+committed to the rendered repository. The `.bin/bootstrap-cluster-sops-key.sh`
+script orchestrates this delivery:
 
 ```bash
-kubectl create secret generic sops-age \
-  --namespace=flux-system \
-  --from-file=age.agekey=/path/to/age.key
+.bin/bootstrap-cluster-sops-key.sh
 ```
 
-This secret must exist before Flux can reconcile any SOPS-encrypted manifest.
+This script:
+1. Creates a 1Password vault named after the cluster to securely store secrets
+2. Generates an age keypair and stores the private key in the vault
+3. Grants vault access to specified users
+4. Retrieves the age key from the vault and creates a Kubernetes secret:
+   ```bash
+   kubectl create secret generic sops-age \
+     --namespace=flux-system \
+     --from-file=age.agekey=/path/to/age.key
+   ```
 
-### Phase 3: Flux bootstrap
+The secret must exist before Flux can reconcile any SOPS-encrypted manifest.
 
-Install Flux and point it at the rendered repository for this cluster:
+### Phase 3: Rendered repository bootstrap
+
+Create or configure the rendered (machine-generated manifests) GitHub repository:
 
 ```bash
-flux bootstrap github \
-  --owner=<rendered_repo_owner> \
-  --repository=<rendered_repo_name> \
-  --branch=main \
-  --path=clusters/<cluster-name>
+.bin/bootstrap-cluster-rendered-repo.sh
 ```
 
-Flux creates a deploy key on the rendered repository and begins reconciling.
-At this point, Flux will attempt to reconcile all components listed in
-`clusters/<cluster-name>/kustomization.yaml`.
+This script:
+- Reads the cluster catalog to extract the GitHub repository slug
+- Creates the private GitHub repository if it doesn't exist
+- Initializes it with a README and auto-merge enabled
 
-### Phase 4: SPIFFE trust domain configuration
+### Phase 4: Deploy key creation
+
+Configure Flux to authenticate with the rendered repository:
+
+```bash
+.bin/bootstrap-cluster-deploy-key.sh
+```
+
+This script creates a Kubernetes secret containing an SSH deploy key, which
+External Secrets Operator will use to provision a GitHub deploy key on the
+rendered repository for Flux to use during reconciliation.
+
+### Phase 5: SPIFFE trust domain configuration
 
 Before cert-manager-spiffe-csi-driver is deployed, configure the cluster's
 unique trust domain. See ADR-16 for requirements and the exact configuration
 steps. The trust domain must match the `status.trustDomain` of the cluster's
 `XDelegatedHostedZoneAWS` claim on the Crossplane control plane.
 
-### Phase 5: Control plane registration
+### Phase 6: Control plane registration
 
 Create the `XDelegatedHostedZoneAWS` claim on the Crossplane control plane
 cluster to provision the cluster's delegated DNS zone, IAM role, and Roles
@@ -84,14 +117,31 @@ AWS IAM Roles Anywhere (see ADR-7 Phase 2).
 
 ### Decommissioning
 
-To decommission a workload cluster:
-1. Delete the `XDelegatedHostedZoneAWS` claim — this removes IAM and DNS
-   resources via Crossplane.
-2. Delete the cluster entry from `clusters/` in this repository and from the
-   rendered repository.
-3. Destroy the cluster using the provider tooling.
-4. Remove the deploy key from the rendered repository.
-5. Revoke the intermediate CA certificate on step-ca (if Pattern D is in use).
+The `.bin/teardown-cluster.sh` script orchestrates decommissioning in two
+modes:
+
+**Partial teardown** (re-bootstrap mode):
+```bash
+.bin/teardown-cluster.sh
+```
+
+This removes local cluster state to allow re-bootstrapping:
+1. Deletes the deploy key from the rendered repository
+2. Deletes the sops-age Kubernetes secret from the cluster
+3. Removes local SOPS files (.sops.yaml, .sops.age-key)
+4. Deletes the 1Password vault (includes stored secrets)
+5. Removes the cluster directory from git
+
+**Full teardown** (complete decommission):
+```bash
+.bin/teardown-cluster.sh --full
+```
+
+In addition to the partial teardown steps, also:
+6. Deletes the GitHub Environment from the platform source repository
+7. Permanently deletes the rendered repository
+8. (Manual step) Delete the 1Password service account via the web UI
+9. (Manual step) Delete the `XDelegatedHostedZoneAWS` claim from Crossplane
 
 ## Consequences
 
