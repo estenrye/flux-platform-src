@@ -39,8 +39,11 @@ repository, the rendered PR is auto-merged, triggering Flux reconciliation on th
 cluster.
 
 Each cluster entry under `clusters/` has a `catalog.yaml` that declares which rendered
-repository it maps to via the `github.com/project-slug` annotation. The
-`render-discover-clusters.sh` script uses these annotations to build the CI job matrix.
+repository it maps to. Two annotations are required for cluster discovery:
+- `github.com/project-slug: <owner>/<rendered-repo>` — the target rendered repository
+- `rye.ninja/flux-source-repo: estenrye/flux-platform-src` — filters out clusters belonging to other source repos
+
+The `render-discover-clusters.sh` script filters on `rye.ninja/flux-source-repo` first; clusters missing this annotation are silently excluded from the CI job matrix.
 
 ## Consequences
 
@@ -48,6 +51,7 @@ repository it maps to via the `github.com/project-slug` annotation. The
   the rendered repository.
 - A change in `flux-platform-src` reaches the cluster only after CI passes. A broken
   pipeline blocks all deployments.
+- On merge to `main`, the rendered PR is auto-merged immediately, triggering Flux reconciliation. On pull request events, a draft PR is created for review before merge.
 - The rendered repository contains plain Kubernetes YAML without SOPS encryption.
   Access to the rendered repository grants read access to decrypted manifest content
   (but not secret values, which are delivered at runtime by External Secrets Operator).
