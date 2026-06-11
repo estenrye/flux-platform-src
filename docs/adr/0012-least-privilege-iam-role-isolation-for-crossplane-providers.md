@@ -39,7 +39,7 @@ Each Crossplane provider gets its own isolated credential stack:
 
 | Provider | ProviderConfig | IAM Role scope |
 |----------|---------------|----------------|
-| `provider-aws-route53` | `route53-dns-admin` | Route53 hosted zone management scoped to delegated zones |
+| `provider-aws-route53` | `dns-admin` | Route53 hosted zone management scoped to delegated zones |
 | `provider-aws-iam` | `iam-admin` | IAM Role/Policy/Attachment management |
 | `provider-aws-rolesanywhere` | `rolesanywhere-admin` | Roles Anywhere Profile management |
 
