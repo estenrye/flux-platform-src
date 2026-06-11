@@ -15,4 +15,4 @@ patches:
 
 images:
   - name: public.ecr.aws/rolesanywhere/credential-helper
-    digest: sha256:c888a0db96d11df7b3469e27ffcaf1b533a83f785cb656226bdd90f2345e8efc
+    digest: sha256:8f04ceefde653637a5e90052c8104ffa57aed5b27cb94d3a909801e54a7578b1
