@@ -32,10 +32,9 @@ to Helm-rendered output without modifying the chart source.
 
 ## Decision
 
-We deploy upstream Helm charts via FluxCD `HelmRelease` resources, then apply
-Kustomize patches to harden the rendered output. Patches are co-located with
-the application's `base/kustomization.yaml` in the `resources/` subdirectory
-(or inline in `kustomization.yaml` for simple patches).
+We deploy upstream Helm charts using Kustomize's built-in `helmCharts:` directive
+in `base/kustomization.yaml`. Kustomize renders the chart during `kustomize build`,
+then applies patches to the rendered output. Patches are co-located in `base/patches/`.
 
 ### Standard patch categories
 
@@ -67,13 +66,12 @@ and `ClusterRoleBinding`. Patches must not remove existing rules.
 
 **Image digest pinning**
 
-All `images` entries in `kustomization.yaml` specify both `newTag` (the version)
-and `digest` (the sha256 digest). Example:
+All `images` entries in `kustomization.yaml` specify `digest` (the sha256 digest).
+The image tag is embedded in the digest reference. Example:
 
 ```yaml
 images:
   - name: quay.io/jetstack/cert-manager-controller
-    newTag: v1.20.1
     digest: sha256:<digest>
 ```
 
@@ -82,13 +80,15 @@ if a manifest references an image by tag only without a digest.
 
 ### Patch file naming convention
 
+Patches live in `base/patches/` and follow this naming convention:
+
 ```
-resources/patches/<resource-kind>-<resource-name>-<patch-type>.yaml
+base/patches/<resource-kind>-<patch-description>.yaml
 ```
 
 Examples:
-- `resources/patches/deployment-cert-manager-network-policy.yaml`
-- `resources/patches/clusterrole-cert-manager-rbac.yaml`
+- `base/patches/deployment.yaml` (patches all Deployments)
+- `base/patches/deployment-webhook-liveness.yaml` (targets a specific probe)
 
 ## Consequences
 
@@ -108,4 +108,4 @@ Examples:
 - [ADR-10: GitOps Layering and Kustomize Composition Strategy](0010-gitops-layering-and-kustomize-composition-strategy.md)
 - [ADR-17: Network Policy Default-Deny Enforcement](0017-network-policy-default-deny-enforcement.md)
 - [Kustomize: Strategic Merge Patch](https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/patches/)
-- [FluxCD: HelmRelease](https://fluxcd.io/flux/components/helm/helmreleases/)
+- [Kustomize: Helm Chart Inflation](https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/helmcharts/)
