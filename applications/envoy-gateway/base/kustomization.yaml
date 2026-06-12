@@ -20,6 +20,21 @@ patches:
   - target:
       kind: Deployment
     path: patches/deployment.yaml
+  - target:
+      kind: ClusterRole
+    path: patches/cluster-role.yaml
+  - path: patches/cluster-role-binding.yaml
+  - target:
+      kind: Job
+    path: patches/job.yaml
+  - target:
+      kind: RoleBinding
+      name: envoy-gateway-gateway-helm-certgen
+    path: patches/role-binding.yaml
+  - target:
+      kind: RoleBinding
+      name: envoy-gateway-gateway-helm-infra-manager
+    path: patches/infra-manager-role-binding.yaml
 
 images:
   - name: docker.io/envoyproxy/gateway

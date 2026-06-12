@@ -18,6 +18,12 @@ patches:
   - target:
       kind: Deployment
     path: patches/deployment.yaml
+  - target:
+      kind: ClusterRole
+    path: patches/cluster-role.yaml
+  - target:
+      kind: ClusterRoleBinding
+    path: patches/cluster-role-binding.yaml
 
 images:
   - name: ghcr.io/cloudnative-pg/cloudnative-pg

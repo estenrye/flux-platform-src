@@ -1,9 +1,36 @@
+- op: remove
+  path: /spec/volumeClaimTemplates
+- op: add
+  path: /spec/strategy
+  value:
+    type: RollingUpdate
 - op: add
   path: /spec/template/spec/restartPolicy
   value: Always
 - op: add
   path: /metadata/annotations/checkov.io~1skip1
   value: "CKV_K8S_38=step-ca requires the service account token for the Kubernetes API when using the K8sSA provisioner."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip2
+  value: "CKV_K8S_35=PGPASSWORD must be an environment variable; lib/pq reads PostgreSQL credentials from the environment and does not support file-based injection."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip3
+  value: "CKV_K8S_40=step-ca image runs as the step user at UID 1000; changing the UID would break file ownership inside the container image."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1default-service-account
+  value: "step-ca uses the chart default service account; a dedicated SA is not required for this single-tenant CA."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1env-value-from
+  value: "Secret step-ca-db-app is created at runtime by CNPG and does not exist in the static rendered manifest."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
+  value: "step-ca is a CA; it intentionally runs as a single instance to avoid split-brain certificate issuance."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+  value: "step-ca runs in a single-zone cluster and does not require node affinity rules."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1read-secret-from-env-var
+  value: "PGPASSWORD must be an environment variable; lib/pq reads PostgreSQL credentials from the environment and does not support file-based injection."
 - op: add
   path: /spec/template/metadata/annotations/secret.reloader.stakater.com~1reload
   value: "csi-driver-spiffe-ca"

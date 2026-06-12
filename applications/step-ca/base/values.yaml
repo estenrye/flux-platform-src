@@ -1,6 +1,42 @@
 kind: Deployment
 replicaCount: 1
 
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi
+
+ca:
+  env:
+    - name: PGPASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: step-ca-db-app
+          key: password
+  # step-ca listens on ports 9000/9001 (> 1024), so NET_BIND_SERVICE is not needed.
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1000
+    capabilities:
+      drop:
+        - ALL
+      add: []
+    seccompProfile:
+      type: RuntimeDefault
+
+podSecurityContext:
+  runAsUser: 1000
+  runAsNonRoot: true
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
 inject:
   enabled: true
   config:
@@ -91,11 +127,3 @@ extraVolumeMounts:
   - name: spiffe-ca-secrets
     mountPath: /home/step/external-secrets
     readOnly: true
-
-ca:
-  env:
-    - name: PGPASSWORD
-      valueFrom:
-        secretKeyRef:
-          name: step-ca-db-app
-          key: password

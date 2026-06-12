@@ -25,6 +25,16 @@ patches:
   - target:
       kind: Deployment
     path: patches/deployment.yaml
+  - target:
+      kind: RoleBinding
+      name: step-certificates-config
+      namespace: step-ca
+    path: patches/role-binding.yaml
+  - target:
+      kind: Pod
+      name: step-certificates-test-connection
+      namespace: step-ca
+    path: patches/pod.yaml
 
 images:
   - name: cr.smallstep.com/smallstep/step-ca
