@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: envoy-gateway
+  description: |-
+    Envoy Gateway controller implementing the Kubernetes
+    Gateway API using Envoy Proxy as the data plane.
+  tags:
+    - gateway
+    - networking
+    - operators
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

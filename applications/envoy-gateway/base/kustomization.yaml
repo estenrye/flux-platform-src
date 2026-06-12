@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: envoy-gateway-system
+
+resources:
+  - resources/namespace.yaml
+  - resources/custom-proxy-config.envoyproxy.yaml
+  - resources/merged-eg.gatewayclass.yaml
+
+helmCharts:
+  - name: gateway-helm
+    repo: oci://docker.io/envoyproxy
+    version: 1.8.1
+    releaseName: envoy-gateway
+    namespace: envoy-gateway-system
+    includeCRDs: true
+    valuesFile: values.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+
+images:
+  - name: docker.io/envoyproxy/gateway
+    newTag: "v1.8.1"
+    digest: sha256:497df13b71f4e544c7e80414873041e291776c28cd788bcbee0d18421fa5db98
+  - name: docker.io/envoyproxy/ratelimit
+    newTag: "ff287602"
+    digest: sha256:f9df277f4c61459f6b26e06e0eb1f511e4da3c67ce133a39bd97a12dc5885eea
