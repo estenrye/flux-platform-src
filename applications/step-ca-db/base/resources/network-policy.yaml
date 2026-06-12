@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: step-ca-db
+  namespace: step-ca
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: step-ca-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: step-certificates
+      ports:
+        - protocol: TCP
+          port: 5432
