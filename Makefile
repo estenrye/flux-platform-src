@@ -151,8 +151,8 @@ deploy-cluster:
 
 bootstrap-cluster: bootstrap-cluster-catalog bootstrap-cluster-environment bootstrap-cluster-rendered-repo bootstrap-cluster-sops-key
 
-oci-kubeconfig:
-	@.bin/oci-kubeconfig.sh
+get-cloudspace-kubeconfigs:
+	@.bin/get-cloudspace-kubeconfigs.sh
 
 teardown-cluster:
 	CLUSTER=$(CLUSTER) SKIP_K8S=$(SKIP_K8S) .bin/teardown-cluster.sh
