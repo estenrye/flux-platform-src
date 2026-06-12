@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -10,7 +10,7 @@ for catalog in "${REPO_ROOT}"/clusters/*/catalog.yaml; do
   org=$(yq e '.metadata.annotations["rye.ninja/spot-org"]' "${catalog}")
   name=$(yq e '.metadata.annotations["rye.ninja/spot-cloudspace-name"]' "${catalog}")
 
-  if [ "${org}" = "null" ] || [ "${name}" = "null" ]; then
+  if [ "${org}" = "null" ] || [ -z "${org}" ] || [ "${name}" = "null" ] || [ -z "${name}" ]; then
     warn "Skipping ${catalog}: missing spot-org or spot-cloudspace-name annotation"
     continue
   fi
