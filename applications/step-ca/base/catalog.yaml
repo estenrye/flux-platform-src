@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: step-ca
+  description: |-
+    Smallstep step-ca certificate authority with X5C provisioner,
+    serving as the intermediate CA signing authority for workload
+    clusters (ADR-7 Pattern D). Backed by a CNPG PostgreSQL cluster.
+  tags:
+    - certificates
+    - pki
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
