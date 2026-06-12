@@ -1,6 +1,6 @@
 # 18. Backstage Catalog as Platform Topology Source of Truth
 
-Date: 2026-06-11
+Date: 2026-06-10
 
 ## Status
 
