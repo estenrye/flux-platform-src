@@ -1,11 +1,6 @@
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: step-ca
-  namespace: step-ca
-spec:
-  listeners:
-    - name: https-passthrough
-      hostname: ca.crossplane.rye.ninja
-    - name: http-crl
-      hostname: ca.crossplane.rye.ninja
+- op: add
+  path: /spec/listeners/0/hostname
+  value: ca.crossplane.rye.ninja
+- op: add
+  path: /spec/listeners/1/hostname
+  value: ca.crossplane.rye.ninja
