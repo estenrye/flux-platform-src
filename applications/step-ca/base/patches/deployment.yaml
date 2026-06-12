@@ -1,6 +1,11 @@
 - op: remove
   path: /spec/volumeClaimTemplates
 - op: add
+  path: /spec/template/spec/volumes/-
+  value:
+    name: database
+    emptyDir: {}
+- op: add
   path: /spec/strategy
   value:
     type: RollingUpdate
