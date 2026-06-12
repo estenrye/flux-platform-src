@@ -18,7 +18,9 @@
       "Bash(xargs -I {} sh -c 'if [ ! -f \"{}/catalog.yaml\" ] && [ ! -f \"{}/base/catalog.yaml\" ] && [ ! -f \"{}/kustomization.yaml\" ] && [ ! -f \"{}/base/kustomization.yaml\" ]; then echo \"Missing structure: {}\"; fi')",
       "Bash(git checkout *)",
       "Bash(xargs -I {} basename {})",
-      "Bash(sops --help)"
+      "Bash(sops --help)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'docs\\(adr\\): add ADR-8 through ADR-18 as journey-ordered onboarding path' --body ' *)"
     ]
   }
 }
