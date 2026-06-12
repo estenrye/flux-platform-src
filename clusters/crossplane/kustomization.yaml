@@ -12,6 +12,7 @@ resources:
   - ../../applications/cert-manager-trust-manager/base
   - ../../applications/cert-manager-spiffe-csi-driver/base
   - ../../applications/cnpg/base
+  - ../../applications/envoy-gateway-crds/base
   - ../../applications/envoy-gateway/base
   - ../../applications/step-ca-db/base
   - ../../applications/step-ca/base
