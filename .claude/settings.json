@@ -8,7 +8,17 @@
       "Bash(make lint-checkov *)",
       "Bash(make lint-kube-linter *)",
       "Bash(gh run *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(xargs ls -la)",
+      "Bash(xargs cat)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(xargs -I{} head -15 {})",
+      "Bash(git commit *)",
+      "Bash(xargs -I {} sh -c 'if [ ! -f \"{}/catalog.yaml\" ] && [ ! -f \"{}/base/catalog.yaml\" ] && [ ! -f \"{}/kustomization.yaml\" ] && [ ! -f \"{}/base/kustomization.yaml\" ]; then echo \"Missing structure: {}\"; fi')",
+      "Bash(git checkout *)",
+      "Bash(xargs -I {} basename {})",
+      "Bash(sops --help)"
     ]
   }
 }
