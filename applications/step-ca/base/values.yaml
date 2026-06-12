@@ -91,9 +91,10 @@ extraVolumeMounts:
     mountPath: /home/step/external-secrets
     readOnly: true
 
-extraEnv:
-  - name: PGPASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: step-ca-db-app
-        key: password
+ca:
+  env:
+    - name: PGPASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: step-ca-db-app
+          key: password

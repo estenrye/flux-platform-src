@@ -23,7 +23,7 @@ helmCharts:
 
 patches:
   - target:
-      kind: Deployment
+      kind: StatefulSet
     path: patches/deployment.yaml
 
 images:
