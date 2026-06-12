@@ -4,6 +4,7 @@ namespace: cnpg-system
 
 resources:
   - resources/namespace.yaml
+  - resources/network-policy.yaml
 
 helmCharts:
   - name: cloudnative-pg
