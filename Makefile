@@ -31,8 +31,7 @@ lint-checkov: lint-deps
 	.venv/bin/checkov -d .render/ --framework kubernetes --quiet --compact --skip-results-upload
 
 lint-kube-linter: lint-deps
-	find .render -type f -name "*.yaml" -o -name "*.yml" \
-	  | xargs .venv/bin/kube-linter lint --config .kube-linter/config.yaml
+	.venv/bin/kube-linter lint --config .kube-linter/config.yaml .render
 
 lint: lint-deps render lint-checkov lint-kube-linter
 
@@ -151,8 +150,8 @@ deploy-cluster:
 
 bootstrap-cluster: bootstrap-cluster-catalog bootstrap-cluster-environment bootstrap-cluster-rendered-repo bootstrap-cluster-sops-key
 
-oci-kubeconfig:
-	@.bin/oci-kubeconfig.sh
+get-cloudspace-kubeconfigs:
+	@.bin/get-cloudspace-kubeconfigs.sh
 
 teardown-cluster:
 	CLUSTER=$(CLUSTER) SKIP_K8S=$(SKIP_K8S) .bin/teardown-cluster.sh

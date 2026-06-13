@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: step-ca-cert-reader
+  namespace: cert-manager
+  annotations:
+    ignore-check.kube-linter.io/access-to-secrets: "ESO cert-reader role requires read access to the step-ca root certificate secret to sync it into the cert-manager namespace."
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: step-ca-cert-reader
+subjects:
+  - kind: ServiceAccount
+    name: step-ca-cert-reader
+    namespace: step-ca

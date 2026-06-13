@@ -1,0 +1,6 @@
+- op: add
+  path: /spec/listeners/0/hostname
+  value: ca.crossplane.rye.ninja
+- op: add
+  path: /spec/listeners/1/hostname
+  value: ca.crossplane.rye.ninja

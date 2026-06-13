@@ -8,6 +8,11 @@ spec:
       required: true
       value: csi-driver-spiffe-ca
     isCA: true
+    usages:
+      - digital signature
+      - cert sign
+      - crl sign
+      - ocsp signing
   selector:
     issuerRef:
       group: cert-manager.io

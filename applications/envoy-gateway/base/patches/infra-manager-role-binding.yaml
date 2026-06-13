@@ -1,0 +1,7 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: envoy-gateway-gateway-helm-infra-manager
+  namespace: envoy-gateway-system
+  annotations:
+    ignore-check.kube-linter.io/access-to-create-pods: "Envoy Gateway infra-manager requires deployment and daemonset creation access to provision Envoy proxy instances for Gateway API resources."

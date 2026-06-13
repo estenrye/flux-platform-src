@@ -1,0 +1,6 @@
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-create-pods
+  value: "CNPG operator requires pod creation access to provision PostgreSQL cluster instances."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-secrets
+  value: "CNPG operator requires secret access to manage PostgreSQL credentials and certificates."

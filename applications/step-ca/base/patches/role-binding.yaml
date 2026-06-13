@@ -1,0 +1,8 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: step-certificates-config
+  namespace: step-ca
+  annotations:
+    checkov.io/skip1: "CKV2_K8S_5=step-ca requires access to its own config secrets to read the CA configuration and certificate material at startup."
+    ignore-check.kube-linter.io/access-to-secrets: "step-ca requires access to its own config secrets to read the CA configuration and certificate material at startup."
