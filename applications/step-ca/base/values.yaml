@@ -79,12 +79,10 @@ inject:
                       "basicConstraints": {
                         "isCA": true,
                         "maxPathLen": 0
-                      },
-                      "crlDistributionPoints": ["http://ca.crossplane.rye.ninja/1.0/crl"]
+                      }
                     }
         crl:
-          enabled: true
-          generateOnRevoke: true
+          enabled: false
         tls:
           cipherSuites:
             - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
