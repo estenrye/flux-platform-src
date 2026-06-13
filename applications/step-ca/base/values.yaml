@@ -65,8 +65,7 @@ inject:
           provisioners:
             - type: X5C
               name: x5c
-              roots:
-                - /home/step/external-certs/tls.crt
+              roots: ROOTS_PLACEHOLDER
               claims:
                 maxTLSCertDuration: 8760h
                 defaultTLSCertDuration: 8760h
@@ -112,6 +111,8 @@ bootstrap:
   enabled: false
 
 extraVolumes:
+  - name: config-rw
+    emptyDir: {}
   - name: spiffe-ca-certs
     secret:
       secretName: csi-driver-spiffe-ca
@@ -120,6 +121,8 @@ extraVolumes:
       secretName: csi-driver-spiffe-ca
 
 extraVolumeMounts:
+  - name: config-rw
+    mountPath: /home/step/config-rw
   - name: spiffe-ca-certs
     mountPath: /home/step/external-certs
     readOnly: true
