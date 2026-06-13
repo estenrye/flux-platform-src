@@ -22,6 +22,6 @@ for catalog in "${REPO_ROOT}"/clusters/*/catalog.yaml; do
   "${SCRIPT_DIR}/../.venv/bin/spotctl" cloudspaces get-config \
     --name "${name}" \
     --org "${org}" \
-    --file "${out}"
+    --file "$(dirname "${out}")"
   success "Saved ${out}"
 done
