@@ -28,6 +28,9 @@
   path: /metadata/annotations/checkov.io~1skip5
   value: "CKV_K8S_20=step-ca binary has CAP_NET_BIND_SERVICE file capability set in the image; allowPrivilegeEscalation must be true to allow execve to succeed with no_new_privs otherwise disabled by the capability bit."
 - op: add
+  path: /metadata/annotations/checkov.io~1skip6
+  value: "CKV_K8S_22=step-ca binary has file capabilities that cause nosuid overlay mounts (from readOnlyRootFilesystem=true) to block execve with EPERM; writable root filesystem is required for this image."
+- op: add
   path: /metadata/annotations/ignore-check.kube-linter.io~1default-service-account
   value: "step-ca uses the chart default service account; a dedicated SA is not required for this single-tenant CA."
 - op: add
