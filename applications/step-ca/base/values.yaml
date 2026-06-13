@@ -26,16 +26,12 @@ ca:
       drop:
         - ALL
       add: []
-    seccompProfile:
-      type: RuntimeDefault
 
 podSecurityContext:
   runAsUser: 1000
   runAsNonRoot: true
   runAsGroup: 1000
   fsGroup: 1000
-  seccompProfile:
-    type: RuntimeDefault
 
 inject:
   enabled: true

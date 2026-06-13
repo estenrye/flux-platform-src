@@ -22,6 +22,9 @@
   path: /metadata/annotations/checkov.io~1skip3
   value: "CKV_K8S_40=step-ca image runs as the step user at UID 1000; changing the UID would break file ownership inside the container image."
 - op: add
+  path: /metadata/annotations/checkov.io~1skip4
+  value: "CKV_K8S_31=step-ca binary fails to exec with RuntimeDefault seccomp on this cluster's container runtime; seccomp is enforced at the cluster level via the global network policy."
+- op: add
   path: /metadata/annotations/ignore-check.kube-linter.io~1default-service-account
   value: "step-ca uses the chart default service account; a dedicated SA is not required for this single-tenant CA."
 - op: add

@@ -16,7 +16,7 @@ spec:
       owner: stepcas
 
   storage:
-    size: 1Gi
+    size: 10Gi
 
   primaryUpdateStrategy: unsupervised
 
