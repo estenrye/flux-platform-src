@@ -11,4 +11,4 @@ spec:
   rules:
     - backendRefs:
         - name: step-certificates
-          port: 9000
+          port: 443
