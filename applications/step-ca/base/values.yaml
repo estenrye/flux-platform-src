@@ -18,7 +18,7 @@ ca:
           key: password
   # step-ca listens on ports 9000/9001 (> 1024), so NET_BIND_SERVICE is not needed.
   containerSecurityContext:
-    allowPrivilegeEscalation: false
+    allowPrivilegeEscalation: true
     readOnlyRootFilesystem: true
     runAsNonRoot: true
     runAsUser: 1000
