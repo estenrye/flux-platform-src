@@ -32,6 +32,8 @@ podSecurityContext:
   runAsNonRoot: true
   runAsGroup: 1000
   fsGroup: 1000
+  seccompProfile:
+    type: Unconfined
 
 inject:
   enabled: true
