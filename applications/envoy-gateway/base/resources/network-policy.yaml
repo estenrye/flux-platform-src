@@ -78,6 +78,8 @@ spec:
           port: 18002
     - ports:
         - protocol: TCP
+          port: 443
+        - protocol: TCP
           port: 9000
         - protocol: TCP
           port: 9001
