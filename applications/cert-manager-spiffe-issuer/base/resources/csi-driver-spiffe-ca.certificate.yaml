@@ -15,6 +15,7 @@ spec:
     - digital signature
     - cert sign
     - crl sign
+    - ocsp signing
   issuerRef:
     name: selfsigned
     kind: ClusterIssuer
