@@ -23,13 +23,15 @@ spec:
           command: ["/bin/sh", "-exc"]
           args:
             - |
-              apt-get update -qq && apt-get install -y -qq curl openssl
+              apk add --no-cache curl openssl 2>/dev/null || true
 
               CA_URL=https://step-certificates.step-ca.svc.cluster.local:9000
               ROOT_CERT=/root-ca/tls.crt
 
               # 1. Health check
-              curl -sf --cacert "$ROOT_CERT" "$CA_URL/health" | grep -q '"status":"ok"'
+              HEALTH=$(curl -s --cacert "$ROOT_CERT" --max-time 15 "$CA_URL/health")
+              echo "Health response: $HEALTH"
+              echo "$HEALTH" | grep -q '"status":"ok"'
               echo "health: ok"
 
               # 2. Root CA fingerprint API
