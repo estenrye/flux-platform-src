@@ -1,0 +1,15 @@
+# tests/step-ca/external/resources/certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: step-ca-x5c-test-cert
+spec:
+  secretName: step-ca-x5c-test-cert
+  duration: 1h
+  commonName: step-ca-x5c-test
+  issuerRef:
+    name: csi-driver-spiffe-ca
+    kind: ClusterIssuer
+    group: cert-manager.io
+  usages:
+    - digital signature
