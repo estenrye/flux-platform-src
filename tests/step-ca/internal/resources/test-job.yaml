@@ -1,0 +1,76 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: step-ca-capability-test
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: step-ca-capability-test
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: x5c-cert
+          secret:
+            secretName: step-ca-x5c-test-cert
+        - name: root-ca
+          secret:
+            secretName: root-ca
+      containers:
+        - name: test
+          image: smallstep/step-cli:0.30.6
+          command: ["/bin/sh", "-exc"]
+          args:
+            - |
+              apt-get update -qq && apt-get install -y -qq curl openssl
+
+              CA_URL=https://step-certificates.step-ca.svc.cluster.local:9000
+              ROOT_CERT=/root-ca/tls.crt
+
+              # 1. Health check
+              curl -sf --cacert "$ROOT_CERT" "$CA_URL/health" | grep -q '"status":"ok"'
+              echo "health: ok"
+
+              # 2. Root CA fingerprint API
+              FINGERPRINT=$(openssl x509 -fingerprint -sha256 -noout -in "$ROOT_CERT" \
+                | sed 's/.*=//;s/://g' | tr '[:upper:]' '[:lower:]')
+              echo "Fingerprint: $FINGERPRINT"
+              curl -sf --cacert "$ROOT_CERT" "$CA_URL/root/$FINGERPRINT" | grep -q '"ca"'
+              echo "root-ca: ok"
+
+              # 3. X5C provisioner — issue intermediate CA cert
+              printf '' > /tmp/empty-pass
+              step ca certificate "step-ca-test-intermediate" /tmp/issued.crt /tmp/issued.key \
+                --provisioner x5c \
+                --x5c-cert /x5c-cert/tls.crt \
+                --x5c-key /x5c-cert/tls.key \
+                --ca-url "$CA_URL" \
+                --root "$ROOT_CERT" \
+                --password-file /tmp/empty-pass
+              openssl x509 -text -noout -in /tmp/issued.crt | grep -q 'CA:TRUE'
+              echo "x5c-provisioner: ok"
+
+              # 4. Revoke the issued cert
+              step ca revoke \
+                --cert /tmp/issued.crt \
+                --key /tmp/issued.key \
+                --ca-url "$CA_URL" \
+                --root "$ROOT_CERT"
+              echo "revocation: ok"
+
+              # 5. CRL contains revoked serial
+              SERIAL=$(openssl x509 -serial -noout -in /tmp/issued.crt | sed 's/serial=//')
+              echo "Revoked serial: $SERIAL"
+              curl -sf --cacert "$ROOT_CERT" "$CA_URL/1.0/crl" -o /tmp/crl.der
+              openssl crl -inform DER -text -noout -in /tmp/crl.der | grep -qi "$SERIAL"
+              echo "crl-contains-revoked: ok"
+
+              echo "ALL CHECKS PASSED"
+          volumeMounts:
+            - name: x5c-cert
+              mountPath: /x5c-cert
+              readOnly: true
+            - name: root-ca
+              mountPath: /root-ca
+              readOnly: true
