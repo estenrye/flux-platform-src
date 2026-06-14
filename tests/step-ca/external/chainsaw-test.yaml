@@ -1,0 +1,126 @@
+# tests/step-ca/external/chainsaw-test.yaml
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: step-ca-external
+spec:
+  steps:
+    - name: apply-approver-policy
+      try:
+        - apply:
+            file: resources/approver-policy.yaml
+
+    - name: create-test-cert
+      try:
+        - apply:
+            file: resources/certificate.yaml
+
+    - name: wait-for-cert
+      try:
+        - assert:
+            timeout: 60s
+            file: resources/assert-cert-ready.yaml
+
+    - name: health
+      try:
+        - script:
+            timeout: 300s
+            content: |
+              set -e
+              RESPONSE=$(curl -sk --max-time 15 --retry 10 --retry-delay 2 --retry-all-errors https://ca.crossplane.rye.ninja/health)
+              echo "Response: $RESPONSE"
+              echo "$RESPONSE" | grep -q '"status":"ok"'
+              echo "health: ok"
+
+    - name: root-ca
+      try:
+        - script:
+            timeout: 300s
+            content: |
+              set -e
+              export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
+              FINGERPRINT=$(kubectl get secret csi-driver-spiffe-ca -n step-ca \
+                -o jsonpath='{.data.tls\.crt}' | base64 -d \
+                | openssl x509 -noout -fingerprint -sha256 \
+                | sed 's/.*=//;s/://g' | tr '[:upper:]' '[:lower:]')
+              echo "Fingerprint: $FINGERPRINT"
+              RESPONSE=$(curl -sk --max-time 15 --retry 10 --retry-delay 2 --retry-all-errors "https://ca.crossplane.rye.ninja/root/${FINGERPRINT}")
+              echo "Response: $RESPONSE"
+              echo "$RESPONSE" | grep -q '"ca"'
+              echo "root-ca: ok"
+
+    - name: x5c-provisioner
+      try:
+        - script:
+            timeout: 600s
+            content: |
+              set -e
+              export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
+              # Extract root CA cert for TLS validation and X5C auth cert/key
+              kubectl get secret csi-driver-spiffe-ca -n step-ca \
+                -o jsonpath='{.data.tls\.crt}' | base64 -d > /tmp/root-ca-${NAMESPACE}.crt
+              kubectl get secret step-ca-x5c-test-cert -n ${NAMESPACE} \
+                -o jsonpath='{.data.tls\.crt}' | base64 -d > /tmp/x5c-${NAMESPACE}.crt
+              kubectl get secret step-ca-x5c-test-cert -n ${NAMESPACE} \
+                -o jsonpath='{.data.tls\.key}' | base64 -d > /tmp/x5c-${NAMESPACE}.key
+              # Issue intermediate CA cert via X5C provisioner (retry on transient TLS errors)
+              printf '' > /tmp/step-pass-${NAMESPACE}.txt
+              STEP=$(git rev-parse --show-toplevel)/.venv/bin/step
+              issued=0
+              for attempt in $(seq 1 20); do
+                if $STEP ca certificate "step-ca-test-intermediate" \
+                  /tmp/issued-${NAMESPACE}.crt \
+                  /tmp/issued-${NAMESPACE}.key \
+                  --provisioner x5c \
+                  --x5c-cert /tmp/x5c-${NAMESPACE}.crt \
+                  --x5c-key /tmp/x5c-${NAMESPACE}.key \
+                  --ca-url https://ca.crossplane.rye.ninja \
+                  --root /tmp/root-ca-${NAMESPACE}.crt \
+                  --password-file /tmp/step-pass-${NAMESPACE}.txt; then
+                  issued=1
+                  break
+                fi
+                echo "Attempt $attempt failed, retrying..."
+                sleep 3
+              done
+              [ "$issued" = "1" ] || { echo "All x5c attempts failed"; exit 1; }
+              # Assert issued cert is a CA cert
+              openssl x509 -text -noout -in /tmp/issued-${NAMESPACE}.crt | grep -q 'CA:TRUE'
+              echo "x5c-provisioner: ok"
+
+    - name: revoke
+      try:
+        - script:
+            timeout: 300s
+            content: |
+              set -e
+              STEP=$(git rev-parse --show-toplevel)/.venv/bin/step
+              revoked=0
+              for attempt in $(seq 1 10); do
+                if $STEP ca revoke \
+                  --cert /tmp/issued-${NAMESPACE}.crt \
+                  --key /tmp/issued-${NAMESPACE}.key \
+                  --ca-url https://ca.crossplane.rye.ninja \
+                  --root /tmp/root-ca-${NAMESPACE}.crt; then
+                  revoked=1
+                  break
+                fi
+                echo "Attempt $attempt failed, retrying..."
+                sleep 3
+              done
+              [ "$revoked" = "1" ] || { echo "All revoke attempts failed"; exit 1; }
+              echo "revocation: ok"
+
+    - name: crl-contains-revoked
+      try:
+        - script:
+            timeout: 300s
+            content: |
+              set -e
+              # Extract serial from revoked cert
+              SERIAL=$(openssl x509 -serial -noout -in /tmp/issued-${NAMESPACE}.crt | sed 's/serial=//')
+              echo "Revoked serial: $SERIAL"
+              # Fetch CRL (DER) and convert to text, check serial appears
+              curl -sk --max-time 15 --retry 10 --retry-delay 2 --retry-all-errors https://ca.crossplane.rye.ninja/1.0/crl -o /tmp/crl-${NAMESPACE}.der
+              openssl crl -inform DER -text -noout -in /tmp/crl-${NAMESPACE}.der | grep -qi "$SERIAL"
+              echo "crl-contains-revoked: ok"

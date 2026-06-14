@@ -35,6 +35,11 @@ patches:
       name: step-certificates-test-connection
       namespace: step-ca
     path: patches/pod.yaml
+  - target:
+      kind: Service
+      name: step-certificates
+      namespace: step-ca
+    path: patches/service.yaml
 
 images:
   - name: cr.smallstep.com/smallstep/step-ca

@@ -5,6 +5,8 @@ metadata:
   name: step-ca-test-x5c-cert-policy
 spec:
   allowed:
+    commonName:
+      value: step-ca-x5c-test
     isCA: false
     usages:
       - digital signature
