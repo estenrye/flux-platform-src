@@ -61,7 +61,17 @@
       "Bash(git -C /Users/esten/src/estenrye/flux-platform-src diff HEAD -- .claude/settings.json)",
       "Bash(git -C /Users/esten/src/estenrye/flux-platform-src checkout HEAD -- .claude/settings.json)",
       "Bash(bash .bin/test/test-prompt-kubeconfig.sh)",
-      "Bash(git -C /Users/esten/src/estenrye/flux-platform-src push -u origin add-cnpg-operator)"
+      "Bash(git -C /Users/esten/src/estenrye/flux-platform-src push -u origin add-cnpg-operator)",
+      "Bash(curl -sk https://ca.crossplane.rye.ninja/health)",
+      "Bash(curl -sfL \"https://api.github.com/repos/smallstep/cli/releases/latest\")",
+      "Bash(curl -sfL \"https://github.com/smallstep/cli/releases/latest/download/checksums.txt\")",
+      "Bash(curl -sfL \"https://github.com/smallstep/cli/releases/latest/download/step_darwin_arm64.tar.gz\")",
+      "Bash(tar -tz)",
+      "Bash(chmod +x /Users/esten/src/estenrye/flux-platform-src/.bin/install-step.sh)",
+      "Bash(bash /Users/esten/src/estenrye/flux-platform-src/.bin/install-step.sh)",
+      "Bash(/Users/esten/src/estenrye/flux-platform-src/.venv/bin/step version *)",
+      "Bash(grep -n 'venv\\\\|\\\\.bin\\\\|PATH\\\\|flux-platform' ~/.bashrc | head -40)",
+      "Read(//Users/esten/**)"
     ],
     "additionalDirectories": [
       "/Users/esten/src/estenrye/flux-platform-src/.claude"

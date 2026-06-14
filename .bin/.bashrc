@@ -85,3 +85,8 @@ fi
 if [ -f "$SCRIPT_DIR/../.venv/bin/talosctl" ]; then
     bash "$SCRIPT_DIR/install-talosctl.sh"
 fi
+
+# Install step CLI if not already installed
+if [ ! -f "$SCRIPT_DIR/../.venv/bin/step" ]; then
+    bash "$SCRIPT_DIR/install-step.sh"
+fi

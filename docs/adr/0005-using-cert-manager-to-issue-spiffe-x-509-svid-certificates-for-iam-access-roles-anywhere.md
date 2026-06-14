@@ -101,6 +101,47 @@ kubectl patch certificate -n cert-manager csi-driver-spiffe-ca \
 ```
 
 
+## Validating step-ca connectivity
+
+After deploying step-ca, verify the health endpoint and confirm the root CA certificate is served correctly.
+
+### Health check
+
+The step-ca health endpoint is reachable at `https://ca.crossplane.rye.ninja/health`. Because step-ca serves a self-signed certificate, pass `-k` to skip CA verification:
+
+```bash
+curl -sk https://ca.crossplane.rye.ninja/health
+# expected: {"status":"ok"}
+```
+
+### Root CA fingerprint retrieval
+
+The root CA fingerprint is derived from the `csi-driver-spiffe-ca` secret in the `step-ca` namespace:
+
+```bash
+export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
+
+FINGERPRINT=$(kubectl get secret csi-driver-spiffe-ca -n step-ca \
+  -o jsonpath='{.data.tls\.crt}' \
+  | base64 -d \
+  | openssl x509 -noout -fingerprint -sha256 \
+  | sed 's/.*=//;s/://g' \
+  | tr '[:upper:]' '[:lower:]')
+
+echo "Fingerprint: $FINGERPRINT"
+```
+
+### Root CA endpoint validation
+
+Use the fingerprint to retrieve the root CA certificate from the step-ca API:
+
+```bash
+curl -sk "https://ca.crossplane.rye.ninja/root/${FINGERPRINT}" | python3 -m json.tool
+# expected: {"ca": "-----BEGIN CERTIFICATE-----\n..."}
+```
+
+A successful response confirms that step-ca is running, has loaded the correct root CA, and the `/root/<fingerprint>` API is reachable.
+
 ## Configuring AWS IAM Access Roles Anywhere to trust cert-manager issued SPIFFE certificates
 
 Use the existing CloudFormation stack in [providers/aws/crossplane-iam-roles-anywhere.yaml](../../providers/aws/crossplane-iam-roles-anywhere.yaml) to bootstrap the IAM Roles Anywhere trust anchor, IAM role, and profile for cert-manager issued SPIFFE certificates.
