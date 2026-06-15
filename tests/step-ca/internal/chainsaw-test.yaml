@@ -29,6 +29,9 @@ spec:
               export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
               kubectl label namespace ${NAMESPACE} step-ca.io/test-access=true --overwrite
               echo "namespace labeled for step-ca access"
+              REPO=$(git rev-parse --show-toplevel)
+              kubectl apply -f "$REPO/applications/step-ca/base/resources/network-policy.yaml"
+              echo "step-ca NetworkPolicy updated to allow test namespace ingress"
         - apply:
             file: resources/network-policy.yaml
 
