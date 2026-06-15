@@ -35,21 +35,6 @@ spec:
         - apply:
             file: resources/network-policy.yaml
 
-    - name: copy-root-ca-secret
-      try:
-        - script:
-            timeout: 30s
-            content: |
-              set -e
-              export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
-              kubectl get secret csi-driver-spiffe-ca -n step-ca \
-                -o jsonpath='{.data.tls\.crt}' | base64 -d > /tmp/root-ca-${NAMESPACE}.crt
-              kubectl create secret generic root-ca \
-                -n ${NAMESPACE} \
-                --from-file=tls.crt=/tmp/root-ca-${NAMESPACE}.crt \
-                --dry-run=client -o yaml | kubectl apply -f -
-              echo "root-ca secret copied to ${NAMESPACE}"
-
     - name: deploy-test-job
       try:
         - apply:
