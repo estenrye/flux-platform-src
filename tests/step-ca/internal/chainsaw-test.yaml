@@ -66,3 +66,16 @@ spec:
                 name: step-ca-capability-test
               status:
                 succeeded: 1
+      catch:
+        - script:
+            timeout: 60s
+            content: |
+              export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
+              echo "=== Job status ==="
+              kubectl get job step-ca-capability-test -n ${NAMESPACE} -o wide
+              echo "=== Pods ==="
+              kubectl get pods -n ${NAMESPACE} -o wide
+              echo "=== Pod logs ==="
+              kubectl logs -n ${NAMESPACE} -l app=step-ca-capability-test --tail=100 2>/dev/null || echo "(no logs available)"
+              echo "=== Pod events ==="
+              kubectl get events -n ${NAMESPACE} --sort-by=.lastTimestamp | tail -20
