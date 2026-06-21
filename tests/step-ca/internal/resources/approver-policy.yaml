@@ -9,6 +9,7 @@ spec:
     isCA: false
     usages:
       - digital signature
+      - client auth
   selector:
     issuerRef:
       group: cert-manager.io

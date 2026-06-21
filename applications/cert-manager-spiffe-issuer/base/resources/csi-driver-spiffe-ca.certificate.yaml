@@ -17,6 +17,7 @@ spec:
     - crl sign
     - ocsp signing
     - server auth
+    - client auth
   issuerRef:
     name: selfsigned
     kind: ClusterIssuer

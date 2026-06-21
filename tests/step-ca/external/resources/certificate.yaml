@@ -13,3 +13,4 @@ spec:
     group: cert-manager.io
   usages:
     - digital signature
+    - client auth
