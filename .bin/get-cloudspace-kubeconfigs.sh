@@ -15,13 +15,14 @@ for catalog in "${REPO_ROOT}"/clusters/*/catalog.yaml; do
     continue
   fi
 
-  out="${HOME}/.kube/spot/${org}/${name}.yaml"
-  mkdir -p "$(dirname "${out}")"
+  out_dir="${HOME}/.kube/spot/${org}"
+  out="${out_dir}/${name}.yaml"
+  mkdir -p "${out_dir}"
 
   info "Fetching kubeconfig for ${name} (org: ${org}) → ${out}"
   "${SCRIPT_DIR}/../.venv/bin/spotctl" cloudspaces get-config \
     --name "${name}" \
     --org "${org}" \
-    --file "${out}"
+    --file "${out_dir}"
   success "Saved ${out}"
 done
