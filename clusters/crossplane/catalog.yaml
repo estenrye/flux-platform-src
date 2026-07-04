@@ -5,7 +5,9 @@ metadata:
   annotations:
     github.com/project-slug: estenrye/flux-platform-rendered
     rye.ninja/flux-source-repo: estenrye/flux-platform-src
-    rye.ninja/kubeconfig: /Users/esten/.kube/crossplane-controlplane-cluster-kubeconfig.yaml
+    rye.ninja/kubeconfig: ~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
+    rye.ninja/spot-org: ryezone-labs
+    rye.ninja/spot-cloudspace-name: crossplane-controlplane-cluster
   description: Crossplane system for managing cloud resources
 spec:
   owner: platform-engineering

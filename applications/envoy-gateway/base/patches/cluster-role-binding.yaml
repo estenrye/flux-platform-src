@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: "envoy-gateway-gateway-helm-certgen:envoy-gateway-system"
+  annotations:
+    ignore-check.kube-linter.io/access-to-secrets: "Envoy Gateway certgen ClusterRoleBinding requires read access to secrets to configure TLS certificates for Gateway API webhooks."
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: envoy-gateway-gateway-helm-envoy-gateway-rolebinding
+  annotations:
+    ignore-check.kube-linter.io/access-to-secrets: "Envoy Gateway controller requires read access to secrets to configure TLS termination for Gateway API listeners."

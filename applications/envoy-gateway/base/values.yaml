@@ -1,0 +1,24 @@
+crds:
+  gatewayAPI:
+    safeUpgradePolicy:
+      enabled: false
+
+deployment:
+  envoyGateway:
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1024Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+certgen:
+  job:
+    resources:
+      limits:
+        cpu: 100m
+        memory: 64Mi
+      requests:
+        cpu: 50m
+        memory: 32Mi

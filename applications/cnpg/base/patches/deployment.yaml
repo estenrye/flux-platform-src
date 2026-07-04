@@ -1,0 +1,19 @@
+- op: add
+  path: /spec/strategy
+  value:
+    type: RollingUpdate
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: Always
+- op: add
+  path: /metadata/annotations/checkov.io~1skip1
+  value: "CKV_K8S_38=CNPG controller requires the service account token to manage PostgreSQL cluster resources."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
+  value: "CNPG operator is a single-instance controller using leader election; multiple replicas use active/standby, not active/active."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+  value: "CNPG operator runs in a single-zone cluster and does not require node affinity rules."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1non-isolated-pod
+  value: "CNPG operator requires broad network access to manage PostgreSQL cluster resources across namespaces."

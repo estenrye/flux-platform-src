@@ -1,0 +1,66 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: step-ca-internal
+spec:
+  steps:
+    - name: apply-approver-policy
+      try:
+        - apply:
+            file: resources/approver-policy.yaml
+
+    - name: create-test-cert
+      try:
+        - apply:
+            file: resources/certificate.yaml
+
+    - name: wait-for-cert
+      try:
+        - assert:
+            timeout: 60s
+            file: resources/assert-cert-ready.yaml
+
+    - name: setup-network-access
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              set -e
+              export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
+              kubectl label namespace ${NAMESPACE} step-ca.io/test-access=true --overwrite
+              echo "namespace labeled for step-ca access"
+              REPO=$(git rev-parse --show-toplevel)
+              kubectl apply -f "$REPO/applications/step-ca/base/resources/network-policy.yaml"
+              echo "step-ca NetworkPolicy updated to allow test namespace ingress"
+        - apply:
+            file: resources/network-policy.yaml
+
+    - name: deploy-test-job
+      try:
+        - apply:
+            file: resources/test-job.yaml
+
+    - name: wait-for-job
+      try:
+        - assert:
+            timeout: 300s
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: step-ca-capability-test
+              status:
+                succeeded: 1
+      catch:
+        - script:
+            timeout: 60s
+            content: |
+              export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
+              echo "=== Job status ==="
+              kubectl get job step-ca-capability-test -n ${NAMESPACE} -o wide
+              echo "=== Pods ==="
+              kubectl get pods -n ${NAMESPACE} -o wide
+              echo "=== Pod logs ==="
+              kubectl logs -n ${NAMESPACE} -l app=step-ca-capability-test --tail=100 2>/dev/null || echo "(no logs available)"
+              echo "=== Pod events ==="
+              kubectl get events -n ${NAMESPACE} --sort-by=.lastTimestamp | tail -20

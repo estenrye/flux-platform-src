@@ -1,0 +1,130 @@
+kind: Deployment
+replicaCount: 1
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi
+
+ca:
+  env:
+    - name: PGPASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: step-ca-db-app
+          key: password
+  # step-ca binary has CAP_NET_BIND_SERVICE as a file capability; it must be present in the bounding set or execve fails with EPERM.
+  containerSecurityContext:
+    allowPrivilegeEscalation: true
+    readOnlyRootFilesystem: false
+    runAsNonRoot: true
+    runAsUser: 1000
+    capabilities:
+      drop:
+        - ALL
+      add:
+        - NET_BIND_SERVICE
+
+podSecurityContext:
+  runAsUser: 1000
+  runAsNonRoot: true
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: Unconfined
+
+inject:
+  enabled: true
+  config:
+    files:
+      ca.json:
+        root: /home/step/external-certs/tls.crt
+        federateRoots: []
+        crt: /home/step/external-certs/tls.crt
+        key: /home/step/external-secrets/tls.key
+        address: 0.0.0.0:9000
+        insecureAddress: 0.0.0.0:9001
+        dnsNames:
+          - ca.crossplane.rye.ninja
+          - step-certificates.step-ca.svc.cluster.local
+          - 127.0.0.1
+        logger:
+          format: json
+        db:
+          type: postgresql
+          dataSource: "postgresql://stepcas@step-ca-db-rw.step-ca.svc.cluster.local:5432/stepcas?sslmode=require"
+        authority:
+          claims:
+            minTLSCertDuration: 5m
+            maxTLSCertDuration: 8760h
+            defaultTLSCertDuration: 8760h
+            disableRenewal: false
+          provisioners:
+            - type: X5C
+              name: x5c
+              roots: ROOTS_PLACEHOLDER
+              claims:
+                maxTLSCertDuration: 8760h
+                defaultTLSCertDuration: 8760h
+              options:
+                x509:
+                  template: |
+                    {
+                      "subject": {{ toJson .Subject }},
+                      "sans": {{ toJson .SANs }},
+                      "keyUsage": ["certSign", "crlSign"],
+                      "basicConstraints": {
+                        "isCA": true,
+                        "maxPathLen": 0
+                      }
+                    }
+        crl:
+          enabled: true
+          generateOnRevoke: true
+        tls:
+          cipherSuites:
+            - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+            - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+            - TLS_AES_128_GCM_SHA256
+          minVersion: 1.2
+          maxVersion: 1.3
+          renegotiation: false
+      defaults.json:
+        ca-url: https://step-certificates.step-ca.svc.cluster.local
+        ca-config: /home/step/config/ca.json
+        fingerprint: ""
+        root: /home/step/external-certs/tls.crt
+  certificates:
+    root_ca: ""
+    intermediate_ca: ""
+  secrets:
+    x509:
+      enabled: false
+    ca_password: ""
+    provisioner_password: ""
+
+bootstrap:
+  enabled: false
+
+extraVolumes:
+  - name: config-rw
+    emptyDir: {}
+  - name: spiffe-ca-certs
+    secret:
+      secretName: csi-driver-spiffe-ca
+  - name: spiffe-ca-secrets
+    secret:
+      secretName: csi-driver-spiffe-ca
+
+extraVolumeMounts:
+  - name: config-rw
+    mountPath: /home/step/config-rw
+  - name: spiffe-ca-certs
+    mountPath: /home/step/external-certs
+    readOnly: true
+  - name: spiffe-ca-secrets
+    mountPath: /home/step/external-secrets
+    readOnly: true

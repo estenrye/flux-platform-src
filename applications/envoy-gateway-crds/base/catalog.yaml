@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: envoy-gateway-crds
+  description: |-
+    CustomResourceDefinitions for Envoy Gateway (gateway.envoyproxy.io group),
+    installed separately from the controller to avoid conflicts with
+    the gateway-api-crds application.
+  tags:
+    - crds
+    - gateway
+    - networking
+    - infrastructure
+spec:
+  type: library
+  lifecycle: production
+  owner: platform-engineering

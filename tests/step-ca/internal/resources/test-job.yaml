@@ -1,0 +1,76 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: step-ca-capability-test
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: step-ca-capability-test
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: x5c-cert
+          secret:
+            secretName: step-ca-x5c-test-cert
+      containers:
+        - name: test
+          image: smallstep/step-cli:0.30.6
+          command: ["/bin/sh", "-exc"]
+          args:
+            - |
+              CA_URL=https://step-certificates.step-ca.svc.cluster.local
+              # step-ca root CA fingerprint (sha256, no colons, lowercase)
+              FINGERPRINT=6d1c12ebc67a50f7af5790f49de659e9a426a921344c765114db4459d0acb16f
+
+              # Bootstrap step CA trust using TOFU with known fingerprint.
+              # This downloads the root CA from step-ca and stores it in ~/.step/.
+              step ca bootstrap \
+                --ca-url "$CA_URL" \
+                --fingerprint "$FINGERPRINT" \
+                --force
+              echo "bootstrap: ok"
+
+              # 1. Health check (curl -k: step-ca cert may lack internal cluster SAN)
+              HEALTH=$(curl -sk --max-time 15 "$CA_URL/health")
+              echo "Health response: $HEALTH"
+              echo "$HEALTH" | grep -q '"status":"ok"'
+              echo "health: ok"
+
+              # 2. Root CA endpoint returns the CA cert JSON
+              curl -sk --max-time 15 "$CA_URL/root/$FINGERPRINT" | grep -q '"ca"'
+              echo "root-ca: ok"
+
+              # 3. X5C provisioner — issue an intermediate CA cert
+              # CA URL and root come from bootstrapped ~/.step/ config
+              printf '' > /tmp/empty-pass
+              step ca certificate "step-ca-test-intermediate" /tmp/issued.crt /tmp/issued.key \
+                --provisioner x5c \
+                --x5c-cert /x5c-cert/tls.crt \
+                --x5c-key /x5c-cert/tls.key \
+                --password-file /tmp/empty-pass
+
+              # Verify issued cert is a CA cert
+              step certificate inspect /tmp/issued.crt | grep -q 'CA:TRUE'
+              echo "x5c-provisioner: ok"
+
+              # 4. Revoke the issued cert using mTLS (cert+key auth)
+              step ca revoke \
+                --cert /tmp/issued.crt \
+                --key /tmp/issued.key
+              echo "revocation: ok"
+
+              # 5. CRL contains the revoked serial number
+              SERIAL=$(step certificate inspect /tmp/issued.crt \
+                | grep 'Serial Number' | sed 's/.*Serial Number: *//')
+              echo "Revoked serial: $SERIAL"
+              curl -sk --max-time 15 "$CA_URL/1.0/crl" -o /tmp/crl.der
+              step crl view /tmp/crl.der | grep -qi "$SERIAL"
+              echo "crl-contains-revoked: ok"
+
+              echo "ALL CHECKS PASSED"
+          volumeMounts:
+            - name: x5c-cert
+              mountPath: /x5c-cert
+              readOnly: true

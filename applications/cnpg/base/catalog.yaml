@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cnpg
+  description: |-
+    CloudNativePG operator and CRDs for managing
+    highly available PostgreSQL clusters in Kubernetes.
+  tags:
+    - database
+    - postgresql
+    - operators
+    - crds
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

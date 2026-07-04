@@ -1,0 +1,89 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: envoy-gateway-controller-allow
+  namespace: envoy-gateway-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "Envoy proxy pods are created dynamically by the controller; the app.kubernetes.io/component=proxy label is valid but pods do not exist in the static rendered manifest."
+spec:
+  podSelector:
+    matchLabels:
+      control-plane: envoy-gateway
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: proxy
+              app.kubernetes.io/managed-by: envoy-gateway
+      ports:
+        - protocol: TCP
+          port: 18000
+        - protocol: TCP
+          port: 18001
+        - protocol: TCP
+          port: 18002
+    - ports:
+        - protocol: TCP
+          port: 9443
+        - protocol: TCP
+          port: 19001
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: envoy-proxy-allow
+  namespace: envoy-gateway-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "Envoy proxy pods are created dynamically by the Envoy Gateway controller; they are not present in the static rendered manifest but exist at runtime."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: proxy
+      app.kubernetes.io/managed-by: envoy-gateway
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 10443
+        - protocol: TCP
+          port: 10080
+        - protocol: TCP
+          port: 19001
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              control-plane: envoy-gateway
+      ports:
+        - protocol: TCP
+          port: 18000
+        - protocol: TCP
+          port: 18001
+        - protocol: TCP
+          port: 18002
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 9000
+        - protocol: TCP
+          port: 9001
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

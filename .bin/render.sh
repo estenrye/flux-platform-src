@@ -34,3 +34,4 @@ ${SCRIPTS_DIR}/render/render-put-target-repository-branch.sh
 ${SCRIPTS_DIR}/render/render-bin.sh
 ${SCRIPTS_DIR}/render/render-kustomize-base-and-patches.sh applications
 ${SCRIPTS_DIR}/render/render-kustomize-base-and-patches.sh clusters
+${SCRIPTS_DIR}/render/render-split-resources.sh

@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: step-ca-test-job-egress
+spec:
+  podSelector:
+    matchLabels:
+      app: step-ca-capability-test
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 9000
+        - protocol: TCP
+          port: 9001
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    - ports:
+        - protocol: TCP
+          port: 443

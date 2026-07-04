@@ -11,6 +11,13 @@ spec:
   # privateKey.rotationPolicy: Always is deferred until Phase 2 TrustAnchor
   # overlap automation is validated. Enabling it without automation causes outage.
   isCA: true
+  usages:
+    - digital signature
+    - cert sign
+    - crl sign
+    - ocsp signing
+    - server auth
+    - client auth
   issuerRef:
     name: selfsigned
     kind: ClusterIssuer

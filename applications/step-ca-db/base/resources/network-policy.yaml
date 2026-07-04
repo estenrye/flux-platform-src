@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: step-ca-db
+  namespace: step-ca
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "CNPG creates PostgreSQL pods dynamically; the cnpg.io/cluster label is valid but pods do not exist in the static rendered manifest."
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: step-ca-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: step-ca
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: step-certificates
+      ports:
+        - protocol: TCP
+          port: 5432

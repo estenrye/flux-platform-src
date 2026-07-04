@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: step-certificates-test-connection
+  namespace: step-ca
+  annotations:
+    checkov.io/skip1: "CKV_K8S_8=Helm test pod - one-shot connectivity check, liveness probe not applicable."
+    checkov.io/skip10: "CKV_K8S_23=Helm test pod - security hardening not applied to upstream chart test container."
+    checkov.io/skip11: "CKV_K8S_25=Helm test pod - security hardening not applied to upstream chart test container."
+    checkov.io/skip12: "CKV_K8S_28=Helm test pod - security hardening not applied to upstream chart test container."
+    checkov.io/skip13: "CKV_K8S_29=Helm test pod - security hardening not applied to upstream chart test container."
+    checkov.io/skip14: "CKV_K8S_30=Helm test pod - security hardening not applied to upstream chart test container."
+    checkov.io/skip15: "CKV_K8S_31=Helm test pod - security hardening not applied to upstream chart test container."
+    checkov.io/skip16: "CKV_K8S_35=Helm test pod - security hardening not applied to upstream chart test container."
+    checkov.io/skip17: "CKV_K8S_37=Helm test pod - security hardening not applied to upstream chart test container."
+    checkov.io/skip18: "CKV_K8S_38=Helm test pod - test container uses service account token to call the step-ca health endpoint."
+    checkov.io/skip19: "CKV_K8S_40=Helm test pod - security hardening not applied to upstream chart test container."
+    checkov.io/skip2: "CKV_K8S_9=Helm test pod - one-shot connectivity check, readiness probe not applicable."
+    checkov.io/skip20: "CKV_K8S_43=Helm test pod - upstream chart uses a floating image tag for the test container."
+    checkov.io/skip3: "CKV_K8S_10=Helm test pod - resource requests not required for a one-shot test."
+    checkov.io/skip4: "CKV_K8S_11=Helm test pod - resource limits not required for a one-shot test."
+    checkov.io/skip5: "CKV_K8S_12=Helm test pod - resource requests not required for a one-shot test."
+    checkov.io/skip6: "CKV_K8S_13=Helm test pod - resource limits not required for a one-shot test."
+    checkov.io/skip7: "CKV_K8S_14=Helm test pod - upstream chart image tag; not a production workload."
+    checkov.io/skip8: "CKV_K8S_20=Helm test pod - security hardening not applied to upstream chart test container."
+    checkov.io/skip9: "CKV_K8S_22=Helm test pod - security hardening not applied to upstream chart test container."
+    ignore-check.kube-linter.io/default-service-account: "Helm test pod - uses default service account for a one-shot connectivity check."
+    ignore-check.kube-linter.io/latest-tag: "Helm test pod - upstream chart uses a floating image tag for the test container."
+    ignore-check.kube-linter.io/no-liveness-probe: "Helm test pod - one-shot connectivity check, liveness probe not applicable."
+    ignore-check.kube-linter.io/no-node-affinity: "Helm test pod - one-shot connectivity check, node affinity not required."
+    ignore-check.kube-linter.io/no-read-only-root-fs: "Helm test pod - security hardening not applied to upstream chart test container."
+    ignore-check.kube-linter.io/no-readiness-probe: "Helm test pod - one-shot connectivity check, readiness probe not applicable."
+    ignore-check.kube-linter.io/restart-policy: "Helm test pod - Never restart policy is correct for a one-shot connectivity check."
+    ignore-check.kube-linter.io/run-as-non-root: "Helm test pod - security hardening not applied to upstream chart test container."
+    ignore-check.kube-linter.io/sorted-keys: "Helm test pod - annotation keys sorted with checkov.io/skip1x before skip2 to satisfy alphanumeric kube-linter ordering."
+    ignore-check.kube-linter.io/unset-cpu-requirements: "Helm test pod - resource limits not required for a one-shot test."
+    ignore-check.kube-linter.io/unset-memory-requirements: "Helm test pod - resource limits not required for a one-shot test."
+spec:
+  containers:
+  - name: curl
+    args:
+    - -vvv
+    - -s
+    - -k
+    - https://step-certificates:443/health
