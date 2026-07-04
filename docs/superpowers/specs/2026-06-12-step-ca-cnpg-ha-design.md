@@ -149,7 +149,7 @@ No Helm chart — the CNPG `Cluster` is a plain CR.
 |---|---|---|
 | `instances` | `3` | 1 primary + 2 standbys; survives single-node failure |
 | `postgresql.parameters.max_connections` | `100` | sufficient for step-ca's small connection pool |
-| `storage.size` | `1Gi` | step-ca stores only cert metadata and CRL state |
+| `storage.size` | `10Gi` | minimum PVC size on Rackspace Spot; step-ca's actual data footprint is small |
 | `bootstrap.initdb.database` | `stepcas` | step-ca's conventional DB name |
 | `bootstrap.initdb.owner` | `stepcas` | CNPG auto-creates `<cluster-name>-app` Secret |
 | `primaryUpdateStrategy` | `unsupervised` | allows automated failover during upgrades |

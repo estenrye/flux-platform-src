@@ -4,7 +4,7 @@ metadata:
   name: step-ca-cert-reader
   namespace: cert-manager
   annotations:
-    ignore-check.kube-linter.io/access-to-secrets: "ESO cert-reader role requires read access to the step-ca root certificate secret to sync it into the cert-manager namespace."
+    ignore-check.kube-linter.io/access-to-secrets: "ESO cert-reader role requires read access to the csi-driver-spiffe-ca secret in cert-manager to sync it into the step-ca namespace."
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

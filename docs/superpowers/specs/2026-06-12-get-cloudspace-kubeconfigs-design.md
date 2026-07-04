@@ -33,7 +33,7 @@ rye.ninja/kubeconfig: ~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.
 
 `prompt-kubeconfig.sh` already expands `~` to `$HOME`, so no lib changes are needed.
 
-Clusters that lack these annotations are silently skipped — safe for future clusters added
+Clusters that lack these annotations are logged and skipped — safe for future clusters added
 before they are annotated.
 
 ## Script: `.bin/get-cloudspace-kubeconfigs.sh`
