@@ -39,10 +39,73 @@ Parameters:
 
   CaX509Cert:
     Type: String
-    Description: 'PEM formatted X.509 certificate from external CA for the trust anchor'
+    Description: 'Base64 encoded PEM formatted X.509 certificate from external CA for the trust anchor'
     NoEcho: true
 
 Resources:
+  # Lambda execution role for the base64-decode custom resource
+  Base64DecodeLambdaRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+
+  # Lambda function that base64-decodes the certificate parameter
+  Base64DecodeFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt Base64DecodeLambdaRole.Arn
+      Runtime: python3.12
+      Timeout: 30
+      Code:
+        ZipFile: |
+          import base64
+          import json
+          import urllib.request
+
+          def send(event, context, status, data):
+              body = json.dumps({
+                  'Status': status,
+                  'Reason': str(data.get('Error', '')),
+                  'PhysicalResourceId': event.get('PhysicalResourceId', context.log_stream_name),
+                  'StackId': event['StackId'],
+                  'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'],
+                  'Data': data,
+              }).encode()
+              req = urllib.request.Request(
+                  event['ResponseURL'], data=body, method='PUT',
+                  headers={'Content-Type': ''})
+              urllib.request.urlopen(req)
+
+          def handler(event, context):
+              try:
+                  if event['RequestType'] == 'Delete':
+                      send(event, context, 'SUCCESS', {})
+                      return
+                  encoded = event['ResourceProperties']['EncodedCert'].strip()
+                  if encoded.startswith('-----BEGIN'):
+                      decoded = encoded
+                  else:
+                      decoded = base64.b64decode(encoded + '=' * (-len(encoded) % 4)).decode('utf-8')
+                  send(event, context, 'SUCCESS', {'DecodedCert': decoded})
+              except Exception as e:
+                  send(event, context, 'FAILED', {'Error': str(e)})
+
+  # Custom resource that invokes the Lambda to produce the decoded cert
+  DecodedCert:
+    Type: 'Custom::Base64Decode'
+    Properties:
+      ServiceToken: !GetAtt Base64DecodeFunction.Arn
+      EncodedCert: !Ref CaX509Cert
   # IAM Roles Anywhere Trust Anchor
   TrustAnchor:
     Type: 'AWS::RolesAnywhere::TrustAnchor'
@@ -51,7 +114,7 @@ Resources:
       Source:
         SourceType: 'CERTIFICATE_BUNDLE'
         SourceData:
-          X509CertificateData: !Ref CaX509Cert
+          X509CertificateData: !GetAtt DecodedCert.DecodedCert
       Enabled: true
       Tags:
         - Key: 'Name'

@@ -50,18 +50,7 @@ auth-aws:
 		--use-device-code
 
 aws-deploy-cloudformation-stack-rolesanywhere:
-	SPIFFE_CA_NAME=csi-driver-spiffe-ca
-	SPIFFE_CA_SECRET_NAME=$$(kubectl get certificate -n cert-manager csi-driver-spiffe-ca -o jsonpath='{.spec.secretName}')
-	SPIFFE_CA_CERT=$$(kubectl get secret -n cert-manager ${SPIFFE_CA_SECRET_NAME} -o jsonpath='{.data.ca\.crt}' | base64 --decode)
-	.venv/bin/awscliv2 cloudformation deploy \
-		--profile ops-opex-dns-automation \
-		--stack-name crossplane-provider-dns-admin \
-		--template-file providers/aws/crossplane-iam-roles-anywhere.yaml \
-		--parameter-overrides \
-			ParameterKey=RoleName,ParameterValue=crossplane-provider-dns-admin \
-			ParameterKey=SpiffeUri,ParameterValue=spiffe://cluster.local/ns/crossplane-system/sa/aws-route53-dns-provider \
-			ParameterKey=CaX509Cert,ParameterValue="${SPIFFE_CA_CERT}" \
-		--capabilities CAPABILITY_NAMED_IAM
+	.bin/deploy-aws-roles-anywhere.sh
 
 aws-get-cloudformation-stack-outputs-trust-anchor-arn:
 	.venv/bin/awscliv2 cloudformation describe-stacks \
