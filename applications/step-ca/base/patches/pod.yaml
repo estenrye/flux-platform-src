@@ -35,3 +35,11 @@ metadata:
     ignore-check.kube-linter.io/sorted-keys: "Helm test pod - annotation keys sorted with checkov.io/skip1x before skip2 to satisfy alphanumeric kube-linter ordering."
     ignore-check.kube-linter.io/unset-cpu-requirements: "Helm test pod - resource limits not required for a one-shot test."
     ignore-check.kube-linter.io/unset-memory-requirements: "Helm test pod - resource limits not required for a one-shot test."
+spec:
+  containers:
+  - name: curl
+    args:
+    - -vvv
+    - -s
+    - -k
+    - https://step-certificates:443/health
