@@ -1,0 +1,165 @@
+digraph step_ca_stack {
+  graph [
+    rankdir=LR
+    fontname="Helvetica Neue"
+    fontsize=13
+    bgcolor="#ffffff"
+    pad=0.6
+    splines=spline
+    nodesep=0.6
+    ranksep=2.2
+  ]
+  node [
+    fontname="Helvetica Neue"
+    fontsize=10
+    shape=box
+    style="rounded,filled"
+    margin="0.15,0.08"
+  ]
+  edge [
+    fontname="Helvetica Neue"
+    fontsize=9
+    arrowsize=0.7
+  ]
+
+  // ── Legend ──────────────────────────────────────────────────────
+  subgraph cluster_legend {
+    label="Legend"
+    style="rounded,filled"
+    fillcolor="#f8fafc"
+    color="#94a3b8"
+    fontsize=10
+
+    l_app    [label="HelmRelease / App"  fillcolor="#dbeafe" color="#3b82f6"]
+    l_secret [label="Secret"             fillcolor="#fed7aa" color="#ea580c"]
+    l_eso    [label="ESO resource"       fillcolor="#ccfbf1" color="#0d9488"]
+    l_rbac   [label="RBAC"              fillcolor="#fce7f3" color="#db2777"]
+    l_prov   [label="Provisioner"        fillcolor="#fef9c3" color="#ca8a04"]
+    l_gw     [label="Gateway resource"   fillcolor="#dcfce7" color="#16a34a"]
+    l_test   [label="Chainsaw Test"      fillcolor="#f3e8ff" color="#9333ea"]
+    l_sc     [label="StorageClass"       fillcolor="#e2e8f0" color="#475569"]
+
+    l_app  -> l_eso    [style=dashed color="#3b82f6" xlabel="defines"]
+    l_eso  -> l_secret [style=dashed color="#0d9488" xlabel="syncs_to"]
+    l_eso  -> l_rbac   [style=solid  color="#0d9488" xlabel="authenticates_via"]
+    l_test -> l_app    [style=dashed color="#9333ea" xlabel="tests"]
+  }
+
+  // ── Platform operators ───────────────────────────────────────────
+  subgraph cluster_platform {
+    label="Platform Operators"
+    style="rounded,filled"
+    fillcolor="#f8fafc"
+    color="#94a3b8"
+    fontsize=10
+
+    cnpg     [label="cnpg\nv0.28.3"                     fillcolor="#dbeafe" color="#3b82f6"]
+    eso      [label="external-secrets-operator\nv2.4.1" fillcolor="#dbeafe" color="#3b82f6"]
+    envoy_gw [label="envoy-gateway\nv1.8.1"             fillcolor="#dbeafe" color="#3b82f6"]
+    sc_ssdv2 [label="StorageClass\nssdv2-performance\ncinder.csi.openstack.org\ntype=performance · default" fillcolor="#e2e8f0" color="#475569"]
+  }
+
+  // ── cert-manager SPIFFE stack ────────────────────────────────────
+  subgraph cluster_certmgr {
+    label="cert-manager SPIFFE stack  (cert-manager namespace)"
+    style="rounded,filled"
+    fillcolor="#eff6ff"
+    color="#3b82f6"
+    fontsize=10
+
+    cm_spiffe_issuer [label="cert-manager\nspiffe-issuer"              fillcolor="#dbeafe" color="#3b82f6"]
+    cm_spiffe_csi    [label="cert-manager\nspiffe-csi-driver\nv0.12.0" fillcolor="#dbeafe" color="#3b82f6"]
+    spiffe_ca_secret [label="Secret\ncsi-driver-spiffe-ca\n(cert-manager ns)\ntls.crt · tls.key · ca.crt" fillcolor="#fed7aa" color="#ea580c"]
+    cert_reader_rbac [label="step-ca-cert-reader RBAC\nSA (step-ca ns)\nRole + RoleBinding (cert-manager ns)\nget secrets/csi-driver-spiffe-ca" fillcolor="#fce7f3" color="#db2777"]
+  }
+
+  // ── step-ca stack ────────────────────────────────────────────────
+  subgraph cluster_step_ca {
+    label="step-ca stack  (step-ca namespace)"
+    style="rounded,filled"
+    fillcolor="#fefce8"
+    color="#ca8a04"
+    fontsize=10
+
+    step_ca    [label="step-ca\nv1.30.1\nhttps://ca.crossplane.rye.ninja" fillcolor="#dbeafe" color="#3b82f6"]
+    step_ca_db [label="step-ca-db\n3× PostgreSQL (CNPG)\ndatabase: stepcas\n10Gi PVC"   fillcolor="#dbeafe" color="#3b82f6"]
+
+    x5c_prov   [label="X5C Provisioner\n(x5c)\nisCA=true · maxPathLen=0\n1y max duration" fillcolor="#fef9c3" color="#ca8a04"]
+    gw         [label="Gateway/step-ca\nTLS Passthrough :443\nHTTP CRL :80\nca.crossplane.rye.ninja" fillcolor="#dcfce7" color="#16a34a"]
+
+    // ESO objects
+    secret_store  [label="SecretStore\ncert-manager-secrets\n(step-ca ns)\nprovider: kubernetes\nremoteNamespace: cert-manager" fillcolor="#ccfbf1" color="#0d9488"]
+    ext_secret    [label="ExternalSecret\ncsi-driver-spiffe-ca\n(step-ca ns)\nrefreshInterval: 1h\ncreationPolicy: Owner" fillcolor="#ccfbf1" color="#0d9488"]
+
+    // Secrets
+    spiffe_ca_secret_stepca [label="Secret\ncsi-driver-spiffe-ca\n(step-ca ns)\ntls.crt · tls.key\nowned by ExternalSecret" fillcolor="#fed7aa" color="#ea580c"]
+    db_app_secret           [label="Secret\nstep-ca-db-app\n(step-ca ns)\npassword\n⚡ runtime · CNPG"                       fillcolor="#fed7aa" color="#ea580c"]
+  }
+
+  // ── Chainsaw tests ───────────────────────────────────────────────
+  subgraph cluster_tests {
+    label="Chainsaw Tests"
+    style="rounded,filled"
+    fillcolor="#faf5ff"
+    color="#9333ea"
+    fontsize=10
+
+    test_internal [label="chainsaw-test\nstep-ca-internal\nin-cluster X5C issuance\n+ test Job" fillcolor="#f3e8ff" color="#9333ea"]
+    test_external [label="chainsaw-test\nstep-ca-external\nhealth · fingerprint\nX5C · revoke · CRL" fillcolor="#f3e8ff" color="#9333ea"]
+  }
+
+  // ── depends_on (solid gray) ──────────────────────────────────────
+  edge [color="#64748b" style=solid]
+  step_ca    -> step_ca_db        [xlabel="stores CA state"]
+  step_ca    -> cm_spiffe_issuer  [xlabel="csi-driver-spiffe-ca\nClusterIssuer"]
+  step_ca    -> eso               [xlabel="ESO operator"]
+  step_ca    -> envoy_gw          [xlabel="Envoy Gateway"]
+  step_ca    -> cm_spiffe_csi     [xlabel="SVID mTLS"]
+  step_ca_db -> cnpg              [xlabel="CNPG operator"]
+  step_ca_db -> sc_ssdv2         [xlabel="10Gi PVC"]
+
+  // ── defines (dashed blue) ────────────────────────────────────────
+  edge [color="#3b82f6" style=dashed arrowsize=0.6]
+  step_ca -> x5c_prov      [xlabel="defines"]
+  step_ca -> gw            [xlabel="defines"]
+  step_ca -> secret_store  [xlabel="defines"]
+  step_ca -> ext_secret    [xlabel="defines"]
+  step_ca -> cert_reader_rbac [xlabel="defines"]
+
+  // ── ESO wiring (teal) ────────────────────────────────────────────
+  edge [color="#0d9488" style=solid arrowsize=0.7]
+  secret_store -> cert_reader_rbac  [xlabel="authenticates_via\n(SA token)"]
+
+  edge [color="#0d9488" style=dashed arrowsize=0.6]
+  secret_store -> spiffe_ca_secret  [xlabel="grants_access_to"]
+  ext_secret   -> secret_store      [xlabel="uses\n(secretStoreRef)"]
+  ext_secret   -> spiffe_ca_secret  [xlabel="reads_from\n(tls.crt, tls.key)"]
+  ext_secret   -> spiffe_ca_secret_stepca [xlabel="syncs_to\n(Owner · 1h)"]
+
+  // ── Gateway uses envoy-gateway (dashed gray) ─────────────────────
+  edge [color="#64748b" style=dashed arrowsize=0.6]
+  gw -> envoy_gw [xlabel="merged-eg\nGatewayClass"]
+
+  // ── mounts (solid orange) ────────────────────────────────────────
+  edge [color="#ea580c" style=solid arrowsize=0.7]
+  step_ca -> spiffe_ca_secret_stepca [xlabel="mounts\n/home/step/external-{certs,secrets}"]
+
+  // ── reads (dashed orange) ────────────────────────────────────────
+  edge [color="#ea580c" style=dashed arrowsize=0.6]
+  step_ca -> db_app_secret [xlabel="reads\nPGPASSWORD"]
+
+  // ── creates (dashed green) ───────────────────────────────────────
+  edge [color="#16a34a" style=dashed arrowsize=0.6]
+  step_ca_db -> db_app_secret [xlabel="creates\n(CNPG bootstrap)"]
+
+  // ── trusts_roots_from (solid purple) ─────────────────────────────
+  edge [color="#9333ea" style=solid arrowsize=0.7]
+  x5c_prov -> spiffe_ca_secret_stepca [xlabel="trusts_roots_from\n(patch-ca-config\ninit container)"]
+
+  // ── tests (dashed purple) ────────────────────────────────────────
+  edge [color="#9333ea" style=dashed arrowsize=0.6]
+  test_internal -> step_ca          [xlabel="tests"]
+  test_external -> step_ca          [xlabel="tests"]
+  test_internal -> cm_spiffe_issuer [xlabel="X5C auth cert"]
+  test_external -> cm_spiffe_issuer [xlabel="X5C auth cert"]
+}

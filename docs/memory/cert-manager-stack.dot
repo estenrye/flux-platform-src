@@ -1,0 +1,190 @@
+digraph cert_manager_stack {
+  graph [
+    rankdir=LR
+    fontname="Helvetica Neue"
+    fontsize=13
+    bgcolor="#ffffff"
+    pad=0.6
+    splines=spline
+    nodesep=0.5
+    ranksep=1.6
+  ]
+  node [
+    fontname="Helvetica Neue"
+    fontsize=10
+    shape=box
+    style="rounded,filled"
+    margin="0.15,0.08"
+  ]
+  edge [
+    fontname="Helvetica Neue"
+    fontsize=9
+    arrowsize=0.7
+  ]
+
+  // ── Legend ──────────────────────────────────────────────────────
+  subgraph cluster_legend {
+    label="Legend"
+    style="rounded,filled"
+    fillcolor="#f8fafc"
+    color="#94a3b8"
+    fontsize=10
+
+    l_app    [label="HelmRelease / App" fillcolor="#dbeafe" color="#3b82f6"]
+    l_ci     [label="ClusterIssuer / Issuer" fillcolor="#dcfce7" color="#16a34a"]
+    l_cert   [label="Certificate" fillcolor="#fef9c3" color="#ca8a04"]
+    l_secret [label="Secret" fillcolor="#fed7aa" color="#ea580c"]
+    l_crp    [label="CertificateRequestPolicy" fillcolor="#f3e8ff" color="#9333ea"]
+    l_ext    [label="External consumer" fillcolor="#fce7f3" color="#db2777"]
+    l_aws    [label="AWS resource" fillcolor="#fde68a" color="#d97706"]
+
+    l_app -> l_ci    [style=dashed color="#3b82f6" xlabel="defines"]
+    l_ci   -> l_cert [style=solid  color="#16a34a" xlabel="issues"]
+    l_cert -> l_secret [style=solid color="#ea580c" xlabel="produces"]
+    l_crp  -> l_cert [style=solid color="#9333ea" xlabel="approves"]
+    l_app  -> l_app  [style=solid color="#64748b" xlabel="depends_on"]
+    l_aws  -> l_aws  [style=dashed color="#d97706" xlabel="creates / links_to"]
+  }
+
+  // ── Application nodes ────────────────────────────────────────────
+  cm      [label="cert-manager\nv1.20.1" fillcolor="#dbeafe" color="#3b82f6"]
+  cm_ap   [label="cert-manager\napprover-policy\nv0.24.0" fillcolor="#dbeafe" color="#3b82f6"]
+  cm_si   [label="cert-manager\nspiffe-issuer" fillcolor="#dbeafe" color="#3b82f6"]
+  cm_tm   [label="cert-manager\ntrust-manager\nv0.22.0" fillcolor="#dbeafe" color="#3b82f6"]
+  cm_csi  [label="cert-manager\nspiffe-csi-driver\nv0.12.0" fillcolor="#dbeafe" color="#3b82f6"]
+
+  // ── Issuers ──────────────────────────────────────────────────────
+  selfsigned_ci  [label="ClusterIssuer\nselfsigned" fillcolor="#dcfce7" color="#16a34a"]
+  spiffe_ca_ci   [label="ClusterIssuer\ncsi-driver-spiffe-ca" fillcolor="#dcfce7" color="#16a34a"]
+  tm_issuer      [label="Issuer\ntrust-manager\n(cert-manager ns)" fillcolor="#dcfce7" color="#16a34a"]
+
+  // ── Certificates ─────────────────────────────────────────────────
+  spiffe_ca_cert [label="Certificate\ncsi-driver-spiffe-ca\n90d · isCA=true\nrotationPolicy: ⚠ NOT set" fillcolor="#fef9c3" color="#ca8a04"]
+  tm_cert        [label="Certificate\ntrust-manager\nrotationPolicy: Always" fillcolor="#fef9c3" color="#ca8a04"]
+
+  // ── Secrets ──────────────────────────────────────────────────────
+  spiffe_ca_secret [label="Secret\ncsi-driver-spiffe-ca\n(cert-manager ns)\ntls.key · tls.crt · ca.crt" fillcolor="#fed7aa" color="#ea580c"]
+  tm_tls_secret    [label="Secret\ntrust-manager-tls\n(cert-manager ns)" fillcolor="#fed7aa" color="#ea580c"]
+
+  // ── CertificateRequestPolicies ───────────────────────────────────
+  spiffe_policy [label="CertificateRequestPolicy\ncsi-driver-spiffe-ca-policy\nscoped: selfsigned ClusterIssuer" fillcolor="#f3e8ff" color="#9333ea"]
+  tm_policy     [label="CertificateRequestPolicy\ntrust-manager-policy\nscoped: trust-manager Issuer" fillcolor="#f3e8ff" color="#9333ea"]
+
+  // ── External consumers ───────────────────────────────────────────
+  step_ca   [label="step-ca\n(external consumer)" fillcolor="#fce7f3" color="#db2777"]
+  workloads [label="workloads\n(SPIFFE SVID consumers)" fillcolor="#fce7f3" color="#db2777"]
+
+  // ── Crossplane providers (SVID consumers → AWS auth) ─────────────
+  xp_r53  [label="crossplane-provider\naws-route53" fillcolor="#dbeafe" color="#3b82f6"]
+  xp_iam  [label="crossplane-provider\naws-iam" fillcolor="#dbeafe" color="#3b82f6"]
+  xp_ra   [label="crossplane-provider\naws-rolesanywhere" fillcolor="#dbeafe" color="#3b82f6"]
+
+  // ── AWS IAM Roles Anywhere ────────────────────────────────────────
+  subgraph cluster_aws {
+    label="AWS · ops-opex-dns-automation (832767337984) · us-east-2\nAWS_PROFILE=ops-opex-dns-automation"
+    style="rounded,filled"
+    fillcolor="#fffbeb"
+    color="#d97706"
+    fontsize=10
+
+    cfn_stack  [label="CloudFormation Stack\ncrossplane-provider-dns-admin\nmake aws-deploy-cloudformation-stack-rolesanywhere" fillcolor="#fde68a" color="#d97706"]
+    trust_anch [label="IAM Roles Anywhere\nTrust Anchor\ncrossplane-provider-trust-anchor" fillcolor="#fde68a" color="#d97706"]
+
+    profile_r53 [label="Profile\ncrossplane-provider-route53-admin" fillcolor="#fef3c7" color="#b45309"]
+    profile_iam [label="Profile\ncrossplane-provider-iam-admin" fillcolor="#fef3c7" color="#b45309"]
+    profile_ra  [label="Profile\ncrossplane-provider-rolesanywhere-admin" fillcolor="#fef3c7" color="#b45309"]
+
+    iam_r53    [label="IAM Role\ncrossplane-provider-route53-admin\n(Route53 full access)" fillcolor="#fef9c3" color="#d97706"]
+    iam_iam    [label="IAM Role\ncrossplane-provider-iam-admin\n(IAM full access)" fillcolor="#fef9c3" color="#d97706"]
+    iam_ra     [label="IAM Role\ncrossplane-provider-rolesanywhere-admin\n(Roles Anywhere admin)" fillcolor="#fef9c3" color="#d97706"]
+  }
+
+  // ── Application depends_on edges (solid gray) ────────────────────
+  edge [color="#64748b" style=solid]
+  cm_ap  -> cm
+  cm_si  -> cm
+  cm_si  -> cm_ap
+  cm_tm  -> cm
+  cm_csi -> cm
+  cm_csi -> cm_si
+  cm_csi -> cm_ap
+
+  // ── defines edges (dashed blue) ──────────────────────────────────
+  edge [color="#3b82f6" style=dashed arrowsize=0.6]
+  cm_si -> selfsigned_ci
+  cm_si -> spiffe_ca_cert
+  cm_si -> spiffe_ca_ci
+  cm_si -> spiffe_policy
+  cm_tm -> tm_issuer
+  cm_tm -> tm_cert
+  cm_tm -> tm_policy
+
+  // ── issues edges (solid green) ───────────────────────────────────
+  edge [color="#16a34a" style=solid]
+  selfsigned_ci -> spiffe_ca_cert
+  tm_issuer     -> tm_cert
+
+  // ── produces edges (solid orange) ───────────────────────────────
+  edge [color="#ea580c" style=solid]
+  spiffe_ca_cert -> spiffe_ca_secret
+  tm_cert        -> tm_tls_secret
+
+  // ── ClusterIssuer depends_on Secret ─────────────────────────────
+  edge [color="#64748b" style=solid]
+  spiffe_ca_ci -> spiffe_ca_secret
+
+  // ── approves edges (solid purple) ────────────────────────────────
+  edge [color="#9333ea" style=solid]
+  spiffe_policy -> spiffe_ca_cert
+  tm_policy     -> tm_cert
+
+  // ── CertificateRequestPolicy depends_on approver-policy ─────────
+  edge [color="#64748b" style=solid]
+  spiffe_policy -> cm_ap
+  tm_policy     -> cm_ap
+
+  // ── CSI driver depends_on ClusterIssuer ─────────────────────────
+  cm_csi -> spiffe_ca_ci
+
+  // ── External consumer edges (dashed pink) ────────────────────────
+  edge [color="#db2777" style=dashed arrowsize=0.6]
+  step_ca   -> spiffe_ca_secret [xlabel="pulls via ESO"]
+  step_ca   -> cm_csi           [xlabel="uses SVID"]
+  cm_csi    -> workloads        [xlabel="injects SVID\ninto pods"]
+  cm_csi    -> xp_r53           [xlabel="injects SVID\ninto pods"]
+  cm_csi    -> xp_iam           [xlabel="injects SVID\ninto pods"]
+  cm_csi    -> xp_ra            [xlabel="injects SVID\ninto pods"]
+
+  // ── Secret → Trust Anchor (source material) ──────────────────────
+  edge [color="#ea580c" style=solid arrowsize=0.7]
+  spiffe_ca_secret -> trust_anch [xlabel="ca.crt →\nTrust Anchor\ncert bundle"]
+
+  // ── CloudFormation creates ────────────────────────────────────────
+  edge [color="#d97706" style=dashed arrowsize=0.6]
+  cfn_stack -> spiffe_ca_secret [xlabel="reads ca.crt"]
+  cfn_stack -> trust_anch       [xlabel="creates"]
+  cfn_stack -> profile_r53      [xlabel="creates"]
+  cfn_stack -> profile_iam      [xlabel="creates"]
+  cfn_stack -> profile_ra       [xlabel="creates"]
+  cfn_stack -> iam_r53          [xlabel="creates"]
+  cfn_stack -> iam_iam          [xlabel="creates"]
+  cfn_stack -> iam_ra           [xlabel="creates"]
+
+  // ── Trust Anchor authenticates Profiles ──────────────────────────
+  edge [color="#d97706" style=solid arrowsize=0.7]
+  trust_anch -> profile_r53 [xlabel="authenticates\nSVIDs"]
+  trust_anch -> profile_iam
+  trust_anch -> profile_ra
+
+  // ── Profiles link to IAM Roles ───────────────────────────────────
+  edge [color="#b45309" style=solid arrowsize=0.7]
+  profile_r53 -> iam_r53 [xlabel="links to"]
+  profile_iam -> iam_iam [xlabel="links to"]
+  profile_ra  -> iam_ra  [xlabel="links to"]
+
+  // ── Crossplane providers authenticate via Profile ─────────────────
+  edge [color="#3b82f6" style=dashed arrowsize=0.6]
+  xp_r53 -> profile_r53 [xlabel="uses profile"]
+  xp_iam -> profile_iam [xlabel="uses profile"]
+  xp_ra  -> profile_ra  [xlabel="uses profile"]
+}

@@ -39,7 +39,7 @@ To configure the local `step` CLI to target this CA:
 ```bash
 step ca bootstrap \
   --ca-url https://ca.crossplane.rye.ninja \
-  --fingerprint 6d1c12ebc67a50f7af5790f49de659e9a426a921344c765114db4459d0acb16f
+  --fingerprint $FINGERPRINT
 ```
 
 Writes CA config and root cert to `~/.step`. Subsequent `step` commands use this CA by default.
