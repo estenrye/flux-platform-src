@@ -1,0 +1,8 @@
+[Unit]
+Description=replicate vmpool/vms zvols to TrueNAS
+After=network-online.target zfs.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/zfs-replicate-vms.sh

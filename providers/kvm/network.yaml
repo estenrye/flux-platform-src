@@ -1,0 +1,60 @@
+# Network plan for the `controlplane` cluster (IPv6-only Talos on KVM).
+# Authoritative record of the ULA plan in the M1 design
+# (docs/superpowers/specs/2026-07-11-m1-controlplane-cluster-design.md §4).
+#
+# Renumbering caveat: everything under gua_prefix is delegated by the ISP and
+# can change. All GUA-derived values MUST be computed from gua_prefix so a
+# renumber is a one-variable change (docs/runbooks/gua-prefix-renumber.md).
+# ULA addressing is site-stable and immune to ISP renumbering.
+
+# RFC 4193 randomly generated site prefix. Final value locked at M1
+# implementation; changing it after bootstrap requires a cluster rebuild.
+ula_prefix: fd97:45c2:b3a1::/48
+
+# Delegated GUA prefix on VLAN 100 (TFiber via UniFi "Internet 1").
+# Variable by design — see renumbering caveat above.
+gua_prefix: 2607:3640:1064:270::/64
+
+vlan100:
+  # IPv4 exists on VLAN 100 but is unused by the cluster; only the NAT64
+  # appliance carries a v4 address (the single deliberate dual-stack exception).
+  ipv4_subnet: 10.45.0.0/16
+  ipv4_gateway: 10.45.0.1
+  ipv6_gateway_gua: 2607:3640:1064:270::1
+  ipv6_gateway_link_local: fe80::ae8b:a9ff:fe6e:13de
+
+allocations:
+  infra_subnet: fd97:45c2:b3a1:100::/64 # node addresses, apiserver VIP, appliance, internal LB VIPs
+  apiserver_vip: fd97:45c2:b3a1:100::10 # Talos shared L2 VIP; api.controlplane.rye.ninja (internal DNS)
+  controlplane_nodes:
+    controlplane-cp-1: fd97:45c2:b3a1:100::11
+    controlplane-cp-2: fd97:45c2:b3a1:100::12
+    controlplane-cp-3: fd97:45c2:b3a1:100::13
+  worker_nodes:
+    controlplane-wk-1: fd97:45c2:b3a1:100::21
+    controlplane-wk-2: fd97:45c2:b3a1:100::22
+    controlplane-wk-3: fd97:45c2:b3a1:100::23
+  nat64_appliance:
+    ula: fd97:45c2:b3a1:100::64
+    ipv4: 10.45.0.64/16 # translated-traffic egress toward the v4 gateway
+    tayga_pool: 192.168.255.0/24 # private dynamic pool on the tayga TUN interface
+    nat64_prefix: 64:ff9b::/96 # RFC 6052 well-known prefix
+  truenas:
+    ula_reserved: fd97:45c2:b3a1:100::1000
+    gua: 2607:3640:1064:270::1000
+    hostname: nas.rye.ninja
+  kvm_host:
+    ula: fd97:45c2:b3a1:100::2000
+  internal_lb_vip_pool: fd97:45c2:b3a1:100:ffff::/112 # Calico BGP-advertised, LAN-internal services
+  pod_cidr: fd97:45c2:b3a1:1100::/56 # Calico IPv6 pool, /64 per node
+  service_cidr: fd97:45c2:b3a1:2000::/112 # kube service network
+  # Ingress GUA VIP pool is <gua_prefix>:ffff::/112 — derived from gua_prefix
+  # at render/apply time, never written out here (renumber-exposed by design).
+  ingress_vip_pool_suffix: "ffff::/112"
+
+bgp:
+  gateway_asn: 64512
+  cluster_asn: 64513
+  # Calico peers with the gateway's VLAN 100 GUA address (<gua_prefix>::1).
+  # The gateway side accepts dynamic neighbors from the VLAN 100 GUA /64
+  # because node source addresses for GUA-destined sessions are SLAAC-derived.

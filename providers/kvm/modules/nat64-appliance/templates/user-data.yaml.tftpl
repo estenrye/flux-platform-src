@@ -1,0 +1,94 @@
+#cloud-config
+# NAT64/DNS64 appliance (M1 design §4.3). Cattle: rebuild via
+# `tofu apply` — docs/runbooks/nat64-appliance-rebuild.md. Its outage breaks
+# only IPv4-only egress (GitHub/ghcr); v6-native traffic is unaffected.
+hostname: ${hostname}
+package_update: true
+packages:
+  - tayga
+  - unbound
+  - nftables
+  - qemu-guest-agent
+
+%{ if length(authorized_ssh_keys) > 0 ~}
+users:
+  - name: nat64admin
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys:
+%{ for key in authorized_ssh_keys ~}
+      - ${key}
+%{ endfor ~}
+%{ endif ~}
+
+growpart:
+  mode: auto
+  devices: ["/"]
+
+write_files:
+  - path: /etc/sysctl.d/99-nat64.conf
+    content: |
+      net.ipv4.ip_forward=1
+      net.ipv6.conf.all.forwarding=1
+
+  - path: /etc/tayga.conf
+    content: |
+      # Userspace NAT64 (RFC 6146) translating the well-known prefix to a
+      # private dynamic IPv4 pool, masqueraded out the LAN interface.
+      tun-device nat64
+      # tayga's own addresses inside the translator (must not collide with
+      # host addresses):
+      ipv4-addr ${tayga_pool_gw}
+      ipv6-addr fd97:45c2:b3a1:100::6401
+      prefix ${nat64_prefix}
+      dynamic-pool ${tayga_pool_cidr}
+      data-dir /var/spool/tayga
+
+  - path: /etc/default/tayga
+    content: |
+      RUN="yes"
+      # Let the packaged unit bring up the tun device and install routes for
+      # the NAT64 prefix and the dynamic pool.
+      CONFIGURE_IFACE="yes"
+      # NAT44 for the pool is handled explicitly in /etc/nftables.conf.
+      CONFIGURE_NAT44="no"
+      IPV4_TUN_ADDR="192.168.255.2"
+      IPV6_TUN_ADDR="fd97:45c2:b3a1:100::6402"
+      DAEMON_OPTS=""
+
+  - path: /etc/nftables.conf
+    content: |
+      #!/usr/sbin/nft -f
+      flush ruleset
+      table ip nat {
+        chain postrouting {
+          type nat hook postrouting priority srcnat; policy accept;
+          ip saddr ${tayga_pool_cidr} oifname "lan" masquerade
+        }
+      }
+
+  - path: /etc/unbound/unbound.conf.d/dns64.conf
+    content: |
+      # DNS64 recursive resolver for the IPv6-only cluster. Synthesizes AAAA
+      # from A records only when no real AAAA exists (dns64-synthall: no).
+      server:
+        interface: ${split("/", ula_address)[0]}
+        interface: ::1
+        interface: 127.0.0.1
+        access-control: ${dns64_allowed_cidr} allow
+        access-control: ::1 allow
+        access-control: 127.0.0.0/8 allow
+        module-config: "dns64 validator iterator"
+        dns64-prefix: ${nat64_prefix}
+        dns64-synthall: no
+        prefetch: yes
+        do-ip4: yes
+        do-ip6: yes
+
+runcmd:
+  - sysctl --system
+  - systemctl enable --now qemu-guest-agent nftables
+  - systemctl restart nftables
+  - systemctl enable --now tayga unbound
+  - systemctl restart tayga unbound

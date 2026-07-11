@@ -1,0 +1,17 @@
+# SOPS creation rules for the controlplane cluster (M1 design §7.1).
+# Recipient: the controlplane age key. The private key is NOT committed
+# (.gitignore) — it lives in the keychain/1Password vault `controlplane`
+# alongside the other cluster age keys. TODO(M1 step 4, human): confirm
+# whether the repo-admin recovery key should be added as a second recipient;
+# the crossplane cluster key is unsuitable because its private half is
+# tracked in this repo.
+creation_rules:
+  # Talos machine secrets: every value is sensitive — encrypt the whole file.
+  - path_regex: secrets/talos-secrets\.sops\.yaml$
+    age: >-
+      age16p6p30le4wlka4gpvjafnr87sunrynwseegl7gvf234qk53hv49q4tl0e7
+  # Kubernetes Secret manifests: encrypt data/stringData only (repo convention).
+  - path_regex: .*\.yaml
+    encrypted_regex: ^(data|stringData)$
+    age: >-
+      age16p6p30le4wlka4gpvjafnr87sunrynwseegl7gvf234qk53hv49q4tl0e7

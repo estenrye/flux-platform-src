@@ -1,0 +1,22 @@
+# Version pins for the KVM-hosted Talos control plane cluster.
+# Single source of truth consumed by tofu (yamldecode) and .bin scripts (yq).
+# Upgrades are deliberate: bump here, then follow docs/runbooks/talos-upgrade.md.
+talos:
+  # Current stable at implementation time (2026-07-11).
+  version: v1.13.5
+  # Kubernetes version shipped with the pinned Talos release.
+  kubernetes_version: 1.36.2
+  # Image factory schematic. The schematic ID is the deterministic hash the
+  # factory returns when this customization is POSTed to
+  # https://factory.talos.dev/schematics; .bin/create-controlplane-cluster.sh
+  # computes it at run time so the ID can never drift from this definition.
+  schematic:
+    customization:
+      systemExtensions:
+        officialExtensions:
+          - siderolabs/qemu-guest-agent # VM lifecycle integration (shutdown, IP reporting)
+          - siderolabs/iscsi-tools # required by democratic-csi iSCSI over IPv6
+nat64_appliance:
+  # Ubuntu LTS cloud image for the Tayga/unbound appliance.
+  ubuntu_series: noble
+  image_url: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img

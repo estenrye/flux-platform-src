@@ -1,0 +1,8 @@
+[Unit]
+Description=controlplane etcd snapshot to TrueNAS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/etcd-snapshot.sh

@@ -1,0 +1,19 @@
+# KVM host inventory for the `controlplane` cluster.
+# Tofu takes this as a host list so a second host can slot in later without
+# redesign (M1 design §3). Single-host SPOF is accepted for M1.
+hosts:
+  - name: mf-ms-a2-01
+    fqdn: mf-ms-a2-01.usmnblm01.rye.ninja
+    libvirt_uri: qemu+ssh://automation-user@mf-ms-a2-01.usmnblm01.rye.ninja/system
+    os: ubuntu-22.04
+    cpu: AMD Ryzen 9 9955HX (16c/32t, AMD-V, nested virt)
+    ram_gb: 64
+    bridge: br0 # native VLAN on bond0 = VLAN 100 (2x X710 10GbE, LACP 802.3ad layer2+3)
+    ula: fd97:45c2:b3a1:100::2000
+    zfs:
+      pool: vmpool # mirror nvme1n1 + nvme2n1 (2x 3.6 TB), created by scripts/prep-kvm-host.sh
+      vm_dataset: vmpool/vms # libvirt zfs storage pool target (zvol per VM disk)
+      appliance_dataset: vmpool/appliances
+      arc_max_bytes: 8589934592 # 8 GiB — host over-commits guest RAM; ARC must not compete
+    os_disk: nvme0n1 # 931 GB LVM root — never touched by automation
+    vm_disks: [nvme1n1, nvme2n1]
