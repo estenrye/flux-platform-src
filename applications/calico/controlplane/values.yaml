@@ -1,0 +1,24 @@
+# Values for the tigera-operator chart — IPv6-only Talos cluster.
+# Addressing derives from providers/kvm/network.yaml (single source of truth);
+# nothing here is under the delegated GUA prefix, so ISP renumbering does not
+# touch this file.
+installation:
+  enabled: true
+  calicoNetwork:
+    bgp: Enabled
+    # IPv6-only: no v4 ipPools and no nodeAddressAutodetectionV4 means the
+    # operator never enables IPv4 (Talos nodes carry no IPv4 addresses at all).
+    ipPools:
+      - name: pods-v6
+        cidr: fd97:45c2:b3a1:1100::/56 # allocations.pod_cidr
+        encapsulation: None # same L2 segment; node-to-node mesh routes pods
+        natOutgoing: Enabled # pods are ULA — SNAT to node address for egress
+        blockSize: 122
+        nodeSelector: all()
+    nodeAddressAutodetectionV6:
+      cidrs:
+        - fd97:45c2:b3a1:100::/64 # node static ULAs (allocations.infra_subnet)
+  # Talos: default paths work with operator-managed Calico; kubelet volume
+  # plugin path patching is not required on Talos >= 1.5.
+apiServer:
+  enabled: true

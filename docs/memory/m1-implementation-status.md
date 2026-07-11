@@ -19,12 +19,26 @@ Pinned: Talos v1.13.5 / K8s 1.36.2; schematic id
 (qemu-guest-agent + iscsi-tools); libvirt provider `~> 0.8.0` — 0.9.x is an
 incompatible plugin-framework rewrite, do not bump casually.
 
-Remaining for M1: baseline applications (new: calico IPv6/BGP variant,
-democratic-csi, external-dns unifi-webhook variant) +
-`clusters/controlplane/kustomization.yaml`; `tests/controlplane-baseline/`
-chainsaw suites; ADRs (Talos-on-KVM, on-prem substrate, UniFi BGP LB,
-IPv6-only+NAT64); truenas-maintenance runbook; human steps 1–3 (UniFi BGP
-upload, TrueNAS prep, host prep script run); DR drill before M1 close.
+Baseline applications done (2026-07-11): applications/calico/controlplane
+(tigera-operator v3.32.1, native LB IPAM, BGP; the chart's pre-delete hook Job
+is deleted from the render — applying it would uninstall Calico),
+democratic-csi/base (chart 0.15.1, image v1.9.5 digest-pinned),
+external-dns/unifi/base (webhook v0.8.2), default-deny controlplane variant,
+clusters/controlplane/kustomization.yaml, .bin/bootstrap-controlplane-flux-key.sh.
+All digest-pinned; kube-linter + checkov clean.
+
+TrueNAS reality (differs from design doc): pool is `flash-pool`, not `tank` —
+datasets flash-pool/k8s/controlplane, flash-pool/k8s/controlplane-etcd-snapshots,
+flash-pool/replication/mf-ms-a2-01.usmnblm01.rye.ninja/vms.
+
+Remaining for M1: SOPS secrets (TrueNAS API key -> democratic-csi driver
+configs, UniFi API key -> external-dns) + uncomment them in the cluster
+kustomization; rendered repo creation BEFORE opening the M1 PR (push-cluster
+CI leg needs it); `tests/controlplane-baseline/` chainsaw suites; ADRs
+(Talos-on-KVM, on-prem substrate, UniFi BGP LB, IPv6-only+NAT64);
+truenas-maintenance runbook; human steps 2–3 finishing (API key, replication
+user, host prep); cluster bring-up; DR drill before M1 close. Human step 1
+(UniFi BGP) done 2026-07-11.
 
 Open decision flagged to Esten: whether to add a repo-admin age key as second
 SOPS recipient for `clusters/controlplane/` — the crossplane cluster key is

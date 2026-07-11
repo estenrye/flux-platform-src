@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: democratic-csi
+  description: |-
+    TrueNAS-backed CSI storage: truenas-iscsi (default, RWO) and truenas-nfs
+    (RWX) StorageClasses via the democratic-csi freenas-api drivers over the
+    TrueNAS websocket API.
+  tags:
+    - storage
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

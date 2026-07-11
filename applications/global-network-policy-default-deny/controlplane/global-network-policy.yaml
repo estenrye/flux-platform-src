@@ -1,0 +1,27 @@
+apiVersion: crd.projectcalico.org/v1
+kind: GlobalNetworkPolicy
+metadata:
+  name: deny-app-policy
+spec:
+  # Same behavioral contract as the rackspace-spot variant (ADR-17): an
+  # unlabeled namespace cannot egress except to cluster DNS. System and CNI
+  # namespaces are exempt; controlplane additionally exempts democratic-csi
+  # (node plugins are hostNetwork and mount storage from TrueNAS).
+  namespaceSelector: kubernetes.io/metadata.name not in {"calico-apiserver", "calico-system", "kube-node-lease", "kube-public", "kube-system", "tigera-operator", "democratic-csi"}
+  types:
+    - Ingress
+    - Egress
+  egress:
+    # allow all namespaces to communicate to DNS pods
+    - action: Allow
+      destination:
+        services:
+          name: kube-dns
+          namespace: kube-system
+      protocol: TCP
+    - action: Allow
+      destination:
+        services:
+          name: kube-dns
+          namespace: kube-system
+      protocol: UDP

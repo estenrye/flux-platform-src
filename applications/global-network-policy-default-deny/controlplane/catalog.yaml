@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: global-network-policy-default-deny-controlplane
+  description: |-
+    Default-deny GlobalNetworkPolicy for the controlplane cluster (ADR-17):
+    unlabeled namespaces cannot ingress or egress except to cluster DNS.
+  tags:
+    - networking
+    - security
+    - platform
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

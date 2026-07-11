@@ -1,0 +1,11 @@
+apiVersion: crd.projectcalico.org/v1
+kind: BGPPeer
+metadata:
+  name: unifi-gateway
+spec:
+  # GUA RENUMBER: the gateway's VLAN 100 GUA address (<gua_prefix>::1) —
+  # update on ISP re-delegation (docs/runbooks/gua-prefix-renumber.md).
+  # The gateway side accepts dynamic neighbors (providers/kvm/unifi-frr.conf),
+  # so only this side names a fixed peer address.
+  peerIP: 2607:3640:1064:270::1
+  asNumber: 64512

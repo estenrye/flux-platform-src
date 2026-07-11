@@ -1,0 +1,50 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Calico for the IPv6-only `controlplane` cluster (M1 design §7.2): operator
+# install + BGP peering with the UniFi gateway + native LoadBalancer IPAM
+# (Calico >= 3.30) for the ULA-internal and GUA-ingress VIP pools.
+# Talos is installed with CNI "none"; this application is what makes nodes Ready.
+
+helmCharts:
+  - name: tigera-operator
+    repo: https://docs.tigera.io/calico/charts
+    version: v3.32.1
+    releaseName: calico
+    namespace: tigera-operator
+    includeCRDs: true
+    valuesFile: values.yaml
+
+resources:
+  - resources/namespace.yaml
+  - resources/bgp-configuration.yaml
+  - resources/bgp-peer.yaml
+  - resources/ippool-lb-internal.yaml
+  - resources/ippool-lb-ingress.yaml
+
+patches:
+  # The chart's pre-delete helm hook renders as a plain Job under kustomize;
+  # applied by Flux it would RUN `operator -pre-delete` and uninstall Calico.
+  - patch: |-
+      $patch: delete
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: tigera-operator-uninstall
+        namespace: tigera-operator
+  - target:
+      kind: Deployment
+      name: tigera-operator
+    path: patches/deployment.yaml
+  - target:
+      kind: ClusterRole
+      name: tigera-operator
+    path: patches/cluster-role.yaml
+  - target:
+      kind: ClusterRoleBinding
+      name: tigera-operator
+    path: patches/cluster-role.yaml
+
+images:
+  - name: quay.io/tigera/operator
+    digest: sha256:4f32a054d5da52731f5f633816ac29cd98ffe97f69903cc04ec5ac60c86e6a02

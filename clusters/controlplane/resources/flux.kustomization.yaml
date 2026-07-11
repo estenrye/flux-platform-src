@@ -1,0 +1,18 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: flux-platform
+  namespace: flux-system
+spec:
+  decryption:
+    provider: sops
+    secretRef:
+      # Applied out-of-band by .bin/bootstrap-controlplane-flux-key.sh.
+      name: sops-age
+  interval: 10m0s
+  path: ./clusters/controlplane
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-platform-rendered
+  wait: false

@@ -1,0 +1,31 @@
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: Always
+- op: add
+  path: /spec/strategy
+  value:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+- op: replace
+  path: /spec/replicas
+  value: 3
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1read-secret-from-env-var
+  value: "This is not a custom application."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1env-value-from
+  value: "Secret comes from an external source."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+  value: "Single-host homelab cluster; no zone or role topology to express affinity against."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-read-only-root-fs
+  value: "The external-dns chart does not expose securityContext for the main container's tmp cache; the webhook sidecar is hardened via values."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip1
+  value: "CKV_K8S_38=external-dns requires the service account token to watch Services, Gateways and manage DNS records."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip2
+  value: "CKV_K8S_35=The UniFi webhook consumes the controller API key via environment variables sourced from a Kubernetes Secret (external-dns-unifi-credentials); credentials are not hardcoded in manifests."

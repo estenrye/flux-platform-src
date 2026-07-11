@@ -1,0 +1,40 @@
+csiDriver:
+  name: org.democratic-csi.nfs
+
+driver:
+  # freenas-api-nfs driver config (TrueNAS URL, API key, NFS dataset under
+  # flash-pool/k8s/controlplane) lives in this SOPS-managed secret.
+  existingConfigSecret: truenas-nfs-driver-config
+  config:
+    driver: freenas-api-nfs
+
+storageClasses:
+  - name: truenas-nfs
+    defaultClass: false
+    reclaimPolicy: Delete
+    volumeBindingMode: Immediate
+    allowVolumeExpansion: true
+    parameters:
+      fsType: nfs
+    mountOptions:
+      - noatime
+      - nfsvers=4.2
+    secrets:
+      provisioner-secret:
+      controller-publish-secret:
+      node-stage-secret:
+      node-publish-secret:
+      controller-expand-secret:
+
+volumeSnapshotClasses: []
+
+controller:
+  enabled: true
+  rbac:
+    enabled: true
+
+node:
+  hostNetwork: true
+  hostIPC: true
+  driver:
+    localtimeEnabled: false

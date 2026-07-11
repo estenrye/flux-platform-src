@@ -1,0 +1,73 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: democratic-csi
+
+# TrueNAS-backed storage for the controlplane cluster (M1 design §5.4):
+# truenas-iscsi (default, RWO) and truenas-nfs (RWX). Driver configs contain
+# the TrueNAS API key and are SOPS-encrypted per cluster
+# (clusters/controlplane/resources/democratic-csi.*.sops.yaml), referenced
+# here via existingConfigSecret.
+#
+# VALIDATION (M1 design open item): freenas-api-* drivers vs the TrueNAS
+# 25.10 JSON-RPC websocket API — exercised by the storage chainsaw suite at
+# bring-up; fallback order is ssh drivers (freenas-iscsi/freenas-nfs), then
+# pinning TrueNAS. iSCSI over IPv6 additionally requires the iscsi-tools
+# Talos extension (baked into the image schematic).
+
+helmCharts:
+  - name: democratic-csi
+    repo: https://democratic-csi.github.io/charts/
+    version: 0.15.1
+    releaseName: truenas-iscsi
+    namespace: democratic-csi
+    includeCRDs: true
+    valuesFile: values-iscsi.yaml
+  - name: democratic-csi
+    repo: https://democratic-csi.github.io/charts/
+    version: 0.15.1
+    releaseName: truenas-nfs
+    namespace: democratic-csi
+    includeCRDs: true
+    valuesFile: values-nfs.yaml
+
+resources:
+  - resources/namespace.yaml
+  - resources/network-policy.yaml
+
+patches:
+  - target:
+      kind: Deployment
+      name: .*-democratic-csi-controller
+    path: patches/controller.yaml
+  - target:
+      kind: DaemonSet
+      name: .*-democratic-csi-node
+    path: patches/node.yaml
+  - target:
+      kind: ClusterRole
+      name: .*-democratic-csi-controller-cr
+    path: patches/controller-rbac.yaml
+  - target:
+      kind: ClusterRoleBinding
+      name: .*-democratic-csi-controller-rb
+    path: patches/controller-rbac.yaml
+
+images:
+  # Chart defaults to :latest; pin the current release by digest (v1.9.5 also
+  # carries the TrueNAS 25.x API compatibility fixes).
+  - name: ghcr.io/democratic-csi/democratic-csi
+    digest: sha256:fc3b7d7ed3a616714139525075312758e23a5d425ffb539ad12c9bd20fb6001f
+  - name: ghcr.io/democratic-csi/csi-grpc-proxy
+    digest: sha256:0240d0fba3cedd598036766b1865e88aa2eac9c16822df03d5d912a81128ebb6
+  - name: registry.k8s.io/sig-storage/csi-attacher
+    digest: sha256:dbded4ebe299973e31d0ef55815eb07a990fc67872b14900a8e69232acae4f2d
+  - name: registry.k8s.io/sig-storage/csi-node-driver-registrar
+    digest: sha256:cd21e19cd8bbd5bc56f1b4f1398a436e7897da2995d6d036c9729be3f4e456e6
+  - name: registry.k8s.io/sig-storage/csi-provisioner
+    digest: sha256:6de50bacfd72627ffe4209e3db8ad7391d04ea6fb741bf51feab6c5dcfd80002
+  - name: registry.k8s.io/sig-storage/csi-resizer
+    digest: sha256:f1f352df97874442624fcef23eab04aa038f66cb0e361212f6ec09e92998184d
+  - name: registry.k8s.io/sig-storage/csi-snapshotter
+    digest: sha256:5f4bb469fec51147ce157329dab598c758da1b018bad6dad26f0ff469326d769
+  - name: docker.io/busybox
+    digest: sha256:9532d8c39891ca2ecde4d30d7710e01fb739c87a8b9299685c63704296b16028

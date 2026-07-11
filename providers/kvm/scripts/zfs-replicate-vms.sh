@@ -18,7 +18,7 @@ set -euo pipefail
 SRC_DATASET="${SRC_DATASET:-vmpool/vms}"
 NAS_HOST="${NAS_HOST:-nas.rye.ninja}"
 NAS_USER="${NAS_USER:-replication}"
-NAS_DATASET="${NAS_DATASET:-tank/replication/mf-ms-a2-01/vms}"
+NAS_DATASET="${NAS_DATASET:-flash-pool/replication/mf-ms-a2-01.usmnblm01.rye.ninja/vms}"
 
 today=$(date -u +%Y%m%d)
 label="nightly-${today}"

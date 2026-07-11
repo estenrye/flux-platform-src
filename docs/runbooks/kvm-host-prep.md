@@ -42,7 +42,7 @@ Scope: preparing a fresh (or replacement) KVM host to carry the
    - TrueNAS NFS export mounted at `/mnt/truenas/etcd-snapshots` (fstab).
    - Replication SSH key generated on the host and installed for the
      `replication` user on TrueNAS; target dataset
-     `tank/replication/mf-ms-a2-01/vms` created.
+     `flash-pool/replication/mf-ms-a2-01.usmnblm01.rye.ninja/vms` created.
    - `talosctl` (pinned version) at `/usr/local/bin/talosctl` and a
      talosconfig at `/etc/controlplane/talosconfig` (mode 0600).
 

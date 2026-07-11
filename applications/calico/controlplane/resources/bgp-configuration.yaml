@@ -1,0 +1,17 @@
+apiVersion: crd.projectcalico.org/v1
+kind: BGPConfiguration
+metadata:
+  name: default
+spec:
+  # Cluster AS per M1 design §4.4; the UniFi gateway is AS 64512.
+  asNumber: 64513
+  # Full node-to-node mesh carries pod routes on the shared L2 segment.
+  nodeToNodeMeshEnabled: true
+  logSeverityScreen: Info
+  # Advertise the LoadBalancer VIP pools to the gateway. The apiserver VIP is
+  # deliberately NOT advertised (Talos L2 shared VIP — works with BGP down).
+  serviceLoadBalancerIPs:
+    - cidr: fd97:45c2:b3a1:100:ffff::/112 # internal ULA VIP pool (site-stable)
+    # GUA RENUMBER: derived from gua_prefix in providers/kvm/network.yaml —
+    # update on ISP re-delegation (docs/runbooks/gua-prefix-renumber.md).
+    - cidr: 2607:3640:1064:270:ffff::/112 # ingress GUA VIP pool

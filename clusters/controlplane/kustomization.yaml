@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Baseline for the IPv6-only controlplane cluster (M1 design §7.2). Calico
+# first: Talos installs with CNI none, nodes stay NotReady until it lands.
+# Deliberately absent until M2: crossplane, step-ca, cert-manager stack, ESO.
+resources:
+  - ../../applications/calico/controlplane
+  - ../../applications/global-network-policy-default-deny/controlplane
+  - ../../applications/priority-classes
+  - ../../applications/prometheus-operator-crds/base
+  - ../../applications/reloader/base
+  - ../../applications/gateway-api-crds/base
+  - ../../applications/envoy-gateway-crds/base
+  - ../../applications/envoy-gateway/base
+  - ../../applications/external-dns/unifi/base
+  - ../../applications/democratic-csi/base
+  - ../../applications/flux/base
+  - ../../applications/flux-monitoring/base
+  - resources/flux.source.git.yaml
+  - resources/flux.kustomization.yaml
+  # TODO(M1, blocked on human step 2): SOPS-encrypted secrets, added once the
+  # TrueNAS API key and UniFi API key are minted:
+  #   - resources/democratic-csi.truenas-iscsi-driver-config.sops.yaml
+  #   - resources/democratic-csi.truenas-nfs-driver-config.sops.yaml
+  #   - resources/external-dns.unifi-credentials.sops.yaml
