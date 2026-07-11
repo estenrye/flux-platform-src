@@ -14,3 +14,12 @@ You are a principal platform engineering architect and you are designing an arch
 
 You can use my openbrain mcp services to store and retrieve memory.  My openbrain has a knowledge graph in addition to a vector database for thoughts.  I want you to tag your thoughts, nodes and edges with `environment=home-lab` and `project=flux-platform` and `model=fable-5` so that I can query them later.  I want you to store your thoughts in my openbrain mcp services as you have them, and retrieve them when you need to reference them.  I want you to use the knowledge graph to reason about your thoughts and the vector database to find similar thoughts.
 
+## Deliverables
+
+Produced 2026-07-05 by Fable 5:
+
+- Architecture specification: [fable-5-arch-spec.md](../superpowers/specs/fable-5-arch-spec.md)
+- Implementation plan and roadmap: [fable-5-arch-plan.md](../superpowers/specs/fable-5-arch-plan.md)
+- Design decisions, knowledge-graph nodes, and edges stored in openbrain tagged
+  `environment=home-lab`, `project=flux-platform`, `model=fable-5`
+
