@@ -1,0 +1,58 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: baseline-network-policy
+spec:
+  description: >-
+    Behavioral default-deny probe (ADR-17): in a fresh namespace, pod-to-pod
+    traffic is denied until explicit NetworkPolicies allow it. Connects by
+    pod IP and container port directly - no service DNAT - per the Calico
+    post-DNAT egress rule (docs/memory/calico-networkpolicy-dnat.md). Asserts
+    behavior, not policy names, so it is portable across default-deny
+    implementations (rackspace-spot overlay today, controlplane variant in M2).
+  steps:
+    - name: start-server
+      try:
+        - apply:
+            file: resources/server-pod.yaml
+        - assert:
+            timeout: 120s
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: np-server
+              status:
+                phase: Running
+    - name: denied-without-policy
+      try:
+        - script:
+            timeout: 120s
+            content: |
+              set -eu
+              IP=$(kubectl get pod np-server -n "${NAMESPACE}" -o jsonpath='{.status.podIP}')
+              kubectl run np-client-deny -n "${NAMESPACE}" --restart=Never \
+                --labels=app=np-client \
+                --image=busybox:1.37.0@sha256:1487d0af5f52b4ba31c7e465126ee2123fe3f2305d638e7827681e7cf6c83d5e \
+                --command -- wget -q -T 5 -O /dev/null "http://${IP}:8080"
+              kubectl wait pod np-client-deny -n "${NAMESPACE}" \
+                --for=jsonpath='{.status.phase}'=Failed --timeout=90s \
+                || { echo "FAIL: connection succeeded without an allow policy (default-deny not enforced)"; exit 1; }
+              echo "OK: traffic denied without policy"
+    - name: allowed-with-policy
+      try:
+        - apply:
+            file: resources/allow-policies.yaml
+        - script:
+            timeout: 120s
+            content: |
+              set -eu
+              IP=$(kubectl get pod np-server -n "${NAMESPACE}" -o jsonpath='{.status.podIP}')
+              kubectl run np-client-allow -n "${NAMESPACE}" --restart=Never \
+                --labels=app=np-client \
+                --image=busybox:1.37.0@sha256:1487d0af5f52b4ba31c7e465126ee2123fe3f2305d638e7827681e7cf6c83d5e \
+                --command -- wget -q -T 10 -O /dev/null "http://${IP}:8080"
+              kubectl wait pod np-client-allow -n "${NAMESPACE}" \
+                --for=jsonpath='{.status.phase}'=Succeeded --timeout=90s \
+                || { echo "FAIL: connection failed despite allow policies"; kubectl describe pod np-client-allow -n "${NAMESPACE}" | tail -20; exit 1; }
+              echo "OK: traffic allowed with explicit policy"

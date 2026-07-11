@@ -1,7 +1,7 @@
 # M0 Design: Baseline Audit, Contract Tests, and Migration Inventory
 
 Date: 2026-07-11
-Status: Approved design, ready for implementation
+Status: Implemented 2026-07-11 — gates green x2 against the Spot cluster; findings recorded in tests/platform-baseline/README.md and the inventory; human review of inventory dispositions pending (step 7)
 Parent: [fable-5-arch-plan.md](fable-5-arch-plan.md) milestone M0
 Related: [M1 design](2026-07-11-m1-controlplane-cluster-design.md) (consumer of the headroom data), M2 (consumer of the inventory and the acceptance suites)
 Executor: Sonnet 4.6 under human review

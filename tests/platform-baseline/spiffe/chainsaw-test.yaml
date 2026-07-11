@@ -1,0 +1,47 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: baseline-spiffe
+spec:
+  description: >-
+    A pod mounting a csi-driver-spiffe volume receives an X.509 SVID whose
+    URI SAN carries the expected trust domain and the pod's namespace and
+    service account (ADR-16 identity contract).
+  steps:
+    - name: create-workload
+      try:
+        - apply:
+            file: resources/approver-policy.yaml
+        - apply:
+            file: resources/rbac.yaml
+        - apply:
+            file: resources/pod.yaml
+    - name: wait-for-pod
+      try:
+        - assert:
+            timeout: 180s
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: spiffe-baseline
+              status:
+                phase: Running
+      catch:
+        - describe:
+            apiVersion: v1
+            kind: Pod
+            name: spiffe-baseline
+    - name: verify-svid
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -eu
+              kubectl exec -n "${NAMESPACE}" spiffe-baseline -- cat /var/run/secrets/spiffe.io/tls.crt > /tmp/svid.$$.pem
+              URI=$(openssl x509 -in /tmp/svid.$$.pem -noout -text | grep -o 'URI:[^,]*' | head -1 | sed 's/^URI://')
+              rm -f /tmp/svid.$$.pem
+              EXPECTED="spiffe://${TRUST_DOMAIN}/ns/${NAMESPACE}/sa/spiffe-baseline"
+              [ "$URI" = "$EXPECTED" ] \
+                || { echo "FAIL: SVID URI '$URI' != expected '$EXPECTED'"; exit 1; }
+              echo "OK: SVID issued with URI $URI"

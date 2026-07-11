@@ -18,11 +18,18 @@ spec:
         - name: test
           image: smallstep/step-cli:0.30.6
           command: ["/bin/sh", "-exc"]
+          env:
+            # Live root fingerprint, computed by the chainsaw step from the
+            # csi-driver-spiffe-ca secret. A hardcoded pin here went stale
+            # when the root rotated (M0 audit finding, 2026-07-11).
+            - name: FINGERPRINT
+              valueFrom:
+                configMapKeyRef:
+                  name: step-ca-fingerprint
+                  key: fingerprint
           args:
             - |
               CA_URL=https://step-certificates.step-ca.svc.cluster.local
-              # step-ca root CA fingerprint (sha256, no colons, lowercase)
-              FINGERPRINT=6d1c12ebc67a50f7af5790f49de659e9a426a921344c765114db4459d0acb16f
 
               # Bootstrap step CA trust using TOFU with known fingerprint.
               # This downloads the root CA from step-ca and stores it in ~/.step/.
@@ -61,12 +68,15 @@ spec:
                 --key /tmp/issued.key
               echo "revocation: ok"
 
-              # 5. CRL contains the revoked serial number
+              # 5. CRL contains the revoked serial number (decimal; the
+              # inspect output is "DEC (0xHEX)" so take the first field).
+              # step-cli has no 'crl view'; 'crl inspect --insecure' is the
+              # supported reader.
               SERIAL=$(step certificate inspect /tmp/issued.crt \
-                | grep 'Serial Number' | sed 's/.*Serial Number: *//')
+                | grep 'Serial Number' | sed 's/.*Serial Number: *//' | awk '{print $1}')
               echo "Revoked serial: $SERIAL"
               curl -sk --max-time 15 "$CA_URL/1.0/crl" -o /tmp/crl.der
-              step crl view /tmp/crl.der | grep -qi "$SERIAL"
+              step crl inspect --insecure /tmp/crl.der | grep -q "$SERIAL"
               echo "crl-contains-revoked: ok"
 
               echo "ALL CHECKS PASSED"

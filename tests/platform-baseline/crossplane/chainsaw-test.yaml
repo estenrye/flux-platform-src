@@ -1,0 +1,68 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: baseline-crossplane
+spec:
+  description: >-
+    Expected providers, functions, and EnvironmentConfigs are present and
+    healthy; every managed resource is Ready and Synced; the fleet count has
+    not dropped below the recorded floor.
+  steps:
+    - name: providers-healthy
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -eu
+              T=$(mktemp); trap 'rm -f "$T"' EXIT
+              kubectl get providers.pkg.crossplane.io -o json > "$T"
+              for name in ${EXPECTED_PROVIDERS}; do
+                jq -e --arg n "$name" '.items[] | select(.metadata.name==$n)' "$T" >/dev/null \
+                  || { echo "FAIL: expected provider $name not found"; exit 1; }
+              done
+              UNHEALTHY=$(jq -r '.items[] | select(([.status.conditions[]? | select((.type=="Healthy" or .type=="Installed") and .status=="True")] | length) < 2) | .metadata.name' "$T")
+              if [ -n "$UNHEALTHY" ]; then
+                echo "FAIL: providers not Healthy+Installed:"; echo "$UNHEALTHY"; exit 1
+              fi
+              echo "OK: all expected providers present, all providers Healthy+Installed"
+    - name: functions-healthy
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -eu
+              T=$(mktemp); trap 'rm -f "$T"' EXIT
+              kubectl get functions.pkg.crossplane.io -o json > "$T"
+              for name in ${EXPECTED_FUNCTIONS}; do
+                jq -e --arg n "$name" '.items[] | select(.metadata.name==$n) | select(([.status.conditions[]? | select((.type=="Healthy" or .type=="Installed") and .status=="True")] | length) >= 2)' "$T" >/dev/null \
+                  || { echo "FAIL: function $name missing or unhealthy"; exit 1; }
+              done
+              echo "OK: all expected functions Healthy+Installed"
+    - name: environment-configs-present
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -eu
+              for name in ${EXPECTED_ENVIRONMENT_CONFIGS}; do
+                kubectl get environmentconfigs.apiextensions.crossplane.io "$name" >/dev/null \
+                  || { echo "FAIL: EnvironmentConfig $name not found"; exit 1; }
+              done
+              echo "OK: EnvironmentConfigs present"
+    - name: managed-resources-healthy
+      try:
+        - script:
+            timeout: 120s
+            content: |
+              set -eu
+              T=$(mktemp); trap 'rm -f "$T"' EXIT
+              # v2 providers register namespaced MRs (.m.upbound.io) - must query -A.
+              kubectl get managed -A -o json > "$T" 2>/dev/null
+              COUNT=$(jq '.items | length' "$T")
+              [ "$COUNT" -ge "${MIN_MANAGED_RESOURCES}" ] \
+                || { echo "FAIL: $COUNT managed resources, expected >= ${MIN_MANAGED_RESOURCES} (out-of-band deletion?)"; exit 1; }
+              BAD=$(jq -r '.items[] | select(([.status.conditions[]? | select((.type=="Ready" or .type=="Synced") and .status=="True")] | length) < 2) | "\(.kind)/\(.metadata.name)"' "$T")
+              if [ -n "$BAD" ]; then
+                echo "FAIL: managed resources not Ready+Synced:"; echo "$BAD"; exit 1
+              fi
+              echo "OK: $COUNT managed resources, all Ready+Synced"

@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: np-server
+  labels:
+    app: np-server
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 2000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: httpd
+      image: busybox:1.37.0@sha256:1487d0af5f52b4ba31c7e465126ee2123fe3f2305d638e7827681e7cf6c83d5e
+      # Serve a real index.html - busybox httpd 404s on a bare directory,
+      # which would make even an allowed wget exit nonzero.
+      command: ["sh", "-c", "echo ok > /tmp/index.html && exec httpd -f -p 8080 -h /tmp"]
+      ports:
+        - containerPort: 8080
+      securityContext:
+        readOnlyRootFilesystem: false
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+      resources:
+        limits:
+          cpu: 10m
+          memory: 20Mi
+        requests:
+          cpu: 10m
+          memory: 20Mi

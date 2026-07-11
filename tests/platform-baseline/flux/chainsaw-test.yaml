@@ -1,0 +1,37 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: baseline-flux
+spec:
+  description: Every Flux Kustomization and GitRepository on the cluster is Ready.
+  steps:
+    - name: all-kustomizations-ready
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -eu
+              T=$(mktemp); trap 'rm -f "$T"' EXIT
+              kubectl get kustomizations.kustomize.toolkit.fluxcd.io -A -o json > "$T"
+              COUNT=$(jq '.items | length' "$T")
+              [ "$COUNT" -ge 1 ] || { echo "FAIL: no Flux Kustomizations found"; exit 1; }
+              NOT_READY=$(jq -r '.items[] | select(([.status.conditions[]? | select(.type=="Ready" and .status=="True")] | length) == 0) | "\(.metadata.namespace)/\(.metadata.name)"' "$T")
+              if [ -n "$NOT_READY" ]; then
+                echo "FAIL: Kustomizations not Ready:"; echo "$NOT_READY"; exit 1
+              fi
+              echo "OK: $COUNT Kustomizations Ready"
+    - name: all-gitrepositories-ready
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -eu
+              T=$(mktemp); trap 'rm -f "$T"' EXIT
+              kubectl get gitrepositories.source.toolkit.fluxcd.io -A -o json > "$T"
+              COUNT=$(jq '.items | length' "$T")
+              [ "$COUNT" -ge 1 ] || { echo "FAIL: no GitRepositories found"; exit 1; }
+              NOT_READY=$(jq -r '.items[] | select(([.status.conditions[]? | select(.type=="Ready" and .status=="True")] | length) == 0) | "\(.metadata.namespace)/\(.metadata.name)"' "$T")
+              if [ -n "$NOT_READY" ]; then
+                echo "FAIL: GitRepositories not Ready:"; echo "$NOT_READY"; exit 1
+              fi
+              echo "OK: $COUNT GitRepositories Ready"

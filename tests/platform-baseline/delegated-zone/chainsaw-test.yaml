@@ -1,0 +1,25 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: baseline-delegated-zone
+spec:
+  description: >-
+    The cluster's XDelegatedHostedZoneAWS claim is Ready and surfaces the
+    expected trust domain (ADR-16). NOTE: on the crossplane cluster the live
+    value is cluster.local, an audit finding recorded in values/crossplane.env.
+  steps:
+    - name: claim-ready-with-trust-domain
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -eu
+              T=$(mktemp); trap 'rm -f "$T"' EXIT
+              kubectl get xdelegatedhostedzoneaws "${DELEGATED_ZONE_CLAIM}" \
+                -n "${DELEGATED_ZONE_NAMESPACE}" -o json > "$T"
+              READY=$(jq -r '[.status.conditions[]? | select(.type=="Ready" and .status=="True")] | length' "$T")
+              [ "$READY" = "1" ] || { echo "FAIL: claim ${DELEGATED_ZONE_CLAIM} not Ready"; exit 1; }
+              TD=$(jq -r '.status.trustDomain // empty' "$T")
+              [ "$TD" = "${TRUST_DOMAIN}" ] \
+                || { echo "FAIL: trustDomain '$TD' != expected '${TRUST_DOMAIN}'"; exit 1; }
+              echo "OK: ${DELEGATED_ZONE_CLAIM} Ready, trustDomain=$TD"
