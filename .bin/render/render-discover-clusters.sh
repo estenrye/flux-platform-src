@@ -23,6 +23,14 @@ for catalog in "${CLUSTERS_DIR}"/*/catalog.yaml; do
     continue
   fi
 
+  # A cluster with a catalog but no kustomization.yaml is not renderable yet
+  # (render-kustomize-base-and-patches.sh skips it for the same reason); don't
+  # spawn a push-cluster job for it.
+  if [ ! -f "${cluster_dir}/kustomization.yaml" ]; then
+    echo "Warning: skipping ${cluster_name} — no kustomization.yaml yet (bootstrap in progress)" >&2
+    continue
+  fi
+
   name=$(yq e '.metadata.name' "${catalog}")
   project_slug=$(yq e '.metadata.annotations["github.com/project-slug"]' "${catalog}")
   rendered_repo_owner=$(echo "${project_slug}" | cut -d'/' -f1)
