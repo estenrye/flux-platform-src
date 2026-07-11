@@ -5,3 +5,4 @@ resources:
   - resources/namespace.yaml
   - resources/network-policy.yaml
   - resources/step-ca-db.cluster.yaml
+  - resources/backup.yaml

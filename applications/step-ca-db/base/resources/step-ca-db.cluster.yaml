@@ -22,3 +22,26 @@ spec:
 
   monitoring:
     enablePodMonitor: true
+
+  # M0 audit finding (2026-07-11): the fleet trust anchor database had no
+  # backups. WAL archiving + base backups to S3-compatible object storage
+  # (Cloudflare R2 until Garage exists in M3; the S3 API is the seam).
+  # REPLACE_ME values are filled from the R2 bucket created at merge time -
+  # see the PR checklist. Credentials come from the cnpg-backup-object-store
+  # ExternalSecret (resources/backup.yaml).
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://REPLACE_ME_BUCKET/step-ca-db
+      endpointURL: https://REPLACE_ME_ACCOUNT_ID.r2.cloudflarestorage.com
+      s3Credentials:
+        accessKeyId:
+          name: cnpg-backup-object-store
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: cnpg-backup-object-store
+          key: SECRET_ACCESS_KEY
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+    retentionPolicy: "14d"

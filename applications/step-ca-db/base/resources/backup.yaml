@@ -1,0 +1,72 @@
+# Backup plumbing for the step-ca-db CNPG cluster (M0 audit fast-follow).
+# Object store credentials sync from 1Password; a daily ScheduledBackup
+# provides base backups on top of continuous WAL archiving; the egress
+# NetworkPolicy lets the postgres pods reach the S3 endpoint (the global
+# default-deny denies egress otherwise).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: cnpg-backup-object-store
+  namespace: step-ca
+spec:
+  secretStoreRef:
+    name: 1password-sdk
+    kind: ClusterSecretStore
+  refreshPolicy: OnChange
+  target:
+    name: cnpg-backup-object-store
+    creationPolicy: Owner
+    deletionPolicy: Delete
+    template:
+      metadata:
+        labels:
+          app: step-ca-db
+        annotations:
+          description: "S3-compatible object store credentials for step-ca-db barman backups, managed by External Secrets Operator"
+      data:
+        ACCESS_KEY_ID: "{{ .access_key_id }}"
+        SECRET_ACCESS_KEY: "{{ .secret_access_key }}"
+  data:
+    - secretKey: access_key_id
+      remoteRef:
+        key: cnpg-backup-r2/access_key_id
+    - secretKey: secret_access_key
+      remoteRef:
+        key: cnpg-backup-r2/secret_access_key
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: step-ca-db-daily
+  namespace: step-ca
+spec:
+  # CNPG uses a 6-field cron expression (with seconds): daily at 03:00 UTC.
+  schedule: "0 0 3 * * *"
+  cluster:
+    name: step-ca-db
+  backupOwnerReference: self
+  # Run the first backup as soon as the resource reconciles so the plumbing
+  # is verified at merge time instead of at 03:00.
+  immediate: true
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: step-ca-db-backup-egress
+  namespace: step-ca
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "CNPG creates PostgreSQL pods dynamically; the cnpg.io/cluster label is valid but pods do not exist in the static rendered manifest."
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: step-ca-db
+  policyTypes:
+    - Egress
+  egress:
+    # WAL archiving and base backups to the external S3-compatible endpoint.
+    # The endpoint resolves to external IPs (no DNAT), so the port is the
+    # real destination port per the Calico post-DNAT rule; destination IPs
+    # are not pinned because R2 addresses are anycast.
+    - ports:
+        - protocol: TCP
+          port: 443
