@@ -78,6 +78,14 @@ Goal: freeze a known-good baseline of the Spot control plane and inventory
 everything that must move, so migration is a checklist rather than an
 archaeology dig.
 
+**Detailed design (2026-07-11, approved):**
+[2026-07-11-m0-baseline-audit-design.md](2026-07-11-m0-baseline-audit-design.md)
+— portable chainsaw suites in `tests/platform-baseline/` (parametrized per
+cluster so the same runner becomes the M2 acceptance gate), a read-only
+regenerable migration inventory generator, and the cold-start runbook
+skeleton. The design doc supersedes the generic task list below where they
+differ.
+
 Tasks:
 1. Chainsaw suites asserting current invariants: Flux kustomizations healthy;
    step-ca issuing (reuse step-ca connectivity validation from memory); SVID
