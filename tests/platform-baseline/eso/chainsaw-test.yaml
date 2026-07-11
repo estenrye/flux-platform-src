@@ -1,0 +1,41 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: baseline-eso
+spec:
+  description: >-
+    Every external-secrets store (cluster and namespaced) is Ready and every
+    ExternalSecret is synced.
+  steps:
+    - name: stores-ready
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -eu
+              T=$(mktemp); T2=$(mktemp); trap 'rm -f "$T" "$T2"' EXIT
+              kubectl get clustersecretstores.external-secrets.io -o json > "$T"
+              COUNT=$(jq '.items | length' "$T")
+              [ "$COUNT" -ge 1 ] || { echo "FAIL: no ClusterSecretStores found"; exit 1; }
+              BAD=$(jq -r '.items[] | select(([.status.conditions[]? | select(.type=="Ready" and .status=="True")] | length) == 0) | .metadata.name' "$T")
+              kubectl get secretstores.external-secrets.io -A -o json > "$T2"
+              BAD_NS=$(jq -r '.items[] | select(([.status.conditions[]? | select(.type=="Ready" and .status=="True")] | length) == 0) | "\(.metadata.namespace)/\(.metadata.name)"' "$T2")
+              if [ -n "$BAD" ] || [ -n "$BAD_NS" ]; then
+                echo "FAIL: stores not Ready:"; echo "$BAD"; echo "$BAD_NS"; exit 1
+              fi
+              echo "OK: all secret stores Ready"
+    - name: externalsecrets-synced
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -eu
+              T=$(mktemp); trap 'rm -f "$T"' EXIT
+              kubectl get externalsecrets.external-secrets.io -A -o json > "$T"
+              COUNT=$(jq '.items | length' "$T")
+              [ "$COUNT" -ge 1 ] || { echo "FAIL: no ExternalSecrets found"; exit 1; }
+              BAD=$(jq -r '.items[] | select(([.status.conditions[]? | select(.type=="Ready" and .status=="True")] | length) == 0) | "\(.metadata.namespace)/\(.metadata.name)"' "$T")
+              if [ -n "$BAD" ]; then
+                echo "FAIL: ExternalSecrets not synced:"; echo "$BAD"; exit 1
+              fi
+              echo "OK: $COUNT ExternalSecrets synced"

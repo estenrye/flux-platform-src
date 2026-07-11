@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: spiffe-baseline
+automountServiceAccountToken: false
+---
+# csi-driver-spiffe creates CertificateRequests using the pod's service
+# account identity; the SA needs create on certificaterequests.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: spiffe-baseline
+rules:
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificaterequests"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: spiffe-baseline
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: spiffe-baseline
+subjects:
+  - kind: ServiceAccount
+    name: spiffe-baseline

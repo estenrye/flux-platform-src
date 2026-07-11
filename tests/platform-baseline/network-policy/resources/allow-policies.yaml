@@ -1,0 +1,38 @@
+# The global default-deny denies both directions, so the probe needs an
+# ingress allow on the server AND an egress allow on the client. Port is the
+# pod's containerPort (post-DNAT rule; no service involved).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-np-server-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: np-server
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: np-client
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-np-client-egress
+spec:
+  podSelector:
+    matchLabels:
+      app: np-client
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: np-server
+      ports:
+        - port: 8080
+          protocol: TCP

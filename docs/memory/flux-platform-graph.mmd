@@ -1,0 +1,119 @@
+---
+config:
+  layout: elk
+  elk:
+    mergeEdges: true
+    nodePlacementStrategy: BRANDES_KOEPF
+---
+flowchart LR
+  subgraph EXT["External Services"]
+    AWS
+    Cloudflare
+    GitHub
+  end
+
+  subgraph FOUNDATION["Foundation"]
+    priority-classes
+    prom-crds["prometheus-operator-crds"]
+    gnp["global-network-policy-default-deny"]
+    gw-crds["gateway-api-crds"]
+    eso["external-secrets-operator"]
+    flux
+    crossplane
+  end
+
+  subgraph GATEWAY["Gateway"]
+    eg-crds["envoy-gateway-crds"]
+    eg["envoy-gateway"]
+  end
+
+  subgraph CERTMGR["cert-manager stack"]
+    cm["cert-manager"]
+    cm-ap["cert-manager-approver-policy"]
+    cm-tm["cert-manager-trust-manager"]
+    cm-si["cert-manager-spiffe-issuer"]
+    cm-csi["cert-manager-spiffe-csi-driver"]
+  end
+
+  subgraph DB["Database"]
+    cnpg
+    step-ca-db
+  end
+
+  step-ca
+
+  subgraph XP_PROVIDERS["Crossplane Providers"]
+    xp-fam-aws["crossplane-family-aws"]
+    xp-fam-cf["crossplane-family-cloudflare"]
+    xp-r53["provider-aws-route53"]
+    xp-iam["provider-aws-iam"]
+    xp-ra["provider-aws-rolesanywhere"]
+    xp-cf-dns["provider-cloudflare-dns"]
+    xp-cf-zone["provider-cloudflare-zone"]
+    xp-gh["provider-github"]
+    xp-k8s["provider-kubernetes"]
+  end
+
+  subgraph XP_FNS["Crossplane Functions"]
+    xp-fn-env["function-environment-configs"]
+    xp-fn-go["function-go-templating"]
+    xp-fn-ar["function-auto-ready"]
+  end
+
+  xp-res["crossplane-resources\ndelegated-hosted-zone-aws"]
+  ext-dns["external-dns-aws"]
+  flux-mon["flux-monitoring"]
+
+  eg-crds --> gw-crds
+  eg --> eg-crds
+  eg --> gw-crds
+
+  cm-ap --> cm
+  cm-tm --> cm
+  cm-si --> cm
+  cm-si --> cm-ap
+  cm-csi --> cm
+  cm-csi --> cm-si
+  cm-csi --> cm-ap
+
+  cnpg --> prom-crds
+  step-ca-db --> cnpg
+
+  step-ca --> step-ca-db
+  step-ca --> cm-si
+  step-ca --> cm-csi
+  step-ca --> eso
+  step-ca --> eg
+
+  xp-fam-aws --> crossplane
+  xp-fam-cf --> crossplane
+  xp-r53 --> xp-fam-aws
+  xp-iam --> xp-fam-aws
+  xp-ra --> xp-fam-aws
+  xp-cf-dns --> xp-fam-cf
+  xp-cf-zone --> xp-fam-cf
+  xp-gh --> crossplane
+  xp-k8s --> crossplane
+  xp-fn-env --> crossplane
+  xp-fn-go --> crossplane
+  xp-fn-ar --> crossplane
+
+  xp-res --> xp-r53
+  xp-res --> xp-cf-dns
+  xp-res --> xp-fn-go
+  xp-res --> xp-fn-ar
+
+  ext-dns --> eso
+  ext-dns --> xp-ra
+
+  flux-mon --> flux
+  flux-mon --> prom-crds
+
+  xp-r53 -.->|manages| AWS
+  xp-iam -.->|manages| AWS
+  xp-ra -.->|manages| AWS
+  ext-dns -.->|manages| AWS
+  xp-cf-dns -.->|manages| Cloudflare
+  xp-cf-zone -.->|manages| Cloudflare
+  xp-gh -.->|manages| GitHub
+  flux -.->|pulls_from| GitHub

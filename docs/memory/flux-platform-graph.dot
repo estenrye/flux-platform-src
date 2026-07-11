@@ -1,0 +1,217 @@
+digraph flux_platform {
+  graph [
+    rankdir=LR
+    fontname="Helvetica Neue"
+    fontsize=14
+    bgcolor="#ffffff"
+    pad=0.6
+    splines=spline
+    nodesep=0.45
+    ranksep=1.4
+  ]
+  node [
+    fontname="Helvetica Neue"
+    fontsize=11
+    shape=box
+    style="rounded,filled"
+    fillcolor="#dbeafe"
+    color="#3b82f6"
+    margin="0.15,0.08"
+  ]
+  edge [
+    fontname="Helvetica Neue"
+    fontsize=9
+    color="#64748b"
+    arrowsize=0.7
+  ]
+
+  // ── Legend ───────────────────────────────────────────────────────
+  subgraph cluster_legend {
+    label="Legend"
+    style="rounded,filled"
+    fillcolor="#f8fafc"
+    color="#94a3b8"
+    fontname="Helvetica Neue"
+    fontsize=11
+    rank=sink
+
+    leg_a [label="A" shape=box style="rounded,filled" fillcolor="#dbeafe" color="#3b82f6"]
+    leg_b [label="B" shape=box style="rounded,filled" fillcolor="#dbeafe" color="#3b82f6"]
+    leg_c [label="C" shape=box style="rounded,filled" fillcolor="#fde68a" color="#d97706"]
+    leg_a -> leg_b [style=solid  color="#64748b" xlabel="depends_on"]
+    leg_a -> leg_c [style=dashed color="#94a3b8" xlabel="manages /\npulls_from"]
+  }
+
+  // ── External Services ────────────────────────────────────────────
+  subgraph cluster_ext {
+    label="External Services"
+    style="rounded,filled"
+    fillcolor="#fef3c7"
+    color="#d97706"
+    fontname="Helvetica Neue"
+    fontsize=12
+
+    AWS        [label="AWS"        fillcolor="#fde68a" color="#d97706"]
+    Cloudflare [label="Cloudflare" fillcolor="#fde68a" color="#d97706"]
+    GitHub     [label="GitHub"     fillcolor="#fde68a" color="#d97706"]
+  }
+
+  // ── Foundation ───────────────────────────────────────────────────
+  subgraph cluster_foundation {
+    label="Foundation (no internal deps)"
+    style="rounded,filled"
+    fillcolor="#f0fdf4"
+    color="#16a34a"
+    fontname="Helvetica Neue"
+    fontsize=12
+
+    priority_classes [label="priority-classes"]
+    prom_crds        [label="prometheus-operator-crds"]
+    gnp              [label="global-network-policy\ndefault-deny"]
+    gw_crds          [label="gateway-api-crds"]
+    eso              [label="external-secrets-operator"]
+    flux             [label="flux"]
+    crossplane       [label="crossplane"]
+  }
+
+  // ── Gateway ──────────────────────────────────────────────────────
+  subgraph cluster_gateway {
+    label="Gateway"
+    style="rounded,filled"
+    fillcolor="#eff6ff"
+    color="#3b82f6"
+    fontname="Helvetica Neue"
+    fontsize=12
+
+    eg_crds [label="envoy-gateway-crds"]
+    eg      [label="envoy-gateway"]
+  }
+
+  // ── cert-manager stack ───────────────────────────────────────────
+  subgraph cluster_certmgr {
+    label="cert-manager stack"
+    style="rounded,filled"
+    fillcolor="#fdf4ff"
+    color="#a855f7"
+    fontname="Helvetica Neue"
+    fontsize=12
+
+    cm     [label="cert-manager"]
+    cm_ap  [label="cert-manager\napprover-policy"]
+    cm_tm  [label="cert-manager\ntrust-manager"]
+    cm_si  [label="cert-manager\nspiffe-issuer"]
+    cm_csi [label="cert-manager\nspiffe-csi-driver"]
+  }
+
+  // ── Database ─────────────────────────────────────────────────────
+  subgraph cluster_db {
+    label="Database"
+    style="rounded,filled"
+    fillcolor="#fff7ed"
+    color="#ea580c"
+    fontname="Helvetica Neue"
+    fontsize=12
+
+    cnpg       [label="cnpg"]
+    step_ca_db [label="step-ca-db"]
+  }
+
+  // ── step-ca ──────────────────────────────────────────────────────
+  step_ca [label="step-ca" fillcolor="#fce7f3" color="#db2777"]
+
+  // ── Crossplane Providers ─────────────────────────────────────────
+  subgraph cluster_xp_providers {
+    label="Crossplane Providers"
+    style="rounded,filled"
+    fillcolor="#f0f9ff"
+    color="#0284c7"
+    fontname="Helvetica Neue"
+    fontsize=12
+
+    xp_fam_aws [label="crossplane-family-aws"]
+    xp_fam_cf  [label="crossplane-family-cloudflare"]
+    xp_r53     [label="provider-aws-route53"]
+    xp_iam     [label="provider-aws-iam"]
+    xp_ra      [label="provider-aws-rolesanywhere"]
+    xp_cf_dns  [label="provider-cloudflare-dns"]
+    xp_cf_zone [label="provider-cloudflare-zone"]
+    xp_gh      [label="provider-github"]
+    xp_k8s    [label="provider-kubernetes"]
+  }
+
+  // ── Crossplane Functions ─────────────────────────────────────────
+  subgraph cluster_xp_fns {
+    label="Crossplane Functions"
+    style="rounded,filled"
+    fillcolor="#f0f9ff"
+    color="#0284c7"
+    fontname="Helvetica Neue"
+    fontsize=12
+
+    xp_fn_env [label="function-environment-configs"]
+    xp_fn_go  [label="function-go-templating"]
+    xp_fn_ar  [label="function-auto-ready"]
+  }
+
+  // ── Standalone ───────────────────────────────────────────────────
+  xp_res   [label="crossplane-resources\ndelegated-hosted-zone-aws"]
+  ext_dns  [label="external-dns-aws"]
+  flux_mon [label="flux-monitoring"]
+
+  // ── depends_on edges (solid) ─────────────────────────────────────
+  eg_crds -> gw_crds
+  eg      -> eg_crds
+  eg      -> gw_crds
+
+  cm_ap  -> cm
+  cm_tm  -> cm
+  cm_si  -> cm
+  cm_si  -> cm_ap
+  cm_csi -> cm
+  cm_csi -> cm_si
+  cm_csi -> cm_ap
+
+  cnpg       -> prom_crds
+  step_ca_db -> cnpg
+
+  step_ca -> step_ca_db
+  step_ca -> cm_si
+  step_ca -> cm_csi
+  step_ca -> eso
+  step_ca -> eg
+
+  xp_fam_aws -> crossplane
+  xp_fam_cf  -> crossplane
+  xp_r53     -> xp_fam_aws
+  xp_iam     -> xp_fam_aws
+  xp_ra      -> xp_fam_aws
+  xp_cf_dns  -> xp_fam_cf
+  xp_cf_zone -> xp_fam_cf
+  xp_gh      -> crossplane
+  xp_k8s    -> crossplane
+  xp_fn_env  -> crossplane
+  xp_fn_go   -> crossplane
+  xp_fn_ar   -> crossplane
+
+  xp_res -> xp_r53
+  xp_res -> xp_cf_dns
+  xp_res -> xp_fn_go
+  xp_res -> xp_fn_ar
+
+  ext_dns  -> eso
+  ext_dns  -> xp_ra
+
+  flux_mon -> flux
+  flux_mon -> prom_crds
+
+  // ── manages / pulls_from edges (dashed) ──────────────────────────
+  edge [style=dashed color="#94a3b8" arrowsize=0.6]
+  xp_r53     -> AWS
+  xp_iam     -> AWS
+  xp_ra      -> AWS
+  ext_dns    -> AWS
+  xp_cf_dns  -> Cloudflare
+  xp_cf_zone -> Cloudflare
+  xp_gh      -> GitHub
+  flux       -> GitHub
+}

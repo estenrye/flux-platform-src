@@ -1,0 +1,59 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: baseline-step-ca
+spec:
+  description: >-
+    step-ca database has a healthy primary, the public CA endpoint serves
+    within the retry budget, and the root fingerprint matches the pinned
+    value (the fleet trust anchor - it must survive the M2 migration
+    unchanged). Full capability tests live in tests/step-ca/, run by the
+    baseline runner after these suites.
+  steps:
+    - name: cnpg-primary-healthy
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -eu
+              C=$(kubectl get clusters.postgresql.cnpg.io "${CNPG_CLUSTER}" -n "${CNPG_NAMESPACE}" -o json)
+              READY=$(echo "$C" | jq -r '.status.readyInstances // 0')
+              WANT=$(echo "$C" | jq -r '.spec.instances')
+              PRIMARY=$(echo "$C" | jq -r '.status.currentPrimary // empty')
+              [ -n "$PRIMARY" ] || { echo "FAIL: no current primary"; exit 1; }
+              [ "$READY" -ge "${CNPG_MIN_READY}" ] \
+                || { echo "FAIL: readyInstances=$READY < ${CNPG_MIN_READY}"; exit 1; }
+              if [ "$READY" -lt "$WANT" ]; then
+                echo "ADVISORY: ${CNPG_CLUSTER} degraded HA: $READY/$WANT ready (phase: $(echo "$C" | jq -r '.status.phase'))"
+              fi
+              echo "OK: primary=$PRIMARY ready=$READY/$WANT"
+    - name: ca-endpoint-and-fingerprint
+      try:
+        - script:
+            timeout: 240s
+            content: |
+              set -eu
+              # Endpoint is flaky on Spot (recorded finding); retry budget from values.
+              ATTEMPT=0
+              until [ "$ATTEMPT" -ge "${STEP_CA_HEALTH_RETRIES}" ]; do
+                ATTEMPT=$((ATTEMPT+1))
+                STATUS=$(curl -sk -o /tmp/health.$$ -w '%{http_code}' --max-time 10 "${STEP_CA_URL}/health" || true)
+                if [ "$STATUS" = "200" ] && grep -q '"status":"ok"' /tmp/health.$$; then break; fi
+                sleep 3
+              done
+              rm -f /tmp/health.$$
+              [ "$STATUS" = "200" ] || { echo "FAIL: ${STEP_CA_URL}/health never returned ok in ${STEP_CA_HEALTH_RETRIES} attempts"; exit 1; }
+              if [ "$ATTEMPT" -gt 1 ]; then
+                echo "ADVISORY: health endpoint needed $ATTEMPT attempts (endpoint flakiness finding)"
+              fi
+              # Root fingerprint: live secret must match the pinned trust anchor.
+              LIVE_FP=$(kubectl get secret csi-driver-spiffe-ca -n step-ca -o jsonpath='{.data.tls\.crt}' \
+                | base64 -d | openssl x509 -noout -fingerprint -sha256 \
+                | sed 's/.*=//;s/://g' | tr '[:upper:]' '[:lower:]')
+              [ "$LIVE_FP" = "${STEP_CA_ROOT_FINGERPRINT}" ] \
+                || { echo "FAIL: live root fingerprint $LIVE_FP != pinned ${STEP_CA_ROOT_FINGERPRINT}"; exit 1; }
+              # And the CA must serve that root publicly.
+              curl -sk --retry 5 --retry-delay 3 --max-time 10 "${STEP_CA_URL}/root/${LIVE_FP}" \
+                | grep -q 'BEGIN CERTIFICATE' \
+                || { echo "FAIL: ${STEP_CA_URL}/root/<fp> did not serve the root cert"; exit 1; }
+              echo "OK: CA serving, root fingerprint matches pinned trust anchor"

@@ -35,6 +35,22 @@ spec:
         - apply:
             file: resources/network-policy.yaml
 
+    - name: publish-root-fingerprint
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              set -e
+              export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
+              FINGERPRINT=$(kubectl get secret csi-driver-spiffe-ca -n step-ca \
+                -o jsonpath='{.data.tls\.crt}' | base64 -d \
+                | openssl x509 -noout -fingerprint -sha256 \
+                | sed 's/.*=//;s/://g' | tr '[:upper:]' '[:lower:]')
+              echo "Live root fingerprint: $FINGERPRINT"
+              kubectl create configmap step-ca-fingerprint -n ${NAMESPACE} \
+                --from-literal=fingerprint="$FINGERPRINT" \
+                --dry-run=client -o yaml | kubectl apply -f -
+
     - name: deploy-test-job
       try:
         - apply:
