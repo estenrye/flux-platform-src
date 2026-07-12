@@ -52,9 +52,8 @@ resource "libvirt_domain" "vm" {
     target_port = "0"
   }
 
-  # virtio memballoon is added by libvirt by default (RAM over-commit relies
-  # on it); the XSLT below injects the qemu-guest-agent channel the
-  # siderolabs/qemu-guest-agent extension talks to.
+  # virtio memballoon and the qemu-guest-agent channel are added by
+  # libvirt/the provider; the XSLT only marks the ISO disk read-only.
   xml {
     xslt = file("${path.module}/guest-agent-channel.xsl")
   }
