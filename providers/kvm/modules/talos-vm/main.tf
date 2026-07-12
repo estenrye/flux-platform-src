@@ -27,12 +27,9 @@ resource "libvirt_domain" "vm" {
     mode = "host-passthrough"
   }
 
-  # Empty disk has no bootloader, so firmware falls through to the ISO
-  # (maintenance mode). Once Talos is installed, the disk boots directly and
-  # the ISO is inert — no detach step needed on rebuilds.
-  boot_device {
-    dev = ["hd", "cdrom"]
-  }
+  # Boot fallthrough (empty disk -> ISO) is via per-device boot order
+  # elements injected by the XSLT: os-level <boot dev=hd/cdrom> never tries
+  # a second virtio disk, and the provider can't express per-disk order.
 
   disk {
     volume_id = libvirt_volume.system.id
