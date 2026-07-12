@@ -19,6 +19,9 @@ SRC_DATASET="${SRC_DATASET:-vmpool/vms}"
 NAS_HOST="${NAS_HOST:-nas.rye.ninja}"
 NAS_USER="${NAS_USER:-replication}"
 NAS_DATASET="${NAS_DATASET:-flash-pool/replication/mf-ms-a2-01.usmnblm01.rye.ninja/vms}"
+# Absolute path: /usr/sbin is not in a non-root user's non-interactive SSH
+# PATH on TrueNAS SCALE, so bare `zfs` fails remotely.
+REMOTE_ZFS="${REMOTE_ZFS:-/usr/sbin/zfs}"
 
 today=$(date -u +%Y%m%d)
 label="nightly-${today}"
@@ -31,7 +34,7 @@ fi
 
 # ── incremental send ─────────────────────────────────────────────────────────
 # Find the newest snapshot that exists on both sides to use as the increment base.
-remote_snaps=$(ssh "${NAS_USER}@${NAS_HOST}" "zfs list -H -t snapshot -o name -s creation -d 1 ${NAS_DATASET} 2>/dev/null" | awk -F@ '{print $2}' || true)
+remote_snaps=$(ssh "${NAS_USER}@${NAS_HOST}" "${REMOTE_ZFS} list -H -t snapshot -o name -s creation -d 1 ${NAS_DATASET} 2>/dev/null" | awk -F@ '{print $2}' || true)
 base=""
 for s in $(zfs list -H -t snapshot -o name -s creation -d 1 "${SRC_DATASET}" | awk -F@ '{print $2}' | tac); do
   [ "${s}" = "${label}" ] && continue
@@ -40,27 +43,27 @@ done
 
 if [ -z "${base}" ]; then
   echo "no common base snapshot — full send of ${SRC_DATASET}@${label}"
-  zfs send -R "${SRC_DATASET}@${label}" | ssh "${NAS_USER}@${NAS_HOST}" "zfs recv -uF ${NAS_DATASET}"
+  zfs send -R "${SRC_DATASET}@${label}" | ssh "${NAS_USER}@${NAS_HOST}" "${REMOTE_ZFS} recv -uF ${NAS_DATASET}"
 else
   echo "incremental send ${base} -> ${label}"
-  zfs send -RI "@${base}" "${SRC_DATASET}@${label}" | ssh "${NAS_USER}@${NAS_HOST}" "zfs recv -uF ${NAS_DATASET}"
+  zfs send -RI "@${base}" "${SRC_DATASET}@${label}" | ssh "${NAS_USER}@${NAS_HOST}" "${REMOTE_ZFS} recv -uF ${NAS_DATASET}"
 fi
 
 # ── prune (both sides) ───────────────────────────────────────────────────────
-prune() { # $1 = list command prefix ("" local, ssh remote), $2 = dataset
-  local prefix="$1" dataset="$2" cutoff_daily cutoff_weekly snap date_part
+prune() { # $1 = command prefix ("" local, ssh remote), $2 = zfs binary, $3 = dataset
+  local prefix="$1" zfs_bin="$2" dataset="$3" cutoff_daily cutoff_weekly snap date_part
   cutoff_daily=$(date -u -d '7 days ago' +%Y%m%d 2>/dev/null || date -u -v-7d +%Y%m%d)
   cutoff_weekly=$(date -u -d '28 days ago' +%Y%m%d 2>/dev/null || date -u -v-28d +%Y%m%d)
-  for snap in $(${prefix} zfs list -H -t snapshot -o name -d 1 "${dataset}" | awk -F@ '{print $2}'); do
+  for snap in $(${prefix} "${zfs_bin}" list -H -t snapshot -o name -d 1 "${dataset}" | awk -F@ '{print $2}'); do
     date_part="${snap##*-}"
     case "${snap}" in
-      nightly-*) [ "${date_part}" -lt "${cutoff_daily}" ] && ${prefix} zfs destroy -r "${dataset}@${snap}" ;;
-      weekly-*) [ "${date_part}" -lt "${cutoff_weekly}" ] && ${prefix} zfs destroy -r "${dataset}@${snap}" ;;
+      nightly-*) [ "${date_part}" -lt "${cutoff_daily}" ] && ${prefix} "${zfs_bin}" destroy -r "${dataset}@${snap}" ;;
+      weekly-*) [ "${date_part}" -lt "${cutoff_weekly}" ] && ${prefix} "${zfs_bin}" destroy -r "${dataset}@${snap}" ;;
     esac
   done
   return 0
 }
-prune "" "${SRC_DATASET}"
-prune "ssh ${NAS_USER}@${NAS_HOST}" "${NAS_DATASET}"
+prune "" "zfs" "${SRC_DATASET}"
+prune "ssh ${NAS_USER}@${NAS_HOST}" "${REMOTE_ZFS}" "${NAS_DATASET}"
 
 echo "replication complete: ${SRC_DATASET}@${label} -> ${NAS_HOST}:${NAS_DATASET}"
