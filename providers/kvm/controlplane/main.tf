@@ -33,7 +33,7 @@ module "talos_node" {
   memory_mb       = each.value.memory_mb
   disk_size_bytes = each.value.disk_size_bytes
   pool            = "vms"
-  iso_volume_id   = libvirt_volume.talos_iso.id
+  iso_path        = libvirt_volume.talos_iso.id
   bridge          = local.host.bridge
   mac             = each.value.mac
 }

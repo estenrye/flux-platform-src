@@ -36,7 +36,8 @@ resource "libvirt_domain" "vm" {
   }
 
   disk {
-    volume_id = var.iso_volume_id
+    # .iso file paths are attached as a CDROM device by the provider.
+    file = var.iso_path
   }
 
   network_interface {

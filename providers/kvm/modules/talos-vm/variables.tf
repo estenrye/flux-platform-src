@@ -23,8 +23,13 @@ variable "pool" {
   type        = string
 }
 
-variable "iso_volume_id" {
-  description = "libvirt volume id of the Talos factory metal ISO (boot fallback for empty disks)"
+variable "iso_path" {
+  description = <<-EOT
+    Host filesystem path of the Talos factory metal ISO. Attached via the
+    provider's file argument: paths ending .iso become a true CDROM device —
+    required because Talos ISOs are not isohybrid and only boot via El
+    Torito, never as a disk.
+  EOT
   type        = string
 }
 
