@@ -92,6 +92,13 @@ success "NAT64 base image: ${UBUNTU_RAW}"
 # data/stringData rule and leave Talos secrets in plaintext.
 SECRETS_PLAIN="${RENDER_DIR}/secrets.yaml"
 AGE_RECIPIENTS=$(yq -r '.creation_rules[0].age' "${SOPS_CONFIG}" | tr -d ' \n')
+AGE_KEY_FILE="${CLUSTER_DIR}/.sops.age-key"
+if [ -f "${AGE_KEY_FILE}" ]; then
+  export SOPS_AGE_KEY_FILE="${AGE_KEY_FILE}"
+elif [ -f "${SECRETS_FILE}" ]; then
+  error "cannot decrypt ${SECRETS_FILE}: ${AGE_KEY_FILE} missing — restore it from 1Password (vault controlplane, item sops-age-key)"
+  exit 1
+fi
 if [ -f "${SECRETS_FILE}" ]; then
   info "Decrypting existing machine secrets ..."
   sops --config /dev/null -d "${SECRETS_FILE}" > "${SECRETS_PLAIN}"
