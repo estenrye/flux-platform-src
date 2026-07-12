@@ -19,7 +19,6 @@ resources:
   - ../../applications/flux-monitoring/base
   - resources/flux.source.git.yaml
   - resources/flux.kustomization.yaml
-  # TODO(M1, blocked on human step 2): SOPS-encrypted secrets, added once the
-  # TrueNAS API key and UniFi API key are minted:
-  #   - resources/truenas-csi.api-credentials.sops.yaml
+  - resources/truenas-csi.api-credentials.sops.yaml
+  # TODO(M1): added once the UniFi API key is minted:
   #   - resources/external-dns.unifi-credentials.sops.yaml
