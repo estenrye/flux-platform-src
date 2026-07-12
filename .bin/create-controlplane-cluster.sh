@@ -57,7 +57,7 @@ POD_CIDR=$(yq -r '.allocations.pod_cidr' "${NETWORK}")
 SVC_CIDR=$(yq -r '.allocations.service_cidr' "${NETWORK}")
 GUA_PREFIX=$(yq -r '.gua_prefix' "${NETWORK}" | sed 's|::/64$||') # e.g. 2607:3640:1064:270
 
-CLIENT_TALOS_VERSION=$(talosctl version --client --short 2>/dev/null | awk '/Tag:/{print $2}' || true)
+CLIENT_TALOS_VERSION=$(talosctl version --client --short 2>/dev/null | awk '/Talos v/{print $2}' || true)
 if [ "${CLIENT_TALOS_VERSION}" != "${TALOS_VERSION}" ]; then
   warn "talosctl client ${CLIENT_TALOS_VERSION:-unknown} != pinned ${TALOS_VERSION}; run .bin/install-talosctl.sh to match before proceeding."
   exit 1
