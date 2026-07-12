@@ -6,7 +6,6 @@ registry: txt
 txtPrefix: edns.
 
 extraArgs:
-  - --enable-leader-election
   - --domain-filter=rye.ninja
 
 serviceAccount:

@@ -87,3 +87,30 @@ spec:
           port: 53
         - protocol: UDP
           port: 53
+---
+# The certgen Job's pods carry no labels the controller policy selects, so
+# under default-deny (ADR-17) the job cannot reach the apiserver to write
+# its TLS secrets (found at controlplane bring-up; latent on any fresh
+# cluster). Namespace-wide apiserver+DNS egress is additive and safe: this
+# namespace only runs envoy-gateway components.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: envoy-gateway-system-apiserver-allow
+  namespace: envoy-gateway-system
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        # apiserver targetPort — Calico evaluates egress post-DNAT
+        # (docs/memory/calico-networkpolicy-dnat.md)
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
