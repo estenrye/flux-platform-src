@@ -33,8 +33,14 @@ esac
 
 # ── 1. Packages ──────────────────────────────────────────────────────────────
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y --no-install-recommends zfsutils-linux ksmtuned >/dev/null
-info "packages present: zfsutils-linux ksmtuned"
+# Ubuntu ships libvirt's ZFS storage backend as a separate driver package;
+# without it, pool-define fails with "missing backend for pool type (zfs)".
+apt-get install -y --no-install-recommends \
+  zfsutils-linux ksmtuned libvirt-daemon-driver-storage-zfs >/dev/null
+info "packages present: zfsutils-linux ksmtuned libvirt-daemon-driver-storage-zfs"
+# Pick up the newly installed storage driver (domains keep running).
+systemctl restart libvirtd
+info "libvirtd restarted (zfs storage backend loaded)"
 
 # ── 2. ZFS pool ──────────────────────────────────────────────────────────────
 if zpool list "${POOL}" >/dev/null 2>&1; then
