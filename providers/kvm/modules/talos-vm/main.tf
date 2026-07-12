@@ -56,9 +56,7 @@ resource "libvirt_domain" "vm" {
     xslt = file("${path.module}/guest-agent-channel.xsl")
   }
 
-  lifecycle {
-    # A reprovisioned ISO volume must not force VM replacement; Talos runs
-    # from disk after install.
-    ignore_changes = [disk[1]]
-  }
+  # No ignore_changes on the ISO disk: a new ISO (Talos version bump) rolls
+  # the VM deliberately — Talos runs from its system disk after install, so
+  # the recreate is a plain reboot from the node's perspective.
 }
