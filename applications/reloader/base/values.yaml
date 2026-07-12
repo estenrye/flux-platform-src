@@ -50,10 +50,4 @@ reloader:
   netpol:
     enabled: true
     from: []
-    # The chart's built-in egress rule allows 443 only; on clusters whose
-    # apiserver targetPort is 6443 (e.g. Talos) Calico evaluates egress
-    # post-DNAT and drops it (docs/memory/calico-networkpolicy-dnat.md).
-    to:
-      - ports:
-          - port: 6443
-            protocol: TCP
+    to: []

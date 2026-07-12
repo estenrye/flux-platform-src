@@ -16,6 +16,9 @@ helmCharts:
 
 patches:
   - target:
+      kind: NetworkPolicy
+    path: patches/network-policy.yaml
+  - target:
       kind: Deployment
     path: patches/deployment.yaml
   
