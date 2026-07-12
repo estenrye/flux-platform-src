@@ -21,7 +21,7 @@
     </xsl:copy>
   </xsl:template>
 
-  <xsl:template match="/domain/devices/disk[contains(source/@file, '.iso')]">
+  <xsl:template match="/domain/devices/disk[contains(source/@file, '.iso') or contains(source/@volume, '.iso')]">
     <xsl:copy>
       <xsl:apply-templates select="node()|@*"/>
       <xsl:if test="not(readonly)">

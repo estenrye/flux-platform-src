@@ -14,13 +14,8 @@ variable "memory_mb" {
   default = 1024
 }
 
-variable "pool" {
-  description = "libvirt storage pool (type zfs) for the system disk zvol"
-  type        = string
-}
-
 variable "cloudinit_pool" {
-  description = "Directory-type pool for the cloud-init ISO"
+  description = "Directory-type pool for the system disk image and cloud-init ISO"
   type        = string
 }
 

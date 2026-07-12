@@ -53,7 +53,7 @@ fi
 # so the Talos ISO / cloud-init media in the controlplane-images dir pool
 # need an explicit read rule.
 if ! grep -q 'controlplane-images' /etc/apparmor.d/abstractions/libvirt-qemu; then
-  echo '  /var/lib/libvirt/controlplane-images/** r,' >> /etc/apparmor.d/abstractions/libvirt-qemu
+  echo '  /var/lib/libvirt/controlplane-images/** rwk,' >> /etc/apparmor.d/abstractions/libvirt-qemu
   info "AppArmor: controlplane-images read rule added"
 fi
 systemctl reload apparmor

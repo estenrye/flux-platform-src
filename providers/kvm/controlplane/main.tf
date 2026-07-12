@@ -41,7 +41,6 @@ module "talos_node" {
 module "nat64" {
   source = "../modules/nat64-appliance"
 
-  pool               = "appliances"
   cloudinit_pool     = libvirt_pool.images.name
   base_image_path    = var.nat64_image_path
   bridge             = local.host.bridge
