@@ -1,14 +1,20 @@
 - op: replace
   path: /data
   value:
-    # DNS name on purpose: avoids IPv6 bracket-literal handling and survives
-    # a GUA renumber (nas.rye.ninja AAAA is kept current).
+    # API over the DNS name (renumber-safe; TrueNAS web/API listens on all
+    # interfaces). Storage data paths below deliberately use the NAS's static
+    # ULA instead: site-stable, immune to ISP prefix re-delegation, and the
+    # NAS binds NFS/iSCSI to it.
     truenasURL: "wss://nas.rye.ninja/api/current"
     # TrueNAS still serves its self-signed certificate; flips to "false" when
     # the step-ca-issued cert lands (M2).
     truenasInsecure: "true"
     defaultPool: "flash-pool"
-    nfsServer: "nas.rye.ninja"
-    iscsiPortal: "nas.rye.ninja:3260"
+    # Driver brackets IPv6 literals itself for NFS mounts (formatNFSSource).
+    nfsServer: "fd97:45c2:b3a1:100::1000"
+    # Bracketed form required: the driver resolves the TrueNAS portal ID by
+    # splitting host:port and matching the host against the portal's listen
+    # address — the TrueNAS portal must be bound to exactly this ULA (not ::).
+    iscsiPortal: "[fd97:45c2:b3a1:100::1000]:3260"
     # Must match the TrueNAS iSCSI Target Global Configuration base name.
     iscsiIQNBase: "iqn.2005-10.org.freenas.ctl"
