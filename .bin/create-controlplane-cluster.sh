@@ -262,9 +262,18 @@ for attempt in $(seq 1 90); do
 done
 
 info "Bootstrapping etcd ..."
-if ! talosctl --talosconfig "${RENDER_DIR}/talosconfig" -n "${FIRST_CP}" bootstrap 2>/dev/null; then
-  info "bootstrap returned non-zero — assuming already bootstrapped (re-run)"
-fi
+# Retry until it lands: a failed bootstrap must not be shrugged off as
+# "already bootstrapped" — that leaves etcd waiting forever (learned the
+# hard way). Only an explicit AlreadyExists counts as done.
+for attempt in $(seq 1 30); do
+  BOOT_OUT=$(talosctl --talosconfig "${RENDER_DIR}/talosconfig" -n "${FIRST_CP}" -e "${FIRST_CP}" bootstrap 2>&1) && { success "etcd bootstrap issued"; break; }
+  if echo "${BOOT_OUT}" | grep -qiE "AlreadyExists|etcd data directory is not empty"; then
+    info "etcd already bootstrapped"
+    break
+  fi
+  [ "${attempt}" -eq 30 ] && { error "bootstrap never succeeded: ${BOOT_OUT}"; exit 1; }
+  sleep 10
+done
 
 mkdir -p "$(dirname "${TALOSCONFIG_PATH}")" "$(dirname "${KUBECONFIG_PATH}")"
 cp "${RENDER_DIR}/talosconfig" "${TALOSCONFIG_PATH}"
