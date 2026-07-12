@@ -155,6 +155,13 @@ talosctl gen config controlplane "https://[${APISERVER_VIP}]:6443" \
   --output-dir "${RENDER_DIR}" \
   --force
 
+# Talos >= 1.13 appends a HostnameConfig document (auto: stable) which
+# conflicts with the static machine.network.hostname set per node below —
+# the apiserver rejects configs carrying both. Strip it.
+for f in "${RENDER_DIR}/controlplane.yaml" "${RENDER_DIR}/worker.yaml"; do
+  yq ea -i 'select(.kind != "HostnameConfig")' "${f}"
+done
+
 # Per-node patches: hostname + static ULA + NAT64 route (+ shared VIP on CPs).
 node_names=()
 node_addrs=()
