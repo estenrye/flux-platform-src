@@ -12,7 +12,10 @@ spec:
   egress:
     - ports:
         - protocol: TCP
-          port: 443 # UniFi controller API + kube-apiserver
+          port: 443 # UniFi controller API
+        # apiserver targetPort — post-DNAT rule, see the Calico DNAT memory
+        - protocol: TCP
+          port: 6443
         - protocol: TCP
           port: 53
         - protocol: UDP
