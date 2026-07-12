@@ -76,10 +76,12 @@ success "schematic: ${SCHEMATIC_ID}"
 UBUNTU_QCOW="${CACHE_DIR}/$(basename "${UBUNTU_IMG_URL}")"
 UBUNTU_RAW="${UBUNTU_QCOW%.img}.raw"
 if [ ! -f "${UBUNTU_RAW}" ]; then
-  info "Downloading Ubuntu cloud image ..."
-  curl -fsSL -o "${UBUNTU_QCOW}" "${UBUNTU_IMG_URL}"
+  [ -f "${UBUNTU_QCOW}" ] || { info "Downloading Ubuntu cloud image ..."; curl -fsSL -o "${UBUNTU_QCOW}" "${UBUNTU_IMG_URL}"; }
   info "Converting to raw (zvol upload requires raw) ..."
-  qemu-img convert -O raw "${UBUNTU_QCOW}" "${UBUNTU_RAW}"
+  # Convert to a temp name and move into place atomically: a partial .raw
+  # from an interrupted run must never be mistaken for a valid cache hit.
+  qemu-img convert -O raw "${UBUNTU_QCOW}" "${UBUNTU_RAW}.tmp"
+  mv "${UBUNTU_RAW}.tmp" "${UBUNTU_RAW}"
 fi
 success "NAT64 base image: ${UBUNTU_RAW}"
 
