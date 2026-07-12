@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: truenas-csi
+  description: |-
+    Official TrueNAS CSI driver over the JSON-RPC websocket API:
+    truenas-iscsi (default, RWO) and truenas-nfs (RWX) StorageClasses backed
+    by flash-pool/k8s/controlplane on nas.rye.ninja.
+  tags:
+    - storage
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

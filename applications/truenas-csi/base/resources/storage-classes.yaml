@@ -1,0 +1,34 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: truenas-iscsi
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: csi.truenas.io
+parameters:
+  protocol: "iscsi"
+  pool: "flash-pool"
+  # Volumes land at flash-pool/k8s/controlplane/iscsi-v/<volume>.
+  datasetPath: "k8s/controlplane/iscsi-v"
+  compression: "LZ4"
+  volblocksize: "16K"
+  iscsi.blocksize: "4096"
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: truenas-nfs
+provisioner: csi.truenas.io
+parameters:
+  protocol: "nfs"
+  pool: "flash-pool"
+  # Volumes land at flash-pool/k8s/controlplane/nfs-v/<volume>.
+  datasetPath: "k8s/controlplane/nfs-v"
+  compression: "LZ4"
+  nfs.mountOptions: "hard,noatime,nfsvers=4.2"
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true

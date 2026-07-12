@@ -1,0 +1,73 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Official TrueNAS CSI driver (JSON-RPC websocket API, TrueNAS SCALE 25.10+):
+# truenas-iscsi (default, RWO) and truenas-nfs (RWX) StorageClasses.
+# Chosen over democratic-csi: native support for the 25.10 API (M1 design §5.4
+# named the API-compat risk; this driver eliminates it).
+#
+# The API key arrives as the SOPS-encrypted secret `truenas-api-credentials`
+# (clusters/controlplane/resources/truenas-csi.api-credentials.sops.yaml); the
+# upstream manifest's placeholder Secret is stripped from the render below.
+#
+# iSCSI over IPv6 requires the iscsi-tools Talos extension (in the image
+# schematic). VolumeSnapshot CRDs are not installed in M1 — the snapshotter
+# sidecar idles until they land (follow-up if snapshot support is wanted).
+
+resources:
+  - https://raw.githubusercontent.com/truenas/truenas-csi/v1.1.1/deploy/truenas-csi-driver.yaml
+  - resources/storage-classes.yaml
+  - resources/network-policy.yaml
+
+patches:
+  # Placeholder credential Secret ships in the upstream manifest; the real one
+  # is SOPS-managed per cluster.
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: truenas-api-credentials
+        namespace: truenas-csi
+  - target:
+      kind: ConfigMap
+      name: truenas-csi-config
+    path: patches/config.yaml
+  - target:
+      kind: Namespace
+      name: truenas-csi
+    path: patches/namespace.yaml
+  - target:
+      kind: Deployment
+      name: truenas-csi-controller
+    path: patches/controller.yaml
+  - target:
+      kind: DaemonSet
+      name: truenas-csi-node
+    path: patches/node.yaml
+  - target:
+      kind: ClusterRole
+      name: truenas-csi-controller-role
+    path: patches/rbac.yaml
+  - target:
+      kind: ClusterRoleBinding
+      name: truenas-csi-controller-binding
+    path: patches/rbac.yaml
+
+images:
+  # Upstream manifest ships :latest for the driver; pinned to the v1.1.1
+  # release digest. Sidecar digests match the tags in the v1.1.1 manifest.
+  - name: ghcr.io/truenas/truenas-csi
+    digest: sha256:5696fe979b1c83fb03363bdd47fa21e19fe745daa6171082a9c476a1f26d8420
+  - name: registry.k8s.io/sig-storage/csi-provisioner
+    digest: sha256:d992c36d4ddd6dfa37c81b487e5a673920e1360e2977eb779051df8da1c5787d
+  - name: registry.k8s.io/sig-storage/csi-attacher
+    digest: sha256:b74b05b39501565022883fc128002b4cb857a7bb6c858606bcb3fdedba0b0b80
+  - name: registry.k8s.io/sig-storage/csi-snapshotter
+    digest: sha256:da081c27e8a6d91f36042c1942362d0515ced8d06e18c11b8f893e58c4d6d797
+  - name: registry.k8s.io/sig-storage/csi-resizer
+    digest: sha256:589e525cddef6d768e68da1f0bc9ffd0a24bf3add3dd010648eb7189976fde79
+  - name: registry.k8s.io/sig-storage/livenessprobe
+    digest: sha256:c4cc074199c045dd73ab85f28897e2a32f4d6f38ffdba4f3b13b8007ccbd3570
+  - name: registry.k8s.io/sig-storage/csi-node-driver-registrar
+    digest: sha256:ab482308a4921e28a6df09a16ab99a457e9af9641ff44fb1be1a690d07ce8b70

@@ -22,7 +22,7 @@ incompatible plugin-framework rewrite, do not bump casually.
 Baseline applications done (2026-07-11): applications/calico/controlplane
 (tigera-operator v3.32.1, native LB IPAM, BGP; the chart's pre-delete hook Job
 is deleted from the render — applying it would uninstall Calico),
-democratic-csi/base (chart 0.15.1, image v1.9.5 digest-pinned),
+truenas-csi/base (official TrueNAS CSI v1.1.1, JSON-RPC native, digest-pinned; replaced democratic-csi at Esten's request),
 external-dns/unifi/base (webhook v0.8.2), default-deny controlplane variant,
 clusters/controlplane/kustomization.yaml, .bin/bootstrap-controlplane-flux-key.sh.
 All digest-pinned; kube-linter + checkov clean.
@@ -31,9 +31,11 @@ TrueNAS reality (differs from design doc): pool is `flash-pool`, not `tank` —
 datasets flash-pool/k8s/controlplane, flash-pool/k8s/controlplane-etcd-snapshots,
 flash-pool/replication/mf-ms-a2-01.usmnblm01.rye.ninja/vms.
 
-Remaining for M1: SOPS secrets (TrueNAS API key -> democratic-csi driver
-configs, UniFi API key -> external-dns) + uncomment them in the cluster
-kustomization; rendered repo creation BEFORE opening the M1 PR (push-cluster
+Remaining for M1: SOPS secrets (TrueNAS API key -> truenas-api-credentials
+Secret in namespace truenas-csi, UniFi API key -> external-dns) + uncomment
+them in the cluster kustomization; TrueNAS-side iSCSI/NFS service config
+(datasets flash-pool/k8s/controlplane/{iscsi-v,nfs-v} exist; iSCSI IQN base
+iqn.2005-10.org.freenas.ctl); rendered repo creation BEFORE opening the M1 PR (push-cluster
 CI leg needs it); `tests/controlplane-baseline/` chainsaw suites; ADRs
 (Talos-on-KVM, on-prem substrate, UniFi BGP LB, IPv6-only+NAT64);
 truenas-maintenance runbook; human steps 2–3 finishing (API key, replication

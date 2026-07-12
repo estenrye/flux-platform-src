@@ -1,9 +1,0 @@
-- op: add
-  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-secrets
-  value: "The CSI controller reads StorageClass-referenced secrets (driver config) to provision volumes; scoped by upstream chart RBAC."
-- op: add
-  path: /metadata/annotations/ignore-check.kube-linter.io~1wildcard-in-rules
-  value: "Upstream democratic-csi chart RBAC uses wildcard verbs on CSI resources; scoping further is an upstream chart limitation."
-- op: add
-  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-create-pods
-  value: "Upstream democratic-csi chart RBAC grants pod access used by CSI attach/detach reconciliation."

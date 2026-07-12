@@ -15,7 +15,7 @@ talos:
       systemExtensions:
         officialExtensions:
           - siderolabs/qemu-guest-agent # VM lifecycle integration (shutdown, IP reporting)
-          - siderolabs/iscsi-tools # required by democratic-csi iSCSI over IPv6
+          - siderolabs/iscsi-tools # required by truenas-csi iSCSI over IPv6
 nat64_appliance:
   # Ubuntu LTS cloud image for the Tayga/unbound appliance.
   ubuntu_series: noble

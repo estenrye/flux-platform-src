@@ -5,9 +5,9 @@ metadata:
 spec:
   # Same behavioral contract as the rackspace-spot variant (ADR-17): an
   # unlabeled namespace cannot egress except to cluster DNS. System and CNI
-  # namespaces are exempt; controlplane additionally exempts democratic-csi
+  # namespaces are exempt; controlplane additionally exempts truenas-csi
   # (node plugins are hostNetwork and mount storage from TrueNAS).
-  namespaceSelector: kubernetes.io/metadata.name not in {"calico-apiserver", "calico-system", "kube-node-lease", "kube-public", "kube-system", "tigera-operator", "democratic-csi"}
+  namespaceSelector: kubernetes.io/metadata.name not in {"calico-apiserver", "calico-system", "kube-node-lease", "kube-public", "kube-system", "tigera-operator", "truenas-csi"}
   types:
     - Ingress
     - Egress

@@ -1,0 +1,23 @@
+# Controller egress to the TrueNAS websocket API and DNS. The node plugin is
+# hostNetwork (NetworkPolicy does not apply); the namespace is also exempted
+# from the default-deny GlobalNetworkPolicy for that reason — this policy
+# documents and constrains the pod-network side regardless.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: truenas-csi-controller-egress
+  namespace: truenas-csi
+spec:
+  podSelector:
+    matchLabels:
+      app: truenas-csi-controller
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443 # TrueNAS JSON-RPC websocket API
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

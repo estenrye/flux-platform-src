@@ -1,0 +1,14 @@
+- op: replace
+  path: /data
+  value:
+    # DNS name on purpose: avoids IPv6 bracket-literal handling and survives
+    # a GUA renumber (nas.rye.ninja AAAA is kept current).
+    truenasURL: "wss://nas.rye.ninja/api/current"
+    # TrueNAS still serves its self-signed certificate; flips to "false" when
+    # the step-ca-issued cert lands (M2).
+    truenasInsecure: "true"
+    defaultPool: "flash-pool"
+    nfsServer: "nas.rye.ninja"
+    iscsiPortal: "nas.rye.ninja:3260"
+    # Must match the TrueNAS iSCSI Target Global Configuration base name.
+    iscsiIQNBase: "iqn.2005-10.org.freenas.ctl"

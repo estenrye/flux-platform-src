@@ -1,0 +1,97 @@
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: Always
+- op: add
+  path: /spec/template/spec/priorityClassName
+  value: platform-critical
+- op: add
+  path: /spec/strategy
+  value:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
+  value: "The CSI controller is a single active instance; CSI sidecars use leader election for failover, not active/active replicas."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-liveness-probe
+  value: "The livenessprobe sidecar supervises the driver via its CSI gRPC socket; helper sidecars intentionally omit probes."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-readiness-probe
+  value: "CSI controller components serve no pod traffic; readiness is not a functional gate."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1liveness-port
+  value: "Probe port wiring comes from the upstream truenas-csi manifest (livenessprobe sidecar pattern)."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-read-only-root-fs
+  value: "The truenas-csi driver writes runtime state inside the container; upstream manifest does not support readOnlyRootFilesystem."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1run-as-non-root
+  value: "Upstream ships the truenas-csi controller as root; constraining it is a tracked upstream follow-up."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+  value: "Single-host homelab cluster; no zone or role topology to express affinity against."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1env-value-from
+  value: "The TrueNAS API key is consumed via env from the SOPS-managed truenas-api-credentials Secret (upstream pattern)."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1read-secret-from-env-var
+  value: "This is not a custom application; the upstream driver reads its API key from a Secret-backed env var."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1unset-cpu-requirements
+  value: "CSI sidecar resource envelopes are pending real usage data from the M1 storage suite; sizing follow-up tracked in the M1 exit checklist."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1unset-memory-requirements
+  value: "CSI sidecar resource envelopes are pending real usage data from the M1 storage suite; sizing follow-up tracked in the M1 exit checklist."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip01
+  value: "CKV_K8S_8=The livenessprobe sidecar supervises the driver via its CSI gRPC socket; helper sidecars intentionally omit probes."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip02
+  value: "CKV_K8S_9=CSI controller components serve no pod traffic; readiness probes are not a functional gate."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip03
+  value: "CKV_K8S_10=CSI sidecar resource requests pending real usage data from the M1 storage suite."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip04
+  value: "CKV_K8S_11=CSI sidecar resource limits pending real usage data from the M1 storage suite."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip05
+  value: "CKV_K8S_12=CSI sidecar memory requests pending real usage data from the M1 storage suite."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip06
+  value: "CKV_K8S_13=CSI sidecar memory limits pending real usage data from the M1 storage suite."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip07
+  value: "CKV_K8S_20=Upstream manifest does not set allowPrivilegeEscalation for CSI sidecars."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip08
+  value: "CKV_K8S_22=The truenas-csi driver writes runtime state inside the container; readOnlyRootFilesystem is not supported upstream."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip09
+  value: "CKV_K8S_23=Upstream ships the truenas-csi controller as root; non-root operation is a tracked follow-up."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip10
+  value: "CKV_K8S_28=Upstream manifest does not drop NET_RAW for CSI sidecars."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip11
+  value: "CKV_K8S_29=Upstream ships the controller as root; pod securityContext is not set in the upstream manifest."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip12
+  value: "CKV_K8S_30=Upstream manifest does not set container securityContext for CSI sidecars."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip13
+  value: "CKV_K8S_31=Upstream manifest does not set seccompProfile; runtime default applies via kubelet configuration."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip14
+  value: "CKV_K8S_35=The TrueNAS API key is consumed via env from the SOPS-managed truenas-api-credentials Secret (upstream pattern); credentials are not hardcoded."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip15
+  value: "CKV_K8S_37=Upstream manifest does not support dropping all capabilities on CSI sidecars."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip16
+  value: "CKV_K8S_38=The CSI controller requires the service account token to watch PVCs and manage PVs/VolumeAttachments."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip17
+  value: "CKV_K8S_40=Upstream ships the truenas-csi controller as root (UID 0); high-UID operation is not supported upstream."

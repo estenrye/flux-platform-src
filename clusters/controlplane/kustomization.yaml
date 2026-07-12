@@ -14,13 +14,12 @@ resources:
   - ../../applications/envoy-gateway-crds/base
   - ../../applications/envoy-gateway/base
   - ../../applications/external-dns/unifi/base
-  - ../../applications/democratic-csi/base
+  - ../../applications/truenas-csi/base
   - ../../applications/flux/base
   - ../../applications/flux-monitoring/base
   - resources/flux.source.git.yaml
   - resources/flux.kustomization.yaml
   # TODO(M1, blocked on human step 2): SOPS-encrypted secrets, added once the
   # TrueNAS API key and UniFi API key are minted:
-  #   - resources/democratic-csi.truenas-iscsi-driver-config.sops.yaml
-  #   - resources/democratic-csi.truenas-nfs-driver-config.sops.yaml
+  #   - resources/truenas-csi.api-credentials.sops.yaml
   #   - resources/external-dns.unifi-credentials.sops.yaml

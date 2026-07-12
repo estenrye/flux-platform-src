@@ -34,4 +34,4 @@ keeps quorum; two losses means restore from snapshot instead
 ## Verify
 
 `talosctl health` clean; node Ready; PVCs on the node re-attached
-(democratic-csi re-mounts iSCSI/NFS from TrueNAS).
+(truenas-csi re-mounts iSCSI/NFS from TrueNAS).
