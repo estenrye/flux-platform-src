@@ -31,11 +31,19 @@ TrueNAS reality (differs from design doc): pool is `flash-pool`, not `tank` —
 datasets flash-pool/k8s/controlplane, flash-pool/k8s/controlplane-etcd-snapshots,
 flash-pool/replication/mf-ms-a2-01.usmnblm01.rye.ninja/vms.
 
-Remaining for M1: SOPS secrets (TrueNAS API key -> truenas-api-credentials
-Secret in namespace truenas-csi, UniFi API key -> external-dns) + uncomment
-them in the cluster kustomization; TrueNAS-side iSCSI/NFS service config
-(datasets flash-pool/k8s/controlplane/{iscsi-v,nfs-v} exist; iSCSI IQN base
-iqn.2005-10.org.freenas.ctl); rendered repo creation BEFORE opening the M1 PR (push-cluster
+TrueNAS side complete (2026-07-12): iSCSI portal on the static ULA
+fd97:45c2:b3a1:100::1000 (portal+initiator group 1, no CHAP), NFS v4,
+etcd-snapshot NFS export (restricted to host ULA ::2000), API key encrypted
+into clusters/controlplane/resources/truenas-csi.api-credentials.sops.yaml
+(1Password: op://controlplane/truenas-api-key), replication user verified
+(remote zfs needs /usr/sbin/zfs — non-root SSH PATH lacks /usr/sbin).
+Storage data paths use the NAS ULA; API uses wss://nas.rye.ninja.
+
+Also done: tests/controlplane-baseline/ (network/storage/lb/flux suites +
+.bin/run-controlplane-baseline.sh), ADRs 0020-0023, truenas-maintenance
+runbook.
+
+Remaining for M1: UniFi API key -> external-dns secret; rendered repo creation BEFORE opening the M1 PR (push-cluster
 CI leg needs it); `tests/controlplane-baseline/` chainsaw suites; ADRs
 (Talos-on-KVM, on-prem substrate, UniFi BGP LB, IPv6-only+NAT64);
 truenas-maintenance runbook; human steps 2–3 finishing (API key, replication

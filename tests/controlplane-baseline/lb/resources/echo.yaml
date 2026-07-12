@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lb-echo
+  labels:
+    app: lb-echo
+spec:
+  restartPolicy: Never
+  containers:
+    - name: echo
+      image: busybox:1.37.0@sha256:1487d0af5f52b4ba31c7e465126ee2123fe3f2305d638e7827681e7cf6c83d5e
+      command: ["sh", "-c", "mkdir -p /www && echo lb-ok > /www/index.html && httpd -f -p 8080 -h /www"]
+      ports:
+        - containerPort: 8080
+---
+# LB traffic arrives at the pod post-DNAT on the container port; the source
+# is outside the cluster, so allow all ingress to the echo pod.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: lb-echo-allow-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: lb-echo
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lb-internal
+  annotations:
+    projectcalico.org/ipPools: '["lb-internal-ula"]'
+spec:
+  type: LoadBalancer
+  selector:
+    app: lb-echo
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lb-ingress
+  annotations:
+    projectcalico.org/ipPools: '["lb-ingress-gua"]'
+spec:
+  type: LoadBalancer
+  selector:
+    app: lb-echo
+  ports:
+    - port: 80
+      targetPort: 8080

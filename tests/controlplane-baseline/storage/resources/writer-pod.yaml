@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: iscsi-writer
+  labels:
+    app: iscsi-probe
+spec:
+  restartPolicy: Never
+  containers:
+    - name: writer
+      image: busybox:1.37.0@sha256:1487d0af5f52b4ba31c7e465126ee2123fe3f2305d638e7827681e7cf6c83d5e
+      command: ["sleep", "1200"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: probe-iscsi

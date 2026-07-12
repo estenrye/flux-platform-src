@@ -1,0 +1,90 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: baseline-network
+spec:
+  description: >-
+    IPv6-only fabric contract (M1 design §9.1): pod-to-pod v6 across nodes
+    over the Calico BGP mesh; v6-native internet egress; egress to an
+    IPv4-only endpoint through DNS64+NAT64; and behavioral default-deny in a
+    namespace without allow policies. Connects by pod IP and container port
+    (post-DNAT rule, docs/memory/calico-networkpolicy-dnat.md).
+  steps:
+    - name: cross-node-pod-to-pod
+      try:
+        - apply:
+            file: resources/cross-node-pods.yaml
+        - assert:
+            timeout: 180s
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: xnode-client
+              status:
+                phase: Running
+        - script:
+            timeout: 180s
+            content: |
+              set -eu
+              IP=$(kubectl get pod xnode-server -n "${NAMESPACE}" -o jsonpath='{.status.podIP}')
+              case "${IP}" in
+                *:*) echo "server pod IP is IPv6: ${IP}" ;;
+                *) echo "FAIL: pod IP ${IP} is not IPv6 (cluster must be v6-only)"; exit 1 ;;
+              esac
+              SRV_NODE=$(kubectl get pod xnode-server -n "${NAMESPACE}" -o jsonpath='{.spec.nodeName}')
+              CLI_NODE=$(kubectl get pod xnode-client -n "${NAMESPACE}" -o jsonpath='{.spec.nodeName}')
+              [ "${SRV_NODE}" != "${CLI_NODE}" ] || { echo "FAIL: pods landed on the same node"; exit 1; }
+              kubectl exec -n "${NAMESPACE}" xnode-client -- wget -q -T 10 -O /dev/null "http://[${IP}]:8080" \
+                || { echo "FAIL: cross-node pod-to-pod v6 traffic blocked (${CLI_NODE} -> ${SRV_NODE})"; exit 1; }
+              echo "OK: cross-node v6 pod traffic (${CLI_NODE} -> ${SRV_NODE})"
+    - name: v6-native-egress
+      try:
+        - apply:
+            file: resources/allow-egress.yaml
+        - script:
+            timeout: 180s
+            content: |
+              set -eu
+              kubectl run v6-egress -n "${NAMESPACE}" --restart=Never \
+                --labels=app=net-probe \
+                --image=curlimages/curl:8.12.1 \
+                --command -- curl -6 -sf -o /dev/null --max-time 20 "https://${V6_HOST}"
+              kubectl wait pod v6-egress -n "${NAMESPACE}" \
+                --for=jsonpath='{.status.phase}'=Succeeded --timeout=120s \
+                || { echo "FAIL: v6-native egress to ${V6_HOST} failed"; kubectl logs v6-egress -n "${NAMESPACE}" || true; exit 1; }
+              echo "OK: v6-native egress"
+    - name: nat64-egress
+      try:
+        - script:
+            timeout: 180s
+            content: |
+              set -eu
+              # -v so the connected address is visible: it must land in the
+              # NAT64 well-known prefix, proving DNS64 synthesis + the
+              # 64:ff9b::/96 route via the appliance.
+              kubectl run nat64-egress -n "${NAMESPACE}" --restart=Never \
+                --labels=app=net-probe \
+                --image=curlimages/curl:8.12.1 \
+                --command -- sh -c "curl -6 -v -sf -o /dev/null --max-time 30 https://${V4ONLY_HOST} 2>&1 | grep -i 'connected to'"
+              kubectl wait pod nat64-egress -n "${NAMESPACE}" \
+                --for=jsonpath='{.status.phase}'=Succeeded --timeout=120s \
+                || { echo "FAIL: egress to ${V4ONLY_HOST} through NAT64 failed"; kubectl logs nat64-egress -n "${NAMESPACE}" || true; exit 1; }
+              kubectl logs nat64-egress -n "${NAMESPACE}" | grep -qi "${NAT64_PREFIX}" \
+                || { echo "FAIL: connection did not use the NAT64 prefix ${NAT64_PREFIX}::/96"; kubectl logs nat64-egress -n "${NAMESPACE}"; exit 1; }
+              echo "OK: ${V4ONLY_HOST} reached via ${NAT64_PREFIX}::/96"
+    - name: default-deny-without-policy
+      try:
+        - script:
+            timeout: 180s
+            content: |
+              set -eu
+              # No allow policy matches label app=denied — egress must fail.
+              kubectl run denied-egress -n "${NAMESPACE}" --restart=Never \
+                --labels=app=denied \
+                --image=curlimages/curl:8.12.1 \
+                --command -- curl -6 -sf -o /dev/null --max-time 10 "https://${V6_HOST}"
+              kubectl wait pod denied-egress -n "${NAMESPACE}" \
+                --for=jsonpath='{.status.phase}'=Failed --timeout=120s \
+                || { echo "FAIL: egress succeeded without an allow policy (default-deny not enforced)"; exit 1; }
+              echo "OK: default-deny enforced"

@@ -1,0 +1,60 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: baseline-lb
+spec:
+  description: >-
+    LoadBalancer contract (M1 design §9.3): Calico LB IPAM assigns one VIP
+    from the site-stable ULA pool and one from the internet-facing GUA pool,
+    and both are reachable from the runner's vantage point — which is another
+    VLAN, so reachability proves the BGP advertisement to the UniFi gateway
+    and its inter-VLAN redistribution end to end. (True from-the-internet
+    verification of the GUA VIP stays manual until an external vantage exists,
+    M5/M6.)
+  steps:
+    - name: vips-assigned-from-correct-pools
+      try:
+        - apply:
+            file: resources/echo.yaml
+        - script:
+            timeout: 300s
+            content: |
+              set -eu
+              for svc in lb-internal lb-ingress; do
+                for i in $(seq 1 30); do
+                  IP=$(kubectl get svc "${svc}" -n "${NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+                  [ -n "${IP}" ] && break
+                  sleep 10
+                done
+                [ -n "${IP}" ] || { echo "FAIL: ${svc} never got a VIP"; kubectl describe svc "${svc}" -n "${NAMESPACE}"; exit 1; }
+                echo "${svc}: ${IP}"
+              done
+              ULA_IP=$(kubectl get svc lb-internal -n "${NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+              GUA_IP=$(kubectl get svc lb-ingress -n "${NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+              case "${ULA_IP}" in
+                "${ULA_VIP_PREFIX}"*) echo "OK: internal VIP in ULA pool" ;;
+                *) echo "FAIL: internal VIP ${ULA_IP} not in ${ULA_VIP_PREFIX}::/112"; exit 1 ;;
+              esac
+              case "${GUA_IP}" in
+                "${ULA_VIP_PREFIX}"*) echo "FAIL: ingress VIP ${GUA_IP} came from the ULA pool"; exit 1 ;;
+                *:*) echo "OK: ingress VIP is a non-ULA IPv6 address (GUA pool ${GUA_VIP_POOL})" ;;
+                *) echo "FAIL: ingress VIP ${GUA_IP} is not IPv6"; exit 1 ;;
+              esac
+    - name: vips-reachable-from-another-vlan
+      try:
+        - script:
+            timeout: 300s
+            content: |
+              set -eu
+              # This script runs on the workstation (a different VLAN), so a
+              # successful fetch traverses gateway BGP routes for the VIPs.
+              for svc in lb-internal lb-ingress; do
+                IP=$(kubectl get svc "${svc}" -n "${NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+                ok=0
+                for i in $(seq 1 12); do
+                  if curl -g -6 -sf --max-time 5 "http://[${IP}]/" | grep -q lb-ok; then ok=1; break; fi
+                  sleep 5
+                done
+                [ "${ok}" = "1" ] || { echo "FAIL: ${svc} VIP ${IP} unreachable from the runner (check gateway BGP routes)"; exit 1; }
+                echo "OK: ${svc} VIP ${IP} reachable cross-VLAN"
+              done

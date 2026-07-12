@@ -1,0 +1,110 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: baseline-storage
+spec:
+  description: >-
+    TrueNAS-backed storage contract (M1 design §9.2): PVC bind + write on
+    truenas-iscsi (proves iSCSI over IPv6 via the iscsi-tools extension),
+    online expansion, data surviving pod rescheduling to a different node,
+    and truly concurrent cross-node RWX on truenas-nfs.
+  steps:
+    - name: iscsi-bind-and-write
+      try:
+        - apply:
+            file: resources/pvc-iscsi.yaml
+        - apply:
+            file: resources/writer-pod.yaml
+        - assert:
+            timeout: 300s
+            resource:
+              apiVersion: v1
+              kind: PersistentVolumeClaim
+              metadata:
+                name: probe-iscsi
+              status:
+                phase: Bound
+        - assert:
+            timeout: 300s
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: iscsi-writer
+              status:
+                phase: Running
+        - script:
+            timeout: 120s
+            content: |
+              set -eu
+              kubectl exec -n "${NAMESPACE}" iscsi-writer -- sh -c 'echo "m1-baseline-$(date +%s)" > /data/probe.txt && sync && cat /data/probe.txt'
+              echo "OK: iSCSI volume bound, mounted, writable"
+    - name: iscsi-online-expand
+      try:
+        - script:
+            timeout: 300s
+            content: |
+              set -eu
+              kubectl patch pvc probe-iscsi -n "${NAMESPACE}" --type merge \
+                -p '{"spec":{"resources":{"requests":{"storage":"2Gi"}}}}'
+              for i in $(seq 1 30); do
+                CAP=$(kubectl get pvc probe-iscsi -n "${NAMESPACE}" -o jsonpath='{.status.capacity.storage}')
+                [ "${CAP}" = "2Gi" ] && { echo "OK: expanded to ${CAP}"; exit 0; }
+                sleep 10
+              done
+              echo "FAIL: PVC never reported 2Gi (last: ${CAP})"
+              kubectl describe pvc probe-iscsi -n "${NAMESPACE}" | tail -15
+              exit 1
+    - name: iscsi-reattach-across-nodes
+      try:
+        - script:
+            timeout: 300s
+            content: |
+              set -eu
+              OLD_NODE=$(kubectl get pod iscsi-writer -n "${NAMESPACE}" -o jsonpath='{.spec.nodeName}')
+              MARKER=$(kubectl exec -n "${NAMESPACE}" iscsi-writer -- cat /data/probe.txt)
+              kubectl delete pod iscsi-writer -n "${NAMESPACE}" --wait=true --timeout=120s
+              # Reschedule onto any OTHER node: the volume must detach from the
+              # old node and stage on the new one.
+              kubectl run iscsi-reader -n "${NAMESPACE}" --restart=Never \
+                --image=busybox:1.37.0@sha256:1487d0af5f52b4ba31c7e465126ee2123fe3f2305d638e7827681e7cf6c83d5e \
+                --overrides="{\"spec\":{\"affinity\":{\"nodeAffinity\":{\"requiredDuringSchedulingIgnoredDuringExecution\":{\"nodeSelectorTerms\":[{\"matchExpressions\":[{\"key\":\"kubernetes.io/hostname\",\"operator\":\"NotIn\",\"values\":[\"${OLD_NODE}\"]}]}]}}},\"containers\":[{\"name\":\"reader\",\"image\":\"busybox:1.37.0@sha256:1487d0af5f52b4ba31c7e465126ee2123fe3f2305d638e7827681e7cf6c83d5e\",\"command\":[\"sleep\",\"600\"],\"volumeMounts\":[{\"name\":\"data\",\"mountPath\":\"/data\"}]}],\"volumes\":[{\"name\":\"data\",\"persistentVolumeClaim\":{\"claimName\":\"probe-iscsi\"}}]}}" \
+                -- sleep 600
+              kubectl wait pod iscsi-reader -n "${NAMESPACE}" \
+                --for=condition=Ready --timeout=240s \
+                || { echo "FAIL: volume never reattached on another node"; kubectl describe pod iscsi-reader -n "${NAMESPACE}" | tail -20; exit 1; }
+              NEW_NODE=$(kubectl get pod iscsi-reader -n "${NAMESPACE}" -o jsonpath='{.spec.nodeName}')
+              [ "${NEW_NODE}" != "${OLD_NODE}" ] || { echo "FAIL: rescheduled onto the same node"; exit 1; }
+              READ=$(kubectl exec -n "${NAMESPACE}" iscsi-reader -- cat /data/probe.txt)
+              [ "${READ}" = "${MARKER}" ] || { echo "FAIL: data mismatch after reattach (${READ} != ${MARKER})"; exit 1; }
+              echo "OK: data survived rescheduling ${OLD_NODE} -> ${NEW_NODE}"
+    - name: nfs-rwx-cross-node
+      try:
+        - apply:
+            file: resources/pvc-nfs-pods.yaml
+        - assert:
+            timeout: 300s
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: nfs-reader
+              status:
+                phase: Running
+        - script:
+            timeout: 120s
+            content: |
+              set -eu
+              W_NODE=$(kubectl get pod nfs-writer -n "${NAMESPACE}" -o jsonpath='{.spec.nodeName}')
+              R_NODE=$(kubectl get pod nfs-reader -n "${NAMESPACE}" -o jsonpath='{.spec.nodeName}')
+              [ "${W_NODE}" != "${R_NODE}" ] || { echo "FAIL: RWX pods landed on the same node"; exit 1; }
+              kubectl exec -n "${NAMESPACE}" nfs-writer -- sh -c 'echo rwx-proof > /data/rwx.txt && sync'
+              for i in $(seq 1 12); do
+                if kubectl exec -n "${NAMESPACE}" nfs-reader -- cat /data/rwx.txt 2>/dev/null | grep -q rwx-proof; then
+                  echo "OK: concurrent RWX across ${W_NODE} and ${R_NODE}"
+                  exit 0
+                fi
+                sleep 5
+              done
+              echo "FAIL: reader never saw the writer's data"
+              exit 1

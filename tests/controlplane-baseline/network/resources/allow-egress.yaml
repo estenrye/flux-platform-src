@@ -1,0 +1,20 @@
+# Explicit allows for the probe namespace: HTTPS egress + DNS. Everything
+# else stays default-denied by the GlobalNetworkPolicy (ADR-17).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: probe-allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app: net-probe
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
