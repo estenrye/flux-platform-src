@@ -179,7 +179,10 @@ machine:
   network:
     hostname: ${name}
     interfaces:
-      - interface: eth0
+      # deviceSelector, not a name: QEMU virtio NICs come up as ensN
+      # (predictable naming), and the VMs have exactly one physical NIC.
+      - deviceSelector:
+          physical: true
         dhcp: false
         addresses:
           - ${ula}/64
@@ -230,6 +233,14 @@ for i in "${!node_names[@]}"; do
   for attempt in $(seq 1 60); do
     if talosctl apply-config --insecure --nodes "${addr}" --file "${RENDER_DIR}/${name}.yaml" 2>/dev/null; then
       success "${name}: config applied — installing to disk"
+      break
+    fi
+    # Node already installed (secure mode) but not at its static ULA yet —
+    # e.g. a previous run applied a config with a bad network section. Its
+    # SLAAC address still answers; apply the corrected config over TLS.
+    if talosctl --talosconfig "${RENDER_DIR}/talosconfig" apply-config \
+        --nodes "${addr}" --endpoints "${addr}" --file "${RENDER_DIR}/${name}.yaml" 2>/dev/null; then
+      success "${name}: corrected config applied over TLS at ${addr}"
       break
     fi
     [ "${attempt}" -eq 60 ] && { error "${name}: never reachable at ${addr}. If SLAAC used stable-privacy instead of EUI-64, find the node via 'virsh domifaddr ${name} --source arp' on the host."; exit 1; }
