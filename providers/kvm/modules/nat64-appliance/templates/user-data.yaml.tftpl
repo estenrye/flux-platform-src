@@ -67,6 +67,22 @@ write_files:
           ip saddr ${tayga_pool_cidr} oifname "lan" masquerade
         }
       }
+      # MSS clamp both directions through the translator: PMTUD does not
+      # complete across the NAT64 boundary and large TLS records blackhole
+      # (found at bring-up: TCP handshakes passed, ServerHello never arrived).
+      table inet mss64 {
+        chain forward {
+          type filter hook forward priority mangle; policy accept;
+          tcp flags syn tcp option maxseg size set 1200
+        }
+      }
+
+  - path: /etc/systemd/system/tayga.service.d/mtu.conf
+    content: |
+      # Clamp the translator TUN to the IPv6 minimum MTU; oversized packets
+      # then trigger local fragmentation/PTB instead of blackholing.
+      [Service]
+      ExecStartPost=/usr/sbin/ip link set dev nat64 mtu 1280
 
   - path: /etc/unbound/unbound.conf.d/dns64.conf
     content: |

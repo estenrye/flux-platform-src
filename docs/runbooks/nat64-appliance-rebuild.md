@@ -38,6 +38,20 @@ Manual side-load path (M1 design §4.3):
    then `ctr -n k8s.io images import` via `talosctl` on the target node — or
    push to a registry that has AAAA records.
 
+## Client routing quirk (VLAN 100 residents)
+
+The UniFi static route `64:ff9b::/96 -> fd97:45c2:b3a1:100::64` serves
+clients on OTHER VLANs (symmetric through the gateway). Clients ON VLAN 100
+(the KVM host, a laptop joined to its WiFi) must route directly:
+
+```sh
+sudo route -n add -inet6 64:ff9b:: -prefixlen 96 fd97:45c2:b3a1:100::64   # macOS
+```
+
+Via the gateway their return traffic arrives on-link (asymmetric) and the
+stateful firewall drops mid-flow packets — handshakes pass, data stalls.
+Cluster nodes are unaffected (machine configs carry the direct route).
+
 ## Retirement flag
 
 If UniFi ships native NAT64 or GitHub publishes AAAA records, the appliance
