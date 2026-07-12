@@ -47,11 +47,16 @@ info "libvirtd restarted (zfs storage backend loaded)"
 # resolved /dev/zdN device and gets DENIED without this rule.
 if ! grep -q '/dev/zd\[0-9\]\* rwk' /etc/apparmor.d/abstractions/libvirt-qemu; then
   echo '  /dev/zd[0-9]* rwk,' >> /etc/apparmor.d/abstractions/libvirt-qemu
-  systemctl reload apparmor
   info "AppArmor: zvol device rule added to libvirt-qemu abstraction"
-else
-  info "AppArmor zvol rule already present"
 fi
+# virt-aa-helper also skips <disk type="volume"> sources from custom pools,
+# so the Talos ISO / cloud-init media in the controlplane-images dir pool
+# need an explicit read rule.
+if ! grep -q 'controlplane-images' /etc/apparmor.d/abstractions/libvirt-qemu; then
+  echo '  /var/lib/libvirt/controlplane-images/** r,' >> /etc/apparmor.d/abstractions/libvirt-qemu
+  info "AppArmor: controlplane-images read rule added"
+fi
+systemctl reload apparmor
 
 # ── 2. ZFS pool ──────────────────────────────────────────────────────────────
 if zpool list "${POOL}" >/dev/null 2>&1; then
