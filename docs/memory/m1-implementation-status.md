@@ -54,3 +54,13 @@ Open decision flagged to Esten: whether to add a repo-admin age key as second
 SOPS recipient for `clusters/controlplane/` — the crossplane cluster key is
 unsuitable because its private half is tracked in the repo
 ([[cluster-kubeconfig-lookup]]).
+
+UniFi credentials done (2026-07-12): external-dns secret encrypted
+(op://controlplane/unifi-os-external-dns; host = gateway ULA
+https://[fd97:45c2:b3a1:100::1] — the gateway DOES carry the VLAN 100 ULA
+::1 and serves /proxy/network/integration/v1/* on it). UniFi 10.5 EA UI:
+API keys live behind the PLUG ICON in the Network app's left rail
+("Integrations"), NOT Settings > Control Plane; creating keys requires
+OS-level super admin — Network "Full Management" role still gets Access
+Prohibited. Workstation has NO global IPv6 (v4-only VLAN) — never probe
+v6 reachability from it; use the KVM host as the VLAN 100 vantage.
