@@ -43,6 +43,10 @@ provider:
             name: external-dns-unifi-credentials
             key: api-key
             optional: false
+      # The controller serves an untrusted certificate; pinned explicitly
+      # even though the webhook currently defaults to skipping verification.
+      - name: UNIFI_SKIP_TLS_VERIFY
+        value: "true"
     livenessProbe:
       httpGet:
         path: /healthz

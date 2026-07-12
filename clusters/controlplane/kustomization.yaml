@@ -20,5 +20,4 @@ resources:
   - resources/flux.source.git.yaml
   - resources/flux.kustomization.yaml
   - resources/truenas-csi.api-credentials.sops.yaml
-  # TODO(M1): added once the UniFi API key is minted:
-  #   - resources/external-dns.unifi-credentials.sops.yaml
+  - resources/external-dns.unifi-credentials.sops.yaml
