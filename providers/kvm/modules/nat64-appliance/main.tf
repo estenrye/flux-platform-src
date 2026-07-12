@@ -10,13 +10,13 @@ locals {
   tayga_pool_gw = cidrhost(var.tayga_pool_cidr, 1) # tayga's own v4 tunnel address
 }
 
-# RAW Ubuntu cloud image uploaded into the zvol. `size` > source size grows
-# the volume; cloud-init growpart expands the root filesystem on first boot.
+# RAW Ubuntu cloud image uploaded into the zvol. The provider forbids
+# size+source together, so the disk is image-sized (~3.5G — ample for
+# Tayga+unbound); cloud-init growpart expands the root fs into it.
 resource "libvirt_volume" "system" {
   name   = "${var.name}-system"
   pool   = var.pool
   source = var.base_image_path
-  size   = var.disk_size_bytes
   format = "raw"
 }
 

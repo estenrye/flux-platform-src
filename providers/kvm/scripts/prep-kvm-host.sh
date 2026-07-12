@@ -42,6 +42,17 @@ info "packages present: zfsutils-linux ksmtuned libvirt-daemon-driver-storage-zf
 systemctl restart libvirtd
 info "libvirtd restarted (zfs storage backend loaded)"
 
+# ── 1b. AppArmor: allow qemu to open zvol block devices ─────────────────────
+# virt-aa-helper whitelists the /dev/zvol/... symlink, but qemu opens the
+# resolved /dev/zdN device and gets DENIED without this rule.
+if ! grep -q '/dev/zd\[0-9\]\* rwk' /etc/apparmor.d/abstractions/libvirt-qemu; then
+  echo '  /dev/zd[0-9]* rwk,' >> /etc/apparmor.d/abstractions/libvirt-qemu
+  systemctl reload apparmor
+  info "AppArmor: zvol device rule added to libvirt-qemu abstraction"
+else
+  info "AppArmor zvol rule already present"
+fi
+
 # ── 2. ZFS pool ──────────────────────────────────────────────────────────────
 if zpool list "${POOL}" >/dev/null 2>&1; then
   info "pool ${POOL} already exists — skipping creation"

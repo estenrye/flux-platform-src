@@ -14,12 +14,6 @@ variable "memory_mb" {
   default = 1024
 }
 
-variable "disk_size_bytes" {
-  description = "System disk size in bytes (design: 10 GB)"
-  type        = number
-  default     = 10737418240
-}
-
 variable "pool" {
   description = "libvirt storage pool (type zfs) for the system disk zvol"
   type        = string
