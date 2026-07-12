@@ -1,0 +1,16 @@
+apiVersion: crd.projectcalico.org/v1
+kind: IPPool
+metadata:
+  name: pods-v6
+spec:
+  # Declared explicitly rather than relying on the Installation spec: the
+  # tigera operator skips creating pools from Installation when ANY IPPool
+  # already exists — and the two LB pools in this kustomization land first
+  # (learned at bring-up: every pod stuck with "no configured Calico pools").
+  cidr: fd97:45c2:b3a1:1100::/56
+  blockSize: 122
+  natOutgoing: true # pods are ULA — SNAT to node address for external destinations
+  nodeSelector: all()
+  ipipMode: Never
+  vxlanMode: Never
+  allowedUses: ["Workload", "Tunnel"]

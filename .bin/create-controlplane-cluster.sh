@@ -128,6 +128,15 @@ machine:
     nodeIP:
       validSubnets:
         - ${INFRA_SUBNET}
+    # Talos kubelet only sees explicitly-mounted host paths; the truenas-csi
+    # node plugin hostPath-mounts /etc/iscsi (provided by the iscsi-tools
+    # extension). Do NOT bind /var/lib/iscsi here: it does not exist until
+    # the CSI daemonset creates it, and a missing bind source kills kubelet.
+    extraMounts:
+      - destination: /etc/iscsi
+        type: bind
+        source: /etc/iscsi
+        options: [bind, rshared, rw]
 cluster:
   network:
     cni:

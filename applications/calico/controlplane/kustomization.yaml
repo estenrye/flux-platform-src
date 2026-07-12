@@ -19,6 +19,7 @@ resources:
   - resources/namespace.yaml
   - resources/bgp-configuration.yaml
   - resources/bgp-peer.yaml
+  - resources/ippool-pods.yaml
   - resources/ippool-lb-internal.yaml
   - resources/ippool-lb-ingress.yaml
 
