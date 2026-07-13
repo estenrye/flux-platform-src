@@ -270,12 +270,23 @@ for attempt in $(seq 1 90); do
   sleep 10
 done
 
-info "Bootstrapping etcd ..."
+# RECOVER_FROM=<snapshot path> turns bootstrap into a disaster-recovery
+# restore: etcd is initialized FROM the snapshot instead of empty. Used by
+# the DR drill and docs/runbooks/etcd-snapshot-restore.md. The snapshot is
+# uploaded to the node and recovered in one step via --recover-from.
+BOOT_ARGS=(-n "${FIRST_CP}" -e "${FIRST_CP}" bootstrap)
+if [ -n "${RECOVER_FROM:-}" ]; then
+  [ -f "${RECOVER_FROM}" ] || { error "RECOVER_FROM snapshot not found: ${RECOVER_FROM}"; exit 1; }
+  info "Recovering etcd from snapshot: ${RECOVER_FROM}"
+  BOOT_ARGS+=(--recover-from="${RECOVER_FROM}")
+else
+  info "Bootstrapping etcd ..."
+fi
 # Retry until it lands: a failed bootstrap must not be shrugged off as
 # "already bootstrapped" — that leaves etcd waiting forever (learned the
 # hard way). Only an explicit AlreadyExists counts as done.
 for attempt in $(seq 1 30); do
-  BOOT_OUT=$(talosctl --talosconfig "${RENDER_DIR}/talosconfig" -n "${FIRST_CP}" -e "${FIRST_CP}" bootstrap 2>&1) && { success "etcd bootstrap issued"; break; }
+  BOOT_OUT=$(talosctl --talosconfig "${RENDER_DIR}/talosconfig" "${BOOT_ARGS[@]}" 2>&1) && { success "etcd ${RECOVER_FROM:+recovery }bootstrap issued"; break; }
   if echo "${BOOT_OUT}" | grep -qiE "AlreadyExists|etcd data directory is not empty"; then
     info "etcd already bootstrapped"
     break
