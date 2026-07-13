@@ -231,13 +231,15 @@ done
 success "VMs provisioned."
 
 # ── 6. Apply configs in maintenance mode ─────────────────────────────────────
-# Maintenance-mode nodes have only SLAAC/link-local addresses. MACs are fixed
-# as 52:54:00:b3:a1:<ula-suffix>, so the EUI-64 SLAAC address under the GUA
-# prefix is predictable: <gua>:5054:ff:feb3:a1<suffix>.
+# Maintenance-mode nodes have only SLAAC/link-local addresses. The MAC is
+# 52:54:00:b3:a1:<octet> where <octet> is the ULA host part as a byte (matching
+# providers/kvm/controlplane/locals.tf), so the EUI-64 SLAAC address under the
+# GUA prefix is predictable: <gua>:5054:ff:feb3:a1<octet>. Zero-pad the octet
+# with %02x so it matches the MAC for single-hex suffixes (::a -> "0a").
 maintenance_addr() {
-  local ula="$1" suffix
-  suffix="${ula##*::}" # 11..13, 21..23
-  echo "${GUA_PREFIX}:5054:ff:feb3:a1${suffix}"
+  local ula="$1" octet
+  octet=$(printf '%02x' "0x${ula##*::}") # 11..13, 21..23; ::a -> 0a
+  echo "${GUA_PREFIX}:5054:ff:feb3:a1${octet}"
 }
 
 for i in "${!node_names[@]}"; do
