@@ -13,10 +13,6 @@ output "talos_iso_url" {
   value = local.iso_url
 }
 
-output "nat64_address" {
-  value = module.nat64.ula_address
-}
-
 output "apiserver_vip" {
   value = local.network.allocations.apiserver_vip
 }

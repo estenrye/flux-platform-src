@@ -4,18 +4,20 @@
 #
 # Prerequisites (M1 design §8 steps 1-4):
 #   - KVM host prepped (providers/kvm/scripts/prep-kvm-host.sh) — pools vms/appliances exist
+#   - NAT64 appliance up (.bin/create-nat64.sh) — the IPv4-only Talos factory
+#     is reached through it; this script prechecks and refuses without it
 #   - UniFi BGP config uploaded; static route for the ULA /64 toward VLAN 100
 #   - clusters/controlplane/.sops.yaml present with the controlplane age key
 #   - ssh-agent holds the automation-user key for the KVM host
 #
 # Flow:
-#   1. Compute the image factory schematic ID from providers/kvm/versions.yaml
-#   2. Download + convert the Ubuntu cloud image for the NAT64 appliance
+#   1. Precheck NAT64 path to the image factory
+#   2. Compute the image factory schematic ID from providers/kvm/versions.yaml
 #   3. Decrypt (or generate + encrypt) Talos machine secrets via SOPS
 #   4. Render machine configs from providers/kvm/network.yaml
 #   5. tofu apply (VMs boot the factory ISO into maintenance mode)
 #   6. Apply configs over the network at MAC-derived EUI-64 SLAAC addresses
-#   7. Bootstrap etcd, fetch kubeconfig, report health
+#   7. Bootstrap (or RECOVER_FROM snapshot) etcd, fetch kubeconfig, report health
 #
 # Expected end state per the design: `talosctl health` etcd/apid clean, nodes
 # NotReady (CNI arrives with Flux/Calico in step 10).
@@ -29,7 +31,6 @@ source "${SCRIPT_DIR}/lib/prompt-color.sh"
 
 KVM_DIR="${REPO_ROOT}/providers/kvm"
 TOFU_DIR="${KVM_DIR}/controlplane"
-CACHE_DIR="${KVM_DIR}/.cache"
 RENDER_DIR="${TOFU_DIR}/.rendered"
 CLUSTER_DIR="${REPO_ROOT}/clusters/controlplane"
 SOPS_CONFIG="${CLUSTER_DIR}/.sops.yaml"
@@ -37,8 +38,8 @@ SECRETS_FILE="${CLUSTER_DIR}/secrets/talos-secrets.sops.yaml"
 KUBECONFIG_PATH="${KUBECONFIG_PATH:-${HOME}/.kube/homelab/controlplane.yaml}"
 TALOSCONFIG_PATH="${TALOSCONFIG_PATH:-${HOME}/.talos/homelab-controlplane.yaml}"
 
-for tool in tofu talosctl yq jq curl sops qemu-img; do
-  command -v "${tool}" >/dev/null || { error "missing tool: ${tool} (see .bin/install-*.sh; qemu-img: brew install qemu)"; exit 1; }
+for tool in tofu talosctl yq jq curl sops; do
+  command -v "${tool}" >/dev/null || { error "missing tool: ${tool} (see .bin/install-*.sh)"; exit 1; }
 done
 [ -f "${SOPS_CONFIG}" ] || { error "${SOPS_CONFIG} not found — run the SOPS key setup first (M1 design step 4)"; exit 1; }
 
@@ -48,7 +49,6 @@ NETWORK="${KVM_DIR}/network.yaml"
 
 TALOS_VERSION=$(yq -r '.talos.version' "${VERSIONS}")
 K8S_VERSION=$(yq -r '.talos.kubernetes_version' "${VERSIONS}")
-UBUNTU_IMG_URL=$(yq -r '.nat64_appliance.image_url' "${VERSIONS}")
 APISERVER_VIP=$(yq -r '.allocations.apiserver_vip' "${NETWORK}")
 INFRA_SUBNET=$(yq -r '.allocations.infra_subnet' "${NETWORK}")
 NAT64_ULA=$(yq -r '.allocations.nat64_appliance.ula' "${NETWORK}")
@@ -63,27 +63,26 @@ if [ "${CLIENT_TALOS_VERSION}" != "${TALOS_VERSION}" ]; then
   exit 1
 fi
 
-mkdir -p "${CACHE_DIR}" "${RENDER_DIR}" && chmod 700 "${RENDER_DIR}"
+mkdir -p "${RENDER_DIR}" && chmod 700 "${RENDER_DIR}"
 
-# ── 1. Schematic ID ──────────────────────────────────────────────────────────
+# ── 1. NAT64 precheck ─────────────────────────────────────────────────────────
+# The Talos image factory is IPv4-only (no AAAA); this v6-only workstation and
+# the cluster nodes reach it THROUGH the NAT64 appliance, which has a separate
+# lifecycle (providers/kvm/nat64, .bin/create-nat64.sh). It must be up first.
+info "Checking NAT64 path to the image factory ..."
+if ! curl -fsS --max-time 10 -o /dev/null https://factory.talos.dev/ 2>/dev/null; then
+  error "Cannot reach factory.talos.dev. The NAT64 appliance is required first."
+  error "Run: .bin/create-nat64.sh   (and ensure this host routes 64:ff9b::/96 -> ${NAT64_ULA})"
+  exit 1
+fi
+success "NAT64 path to factory OK."
+
+# ── 2. Schematic ID ──────────────────────────────────────────────────────────
 info "Computing image factory schematic ID ..."
 SCHEMATIC_ID=$(yq -o=yaml '.talos.schematic' "${VERSIONS}" \
   | curl -fsS -X POST --data-binary @- https://factory.talos.dev/schematics \
   | jq -r '.id')
 success "schematic: ${SCHEMATIC_ID}"
-
-# ── 2. NAT64 appliance base image ────────────────────────────────────────────
-UBUNTU_QCOW="${CACHE_DIR}/$(basename "${UBUNTU_IMG_URL}")"
-UBUNTU_RAW="${UBUNTU_QCOW%.img}.raw"
-if [ ! -f "${UBUNTU_RAW}" ]; then
-  [ -f "${UBUNTU_QCOW}" ] || { info "Downloading Ubuntu cloud image ..."; curl -fsSL -o "${UBUNTU_QCOW}" "${UBUNTU_IMG_URL}"; }
-  info "Converting to raw (zvol upload requires raw) ..."
-  # Convert to a temp name and move into place atomically: a partial .raw
-  # from an interrupted run must never be mistaken for a valid cache hit.
-  qemu-img convert -O raw "${UBUNTU_QCOW}" "${UBUNTU_RAW}.tmp"
-  mv "${UBUNTU_RAW}.tmp" "${UBUNTU_RAW}"
-fi
-success "NAT64 base image: ${UBUNTU_RAW}"
 
 # ── 3. Talos machine secrets (SOPS) ──────────────────────────────────────────
 # Whole-file encryption with explicit recipients. Do NOT rely on .sops.yaml
@@ -216,8 +215,7 @@ success "machine configs rendered for: ${node_names[*]}"
 info "Applying infrastructure (tofu) ..."
 tofu -chdir="${TOFU_DIR}" init -input=false >/dev/null
 tofu -chdir="${TOFU_DIR}" apply -input=false -auto-approve \
-  -var "schematic_id=${SCHEMATIC_ID}" \
-  -var "nat64_image_path=${UBUNTU_RAW}"
+  -var "schematic_id=${SCHEMATIC_ID}"
 success "VMs provisioned."
 
 # ── 6. Apply configs in maintenance mode ─────────────────────────────────────

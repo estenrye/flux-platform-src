@@ -15,19 +15,17 @@ export PATH="${REPO_ROOT}/.venv/bin:${PATH}"
 source "${SCRIPT_DIR}/lib/prompt-color.sh"
 
 TOFU_DIR="${REPO_ROOT}/providers/kvm/controlplane"
-CACHE_DIR="${REPO_ROOT}/providers/kvm/.cache"
 
 warn "This DESTROYS all controlplane cluster VMs and their disks on the KVM host."
+warn "The NAT64 appliance is a SEPARATE module and is left untouched."
 warn "etcd data is lost unless a snapshot exists (make backup-controlplane-etcd)."
 read -r -p "Type 'controlplane' to confirm: " CONFIRM
 [ "${CONFIRM}" = "controlplane" ] || { error "confirmation mismatch — aborting"; exit 1; }
 
-# Vars are structurally required by the root module but irrelevant to destroy.
-UBUNTU_RAW=$(ls "${CACHE_DIR}"/*.raw 2>/dev/null | head -1 || echo "/dev/null")
+# schematic_id is structurally required by the root module but irrelevant to destroy.
 tofu -chdir="${TOFU_DIR}" init -input=false >/dev/null
 tofu -chdir="${TOFU_DIR}" destroy -input=false -auto-approve \
-  -var "schematic_id=destroy" \
-  -var "nat64_image_path=${UBUNTU_RAW}"
+  -var "schematic_id=destroy"
 
 rm -rf "${TOFU_DIR}/.rendered"
 success "Destroyed. Rebuild with .bin/create-controlplane-cluster.sh"

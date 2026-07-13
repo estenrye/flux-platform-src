@@ -38,19 +38,3 @@ module "talos_node" {
   mac             = each.value.mac
 }
 
-module "nat64" {
-  source = "../modules/nat64-appliance"
-
-  cloudinit_pool     = libvirt_pool.images.name
-  base_image_path    = var.nat64_image_path
-  bridge             = local.host.bridge
-  mac                = "52:54:00:b3:a1:64"
-  ula_address        = "${local.network.allocations.nat64_appliance.ula}/64"
-  ipv4_address       = local.network.allocations.nat64_appliance.ipv4
-  ipv4_gateway       = local.network.vlan100.ipv4_gateway
-  tayga_pool_cidr    = local.network.allocations.nat64_appliance.tayga_pool
-  nat64_prefix       = local.network.allocations.nat64_appliance.nat64_prefix
-  dns64_allowed_cidr = local.network.ula_prefix
-
-  authorized_ssh_keys = var.nat64_authorized_ssh_keys
-}
