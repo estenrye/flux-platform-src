@@ -1,0 +1,45 @@
+# truenas-nfs (RWX) is the DEFAULT StorageClass. truenas-iscsi is defined but
+# non-default and currently BLOCKED on IPv6-only clusters: the pinned
+# csi-lib-iscsi mis-parses IPv6 portals so device-path detection never matches
+# (NodeStageVolume: "failed to find device path"). Discovery + login work;
+# only the library's portal parsing is IPv4-only. democratic-csi handles the
+# same case correctly and is the iSCSI-over-IPv6 fallback once its TrueNAS
+# 25.10 API support is validated.
+#   upstream: https://github.com/kubernetes-csi/csi-lib-iscsi/issues/94
+#   tracking: https://github.com/truenas/truenas-csi/issues/45
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: truenas-nfs
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: csi.truenas.io
+parameters:
+  protocol: "nfs"
+  pool: "flash-pool"
+  # Volumes land at flash-pool/k8s/controlplane/nfs-v/<volume>.
+  datasetPath: "k8s/controlplane/nfs-v"
+  compression: "LZ4"
+  nfs.mountOptions: "hard,noatime,nfsvers=4.2"
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: truenas-iscsi
+  # Not default — blocked on IPv6 (see header). Kept so RWO block volumes
+  # work immediately once the driver issue is resolved.
+provisioner: csi.truenas.io
+parameters:
+  protocol: "iscsi"
+  pool: "flash-pool"
+  # Volumes land at flash-pool/k8s/controlplane/iscsi-v/<volume>.
+  datasetPath: "k8s/controlplane/iscsi-v"
+  compression: "LZ4"
+  volblocksize: "16K"
+  iscsi.blocksize: "4096"
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true

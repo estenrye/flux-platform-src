@@ -1,0 +1,104 @@
+logLevel: info
+logFormat: json
+interval: 3m
+triggerLoopOnEvent: true
+registry: txt
+txtPrefix: edns.
+
+extraArgs:
+  - --domain-filter=rye.ninja
+
+serviceAccount:
+  create: true
+  name: external-dns
+
+sources:
+  - gateway-grpcroute
+  - gateway-httproute
+  - gateway-tlsroute
+  - gateway-udproute
+  - gateway-tcproute
+  - service
+  - crd
+
+policy: sync
+
+provider:
+  name: webhook
+  webhook:
+    image:
+      repository: ghcr.io/kashalls/external-dns-unifi-webhook
+      tag: v0.8.2
+    env:
+      - name: UNIFI_HOST
+        valueFrom:
+          secretKeyRef:
+            name: external-dns-unifi-credentials
+            key: host
+            optional: false
+      - name: UNIFI_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: external-dns-unifi-credentials
+            key: api-key
+            optional: false
+      # The controller serves an untrusted certificate; pinned explicitly
+      # even though the webhook currently defaults to skipping verification.
+      - name: UNIFI_SKIP_TLS_VERIFY
+        value: "true"
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: http-webhook
+      initialDelaySeconds: 10
+      timeoutSeconds: 5
+    readinessProbe:
+      httpGet:
+        path: /readyz
+        port: http-webhook
+      initialDelaySeconds: 10
+      timeoutSeconds: 5
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop:
+          - ALL
+
+serviceMonitor:
+  enabled: true
+  interval: 60s
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  unhealthyPodEvictionPolicy: AlwaysAllow
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: external-dns
+          topologyKey: kubernetes.io/hostname
+        weight: 100

@@ -1,0 +1,56 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: baseline-flux
+spec:
+  description: >-
+    GitOps contract (M1 design §9.4): the baseline Kustomization is healthy,
+    and Flux restores a deleted baseline workload after a forced reconcile
+    (self-heal). Targets the truenas-csi controller because its name comes
+    from the upstream manifest and is deterministic.
+  steps:
+    - name: baseline-healthy
+      try:
+        - assert:
+            timeout: 120s
+            resource:
+              apiVersion: source.toolkit.fluxcd.io/v1
+              kind: GitRepository
+              metadata:
+                name: flux-platform-rendered
+                namespace: flux-system
+              status:
+                (conditions[?type == 'Ready']):
+                  - status: "True"
+        - assert:
+            timeout: 120s
+            resource:
+              apiVersion: kustomize.toolkit.fluxcd.io/v1
+              kind: Kustomization
+              metadata:
+                name: flux-platform
+                namespace: flux-system
+              status:
+                (conditions[?type == 'Ready']):
+                  - status: "True"
+    - name: self-heal
+      try:
+        - script:
+            timeout: 600s
+            content: |
+              set -eu
+              kubectl delete deployment truenas-csi-controller -n truenas-csi --wait=true --timeout=120s
+              # Force an immediate reconcile instead of waiting out the 10m interval.
+              kubectl annotate kustomization flux-platform -n flux-system \
+                reconcile.fluxcd.io/requestedAt="$(date -u +%Y-%m-%dT%H:%M:%SZ)" --overwrite
+              for i in $(seq 1 40); do
+                if kubectl get deployment truenas-csi-controller -n truenas-csi >/dev/null 2>&1; then
+                  kubectl rollout status deployment truenas-csi-controller -n truenas-csi --timeout=180s
+                  echo "OK: flux restored the deleted workload"
+                  exit 0
+                fi
+                sleep 10
+              done
+              echo "FAIL: flux never recreated truenas-csi-controller"
+              kubectl get kustomization flux-platform -n flux-system -o yaml | tail -25
+              exit 1

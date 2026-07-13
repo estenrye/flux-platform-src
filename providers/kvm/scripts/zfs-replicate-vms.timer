@@ -1,0 +1,10 @@
+[Unit]
+Description=nightly VM zvol replication to TrueNAS (M1 design 5.2)
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: external-dns-unifi
+  description: |-
+    external-dns with the UniFi webhook provider — publishes LAN AAAA records
+    for LoadBalancer and Gateway VIPs into the UniFi gateway's DNS.
+  tags:
+    - dns
+    - networking
+    - platform
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

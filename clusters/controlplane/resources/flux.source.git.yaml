@@ -1,0 +1,17 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: flux-platform-rendered
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  ref:
+    branch: main
+  # Rendered repo per the M1 design (rename before creation if desired; must
+  # match github.com/project-slug in catalog.yaml). GitHub has no AAAA
+  # records: this pull flows through DNS64/NAT64 by design.
+  url: ssh://git@github.com/estenrye/flux-platform-rendered-controlplane.git
+  secretRef:
+    # Applied out-of-band by .bin/bootstrap-controlplane-flux-key.sh
+    # (no ESO on this cluster in M1).
+    name: flux-ssh-key-secret

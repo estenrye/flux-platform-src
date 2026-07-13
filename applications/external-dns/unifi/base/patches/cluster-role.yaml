@@ -1,0 +1,6 @@
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1wildcard-in-rules
+  value: "Upstream external-dns chart RBAC uses wildcards for source watching."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-secrets
+  value: "external-dns watches Gateway API resources whose TLS references are Secrets; read access comes from the upstream chart RBAC."

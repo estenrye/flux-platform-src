@@ -1,0 +1,10 @@
+[Unit]
+Description=controlplane etcd snapshot every 6 hours (M1 design 5.3)
+
+[Timer]
+OnCalendar=00/6:15
+RandomizedDelaySec=5m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

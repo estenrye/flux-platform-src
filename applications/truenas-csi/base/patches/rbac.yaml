@@ -1,0 +1,3 @@
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-secrets
+  value: "The CSI controller reads its API credential Secret and StorageClass-referenced secrets to provision volumes."

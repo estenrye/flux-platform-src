@@ -1,0 +1,52 @@
+# Server + client forced onto different nodes: cross-node pod traffic rides
+# the Calico node-to-node BGP mesh over the ULA fabric.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: xnode-server
+  labels:
+    app: xnode-server
+spec:
+  restartPolicy: Never
+  containers:
+    - name: server
+      image: busybox:1.37.0@sha256:1487d0af5f52b4ba31c7e465126ee2123fe3f2305d638e7827681e7cf6c83d5e
+      command: ["sh", "-c", "mkdir -p /www && echo xnode-ok > /www/index.html && httpd -f -p 8080 -h /www"]
+      ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: xnode-client
+  labels:
+    app: xnode-client
+spec:
+  restartPolicy: Never
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app: xnode-server
+          topologyKey: kubernetes.io/hostname
+  containers:
+    - name: client
+      image: busybox:1.37.0@sha256:1487d0af5f52b4ba31c7e465126ee2123fe3f2305d638e7827681e7cf6c83d5e
+      command: ["sleep", "600"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: xnode-allow
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}

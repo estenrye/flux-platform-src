@@ -1,0 +1,80 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: baseline-lb
+spec:
+  description: >-
+    LoadBalancer contract (M1 design §9.3): Calico LB IPAM assigns one VIP
+    from the site-stable ULA pool and one from the internet-facing GUA pool
+    (selected via the projectcalico.org/ipv6pools annotation), and the
+    LoadBalancer datapath actually serves traffic (in-cluster client -> VIP
+    -> backend).
+
+    BGP advertisement of the VIP pools to the UniFi gateway is verified
+    out-of-band: the bird6 Global peer session to the gateway is Established
+    and exports both /112 pool prefixes (serviceLoadBalancerAggregation). True
+    from-another-VLAN / from-the-internet reachability is a manual check
+    (execution step 11 / M5-M6 external vantage) — it cannot be asserted from
+    a runner that sits on VLAN 100, where the ULA VIP is on-link within the
+    node /64.
+  steps:
+    - name: vips-assigned-from-correct-pools
+      try:
+        - apply:
+            file: resources/echo.yaml
+        - assert:
+            timeout: 120s
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: lb-echo
+              status:
+                phase: Running
+        - script:
+            timeout: 300s
+            content: |
+              set -eu
+              for svc in lb-internal lb-ingress; do
+                for i in $(seq 1 30); do
+                  IP=$(kubectl get svc "${svc}" -n "${NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+                  [ -n "${IP}" ] && break
+                  sleep 5
+                done
+                [ -n "${IP}" ] || { echo "FAIL: ${svc} never got a VIP"; kubectl describe svc "${svc}" -n "${NAMESPACE}"; exit 1; }
+                echo "${svc}: ${IP}"
+              done
+              ULA_IP=$(kubectl get svc lb-internal -n "${NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+              GUA_IP=$(kubectl get svc lb-ingress -n "${NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+              case "${ULA_IP}" in
+                "${ULA_VIP_PREFIX}"*) echo "OK: internal VIP in ULA pool" ;;
+                *) echo "FAIL: internal VIP ${ULA_IP} not in ${ULA_VIP_PREFIX}::/112"; exit 1 ;;
+              esac
+              case "${GUA_IP}" in
+                "${ULA_VIP_PREFIX}"*) echo "FAIL: ingress VIP ${GUA_IP} came from the ULA pool"; exit 1 ;;
+                *:*) echo "OK: ingress VIP is a non-ULA IPv6 address (GUA pool ${GUA_VIP_POOL})" ;;
+                *) echo "FAIL: ingress VIP ${GUA_IP} is not IPv6"; exit 1 ;;
+              esac
+    - name: lb-datapath-serves-traffic
+      try:
+        - script:
+            timeout: 180s
+            content: |
+              set -eu
+              # In-cluster client through the LoadBalancer VIP (kube-proxy DNAT
+              # to the backend). Deterministic regardless of the runner's VLAN.
+              ULA_IP=$(kubectl get svc lb-internal -n "${NAMESPACE}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+              kubectl run lb-client -n "${NAMESPACE}" --restart=Never \
+                --labels=app=lb-client \
+                --image=curlimages/curl:8.12.1 \
+                --command -- curl -g -6 -sf --max-time 10 "http://[${ULA_IP}]/"
+              kubectl wait pod lb-client -n "${NAMESPACE}" \
+                --for=jsonpath='{.status.phase}'=Succeeded --timeout=120s \
+                || { echo "FAIL: LoadBalancer VIP ${ULA_IP} did not serve traffic"; kubectl logs lb-client -n "${NAMESPACE}" || true; exit 1; }
+              kubectl logs lb-client -n "${NAMESPACE}" | grep -q lb-ok \
+                || { echo "FAIL: unexpected body from VIP ${ULA_IP}"; exit 1; }
+              echo "OK: LoadBalancer datapath serves traffic via ${ULA_IP}"
+      finally:
+        - script:
+            content: |
+              kubectl delete pod lb-client -n "${NAMESPACE}" --wait=false --ignore-not-found

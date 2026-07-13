@@ -1,0 +1,16 @@
+apiVersion: crd.projectcalico.org/v1
+kind: IPPool
+metadata:
+  name: lb-ingress-gua
+spec:
+  # Internet-facing LoadBalancer VIPs. GUA RENUMBER: derived from gua_prefix
+  # in providers/kvm/network.yaml (<gua_prefix>:ffff::/112) — update on ISP
+  # re-delegation (docs/runbooks/gua-prefix-renumber.md).
+  cidr: 2607:3640:1064:270:ffff::/112
+  allowedUses:
+    - LoadBalancer
+  # allowedUses:[LoadBalancer] already excludes pod IPAM; "!all()" here would
+  # also disqualify the pool for the virtual load-balancer host (VIPs stay
+  # pending). Keep all().
+  nodeSelector: "all()"
+  disabled: false

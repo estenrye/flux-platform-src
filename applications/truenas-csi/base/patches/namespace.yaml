@@ -1,0 +1,5 @@
+- op: add
+  path: /metadata/labels
+  value:
+    # Node plugins mount host paths and manage block devices.
+    pod-security.kubernetes.io/enforce: privileged

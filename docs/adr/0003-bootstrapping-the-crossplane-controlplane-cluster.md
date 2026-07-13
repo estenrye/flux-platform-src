@@ -6,6 +6,10 @@ Date: 2026-04-08
 
 Accepted
 
+Placement decision (Rackspace Spot) superseded by
+[ADR-20](0020-control-plane-on-talos-on-kvm.md); the bootstrapping
+principles here remain valid.
+
 ## Context
 
 I want to utilize GitOps practices to manage the provisioning and configuration of Kubernetes Clusters and the applications running on them across multiple cloud providers and on-premises environments.  I have seen many videos about Crossplane and want to experiment with it as a potential solution for this capability.  I want to use Flux and GitOps practices to bootstrap a Crossplane Controlplane cluster.

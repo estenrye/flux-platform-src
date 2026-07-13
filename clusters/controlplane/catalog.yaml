@@ -1,0 +1,20 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: controlplane
+  annotations:
+    # Placeholder rendered repo per the M1 design — rename freely BEFORE the
+    # repo is created (execution step 9); CI discovery keys on
+    # rye.ninja/flux-source-repo (ADR-8).
+    github.com/project-slug: estenrye/flux-platform-rendered-controlplane
+    rye.ninja/flux-source-repo: estenrye/flux-platform-src
+    rye.ninja/kubeconfig: ~/.kube/homelab/controlplane.yaml
+    rye.ninja/talosconfig: ~/.talos/homelab-controlplane.yaml
+    rye.ninja/trust-domain: controlplane.rye.ninja
+    rye.ninja/kvm-host: mf-ms-a2-01.usmnblm01.rye.ninja
+  description: >-
+    Fleet control plane cluster — IPv6-only Talos Linux on home lab KVM
+    (supersedes the Rackspace Spot crossplane cluster after M2).
+spec:
+  owner: platform-engineering
+  domain: controlplane
