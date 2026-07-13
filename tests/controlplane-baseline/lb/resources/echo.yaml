@@ -30,12 +30,34 @@ spec:
         - protocol: TCP
           port: 8080
 ---
+# The in-cluster lb-client (datapath test) needs egress to the VIP + DNS
+# under default-deny. Post-DNAT the connection targets the backend pod's
+# 8080 (docs/memory/calico-networkpolicy-dnat.md).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: lb-client-allow-egress
+spec:
+  podSelector:
+    matchLabels:
+      app: lb-client
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+---
 apiVersion: v1
 kind: Service
 metadata:
   name: lb-internal
   annotations:
-    projectcalico.org/ipPools: '["lb-internal-ula"]'
+    projectcalico.org/ipv6pools: '["lb-internal-ula"]'
 spec:
   type: LoadBalancer
   selector:
@@ -49,7 +71,7 @@ kind: Service
 metadata:
   name: lb-ingress
   annotations:
-    projectcalico.org/ipPools: '["lb-ingress-gua"]'
+    projectcalico.org/ipv6pools: '["lb-ingress-gua"]'
 spec:
   type: LoadBalancer
   selector:
