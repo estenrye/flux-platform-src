@@ -52,7 +52,11 @@ eso.service-account-secret.yaml  →  1Password service-account token
    credential; write access to the rendered repos and read to source. Could
    push malicious manifests into the delivery path. **Org-wide — outlives
    crossplane.** (`app_id`/`installation_id` are not secret; the private key
-   is.)
+   is.) *Realized risk is low: this App was never actually used —
+   `provider-github` never authenticated with it, so no live installation
+   tokens depended on the key. The exposed key and client
+   secret were revoked in the GitHub App settings on 2026-07-13; a new key was
+   generated and stored in 1Password. **DONE.***
 3. **1Password service-account token** (`crossplane` vault) — read access to
    the whole vault; the pivot that unlocks 1 and 2. **Crossplane-scoped.**
 4. **Crossplane age key** — decrypts the cluster's SOPS secrets. This is the
