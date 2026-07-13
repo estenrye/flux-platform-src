@@ -50,11 +50,12 @@ if ! grep -q '/dev/zd\[0-9\]\* rwk' /etc/apparmor.d/abstractions/libvirt-qemu; t
   info "AppArmor: zvol device rule added to libvirt-qemu abstraction"
 fi
 # virt-aa-helper also skips <disk type="volume"> sources from custom pools,
-# so the Talos ISO / cloud-init media in the controlplane-images dir pool
-# need an explicit read rule.
-if ! grep -q 'controlplane-images' /etc/apparmor.d/abstractions/libvirt-qemu; then
-  echo '  /var/lib/libvirt/controlplane-images/** rwk,' >> /etc/apparmor.d/abstractions/libvirt-qemu
-  info "AppArmor: controlplane-images read rule added"
+# so media in the dir pools (controlplane-images for the Talos ISO,
+# nat64-images for the appliance disk/cloud-init) need explicit rules.
+# Generalized to any *-images pool so a new dir pool works without edits.
+if ! grep -q '/var/lib/libvirt/\*-images' /etc/apparmor.d/abstractions/libvirt-qemu; then
+  echo '  /var/lib/libvirt/*-images/** rwk,' >> /etc/apparmor.d/abstractions/libvirt-qemu
+  info "AppArmor: *-images dir-pool rule added"
 fi
 systemctl reload apparmor
 
