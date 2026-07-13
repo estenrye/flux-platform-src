@@ -19,31 +19,52 @@ survive teardown, so the rebuilt cluster keeps the same CA and node identity.
 1. Tear down and rebuild, stopping before workloads matter:
 
    ```sh
+   # The NAT64 appliance is a SEPARATE module and survives the cluster
+   # teardown — do NOT destroy it (the rebuild pulls the Talos installer
+   # through it). If it is somehow down, bring it back first:
+   #   .bin/create-nat64.sh
    .bin/destroy-controlplane-cluster.sh
-   .bin/create-controlplane-cluster.sh
+
+   # Rebuild AND recover etcd in one shot: RECOVER_FROM makes the create
+   # script initialize etcd from the snapshot instead of bootstrapping empty.
+   RECOVER_FROM=./etcd-backups/controlplane-etcd-<ts>.snapshot \
+     .bin/create-controlplane-cluster.sh
    ```
 
-2. **Do not let the empty cluster be treated as truth.** Immediately recover
-   etcd from the snapshot (single-node recovery, then rejoin the others):
+   The script uploads the snapshot and recovers via `talosctl bootstrap
+   --recover-from` on the first control plane node, so etcd is never empty.
+   (Manual equivalent, if not using the script:
+   `talosctl -n fd97:45c2:b3a1:100::11 bootstrap --recover-from=<snapshot>`.)
+
+2. Watch the other control plane nodes rejoin (cp-2/cp-3 join as learners,
+   then auto-promote to voting members):
 
    ```sh
-   export TALOSCONFIG=~/.talos/homelab-controlplane.yaml
-   talosctl -n fd97:45c2:b3a1:100::11 etcd recover ./etcd-backups/controlplane-etcd-<ts>.snapshot
-   talosctl -n fd97:45c2:b3a1:100::11 bootstrap --recover-from=./etcd-backups/controlplane-etcd-<ts>.snapshot
+   talosctl --talosconfig ~/.talos/homelab-controlplane.yaml \
+     -n fd97:45c2:b3a1:100::11 -e fd97:45c2:b3a1:100::11 etcd members
    ```
 
-   (On the current Talos release `bootstrap --recover-from` uploads and
-   recovers in one step; check `talosctl bootstrap -h` after upgrades.)
+3. Verify convergence: nodes go Ready once Calico reconciles, Flux
+   Kustomization Ready (`flux get kustomizations -A`), `talosctl health`
+   clean, and the chainsaw baseline suites pass
+   (`.bin/run-controlplane-baseline.sh`).
 
-3. Watch the other control plane nodes rejoin:
+## Proving a restore (DR drill)
 
-   ```sh
-   talosctl -n fd97:45c2:b3a1:100::11,fd97:45c2:b3a1:100::12,fd97:45c2:b3a1:100::13 etcd status
-   ```
+To prove the restore worked — not just that the cluster rebuilt and Flux
+re-converged from git — plant a marker that lives ONLY in etcd before the
+snapshot, and check it comes back:
 
-4. Verify convergence: Flux reconciles the baseline
-   (`flux get kustomizations -A`), nodes go Ready once Calico is back,
-   `talosctl health` clean, chainsaw baseline suites green.
+```sh
+kubectl create configmap dr-marker -n kube-system --from-literal=stamp="$(date -u +%s)"
+.bin/backup-controlplane-etcd.sh          # snapshot now contains the marker
+# ... destroy + RECOVER_FROM rebuild ...
+kubectl get cm dr-marker -n kube-system   # present == etcd was restored
+kubectl delete cm dr-marker -n kube-system
+```
+
+Exercised successfully 2026-07-13: full teardown + RECOVER_FROM rebuild,
+marker recovered, 6/6 nodes Ready and all four baseline suites green.
 
 ## Prove a snapshot is usable (cheap check between drills)
 

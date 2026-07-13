@@ -212,10 +212,22 @@ while IFS=$'\t' read -r name ula; do render_node "${name}" "${ula}" worker; done
 success "machine configs rendered for: ${node_names[*]}"
 
 # ── 5. tofu apply ────────────────────────────────────────────────────────────
+# Retry to absorb the zvol udev race: the volume resource creates the zvol,
+# but /dev/zvol/<pool>/<name> (the udev symlink) can lag when the domain
+# references it — qemu then fails "Storage volume not found". The zvols
+# persist in state, so the next apply (device nodes now present) completes
+# the domains. Idempotent: a clean apply is a no-op.
 info "Applying infrastructure (tofu) ..."
 tofu -chdir="${TOFU_DIR}" init -input=false >/dev/null
-tofu -chdir="${TOFU_DIR}" apply -input=false -auto-approve \
-  -var "schematic_id=${SCHEMATIC_ID}"
+for attempt in 1 2 3; do
+  if tofu -chdir="${TOFU_DIR}" apply -input=false -auto-approve \
+      -var "schematic_id=${SCHEMATIC_ID}"; then
+    break
+  fi
+  [ "${attempt}" -eq 3 ] && { error "tofu apply failed after 3 attempts"; exit 1; }
+  warn "apply failed (likely zvol device-node race); settling 15s and retrying (${attempt}/3) ..."
+  sleep 15
+done
 success "VMs provisioned."
 
 # ── 6. Apply configs in maintenance mode ─────────────────────────────────────

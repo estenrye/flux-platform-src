@@ -16,33 +16,44 @@ IPv6-only Talos Linux cluster on the `mf-ms-a2-01` KVM host. Design:
 | [scripts/zfs-replicate-vms.*](scripts/) | Nightly zvol replication to TrueNAS (systemd timer on the host) |
 | [modules/talos-vm/](modules/talos-vm/) | zvol + libvirt domain; boots factory ISO only while the disk is empty |
 | [modules/nat64-appliance/](modules/nat64-appliance/) | Tayga NAT64 + unbound DNS64 Ubuntu VM (cloud-init) |
-| [controlplane/](controlplane/) | Tofu root module for this cluster |
+| [nat64/](nat64/) | Tofu root module for the NAT64 appliance (own dir pool `nat64-images`) |
+| [controlplane/](controlplane/) | Tofu root module for the cluster VMs (own dir pool `controlplane-images`) |
 
-## Workflow
+## Two independent lifecycles
 
-Everything is driven by the repo-root scripts (execution order and human
-steps in the design doc §8):
+The **NAT64 appliance** and the **cluster** are separate tofu root modules
+with separate libvirt dir pools, so `tofu destroy` on one never touches the
+other. This is deliberate: the appliance is shared, long-lived infra the
+IPv6-only cluster depends on to reach the IPv4-only Talos factory. If a
+cluster teardown also removed it, the rebuild couldn't pull the installer
+(and the workstation would lose its own factory/ghcr path). **Bring NAT64 up
+first and leave it; rebuild the cluster underneath it freely.**
 
 ```sh
-.bin/create-controlplane-cluster.sh    # tofu apply + talos gen/apply/bootstrap
+# NAT64 (once; rarely destroyed):
+.bin/create-nat64.sh                   # tofu apply + verify it translates
+.bin/destroy-nat64.sh                  # only to retire the appliance entirely
+
+# Cluster (cattle):
+.bin/create-controlplane-cluster.sh    # prechecks NAT64, then apply + talos bootstrap
 .bin/backup-controlplane-etcd.sh       # ad-hoc etcd snapshot (pre-upgrade, DR drill)
-.bin/destroy-controlplane-cluster.sh   # teardown; machine secrets survive in git
+.bin/destroy-controlplane-cluster.sh   # teardown; NAT64 + machine secrets survive
+
+# Disaster recovery — rebuild AND restore etcd in one shot:
+RECOVER_FROM=./etcd-backups/<snap>.snapshot .bin/create-controlplane-cluster.sh
 ```
 
 Machine configs are generated from `network.yaml` + SOPS-encrypted secrets in
 `clusters/controlplane/secrets/` and applied over the network — they never
 pass through tofu, so **tofu state holds no cluster secrets**. State is local
-to the workstation and gitignored (the NAT64 cloud-init user-data is the only
-mildly sensitive thing in it).
+to the workstation and gitignored.
 
-Run tofu directly (e.g. `plan`) with the two vars the script normally
-provides:
+Run cluster tofu directly (e.g. `plan`) with the one var the script provides:
 
 ```sh
 tofu -chdir=providers/kvm/controlplane plan \
   -var schematic_id=$(yq -o=yaml '.talos.schematic' providers/kvm/versions.yaml \
-      | curl -fsS -X POST --data-binary @- https://factory.talos.dev/schematics | jq -r .id) \
-  -var nat64_image_path=providers/kvm/.cache/noble-server-cloudimg-amd64.raw
+      | curl -fsS -X POST --data-binary @- https://factory.talos.dev/schematics | jq -r .id)
 ```
 
 ## Design invariants worth knowing before touching anything
