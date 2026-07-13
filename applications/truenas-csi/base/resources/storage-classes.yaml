@@ -1,3 +1,10 @@
+# KNOWN ISSUE (IPv6-only clusters): truenas-iscsi cannot mount — the pinned
+# csi-lib-iscsi mis-parses IPv6 portals so device-path detection never
+# matches (NodeStageVolume: "failed to find device path"). Discovery + login
+# themselves work; only the library's portal parsing is IPv4-only.
+#   upstream: https://github.com/kubernetes-csi/csi-lib-iscsi/issues/94
+#   tracking: https://github.com/truenas/truenas-csi/issues/45
+# truenas-nfs (RWX) is the working storage path on this cluster until fixed.
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:

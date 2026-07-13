@@ -30,7 +30,18 @@ controlplane cluster ([[m1-implementation-status]]):
    delete`. This is upstream behavior; the storage baseline suite passes on
    clean state.
 
+**HARD BLOCKER (filed):** truenas-iscsi does not work on this IPv6-only
+cluster at all. The pinned csi-lib-iscsi (`v0.0.0-20240130`, unfixed on
+master) parses portals with `strings.Split(portal, ":")[0]/[1]`, shredding
+any IPv6 address, so the `/dev/disk/by-path/ip-<portal>-...` search never
+matches the real (unbracketed) udev symlink — NodeStageVolume fails
+"find device path". Discovery + login + device creation all work manually;
+only the library's parsing is IPv4-only. No `iscsiPortal` config value fixes
+it. Issues: kubernetes-csi/csi-lib-iscsi#94 (root) + truenas/truenas-csi#45
+(tracking). **truenas-nfs (RWX) works fine and is the storage path until an
+upstream fix lands.**
+
 iSCSI portal is bound to the NAS static ULA (see
-[[m1-implementation-status]]); bracketed IPv6 (`[addr]:3260`) is required and
-works — an UNbracketed portal silently creates a malformed
-`addr:3260:3260` record.
+[[m1-implementation-status]]); bracketed IPv6 (`[addr]:3260`) is what the
+config uses — an UNbracketed portal silently creates a malformed
+`addr:3260:3260` discoverydb record.
