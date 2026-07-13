@@ -1,6 +1,9 @@
 .DS_Store
 .mcp.json# controlplane cluster: private age key stays out of git (1Password holds it)
 clusters/controlplane/.sops.age-key
+# crossplane private age key: untracked (was committed since afe949f — rotate the
+# crossplane age key, its exposure is already in git history)
+clusters/crossplane/.sops.age-key
 # tofu working files: state stays on the workstation, media cache is derived
 providers/kvm/.cache/
 providers/kvm/**/.terraform/
