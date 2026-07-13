@@ -40,9 +40,23 @@ Scope: preparing a fresh (or replacement) KVM host to carry the
      `echo "fd97:45c2:b3a1:100::1000 nas-ula.rye.ninja" | sudo tee -a /etc/hosts`
    - The etcd-snapshot NFS export is restricted to the host's **static** ULA
      (`::2000`), but the host's default source toward the NAS ULA is a SLAAC
-     address. `etcd-snapshot.sh` pins the `/128` route source to `::2000` and
-     self-mounts on each run, so no fstab entry is needed (a DR tool that
-     silently no-ops after a reboot is worse than one that sets itself up).
+     address, so a `/128` route to the NAS with `from: ::2000` is required or
+     the mount is denied. This lives in **netplan** (persistent host state, up
+     at boot before the timer can fire) — add to the `br0` bridge stanza in
+     `/etc/netplan/50-cloud-init.yaml`:
+
+     ```yaml
+     routes:
+       - to: fd97:45c2:b3a1:100::1000/128
+         scope: link
+         from: fd97:45c2:b3a1:100::2000
+     ```
+
+     Then `sudo chmod 600 /etc/netplan/50-cloud-init.yaml && sudo netplan
+     generate && sudo netplan apply`; verify with
+     `ip -6 route get fd97:45c2:b3a1:100::1000` (should show `src ...::2000
+     proto static`). `etcd-snapshot.sh` self-mounts on each run (no fstab
+     entry needed) but relies on this route being present.
    - Replication SSH key on the host for the `replication` user on TrueNAS
      (`/root/.ssh/replication_ed25519` + an `/root/.ssh/config` alias) and
      the target dataset
