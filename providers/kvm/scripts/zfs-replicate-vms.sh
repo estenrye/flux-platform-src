@@ -32,22 +32,32 @@ if ! zfs list -t snapshot "${SRC_DATASET}@${label}" >/dev/null 2>&1; then
   zfs snapshot -r "${SRC_DATASET}@${label}"
 fi
 
-# ── incremental send ─────────────────────────────────────────────────────────
-# Find the newest snapshot that exists on both sides to use as the increment base.
-remote_snaps=$(ssh "${NAS_USER}@${NAS_HOST}" "${REMOTE_ZFS} list -H -t snapshot -o name -s creation -d 1 ${NAS_DATASET} 2>/dev/null" | awk -F@ '{print $2}' || true)
-base=""
-for s in $(zfs list -H -t snapshot -o name -s creation -d 1 "${SRC_DATASET}" | awk -F@ '{print $2}' | tac); do
-  [ "${s}" = "${label}" ] && continue
-  if echo "${remote_snaps}" | grep -qx "${s}"; then base="${s}"; break; fi
-done
+# ── incremental send, one zvol at a time ─────────────────────────────────────
+# Each child zvol is sent into ${NAS_DATASET}/<name> individually. Sending the
+# parent filesystem with -R would make the remote `recv -F` roll back (and thus
+# unmount) the mounted target dataset, and Linux ZFS cannot delegate
+# mount/umount to the non-root ${NAS_USER} — zvols have no mounts, so per-zvol
+# receives stay inside what `zfs allow` can grant.
+for src in $(zfs list -H -r -d 1 -t volume -o name "${SRC_DATASET}"); do
+  child="${src##*/}"
+  target="${NAS_DATASET}/${child}"
 
-if [ -z "${base}" ]; then
-  echo "no common base snapshot — full send of ${SRC_DATASET}@${label}"
-  zfs send -R "${SRC_DATASET}@${label}" | ssh "${NAS_USER}@${NAS_HOST}" "${REMOTE_ZFS} recv -uF ${NAS_DATASET}"
-else
-  echo "incremental send ${base} -> ${label}"
-  zfs send -RI "@${base}" "${SRC_DATASET}@${label}" | ssh "${NAS_USER}@${NAS_HOST}" "${REMOTE_ZFS} recv -uF ${NAS_DATASET}"
-fi
+  # Newest snapshot present on both sides is the increment base.
+  remote_snaps=$(ssh "${NAS_USER}@${NAS_HOST}" "${REMOTE_ZFS} list -H -t snapshot -o name -s creation -d 1 ${target} 2>/dev/null" | awk -F@ '{print $2}' || true)
+  base=""
+  for s in $(zfs list -H -t snapshot -o name -s creation -d 1 "${src}" | awk -F@ '{print $2}' | tac); do
+    [ "${s}" = "${label}" ] && continue
+    if echo "${remote_snaps}" | grep -qx "${s}"; then base="${s}"; break; fi
+  done
+
+  if [ -z "${base}" ]; then
+    echo "no common base snapshot — full send of ${src}@${label}"
+    zfs send "${src}@${label}" | ssh "${NAS_USER}@${NAS_HOST}" "${REMOTE_ZFS} recv -uF ${target}"
+  else
+    echo "incremental send ${base} -> ${label} for ${src}"
+    zfs send -I "@${base}" "${src}@${label}" | ssh "${NAS_USER}@${NAS_HOST}" "${REMOTE_ZFS} recv -uF ${target}"
+  fi
+done
 
 # ── prune (both sides) ───────────────────────────────────────────────────────
 prune() { # $1 = command prefix ("" local, ssh remote), $2 = zfs binary, $3 = dataset
@@ -64,6 +74,9 @@ prune() { # $1 = command prefix ("" local, ssh remote), $2 = zfs binary, $3 = da
   return 0
 }
 prune "" "zfs" "${SRC_DATASET}"
-prune "ssh ${NAS_USER}@${NAS_HOST}" "${REMOTE_ZFS}" "${NAS_DATASET}"
+# Remote snapshots live on the per-zvol children (no parent-level snapshots).
+for src in $(zfs list -H -r -d 1 -t volume -o name "${SRC_DATASET}"); do
+  prune "ssh ${NAS_USER}@${NAS_HOST}" "${REMOTE_ZFS}" "${NAS_DATASET}/${src##*/}"
+done
 
 echo "replication complete: ${SRC_DATASET}@${label} -> ${NAS_HOST}:${NAS_DATASET}"
