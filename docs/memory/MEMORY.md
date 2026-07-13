@@ -8,3 +8,4 @@
 - [Calico NetworkPolicy and DNAT](calico-networkpolicy-dnat.md) — Calico evaluates egress post-DNAT; egress rules must use pod targetPort, not service port
 - [M1 Implementation Status](m1-implementation-status.md) — controlplane-on-KVM progress, pins (Talos v1.13.5, libvirt provider 0.8.x), and what remains
 - [SOPS Creation Rule Input Path](sops-creation-rule-input-path.md) — sops -e matches rules against the plaintext input path; temp-file encryption can silently skip encryption
+- [Talos iSCSI + truenas-csi](talos-iscsi-truenas-csi.md) — iscsiadm lives at /usr/local/sbin on Talos; csi-lib-iscsi discovery is not idempotent (stale record → exit 7)
