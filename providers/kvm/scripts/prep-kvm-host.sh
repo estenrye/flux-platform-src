@@ -42,22 +42,28 @@ info "packages present: zfsutils-linux ksmtuned libvirt-daemon-driver-storage-zf
 systemctl restart libvirtd
 info "libvirtd restarted (zfs storage backend loaded)"
 
-# ── 1b. AppArmor: allow qemu to open zvol block devices ─────────────────────
-# virt-aa-helper whitelists the /dev/zvol/... symlink, but qemu opens the
-# resolved /dev/zdN device and gets DENIED without this rule.
-if ! grep -q '/dev/zd\[0-9\]\* rwk' /etc/apparmor.d/abstractions/libvirt-qemu; then
-  echo '  /dev/zd[0-9]* rwk,' >> /etc/apparmor.d/abstractions/libvirt-qemu
-  info "AppArmor: zvol device rule added to libvirt-qemu abstraction"
-fi
-# virt-aa-helper also skips <disk type="volume"> sources from custom pools,
-# so media in the dir pools (controlplane-images for the Talos ISO,
-# nat64-images for the appliance disk/cloud-init) need explicit rules.
-# Generalized to any *-images pool so a new dir pool works without edits.
-if ! grep -q '/var/lib/libvirt/\*-images' /etc/apparmor.d/abstractions/libvirt-qemu; then
-  echo '  /var/lib/libvirt/*-images/** rwk,' >> /etc/apparmor.d/abstractions/libvirt-qemu
-  info "AppArmor: *-images dir-pool rule added"
-fi
+# ── 1b. AppArmor: let qemu open zvol block devices + dir-pool media ─────────
+# virt-aa-helper whitelists the /dev/zvol/... symlink but qemu opens the
+# resolved /dev/zdN device (DENIED without a rule), and it skips
+# <disk type="volume"> sources from custom dir pools (controlplane-images for
+# the Talos ISO, nat64-images for the appliance disk/cloud-init).
+#
+# These go in the /etc/apparmor.d/local/ include — NOT the distro-shipped
+# abstraction — so an apt upgrade of libvirt/apparmor cannot silently drop
+# them (which would leave qemu unable to open the zvols after the next
+# reboot). The shipped abstraction ends with `#include <local/abstractions/
+# libvirt-qemu>`, so the local file is always sourced.
+AA_LOCAL=/etc/apparmor.d/local/abstractions/libvirt-qemu
+mkdir -p "$(dirname "${AA_LOCAL}")"
+touch "${AA_LOCAL}"
+# Remove any copies previously appended to the shipped abstraction (migration
+# from the earlier approach), then own them in the local include.
+sed -i '\#/dev/zd\[0-9\]\* rwk,#d; \#/var/lib/libvirt/\*-images/\*\* rwk,#d' \
+  /etc/apparmor.d/abstractions/libvirt-qemu
+grep -qF '/dev/zd[0-9]* rwk,' "${AA_LOCAL}" || echo '  /dev/zd[0-9]* rwk,' >> "${AA_LOCAL}"
+grep -qF '/var/lib/libvirt/*-images/** rwk,' "${AA_LOCAL}" || echo '  /var/lib/libvirt/*-images/** rwk,' >> "${AA_LOCAL}"
 systemctl reload apparmor
+info "AppArmor: zvol + dir-pool rules in ${AA_LOCAL} (upgrade-safe)"
 
 # ── 2. ZFS pool ──────────────────────────────────────────────────────────────
 if zpool list "${POOL}" >/dev/null 2>&1; then
