@@ -116,15 +116,35 @@ anything anomalous before rotating (rotation destroys some forensic state).
 
 ### 4. Crossplane age key + re-encrypt  — crossplane-scoped, do last
 
-1. `.bin/rotate-cluster-sops-key.sh` for `CLUSTER=crossplane`: generates a new
-   age keypair, re-encrypts all `clusters/crossplane/**` SOPS files, updates
-   `clusters/crossplane/.sops.yaml` (new recipient), the on-cluster `sops-age`
-   secret, and the 1Password copy.
-2. Commit the re-encrypted files + new `.sops.yaml`. **The new private key must
-   never be committed** — it stays in `.gitignore` and lives only in 1Password
-   and on the cluster.
-3. Let Flux + ESO reconcile; verify the crossplane cluster's controllers come
-   back healthy with the re-wrapped secrets.
+**Do NOT use the stock `.bin/rotate-cluster-sops-key.sh` here.** It updates the
+on-cluster `sops-age` secret to the new key *before* pushing, and assumes Flux
+reads the repo it pushes to. But this cluster's Flux reads the **rendered** repo
+(`flux-platform-rendered`, path `./clusters/crossplane`, decrypt `sops-age`) via
+a CI render pipeline. A hard key-swap would leave Flux unable to decrypt the
+still-rendered old-key content until a merge + render lands — an open-ended
+decryption outage on the crossplane Kustomization.
+
+Use a **dual-key transition** instead (zero gap):
+
+1. Generate the new age keypair. Set the on-cluster `flux-system/sops-age`
+   secret's `age.agekey` to hold **both** the old and new private keys
+   (newline-separated) — Flux tries each identity, so both old-recipient
+   (currently rendered) and new-recipient content decrypt.
+2. Point `clusters/crossplane/.sops.yaml` at the new recipient and
+   `SOPS_CONFIG=clusters/crossplane/.sops.yaml sops updatekeys --yes` every
+   `clusters/crossplane/**` SOPS file (with `SOPS_AGE_KEY` = old private key to
+   decrypt). Commit `.sops.yaml` + the re-wrapped files. **The new private key
+   is never committed** — `.gitignore` covers `clusters/crossplane/.sops.age-key`;
+   it lives only in 1Password and on the cluster.
+3. Merge → CI renders → `flux-platform-rendered` gets the new-key content →
+   Flux decrypts it with the new key (already present). Verify the
+   `flux-platform` Kustomization reconciles Ready with no decryption errors.
+4. **Only then**, remove the old key from `flux-system/sops-age` (set it to the
+   new key alone). The leaked key now decrypts nothing on the cluster.
+
+Status (2026-07-13): steps 1–2 DONE (new recipient
+`age18zfz6h2nt…`, dual-key secret live, re-wrapped file on PR #68, new key in
+1Password `sops-age-key`). Steps 3–4 pending PR #68 merge + render.
 
 ### 5. Git history
 
