@@ -76,10 +76,25 @@ echo "rendered_pr_url=${PR_URL}" >> "${GITHUB_OUTPUT:-/dev/null}"
 
 if [ "${AUTO_MERGE}" = "true" ]; then
   PR_NUMBER=$(echo "${PR_URL}" | grep -oE '[0-9]+$')
-  gh pr merge "${PR_NUMBER}" \
+  # Auto-merge requires the setting to be enabled on the target repo, which in
+  # turn requires required status checks (a planned CI/CD milestone for the
+  # rendered repos). Until that lands the repos disallow auto-merge; treat that
+  # specific case as a soft failure — leave the PR open for a manual merge
+  # rather than failing the whole render. Any other merge error still fails.
+  MERGE_ERR=$(mktemp)
+  if ! gh pr merge "${PR_NUMBER}" \
     --repo "${TARGET_REPO_OWNER}/${TARGET_REPO_NAME}" \
     --squash \
-    --auto
+    --auto 2> "${MERGE_ERR}"; then
+    if grep -q "Auto merge is not allowed for this repository" "${MERGE_ERR}"; then
+      echo "::warning::Auto-merge is disabled on ${TARGET_REPO_OWNER}/${TARGET_REPO_NAME}; leaving PR #${PR_NUMBER} open for manual merge. Enable auto-merge (needs required status checks) to restore automatic delivery." >&2
+    else
+      cat "${MERGE_ERR}" >&2
+      rm -f "${MERGE_ERR}"
+      exit 1
+    fi
+  fi
+  rm -f "${MERGE_ERR}"
 fi
 
 popd > /dev/null || exit 1

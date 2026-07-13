@@ -9,3 +9,5 @@
 - [M1 Implementation Status](m1-implementation-status.md) — controlplane-on-KVM progress, pins (Talos v1.13.5, libvirt provider 0.8.x), and what remains
 - [SOPS Creation Rule Input Path](sops-creation-rule-input-path.md) — sops -e matches rules against the plaintext input path; temp-file encryption can silently skip encryption
 - [Talos iSCSI + truenas-csi](talos-iscsi-truenas-csi.md) — iscsiadm lives at /usr/local/sbin on Talos; csi-lib-iscsi discovery is not idempotent (stale record → exit 7)
+- [Crossplane Credential Rotation](crossplane-credential-rotation.md) — Dual-key age rotation (Flux reads rendered repo); SA token must grant the `crossplane` vault; GitHub key via stable 1P field
+- [Rendered-Repo Auto-Merge Milestone](rendered-repo-automerge-milestone.md) — Auto-merge is off on rendered repos until a required-checks milestone; renders soft-warn and leave PRs for manual merge
