@@ -108,3 +108,10 @@ spec:
               READ=$(kubectl exec -n "${NAMESPACE}" nfs-rescheduled -- cat /data/probe.txt)
               [ "${READ}" = "${MARKER}" ] || { echo "FAIL: data mismatch after reschedule (${READ} != ${MARKER})"; exit 1; }
               echo "OK: data survived rescheduling ${OLD_NODE} -> ${NEW_NODE}"
+        # nfs-rescheduled is created via kubectl run, so chainsaw does not
+        # track it for teardown; delete it here so it releases the PVC and
+        # step cleanup does not block on the pvc-protection finalizer.
+      finally:
+        - script:
+            content: |
+              kubectl delete pod nfs-rescheduled -n "${NAMESPACE}" --wait=false --ignore-not-found
