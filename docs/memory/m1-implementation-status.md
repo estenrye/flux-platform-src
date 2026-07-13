@@ -43,12 +43,36 @@ Also done: tests/controlplane-baseline/ (network/storage/lb/flux suites +
 .bin/run-controlplane-baseline.sh), ADRs 0020-0023, truenas-maintenance
 runbook.
 
-Remaining for M1: UniFi API key -> external-dns secret; rendered repo creation BEFORE opening the M1 PR (push-cluster
-CI leg needs it); `tests/controlplane-baseline/` chainsaw suites; ADRs
-(Talos-on-KVM, on-prem substrate, UniFi BGP LB, IPv6-only+NAT64);
-truenas-maintenance runbook; human steps 2–3 finishing (API key, replication
-user, host prep); cluster bring-up; DR drill before M1 close. Human step 1
-(UniFi BGP) done 2026-07-11.
+CLUSTER LIVE + M1 NEARLY DONE (2026-07-13): 6-node cluster bootstrapped,
+all 4 baseline suites PASS, Flux reconciling. Storage: truenas-nfs is DEFAULT
+(works); truenas-iscsi BLOCKED on IPv6 by upstream csi-lib-iscsi
+([[talos-iscsi-truenas-csi]], issues #94 + truenas-csi#45). BGP fully up
+(bird6 mesh + gateway peer Established; query bird6 not bird for v6-only).
+
+NAT64 SPLIT (2026-07-13, Esten's call): NAT64 is its own tofu root module
+(providers/kvm/nat64, own dir pool nat64-images) with .bin/create-nat64.sh /
+destroy-nat64.sh, independent of the cluster lifecycle. Reason: cluster
+teardown was destroying the appliance, which cut the workstation's own path
+to the IPv4-only Talos factory and blocked rebuild. create-controlplane
+prechecks NAT64 and refuses without it.
+
+DR DRILL PASSED (2026-07-13): full teardown + rebuild with RECOVER_FROM=<snap>
+(new env in create script → talosctl bootstrap --recover-from). Proven by a
+snapshot-only dr-marker ConfigMap surviving the rebuild (not git
+reconvergence); 6/6 Ready + all suites green after. Runbook:
+docs/runbooks/etcd-snapshot-restore.md.
+
+Known: zvol udev race on tofu apply ("Storage volume not found") — create
+script now retries 3x. Workstation on VLAN 100 needs a direct 64:ff9b::/96
+route (gateway hairpin dropped as asymmetric) and can't self-test cross-VLAN
+LB reachability (VIP on-link in its /64) — lb suite asserts in-cluster
+datapath instead.
+
+Remaining for M1: install host-side DR timers (etcd snapshot + ZFS
+replication systemd units — providers/kvm/scripts/) and verify a ZFS
+replication rollback (needs one nightly run); merge PR #65; [H] confirm the
+gateway installed the VIP /112 routes in UniFi (step 11). ADRs 0020-0023,
+runbooks, suites all done.
 
 Open decision flagged to Esten: whether to add a repo-admin age key as second
 SOPS recipient for `clusters/controlplane/` — the crossplane cluster key is
