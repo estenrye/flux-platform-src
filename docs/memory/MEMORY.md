@@ -11,3 +11,4 @@
 - [Talos iSCSI + truenas-csi](talos-iscsi-truenas-csi.md) — iscsiadm lives at /usr/local/sbin on Talos; csi-lib-iscsi discovery is not idempotent (stale record → exit 7)
 - [Crossplane Credential Rotation](crossplane-credential-rotation.md) — Dual-key age rotation (Flux reads rendered repo); SA token must grant the `crossplane` vault; GitHub key via stable 1P field
 - [Rendered-Repo Auto-Merge Milestone](rendered-repo-automerge-milestone.md) — Auto-merge is off on rendered repos until a required-checks milestone; renders soft-warn and leave PRs for manual merge
+- [TrueNAS API Surface](truenas-api-surface.md) — JSON-RPC API cannot do zfs allow/canmount/umount even with Full Admin key; how to call it
