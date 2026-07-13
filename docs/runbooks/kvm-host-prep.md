@@ -63,6 +63,11 @@ Scope: preparing a fresh (or replacement) KVM host to carry the
      `flash-pool/replication/mf-ms-a2-01.usmnblm01.rye.ninja/vms`. Verify:
      `sudo ssh replication@nas.rye.ninja /usr/sbin/zfs list <target>` (remote
      zfs needs the absolute path — `/usr/sbin` is not in a non-root SSH PATH).
+   - ZFS delegation for the `replication` user on the parent dataset must
+     include `send` — nightly push only needs `receive`, but the host-replace
+     restore path pulls the zvols back, and delegation is the only send
+     authority the user has. Full set (as admin on the NAS):
+     `zfs allow replication create,destroy,hold,mount,receive,release,rollback,send,snapshot flash-pool/replication/mf-ms-a2-01.usmnblm01.rye.ninja`.
 
    Install:
 
@@ -75,8 +80,12 @@ Scope: preparing a fresh (or replacement) KVM host to carry the
    # Verify: sudo systemctl start etcd-snapshot.service && ls /mnt/truenas/etcd-snapshots/
    ```
 
-   The first `zfs-replicate-vms` run does a full send of `vmpool/vms` (sizeable
-   but sparse); subsequent nightly runs are incremental.
+   The first `zfs-replicate-vms` run does a full send of each zvol under
+   `vmpool/vms` (sizeable but sparse); subsequent nightly runs are incremental.
+   Zvols are sent individually into `<target>/<name>` — never `-R` from the
+   parent filesystem: the remote `recv -F` would have to unmount the mounted
+   target dataset, and Linux ZFS cannot delegate mount/umount to the non-root
+   `replication` user (and the TrueNAS API exposes no canmount/umount either).
 
 4. **Memory pressure spot-check** (until the Grafana alert lands in M5):
 
