@@ -39,10 +39,22 @@ if [ -n "${RENDER_GITHUB_TOKEN:-}" ]; then
 fi
 
 git add .
+
+# A source change need not touch every cluster's rendered output. When this
+# cluster is unaffected there is nothing to commit; that is success, not a
+# build failure. Signal downstream steps to skip the rendered PR for it.
+if git diff --cached --quiet; then
+  echo "No rendered changes for ${TARGET_REPO_NAME}; skipping commit/push."
+  echo "has_changes=false" >> "${GITHUB_OUTPUT:-/dev/null}"
+  popd > /dev/null || exit 1
+  exit 0
+fi
+
 git commit \
   -m "Render ${SOURCE_REPO_NAME}/${SOURCE_REPO_BRANCH}" \
   -m "Commit: ${SOURCE_REPO_COMMIT_HASH}"
 
 # This branch is automation-owned and is always rewritten from scratch each run.
 git push --force origin ${BRANCH_NAME}
+echo "has_changes=true" >> "${GITHUB_OUTPUT:-/dev/null}"
 popd > /dev/null || exit 1
