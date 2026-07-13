@@ -28,7 +28,29 @@ Scope: preparing a fresh (or replacement) KVM host to carry the
 2. **Static ULA for the host** (`fd97:45c2:b3a1:100::2000/64` per
    network.yaml) in the host's netplan, alongside its existing addressing.
 
-3. **DR timers** — install both host-side units:
+3. **DR timers** — prerequisites, then install both host-side units.
+
+   Prerequisites (one-offs; verified working 2026-07-13):
+   - `talosctl` at `/usr/local/bin/talosctl`, matching the cluster version
+     (`talosctl-linux-amd64` from the pinned Talos release), and a
+     talosconfig at `/etc/controlplane/talosconfig` (mode 0600, root).
+   - `nfs-common` installed (provides `mount.nfs4`).
+   - `/etc/hosts` alias for the NAS ULA — `mount.nfs4` cannot parse a
+     bracketed IPv6 literal:
+     `echo "fd97:45c2:b3a1:100::1000 nas-ula.rye.ninja" | sudo tee -a /etc/hosts`
+   - The etcd-snapshot NFS export is restricted to the host's **static** ULA
+     (`::2000`), but the host's default source toward the NAS ULA is a SLAAC
+     address. `etcd-snapshot.sh` pins the `/128` route source to `::2000` and
+     self-mounts on each run, so no fstab entry is needed (a DR tool that
+     silently no-ops after a reboot is worse than one that sets itself up).
+   - Replication SSH key on the host for the `replication` user on TrueNAS
+     (`/root/.ssh/replication_ed25519` + an `/root/.ssh/config` alias) and
+     the target dataset
+     `flash-pool/replication/mf-ms-a2-01.usmnblm01.rye.ninja/vms`. Verify:
+     `sudo ssh replication@nas.rye.ninja /usr/sbin/zfs list <target>` (remote
+     zfs needs the absolute path — `/usr/sbin` is not in a non-root SSH PATH).
+
+   Install:
 
    ```sh
    sudo install -m 0755 providers/kvm/scripts/etcd-snapshot.sh /usr/local/sbin/
@@ -36,15 +58,11 @@ Scope: preparing a fresh (or replacement) KVM host to carry the
    sudo install -m 0644 providers/kvm/scripts/etcd-snapshot.{service,timer} /etc/systemd/system/
    sudo install -m 0644 providers/kvm/scripts/zfs-replicate-vms.{service,timer} /etc/systemd/system/
    sudo systemctl daemon-reload && sudo systemctl enable --now etcd-snapshot.timer zfs-replicate-vms.timer
+   # Verify: sudo systemctl start etcd-snapshot.service && ls /mnt/truenas/etcd-snapshots/
    ```
 
-   Human one-offs the timers depend on:
-   - TrueNAS NFS export mounted at `/mnt/truenas/etcd-snapshots` (fstab).
-   - Replication SSH key generated on the host and installed for the
-     `replication` user on TrueNAS; target dataset
-     `flash-pool/replication/mf-ms-a2-01.usmnblm01.rye.ninja/vms` created.
-   - `talosctl` (pinned version) at `/usr/local/bin/talosctl` and a
-     talosconfig at `/etc/controlplane/talosconfig` (mode 0600).
+   The first `zfs-replicate-vms` run does a full send of `vmpool/vms` (sizeable
+   but sparse); subsequent nightly runs are incremental.
 
 4. **Memory pressure spot-check** (until the Grafana alert lands in M5):
 
