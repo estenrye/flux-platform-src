@@ -26,7 +26,7 @@ spec:
             timeout: 30s
             content: |
               set -e
-              export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
+              # KUBECONFIG inherited from the runner (M0 portability rule 3)
               kubectl label namespace ${NAMESPACE} step-ca.io/test-access=true --overwrite
               echo "namespace labeled for step-ca access"
               REPO=$(git rev-parse --show-toplevel)
@@ -41,7 +41,6 @@ spec:
             timeout: 30s
             content: |
               set -e
-              export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
               FINGERPRINT=$(kubectl get secret csi-driver-spiffe-ca -n step-ca \
                 -o jsonpath='{.data.tls\.crt}' | base64 -d \
                 | openssl x509 -noout -fingerprint -sha256 \
@@ -71,7 +70,6 @@ spec:
         - script:
             timeout: 60s
             content: |
-              export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
               echo "=== Job status ==="
               kubectl get job step-ca-capability-test -n ${NAMESPACE} -o wide
               echo "=== Pods ==="

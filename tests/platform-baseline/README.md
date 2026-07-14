@@ -41,7 +41,8 @@ expensive.
 2. Assert behavior, not implementation variants (e.g. default-deny is proved
    by a probe, not by looking up the `rackspace-spot` overlay by name).
 3. Scripts inherit `KUBECONFIG` from the runner — never hardcode paths.
-   (`tests/step-ca/` predates this rule and gets parametrized in M2.)
+   (`tests/step-ca/` was parametrized in M2: KUBECONFIG inherited,
+   CA endpoint via `STEP_CA_URL`, retry budget via `STEP_CA_HEALTH_RETRIES`.)
 
 ## Known audit findings asserted as-is (2026-07-11)
 

@@ -56,8 +56,8 @@ info "running platform baseline suites"
 if [ "${RUN_STEP_CA_SUITES}" = "true" ]; then
     # The pre-existing step-ca capability suites are part of the baseline
     # contract (see docs/superpowers/specs/2026-07-11-m0-baseline-audit-design.md).
-    # NOTE: they currently hardcode the Spot kubeconfig internally and get
-    # parametrized in M2.
+    # Parametrized in M2: they inherit KUBECONFIG and read STEP_CA_URL /
+    # STEP_CA_HEALTH_RETRIES from the sourced values file.
     info "running step-ca internal capability suite (gate)"
     "${CHAINSAW}" test "${REPO}/tests/step-ca/internal"
 

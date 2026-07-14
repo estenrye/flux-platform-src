@@ -41,8 +41,14 @@ radius (worst case: DNS breaks for a name that is being retired anyway).
 
 ## 3. Inventory dispositions
 
-Fills the empty disposition column of the [M0 inventory](../migration/m2-spot-migration-inventory.md)
-(regenerate the inventory at kickoff and reconcile before executing).
+Fills the empty disposition column of the [M0 inventory](../migration/m2-spot-migration-inventory.md).
+No kickoff regeneration: with a fresh root and fresh DB (A1/A2), the only
+state that must be current at migration time is the delegated-zone stack's
+external names, and those come from the **live export in step 8** — the
+2026-07-11 snapshot remains the Spot-death fallback (external IDs are
+immutable while the resources exist). Note: the generator writes an empty
+inventory when the cluster is unreachable instead of failing; do not run it
+casually against the committed snapshot.
 
 ### 3.1 Crossplane managed resources
 
@@ -217,14 +223,14 @@ window (soak dominates the calendar).
 
 | # | Step | Verify |
 |---|---|---|
-| 1 | Kickoff: regenerate migration inventory, diff against 2026-07-11 snapshot, reconcile dispositions (section 3); parametrize `tests/step-ca/` (KUBECONFIG inheritance — the M0 README rule 3 debt); create `values/controlplane.env` | inventory diff reviewed; step-ca suites run against a values file |
+| 1 | Kickoff: parametrize `tests/step-ca/` (KUBECONFIG inheritance — the M0 README rule 3 debt); create `values/controlplane.env` | step-ca suites run against a values file |
 | 2 | **[H]** Generate fresh root offline (`step` CLI), SOPS-encrypt under `clusters/controlplane/`; record fingerprint in values file | sops round-trip; fingerprint recorded |
 | 3 | CNPG operator + fresh `step-ca-db` + step-ca (`ca.rye.ninja`) + dump-based backup CronJob | CA health 200 on ULA VIP; fingerprint matches values file; dump lands on NFS |
 | 4 | cert-manager stack, trust domain `controlplane.rye.ninja` (drift-cause fix + guard) | `spiffe/` suite green: URI SAN carries the right trust domain |
 | 5 | DNS: `ca.rye.ninja` AAAA (GUA) + LAN ULA record; **[H]** workstation `step ca bootstrap` re-run | curl + fingerprint check from LAN and from a v6 external vantage |
 | 6 | Crossplane + providers + functions + XRDs/compositions via Flux; Roles Anywhere bootstrap (4.4): static cred → new trust anchor/profiles/ABAC → flip to SVID auth → quarantine static cred | all providers `Healthy=True` on SVID credentials; `crossplane/` suite green |
 | 7 | New `controlplane.rye.ninja` delegated-zone claim | claim Ready; `delegated-zone/` suite green with new trust domain |
-| 8 | State migration of the `crossplane.rye.ninja` stack (4.3, Orphan → pause → export → import → observe) | external-name diff zero; no new cloud-side IDs; deletionPolicy restored |
+| 8 | State migration of the `crossplane.rye.ninja` stack (4.3, Orphan → pause → export → import → observe); reconcile the live export against the 2026-07-11 snapshot before importing | external-name diff zero; no new cloud-side IDs; deletionPolicy restored |
 | 9 | ESO + public external-dns variant (4.5) | `eso/` suite green; a test record reconciles |
 | 10 | Full baseline runner x2 against `controlplane`; start 7-day soak; change freeze on `clusters/crossplane/` | both runs green, `STEP_CA_EXTERNAL_GATE=gate` |
 | 11 | Restore drill: step-ca-db from a scheduled dump onto a scratch CNPG cluster | step-ca starts against restored DB |
