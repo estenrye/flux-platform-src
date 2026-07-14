@@ -68,11 +68,23 @@ route (gateway hairpin dropped as asymmetric) and can't self-test cross-VLAN
 LB reachability (VIP on-link in its /64) — lb suite asserts in-cluster
 datapath instead.
 
-Remaining for M1: install host-side DR timers (etcd snapshot + ZFS
-replication systemd units — providers/kvm/scripts/) and verify a ZFS
-replication rollback (needs one nightly run); merge PR #65; [H] confirm the
-gateway installed the VIP /112 routes in UniFi (step 11). ADRs 0020-0023,
-runbooks, suites all done.
+M1 EXIT CRITERIA CLOSED (2026-07-13 evening): PR #65 merged (+ follow-ups
+#66-#70). DR timers verified installed + enabled on the host (etcd snapshots
+running 6-hourly, succeeding). Gateway VIP routes CONFIRMED via
+`ssh root@fd97:45c2:b3a1:100::1` (jump through the KVM host; 10.45.0.1 is
+NOT reachable from the workstation VLAN): both /112 pools in FIB, ECMP
+across all 6 nodes, only Calico dynamic neighbors, PfxSnt 0 (DENY-ALL-OUT
+verified). ZFS replication live: first run failed — `send -R` of the parent
+fs makes remote `recv -F` unmount the mounted target, and Linux ZFS can't
+delegate mount/umount to non-root; fixed by per-zvol sends (PR #72,
+runbook updated). All 6 zvol snapshot GUIDs match source↔NAS. Rollback
+verified by pulling a zvol back from the NAS and sha256-comparing against
+the source snapshot ([[truenas-api-surface]] for why the API couldn't fix
+the mount issue). Esten added `send` to the replication user's delegation
+2026-07-13 — the restore path needs it and the original setup missed it.
+
+Still M1-adjacent, not blocking: truenas-iscsi blocked upstream
+([[talos-iscsi-truenas-csi]]); lb suite asserts in-cluster datapath only.
 
 Open decision flagged to Esten: whether to add a repo-admin age key as second
 SOPS recipient for `clusters/controlplane/` — the crossplane cluster key is
