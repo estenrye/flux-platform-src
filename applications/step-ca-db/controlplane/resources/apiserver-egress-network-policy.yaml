@@ -1,0 +1,39 @@
+# CNPG instance pods (initdb jobs, postgres instances) run in the step-ca
+# namespace and need the apiserver: the instance manager reads its Cluster
+# resource and posts status. The base policy is Ingress-only, so egress
+# fell to the global default-deny — controlplane-only fix because adding
+# egress restrictions to the base would newly constrain Spot's running
+# instances mid-migration.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: step-ca-db-instance-egress
+  namespace: step-ca
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "CNPG creates PostgreSQL pods dynamically; the cnpg.io/cluster label is valid but pods do not exist in the static rendered manifest."
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "CNPG creates PostgreSQL pods dynamically; the cnpg.io/cluster label is valid but pods do not exist in the static rendered manifest."
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: step-ca-db
+  policyTypes:
+    - Egress
+  egress:
+    # apiserver targetPort — Calico evaluates egress post-DNAT
+    # (docs/memory/calico-networkpolicy-dnat.md). Talos serves 6443.
+    - ports:
+        - protocol: TCP
+          port: 6443
+    # streaming replication to peer instances (pod port, same rule)
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: step-ca-db
+      ports:
+        - protocol: TCP
+          port: 5432
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

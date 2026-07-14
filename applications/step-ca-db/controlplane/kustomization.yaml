@@ -8,6 +8,7 @@ kind: Kustomization
 
 resources:
   - ../base
+  - resources/apiserver-egress-network-policy.yaml
   - resources/backup-pvc.yaml
   - resources/backup-cronjob.yaml
   - resources/backup-network-policy.yaml
