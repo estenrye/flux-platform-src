@@ -1,0 +1,14 @@
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TLSRoute
+metadata:
+  name: step-ca
+  namespace: step-ca
+spec:
+  parentRefs:
+    - name: step-ca
+      namespace: step-ca
+      sectionName: https-passthrough
+  rules:
+    - backendRefs:
+        - name: step-certificates
+          port: 443

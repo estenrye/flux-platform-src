@@ -1,0 +1,53 @@
+# Additive policies for the dump job: NetworkPolicies are ORed, so these
+# extend the base step-ca-db policy without patching it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: step-ca-db-allow-dump
+  namespace: step-ca
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "CNPG creates PostgreSQL pods dynamically; the cnpg.io/cluster label is valid but pods do not exist in the static rendered manifest."
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The dump-job pods are created by the CronJob at run time and do not exist in the static rendered manifest."
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: step-ca-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: step-ca-db-dump
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: step-ca-db-dump
+  namespace: step-ca
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "The dump-job pods are created by the CronJob at run time and do not exist in the static rendered manifest."
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "CNPG creates PostgreSQL pods dynamically; the cnpg.io/cluster label is valid but pods do not exist in the static rendered manifest."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: step-ca-db-dump
+  policyTypes:
+    - Egress
+  egress:
+    # Post-DNAT rule: target the postgres pod port directly.
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: step-ca-db
+      ports:
+        - protocol: TCP
+          port: 5432
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

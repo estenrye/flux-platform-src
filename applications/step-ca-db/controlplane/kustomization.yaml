@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# controlplane variant (M2 design §4.1): base cluster plus the interim
+# logical-dump backup path — barman needs S3, which arrives with Garage in
+# M3. Dumps land on a truenas-nfs PVC (iSCSI is blocked on IPv6, R2) and
+# ride the NAS's own ZFS snapshot schedule off-host.
+
+resources:
+  - ../base
+  - resources/backup-pvc.yaml
+  - resources/backup-cronjob.yaml
+  - resources/backup-network-policy.yaml

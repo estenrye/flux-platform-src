@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: step-ca-db-controlplane
+  description: |-
+    CNPG PostgreSQL cluster for step-ca on the controlplane cluster,
+    with nightly pg_dump backups to TrueNAS NFS (interim until barman
+    targets Garage in M3). Restore drill: M2 execution step 11.
+  tags:
+    - database
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

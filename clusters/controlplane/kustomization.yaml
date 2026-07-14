@@ -3,7 +3,9 @@ kind: Kustomization
 
 # Baseline for the IPv6-only controlplane cluster (M1 design §7.2). Calico
 # first: Talos installs with CNI none, nodes stay NotReady until it lands.
-# Deliberately absent until M2: crossplane, step-ca, cert-manager stack, ESO.
+# M2 migration in progress (2026-07-13 design): step-ca stack landed in
+# step 3; still absent: cert-manager stack (step 4), crossplane (step 6),
+# ESO 1Password store (step 9).
 resources:
   - ../../applications/calico/controlplane
   - ../../applications/global-network-policy-default-deny/controlplane
@@ -17,7 +19,14 @@ resources:
   - ../../applications/truenas-csi/base
   - ../../applications/flux/base
   - ../../applications/flux-monitoring/base
+  - ../../applications/external-secrets-operator/base
+  - ../../applications/cnpg/base
+  - ../../applications/step-ca-db/controlplane
+  - ../../applications/step-ca/controlplane
   - resources/flux.source.git.yaml
   - resources/flux.kustomization.yaml
   - resources/truenas-csi.api-credentials.sops.yaml
   - resources/external-dns.unifi-credentials.sops.yaml
+  - resources/namespace.cert-manager.yaml
+  - resources/step-ca-intermediate.sops.yaml
+  - resources/step-ca-root-cert.yaml

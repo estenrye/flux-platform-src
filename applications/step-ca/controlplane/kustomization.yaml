@@ -1,0 +1,55 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# controlplane variant (M2 design A5 + §4.1): serves the offline root,
+# issues from the 1y intermediate, binds all-families for the IPv6-only
+# cluster, endpoint ca.rye.ninja. Deltas from base are confined to
+# values.yaml (ca.json), patches/deployment.yaml (x5c roots chain), and
+# resources/eso.external-secret.yaml (ca.crt sync).
+
+resources:
+  - resources/network-policy.yaml
+  - resources/eso.service-account.yaml
+  - resources/eso.cert-manager-role.yaml
+  - resources/eso.cert-manager-rolebinding.yaml
+  - resources/eso.secret-store.yaml
+  - resources/eso.external-secret.yaml
+  - resources/gateway.yaml
+  - resources/tls-route.yaml
+  - resources/http-route.yaml
+
+helmCharts:
+  - name: step-certificates
+    repo: https://smallstep.github.io/helm-charts
+    version: 1.30.1
+    releaseName: step-certificates
+    namespace: step-ca
+    includeCRDs: false
+    valuesFile: values.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+  - target:
+      kind: RoleBinding
+      name: step-certificates-config
+      namespace: step-ca
+    path: patches/role-binding.yaml
+  - target:
+      kind: Pod
+      name: step-certificates-test-connection
+      namespace: step-ca
+    path: patches/pod.yaml
+  - target:
+      kind: Service
+      name: step-certificates
+      namespace: step-ca
+    path: patches/service.yaml
+
+images:
+  - name: cr.smallstep.com/smallstep/step-ca
+    newTag: "0.30.2"
+    digest: sha256:a2b17872915c193259b75a5474c398326f41bd199f0842093e52cf4182bc8270
+  - name: cr.smallstep.com/smallstep/step-ca-bootstrap
+    digest: sha256:5270356cf91596afe18478eab60c6c0866b2cc62618f282d42827e58f84d6eae

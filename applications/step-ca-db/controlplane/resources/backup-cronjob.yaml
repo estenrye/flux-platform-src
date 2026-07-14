@@ -1,0 +1,89 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: step-ca-db-dump
+  namespace: step-ca
+  annotations:
+    ignore-check.kube-linter.io/no-node-affinity: "Single-zone home lab cluster; node affinity not required."
+    checkov.io/skip1: "CKV_K8S_35=PGPASSWORD must be an environment variable; libpq reads PostgreSQL credentials from the environment and a pgpass file mount adds ownership/mode fragility for no security gain inside a NetworkPolicy-scoped one-shot job."
+    checkov.io/skip2: "CKV_K8S_40=The cloudnative-pg/postgresql image runs as the postgres user at UID 26; changing the UID would break file ownership inside the container image."
+    ignore-check.kube-linter.io/read-secret-from-env-var: "PGPASSWORD must be an environment variable; libpq reads PostgreSQL credentials from the environment."
+spec:
+  # Nightly at 02:10 local cluster time; the TrueNAS ZFS snapshot schedule
+  # provides the off-host copy of the dump volume.
+  schedule: "10 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: step-ca-db-dump
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 26
+            runAsGroup: 26
+            fsGroup: 26
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: pg-dump
+              # Same major as the CNPG operator default (PostgreSQL 17).
+              image: ghcr.io/cloudnative-pg/postgresql:17.5@sha256:b1deeed2aa998b2f381e39c5cadb9ec06127708c8bd62965743af19abf21628f
+              command:
+                - /bin/bash
+                - -ceu
+                - |
+                  STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+                  OUT="/backups/stepcas-${STAMP}.dump"
+                  pg_dump --format=custom --file="${OUT}" "${PGDATABASE}"
+                  pg_restore --list "${OUT}" > /dev/null
+                  echo "dump OK: ${OUT} ($(stat -c%s "${OUT}") bytes)"
+                  find /backups -name 'stepcas-*.dump' -mtime +13 -delete
+                  echo "retention pruned to 14 days; $(ls /backups | wc -l) dumps on volume"
+              env:
+                - name: PGHOST
+                  value: step-ca-db-rw.step-ca.svc.cluster.local
+                - name: PGDATABASE
+                  value: stepcas
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: step-ca-db-app
+                      key: username
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: step-ca-db-app
+                      key: password
+              volumeMounts:
+                - name: dumps
+                  mountPath: /backups
+                - name: tmp
+                  mountPath: /tmp
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+          volumes:
+            - name: dumps
+              persistentVolumeClaim:
+                claimName: step-ca-db-dumps
+            - name: tmp
+              emptyDir: {}
