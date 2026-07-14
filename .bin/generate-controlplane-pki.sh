@@ -145,7 +145,10 @@ kubectl create secret generic csi-driver-spiffe-ca \
     --from-file=tls.crt="${TMP}/intermediate.crt" \
     --from-file=tls.key="${TMP}/intermediate.key" \
     --from-file=ca.crt="${TMP}/root.crt" \
-    --dry-run=client -o yaml > "${TMP}/intermediate-secret.yaml"
+    --dry-run=client -o yaml \
+    | kubectl annotate --local -f - -o yaml \
+        'ignore-check.kube-linter.io/schema-validation=SOPS-encrypted secret; top-level sops field is expected and non-standard by design' \
+    > "${TMP}/intermediate-secret.yaml"
 enc "${TMP}/intermediate-secret.yaml" "${INT_OUT}" --data-only
 info "wrote ${INT_OUT}"
 

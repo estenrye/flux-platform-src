@@ -8,6 +8,10 @@ metadata:
     checkov.io/skip1: "CKV_K8S_35=PGPASSWORD must be an environment variable; libpq reads PostgreSQL credentials from the environment and a pgpass file mount adds ownership/mode fragility for no security gain inside a NetworkPolicy-scoped one-shot job."
     checkov.io/skip2: "CKV_K8S_40=The cloudnative-pg/postgresql image runs as the postgres user at UID 26; changing the UID would break file ownership inside the container image."
     ignore-check.kube-linter.io/read-secret-from-env-var: "PGPASSWORD must be an environment variable; libpq reads PostgreSQL credentials from the environment."
+    ignore-check.kube-linter.io/env-value-from: "Secret step-ca-db-app is created at runtime by CNPG and does not exist in the static rendered manifest."
+    ignore-check.kube-linter.io/no-liveness-probe: "One-shot dump job; liveness probe not applicable."
+    ignore-check.kube-linter.io/no-readiness-probe: "One-shot dump job; readiness probe not applicable."
+    ignore-check.kube-linter.io/restart-policy: "Never is correct here: retries come from the Job backoffLimit as fresh pods, preserving each attempt's logs."
 spec:
   # Nightly at 02:10 local cluster time; the TrueNAS ZFS snapshot schedule
   # provides the off-host copy of the dump volume.

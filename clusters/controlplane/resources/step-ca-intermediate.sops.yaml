@@ -7,6 +7,8 @@ kind: Secret
 metadata:
     name: csi-driver-spiffe-ca
     namespace: cert-manager
+    annotations:
+        ignore-check.kube-linter.io/schema-validation: SOPS-encrypted secret; top-level sops field is expected and non-standard by design
 type: kubernetes.io/tls
 sops:
     age:
@@ -20,6 +22,6 @@ sops:
             -----END AGE ENCRYPTED FILE-----
           recipient: age16p6p30le4wlka4gpvjafnr87sunrynwseegl7gvf234qk53hv49q4tl0e7
     encrypted_regex: ^(data|stringData)$
-    lastmodified: "2026-07-14T01:47:54Z"
-    mac: ENC[AES256_GCM,data:hhKeyVmjbK5qEKTK7fDr0EHu16YWMN8K7D37fn7Sh0p2TfaNspBtT+u29wtLZKKYSjnOw2fi531MkGaRIVEBXvF4nMP1Aom06otmqAK0Ws8WhL6H+bz9NSX5En99QQVBDpXeOUO/LfXem9HkbMHFyo5JwoRuH33flpeu/lEnPUM=,iv:VwHzPqAzqHM3ndjkeWGHMx6TQDzCw45UzGasxOQ5uE8=,tag:/Fmie/v9Z1vLwKF/lA4/NA==,type:str]
+    lastmodified: "2026-07-14T02:18:52Z"
+    mac: ENC[AES256_GCM,data:oALeNkzXzr9/jLsjxK67E7xVmiSQoIaA6S6sr1xOYr/3MZN79vzSLiEmP7o5pwRL+pg41NkPfW5DGoe/KY2UlJcQCA2yZQre+XPdSDDxgx0yqK32lyDg3j511WLRlNrjW4LUPLDQo5KG5aQKeiej4SNP4MN3ejruU7hGScTeJng=,iv:Monbxi7IpRqyuwUDWITPAOnnH1jAFk2FriHEdHF+qXc=,tag:ANajHd4Mu4/cT+/7LnwxTw==,type:str]
     version: 3.13.2
