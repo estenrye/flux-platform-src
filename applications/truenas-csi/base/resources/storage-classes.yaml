@@ -25,6 +25,31 @@ reclaimPolicy: Delete
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
 ---
+# Ownership-sensitive workloads (PostgreSQL/CNPG): the driver ALWAYS sets
+# NFS mapall (default root:wheel — pkg/driver/controller.go pins it, empty
+# param falls back to root), so a uid-26 process sees its own files owned
+# by root and postgres refuses to start ("data directory has wrong
+# ownership", M2 step 3). This class maps all access to the NAS user
+# k8s-postgres (uid/gid 26, created manually on TrueNAS) so ownership
+# checks pass. Not default; use only for postgres-family volumes.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: truenas-nfs-pg
+provisioner: csi.truenas.io
+parameters:
+  protocol: "nfs"
+  pool: "flash-pool"
+  # Volumes land at flash-pool/k8s/controlplane/nfs-v/<volume>.
+  datasetPath: "k8s/controlplane/nfs-v"
+  compression: "LZ4"
+  nfs.mountOptions: "hard,noatime,nfsvers=4.2"
+  nfs.mapAllUser: "k8s-postgres"
+  nfs.mapAllGroup: "k8s-postgres"
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:

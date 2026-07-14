@@ -12,3 +12,16 @@ resources:
   - resources/backup-pvc.yaml
   - resources/backup-cronjob.yaml
   - resources/backup-network-policy.yaml
+
+patches:
+  # Postgres validates that it owns PGDATA; the default truenas-nfs class
+  # mapalls to root and fails that check (see storage-classes.yaml,
+  # truenas-nfs-pg header).
+  - target:
+      kind: Cluster
+      name: step-ca-db
+      namespace: step-ca
+    patch: |-
+      - op: add
+        path: /spec/storage/storageClass
+        value: truenas-nfs-pg
