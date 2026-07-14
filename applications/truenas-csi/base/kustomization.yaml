@@ -18,6 +18,14 @@ resources:
   - https://raw.githubusercontent.com/truenas/truenas-csi/v1.1.1/deploy/truenas-csi-driver.yaml
   - resources/storage-classes.yaml
   - resources/network-policy.yaml
+  # Dataset-root ownership hook for mapall'd NFS classes (truenas-nfs-pg):
+  # the driver creates dataset roots as root:755, which mapall'd clients
+  # cannot write into. Retire when upstream chowns at CreateVolume or the
+  # class moves to democratic-csi (M3 re-evaluation).
+  - resources/nfs-pg-owner-script.yaml
+  - resources/nfs-pg-owner-rbac.yaml
+  - resources/nfs-pg-owner-cronjob.yaml
+  - resources/nfs-pg-owner-network-policy.yaml
 
 patches:
   # Placeholder credential Secret ships in the upstream manifest; the real one

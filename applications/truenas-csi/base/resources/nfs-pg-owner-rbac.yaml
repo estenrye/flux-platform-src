@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nfs-pg-owner
+  namespace: truenas-csi
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: truenas-csi-nfs-pg-owner
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: truenas-csi-nfs-pg-owner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: truenas-csi-nfs-pg-owner
+subjects:
+  - kind: ServiceAccount
+    name: nfs-pg-owner
+    namespace: truenas-csi
