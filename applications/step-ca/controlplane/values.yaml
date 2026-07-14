@@ -33,8 +33,11 @@ podSecurityContext:
   runAsNonRoot: true
   runAsGroup: 1000
   fsGroup: 1000
+  # Unconfined (base) was a workaround for the Spot runtime and violates
+  # the baseline PodSecurity level Talos enforces — pod creation is
+  # admission-blocked. RuntimeDefault verified against Talos in M2 step 3.
   seccompProfile:
-    type: Unconfined
+    type: RuntimeDefault
 
 inject:
   enabled: true

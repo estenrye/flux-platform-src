@@ -22,9 +22,6 @@
   path: /metadata/annotations/checkov.io~1skip3
   value: "CKV_K8S_40=step-ca image runs as the step user at UID 1000; changing the UID would break file ownership inside the container image."
 - op: add
-  path: /metadata/annotations/checkov.io~1skip4
-  value: "CKV_K8S_31=step-ca binary fails to exec with RuntimeDefault seccomp on this cluster's container runtime; Unconfined seccomp profile is required for the binary to execute successfully."
-- op: add
   path: /metadata/annotations/checkov.io~1skip5
   value: "CKV_K8S_20=step-ca binary has CAP_NET_BIND_SERVICE file capability set in the image; allowPrivilegeEscalation must be true to allow execve to succeed with no_new_privs otherwise disabled by the capability bit."
 - op: add
