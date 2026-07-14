@@ -165,6 +165,16 @@ Goal: step-ca, Crossplane, and all fleet-management duties run on
 `controlplane`; Rackspace Spot decommissioned. Parallel-run throughout —
 Spot stays authoritative until each service's cutover is verified.
 
+**Detailed design (2026-07-13, draft):**
+[2026-07-13-m2-migration-design.md](2026-07-13-m2-migration-design.md)
+— amends this milestone in four approved ways: fresh step-ca root minted on
+`controlplane` (the M0 audit found `cluster.local` trust-domain drift forcing
+full re-enrollment anyway, plus an Oct 2026 root expiry), fresh step-ca DB
+(no barman backup exists on Spot to restore), the old CA name is never
+repointed (`ca.rye.ninja` is born on the new CA; IPv4 exposure deferred to
+M6), and the old rendered repo is archived at decommission. The design doc
+supersedes the task list below where they differ.
+
 Tasks:
 1. **CNPG + step-ca**: deploy CNPG operator and `step-ca-db` on the new
    cluster; restore from barman backup; deploy step-ca with root/intermediate
