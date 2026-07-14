@@ -128,7 +128,18 @@ first SVID is issued** (ADR-16). Issuer change (A5): the ClusterIssuer is a
 CA issuer over the SOPS-provisioned intermediate secret — the
 `selfsigned` ClusterIssuer and the self-signed `csi-driver-spiffe-ca`
 Certificate resource are **not** reproduced on `controlplane`.
-trust-manager distributes the **root** as the fleet bundle. Implementation must find and fix the cause
+trust-manager distributes the **root** as the fleet bundle.
+
+**Deferred to M4** (Esten, 2026-07-13): evaluating
+[smallstep/step-issuer](https://github.com/smallstep/step-issuer) as the
+leaf-issuance path (cert-manager forwards CSRs to step-ca via a JWK
+provisioner; intermediate key custody shrinks to the step-ca namespace and
+the ESO mirror disappears). It cannot provision or rotate the intermediate
+itself (`isCA` requests are rejected — leaf-only), and it couples every
+SVID renewal to single-replica step-ca availability, so it is weighed at
+M4 against the x5c per-cluster-intermediate pattern (ADR-7 Pattern D) when
+workload-cluster issuance is designed; whatever wins can be retrofitted to
+`controlplane` in the same stroke. Implementation must find and fix the cause
 of the Spot drift (trust domain defaulted to `cluster.local` — almost
 certainly the csi-driver-spiffe `--trust-domain` flag was never set in the
 Spot variant) and add a render-time lint or chainsaw assertion so it cannot
