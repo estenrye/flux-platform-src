@@ -1,0 +1,25 @@
+apiVersion: v1
+data:
+    ca.crt: ENC[AES256_GCM,data:ShpA6WIC+Nwe1AHGFop3SR5b0FLXXXeNvXGkr+6hVqNt1+U8zXeOulO/UbFsD5PkWTL893ChpOi917nugNzCDGIUpg8DxidyrFdMgWd2I1W9ptBdz2lN5Edf6jQjaS4ngXeTSkwI0RPr60HAQpjK2wp8/rcan1F4+XWKxkH8Od9AmJnU+Ax3uZ4wh7caQrBNI9JCeqgkYeBCZUrleDXNM4BQqohGVMCn4c0yzokl0uju81Nh4nx/l5acuZWv+9Y/vQbbElXmZsZHSjGJl2IQ/fpQ/nbgLMBB1WAyNJA40+e3e5Eld7EFHNnuo4CTqJR0ItQgl2ck3PZb/zUj9HWg92EyW4XmuyEv1LoaFEcyewv+ryJS90mbEE4ob3XVqMkAtqYvjmFn90hEHLYROq5KrJrCil+rkag5dfzYqm1k+VwmGkoNhqAVgk+9VKXCkiZvPPUfZ6Sgod6gApdFeDFD+HrYclUFfRZwnabdEC+oVTLckhl3HRcp6KbkMe+cBuQpi/YR1M0jXGJ6MvvYzE5mZN8tR2yZPzkJRvycDKDvBf1Ztqtsj7gDKryomOnrXwWa5OHksGCgBANAMrgXXytX2NG2E38ievsE7ibJZloCoZg/Q8hOuwyquFyjbTE8GTg+rCnywJehzyo1uP6B1Nev48mcmp+cxNaofG7AQxjbTyRQjnDKOw4yghUiB9XJ9nHeF9Q0LSj6PnWvF7UWDkNTeQfmBYTFWCALdw90+TvufhihKrvKQzcYWKiSKl8EZRHHm7YcsZcFrqFla0loAFssi0rP9sC83jw/LgKXHikBdBuDPkLsX8C5xYZZ+CE3D4jbmpVuf0AmVKfpjCs+ZOvXn4T/bXE8OEyb+cpAFYiIfEw6pMiiFDz6TcNLyggEkpIlLus+k4DbXj28W0TV6gBRO2Nc8uhrOWqdwuIEFUrO7iXPVVAkV/I9NYXuV7SzGAtxVwfe34R8dDeKr0P4PbwwE9RTsr6h4dJKLq+ybW+ROdsfdFvRbT9vSSW00T0G1XF1EKErcHAV5/Dy/l+q,iv:18ReZkN/Y39ic2si3SMXYNzTLgS2Of3wSBYQC2CTIp0=,tag:BOy8x9p1AdZIkckpz/JXhA==,type:str]
+    tls.crt: ENC[AES256_GCM,data:Uo6SUWHzgFJUCwEQmLpQlE3qwO8vwsErM9tWce3W2kAtL3QfoWcWlkz2iYFbs3HDW0l3CXjKaQpaq3FNqP/recLE8zABO4BVSN3FHtHNZPNPNybPxrK/QIfIHv08p7N8dvM10l7cYg4HLHwQ+2REAOi0caGtRnFxsfj+DgQRxxVDd79yNyBxD3ibyq9ERZJ9omkHtbJRfVw3IYMPNGUIl1mG17leCP//kMrtjl1hjW44qC1i8x29SEaL29gXbo3Nsr5ipSrl/SqxvK5c8wlrvn3iorC7afElJ6NcUCWj5ZrbokhOMXMBul6x9ujTmKkIgfTeGXbSsni6nsaUMSrqTUfGtNfErUU/5eEikGzxINfXKEfao1baj4mSQP3GlMRy1j88mHScE6G3pFftp3Z+yM2Gl7SoqsA0oCQ3kW98v9eQ36rq/WYmVLyDay+IvUQBkl4SYVw9klhTGYfjee70/b+JvOZYc4X/LVQnw4tipSEp1gx1cSJeCjbddrPxXEX+5m7EEz4nyzmWnJ/dwzjBdgHbuYtffH/P4CN21W+EsIUCyUXuLPzHzReKrDefZ+G4+yDMXv14oeWljaTEQoJortzSSPho4eRa8XhJ8XbzE07KsEnPzVINpiIzqkRi6KPwEHbdLzaMoW3JJfoDhaTsWmkLThISgV7Y213R7aZDfn4G+94/PLRwDD188tOEBBzPxL859cb6UGRZVboRYRx04DRvsSi3YPJ3/r4l1NOT54XHURSsN8oSgKanGip/VIJeTYgfmcZgcVFl6vY/L4OsiQcVosAxkd+Id2V4gq0HxA11O4/Io0Wj5mei+HSOIhqlDTo9GI4S+aKl7cqbp0IKc8PiFl666gxniCELZ0ZBiVNaD5r3LF2mL2J9TeLoPrcPVqdITp4YBWH+0Ob29rFNnRh0oej+KK+7CUJ3DWDrwdyTCFhYYPgIWKiPNBXk6BoQiFQBeiHotYvYzRif+S74nu6Uy90sNCBcoW7qJfwd5nMz10EKeFFd8Pbzb4UwU34G8/6nj3MXzxYzcv9yTzTGHHIn2+oRkIPcWoc277u9u5ZPmVV8cCRvW+VGcxXTA7cy+Qgx02ZAVVEp3i7gKcNIrOn781MiOiCJYNN28x7pkN7QnDyQiXQ/QOFPqJ7PGraHGwIXGaLtIuIBryr3+OxvMA==,iv:6hf3BsTvr9QnbVYxg9Jh6fzbtStciGu9jXLq/UEORCk=,tag:Fsexf8Hm78/bbzNlGSJmIA==,type:str]
+    tls.key: ENC[AES256_GCM,data:acATN27p7YPzE8AV5tQPrnc8ozpv0WQxRDzL68UZPaLDPUZu8Zh6DAsRCz8xlkuucIm++cGdxNWfrguBm4Yh5M0DVvpRvhMiJM3y7FT0YQRmpxmZRS2TwXnHDh+FnTl5Rg6fo0UYGQeyTxOTDmF9WaZ4VXB7kEidVcAdkSCzr/7Bd1hDq1ggcCGyNs+pX6iP8q/he6or3FQYQ4ViXgakH6kEXn/5wd8mJBpCjZ+AObO9zLOU/IdWzW2OfUhB0nj2SbZtNoLxu9K+POqvwcLnI/PE/lO19WL5xsm/Q7IenSRH2S2yMw6v7JaTvsTJkdPl6V4+1iAq1OBL4H6ufMKaLPoSo0IRM6QZp6gGtl9QJrrye4IiEB3wkSIgcKrPg6rGhQ0J5rgKMhlb9FIm4lOxxg==,iv:OX9r39/sQVCRlF8R0lSiD1kBwXBYfLdoBaPnIt7t0Ng=,tag:q7o9DDN/Q2yD6q60u42EGg==,type:str]
+kind: Secret
+metadata:
+    name: csi-driver-spiffe-ca
+    namespace: cert-manager
+type: kubernetes.io/tls
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBab2h5c0NaQWFkZ1hJUStY
+            VzhpWkt2MFdaVUgvK1pjUFVZRjM3QTdzYkJjClBxbUhUOCtKQU5QTEx0a3hHdGFN
+            NlJieE1nam9rTnZpWGhkdUJDOElZUTgKLS0tIGpGVTloSGdXYzd0Yy9zQ0xqZDdt
+            ZkgzTnFRQ3I1dSs5clRlVUxReFUzaUEKyGEWZvLhWTbMwbrvIKWrM1k8iVzLRAPN
+            XfpMVA3DxrJp7TvN22zXUqTVUgnMLiH0+a/ZTD1sj0Zs65q8zLy4+A==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age16p6p30le4wlka4gpvjafnr87sunrynwseegl7gvf234qk53hv49q4tl0e7
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-07-14T01:47:54Z"
+    mac: ENC[AES256_GCM,data:hhKeyVmjbK5qEKTK7fDr0EHu16YWMN8K7D37fn7Sh0p2TfaNspBtT+u29wtLZKKYSjnOw2fi531MkGaRIVEBXvF4nMP1Aom06otmqAK0Ws8WhL6H+bz9NSX5En99QQVBDpXeOUO/LfXem9HkbMHFyo5JwoRuH33flpeu/lEnPUM=,iv:VwHzPqAzqHM3ndjkeWGHMx6TQDzCw45UzGasxOQ5uE8=,tag:/Fmie/v9Z1vLwKF/lA4/NA==,type:str]
+    version: 3.13.2
