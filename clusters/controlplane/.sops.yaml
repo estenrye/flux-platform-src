@@ -10,6 +10,11 @@ creation_rules:
   - path_regex: secrets/talos-secrets\.sops\.yaml$
     age: >-
       age16p6p30le4wlka4gpvjafnr87sunrynwseegl7gvf234qk53hv49q4tl0e7
+  # Offline root CA key material (M2 design A5): whole-file encryption.
+  # Written by .bin/generate-controlplane-pki.sh; never applied to a cluster.
+  - path_regex: secrets/step-ca-root\.sops\.yaml$
+    age: >-
+      age16p6p30le4wlka4gpvjafnr87sunrynwseegl7gvf234qk53hv49q4tl0e7
   # Kubernetes Secret manifests: encrypt data/stringData only (repo convention).
   - path_regex: .*\.yaml
     encrypted_regex: ^(data|stringData)$
