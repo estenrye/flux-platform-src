@@ -21,10 +21,10 @@ PVs whose `nfs.mapAllUser` matches, via JSON-RPC `filesystem.chown`
 Full-Admin key; see [[truenas-api-surface]]). NAS user `k8s-postgres`
 uid/gid 26 must exist.
 
-**Upstream (option B):** issue drafted 2026-07-14 asking for
-CreateVolume-time chown or maproot support (`MapRootUser` field exists in
-the client struct, unused; clone path omits mapall entirely). Link the
-filed issue here: ___
+**Upstream (option B):** filed 2026-07-14 —
+https://github.com/truenas/truenas-csi/issues/47 (CreateVolume-time chown
+or maproot support; `MapRootUser` field exists in the client struct,
+unused; clone path omits mapall entirely).
 
 **Swap candidate (option C), decide at M3 kickoff** before keycloak-db:
 democratic-csi has native `datasetPermissions*` (solves this class), and
