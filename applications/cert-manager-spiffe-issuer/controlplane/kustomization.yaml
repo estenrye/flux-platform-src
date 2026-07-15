@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cert-manager
+
+# controlplane variant (M2 design A5): the ClusterIssuer is a CA issuer
+# over the SOPS-provisioned intermediate secret. The base's selfsigned
+# ClusterIssuer, CA Certificate, and their approval plumbing
+# (CertificateRequestPolicy + use-RBAC) exist only to mint the in-cluster
+# CA that A5 replaced with the offline root — none of it is reproduced
+# here. SVID approval is handled by csi-driver-spiffe's own approver.
+resources:
+  - resources/csi-driver-spiffe-ca.clusterissuer.yaml

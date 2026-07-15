@@ -33,7 +33,15 @@ lint-checkov: lint-deps
 lint-kube-linter: lint-deps
 	.venv/bin/kube-linter lint --config .kube-linter/config.yaml .render
 
-lint: lint-deps render lint-checkov lint-kube-linter
+# ADR-16 drift guard: Spot silently ran with the csi-driver-spiffe default
+# trust domain (cluster.local) for weeks — M0 audit finding. Fail the lint
+# if any non-Spot cluster render carries it (Spot keeps it until decommission).
+lint-trust-domain:
+	@BAD=$$(grep -rl -- '--trust-domain=cluster.local\|trust-domain: cluster.local' .render/*/clusters/* 2>/dev/null | grep -v '/clusters/crossplane/' || true); \
+	if [ -n "$$BAD" ]; then echo "ADR-16 VIOLATION: trust domain cluster.local rendered outside Spot:"; echo "$$BAD"; exit 1; fi; \
+	echo "trust-domain guard: OK"
+
+lint: lint-deps render lint-checkov lint-kube-linter lint-trust-domain
 
 flux-reconcile-source:
 	flux reconcile source git flux-platform-rendered -n flux-system

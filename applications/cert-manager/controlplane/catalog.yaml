@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cert-manager-controlplane
+  description: |-
+    cert-manager on the controlplane cluster: base configuration plus the
+    privileged PodSecurity namespace label required by the
+    csi-driver-spiffe node DaemonSet's host-path mounts under Talos's
+    baseline PSA enforcement.
+  tags:
+    - certificates
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

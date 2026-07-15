@@ -1,0 +1,34 @@
+- op: add
+  path: /spec/template/spec/containers/0/ports/-
+  value:
+    containerPort: 6060
+    name: readyz
+- op: add
+  path: /spec/template/spec/containers/0/livenessProbe
+  value:
+    httpGet:
+      path: /readyz
+      port: readyz
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: Always
+- op: add
+  path: /spec/strategy
+  value:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+- op: add
+  path: /spec/template/spec/securityContext/runAsUser
+  value: 65532
+- op: add
+  path: /spec/template/spec/containers/0/securityContext/runAsUser
+  value: 65532
+- op: add
+  path: /metadata/annotations/checkov.io~1skip1
+  value: "CKV_K8S_38=The SPIFFE CSI driver approver requires the service account token to approve CertificateRequests for SPIFFE identities."

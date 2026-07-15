@@ -1,7 +1,0 @@
-# Interim namespace for the SOPS-provisioned PKI secrets (M2 step 3).
-# Replaced by applications/cert-manager/base ownership when the
-# cert-manager stack lands in M2 step 4 — remove this file in that change.
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: cert-manager
