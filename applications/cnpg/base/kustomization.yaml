@@ -27,6 +27,9 @@ patches:
     path: patches/cluster-role-binding.yaml
 
 images:
+  # 1.29.2: fixes the 1.29.1 IPv6 regression (unbracketed pod IP in the
+  # instance status URL — upstream #10713, fix #10682) that left clusters
+  # stuck in "Instance Status Extraction Error" on v6-only networks.
   - name: ghcr.io/cloudnative-pg/cloudnative-pg
-    newTag: "1.29.1"
-    digest: sha256:0dfff19ba7b52ca25851a1010028b6940fff2e233290465af1cfb08a5f3f4661
+    newTag: "1.29.2"
+    digest: sha256:4710b10a4897a4f888cbe80bce8b279475315590fb9f2cb0ebb516f2f40ebf06
