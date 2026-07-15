@@ -15,3 +15,4 @@
 - [TrueNAS API Surface](truenas-api-surface.md) — JSON-RPC API cannot do zfs allow/canmount/umount even with Full Admin key; how to call it
 - [TrueNAS NFS Ownership Workaround](truenas-nfs-ownership-workaround.md) — truenas-csi mapall + root:755 dataset roots block non-root bootstrap; chown hook bridges; democratic-csi decision at M3
 - [UniFi Gateway PD Discovery](unifi-gateway-pd-discovery.md) — root shell + odhcp6c log to confirm the real DHCPv6-PD grant; also BGP RIB/FIB and firewall-zone debugging commands used on the gateway
+- [VIP Renumber Flakiness Investigation](vip-renumber-flakiness-investigation.md) — post-renumber ingress VIP intermittently unreachable; SNI-less curl gives a misleading RST, real per-node cause still open
