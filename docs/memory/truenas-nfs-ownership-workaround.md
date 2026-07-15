@@ -33,3 +33,17 @@ its maintainer confirmed TrueNAS 25.04/25.10 support on the mutable
 digest-pinnable release exists by M3, move `truenas-nfs-pg` to it and
 retire the hook + NAS-user hack; if truenas-csi fixes upstream first,
 keep the driver and retire just the hook.
+
+**Shape decision (settled 2026-07-15, don't re-litigate at M3):** a
+mutating webhook on PV admission was considered and rejected — nothing to
+mutate (the need is an external NAS side effect, an admission
+antipattern; Flux dry-runs the whole inventory every reconcile), 10s
+admission window vs async `filesystem.chown` middleware jobs, and a
+fail-closed webhook on PV creation recreates the ESO webhook/Flux
+deadlock from M2 step 3 at the platform's most foundational layer (its
+TLS cert would also need cert-manager, which sits *above* this storage
+in the bootstrap order). The 5-min CronJob window only bites during
+initial provisioning of a postgres cluster (CNPG initdb retries absorb
+it). If the window ever demonstrably hurts before the bridge is retired,
+the upgrade is the same script as a watch-loop Deployment — never
+admission.
