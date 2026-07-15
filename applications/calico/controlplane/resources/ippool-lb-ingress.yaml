@@ -3,10 +3,14 @@ kind: IPPool
 metadata:
   name: lb-ingress-gua
 spec:
-  # Internet-facing LoadBalancer VIPs. GUA RENUMBER: derived from gua_prefix
-  # in providers/kvm/network.yaml (<gua_prefix>:ffff::/112) — update on ISP
-  # re-delegation (docs/runbooks/gua-prefix-renumber.md).
-  cidr: 2607:3640:1064:270:ffff::/112
+  # Internet-facing LoadBalancer VIPs. Routed, not-on-link (services-network
+  # design, 2026-07-15): dedicated /64 carved from the PD's spare space
+  # (gua_pd_prefix in providers/kvm/network.yaml), no VLAN, no RA — replaces
+  # the old on-link-carved <gua_prefix>:ffff::/112 (client NDP flakiness).
+  # GUA RENUMBER: ingress_vip_pool in providers/kvm/network.yaml is a manual
+  # pick from gua_pd_prefix, not a formula — update on ISP re-delegation
+  # (docs/runbooks/gua-prefix-renumber.md).
+  cidr: 2607:3640:1064:27f::/112
   allowedUses:
     - LoadBalancer
   # allowedUses:[LoadBalancer] already excludes pod IPAM; "!all()" here would

@@ -5,7 +5,11 @@ metadata:
 spec:
   # LAN-internal LoadBalancer VIPs (site-stable ULA; never leaves the site —
   # the gateway's outbound BGP prefix filters enforce this).
-  cidr: fd97:45c2:b3a1:100:ffff::/112
+  # Routed, not-on-link (services-network design, 2026-07-15): dedicated
+  # block, no VLAN, no RA — replaces the old on-link-carved
+  # fd97:45c2:b3a1:100:ffff::/112 (client NDP flakiness with on-link VLAN
+  # 100 hosts). Matches providers/kvm/network.yaml internal_lb_vip_pool.
+  cidr: fd97:45c2:b3a1:f00::/112
   allowedUses:
     - LoadBalancer
   # Never used for pod addresses.
