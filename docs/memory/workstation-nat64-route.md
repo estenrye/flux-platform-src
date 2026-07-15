@@ -1,39 +1,31 @@
 ---
 name: workstation-nat64-route
-description: Mac on VLAN 100 needs TWO manual v6 routes (NAT64 /96 and VIP /112); both vanish on reboot/interface flap
+description: RETIRED 2026-07-15 — manual v6 routes are no longer needed after the client-VLAN move + VIP renumber
 metadata:
   type: project
 ---
 
-The workstation (Mac, VLAN 100, ULA **and GUA** via RA autoconf — the
-earlier "no GUA" note was stale by 2026-07-15) requires two manually
-added routes:
+**Retired 2026-07-15.** The workstation previously needed two manual v6
+routes (NAT64 `64:ff9b::/96` and the BGP VIP `/112`) while it lived on
+VLAN 100, sharing an on-link `/64` with the VIP pools and the NAT64
+appliance. Both are gone now that the workstation moved to a dedicated
+client VLAN (101) and the VIP pools were renumbered onto routed,
+not-on-link prefixes
+([2026-07-15-services-network-design.md](../superpowers/specs/2026-07-15-services-network-design.md)).
 
-```bash
-# NAT64: v4-only destinations via the appliance
-sudo route -n add -inet6 64:ff9b::/96 fd97:45c2:b3a1:100::64
-# BGP VIPs: carved from the on-link /64, so the Mac NDPs for them
-# instead of routing via the gateway (which holds the BGP routes)
-sudo route -n add -inet6 2607:3640:1064:270:ffff::/112 fe80::ae8b:a9ff:fe6e:13de%en0
-```
+Validated 2026-07-15 from VLAN 101 with **zero manual routes present**:
+`curl https://ca.rye.ninja/health` 15/15 (VIP path) and
+`curl https://api.github.com` (NAT64 path) both succeed via the default
+route alone.
 
-macOS drops manual routes on reboot or interface flap, so both recur.
-UniFi exposes no RA route-information/L-bit knobs, so the gateway cannot
-push them (asked and settled 2026-07-15).
+Root causes, for reference:
+- VIP route: the pool lived inside VLAN 100's on-link `/64`, so on-link
+  hosts NDP'd for it instead of routing via the gateway (the M1
+  "workstation can't self-test LB" limitation). Fixed by relocating both
+  VIP pools to dedicated routed subnets (ADR-22 amendment).
+- NAT64 route: incidentally resolved by the same VLAN move — no longer
+  needs investigating separately.
 
-**Symptoms when missing:**
-- NAT64 route: TLS timeouts to v4-only hosts (api.github.com, ghcr.io)
-  while dual-stack sites work — first bit 2026-07-13 masquerading as
-  "Spot is down".
-- VIP route: "Network is unreachable" connecting to any LB VIP
-  (ca.rye.ninja) — the M1 "workstation can't self-test LB" limitation,
-  root-caused 2026-07-15: VIP pools live inside the on-link /64s.
-
-**Verify:** `route -n get -inet6 64:ff9b::1` → gateway `…::64`;
-`route -n get -inet6 2607:3640:1064:270:ffff::1` → gateway `fe80::…`.
-
-**Structural fix deferred** (M2 design §4.6): if TFiber's PD is ≥/56,
-renumber both VIP pools onto routed-not-on-link prefixes — deletes both
-the VIP host route and the M1 limitation. A UniFi static route for
-64:ff9b::/96 would retire the NAT64 route for all hosts (retest the M1
-hairpin verdict). Persistence stopgap if re-adding annoys: LaunchDaemon.
+If a workstation ever needs to test from VLAN 100 directly again, expect
+the VIP-route symptom to return for that specific case (VLAN 100 itself
+wasn't renumbered, only the VIP pools moved off it).

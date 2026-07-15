@@ -1,8 +1,11 @@
 # Services-Network Design: Routed VIP Subnets + Zone Firewall
 
 Date: 2026-07-15
-Status: Draft for review (Esten's proposal, step-5 debugging outcome)
-Parent: [M2 design](2026-07-13-m2-migration-design.md) §4.6 deferred item; amends ADR-22 (UniFi BGP) and ADR-23 (IPv6-only) when executed
+Status: **Partially executed 2026-07-15.** Routed VIP subnets (design §2
+items 1–2, migration steps 1–5) are done and validated. Zone-based
+firewall (§2 item 3) is still open — not blocking, routing correctness
+didn't depend on it.
+Parent: [M2 design](2026-07-13-m2-migration-design.md) §4.6 deferred item; amends ADR-22 (UniFi BGP) and ADR-23 (IPv6-only), both amended 2026-07-15
 Execute: before the M2 step-10 soak (steps 6-8 are network-indifferent and proceed in parallel)
 
 ## 1. Problem
@@ -42,32 +45,45 @@ so no firewall policy can be expressed for client→service traffic.
 
 ## 3. Changes
 
-| Where | What |
-|---|---|
-| `providers/kvm/network.yaml` | new `vip_internal` / `vip_ingress` allocations; retire the `:ffff::/112` entries |
-| Calico (`applications/calico/controlplane`) | IPPools `lb-internal-ula`/`lb-ingress-gua` re-CIDRed; `BGPConfiguration.serviceLoadBalancerIPs` updated |
-| `providers/kvm/unifi-frr.conf` | regenerate `CALICO-VIPS-IN` for the new prefixes; **[H] re-upload** |
-| UniFi | **[H]** client-VLAN move, zones/policies, PD size check |
-| Cleanup | delete both workstation host routes; simplify `workstation-nat64-route.md` memory; drop the M2 design §4.6 interim note |
-| ADRs | amend ADR-22/ADR-23 with the routed-VIP topology (fold into the M2 migration ADR pass, step 14) |
+| Where | What | Status |
+|---|---|---|
+| `providers/kvm/network.yaml` | `gua_pd_prefix` added; `internal_lb_vip_pool` + `ingress_vip_subnet`/`ingress_vip_pool` replace the `:ffff::/112` entries | Done |
+| Calico (`applications/calico/controlplane`) | **Not an in-place re-CIDR** — `IPPool.spec.cidr` is immutable (Flux dry-run rejected the original attempt). New pools `lb-internal-ula-routed`/`lb-ingress-gua-routed` added; old `lb-internal-ula`/`lb-ingress-gua` disabled, not deleted; `BGPConfiguration.serviceLoadBalancerIPs` points at the new pools | Done |
+| `providers/kvm/unifi-frr.conf` | `CALICO-VIPS-IN` regenerated for the new prefixes | Done, uploaded and applied |
+| UniFi | client-VLAN move ✓, PD size check ✓; zones/policies still open | Partial |
+| Cleanup | `workstation-nat64-route.md` rewritten (retired, not deleted); this doc and the M2 design §4.6 caveat updated to reflect execution | Done |
+| ADRs | ADR-22/ADR-23 amended directly (not deferred to M2 ADR pass step 14 — done now while the context is fresh) | Done |
+| Envoy Gateway (`applications/envoy-gateway`) | *(not in original scope — found during step 4 validation)* `EnvoyProxy` custom-proxy-config: 6 replicas, required anti-affinity, control-plane taint toleration, `maxSurge:0`/`maxUnavailable:1`; mitigates a separate Calico BGP-advertisement bug for `externalTrafficPolicy: Local` services (ADR-22 amendment) | Done |
 
 ## 4. Migration order (VIP churn is LAN-only; no fleet consumers yet)
 
-1. [H] UniFi prep: PD check, client VLAN, zones. Move the Mac; confirm
-   kubectl + ULA paths.
-2. PR: network.yaml + Calico pools + BGPConfig + FRR regen (render/lint).
-3. [H] Upload FRR config; merge render. Envoy service picks up new VIPs;
-   external-dns republishes `ca.rye.ninja` automatically.
-4. Validate from the client VLAN, no host routes: `ca.rye.ninja` health
-   ×5 spaced past ND expiry (the flap test), `lb` suite, WAN-side
-   negative check (VIP prefixes must not leak — DENY-ALL-OUT unchanged).
-5. Retire interim artifacts (routes, memory notes, §4.6 caveat).
+1. **[Done, partial]** UniFi prep: PD check ✓ (`/60`, confirmed via
+   odhcp6c — `docs/memory/unifi-gateway-pd-discovery.md`), client VLAN ✓
+   (VLAN 101). Zones: **not done** — VLAN 100 and 101 both still in
+   UniFi's default "internal" zone; tracked separately, not blocking.
+2. **Done.** PR: network.yaml + Calico pools + BGPConfig + FRR regen.
+   Calico's `IPPool.spec.cidr` is immutable — this became a new-pool
+   swap (old pools disabled, not deleted) rather than an in-place edit;
+   see the Changes table note below.
+3. **Done.** FRR uploaded and applied; BGP sessions re-established
+   clean. Rendered PRs merged, Flux reconciled.
+4. **Done.** Validated from VLAN 101 with zero manual routes:
+   `ca.rye.ninja` health 15/15 after the full fix. The flap test caught a
+   second, unrelated bug — Calico doesn't restrict BGP advertisement of a
+   LoadBalancer's host route to nodes with a local endpoint under
+   `externalTrafficPolicy: Local` (ADR-22 amendment) — fixed by spreading
+   Envoy across all 6 nodes with anti-affinity, not by this design's own
+   scope. WAN-side negative check not yet re-run since the renumber.
+5. **Done.** Interim artifacts retired:
+   `docs/memory/workstation-nat64-route.md` rewritten to record
+   retirement (not deleted — kept as historical root-cause reference);
+   this §4.6 caveat replaced with a resolved summary in the M2 design.
 
 ## 5. Risks
 
-| Risk | Handling |
-|---|---|
-| PD is /64-only | ULA-only LAN VIPs; public-GUA question moves to M6 where its consumers live |
-| UniFi zone semantics for routed BGP prefixes unclear | address-group firewall rules as fallback; validate in step 1 |
-| VIP churn breaks something mid-migration | do before the soak; only LAN consumers exist; step-ca in-cluster paths use service DNS, not VIPs |
-| Node-GUA NS mystery persists for node-initiated flows | out of scope here — client paths no longer depend on it; tracked for the M11 chaos/hardening pass |
+| Risk | Handling | Outcome |
+|---|---|---|
+| PD is /64-only | ULA-only LAN VIPs; public-GUA question moves to M6 where its consumers live | N/A — PD confirmed `/60`, both pools routed |
+| UniFi zone semantics for routed BGP prefixes unclear | address-group firewall rules as fallback; validate in step 1 | Still open — zones not yet configured for VLAN 100/101; the routed VIP `/64`s aren't bound to any UniFi network at all, so this needs the address-group fallback when tackled |
+| VIP churn breaks something mid-migration | do before the soak; only LAN consumers exist; step-ca in-cluster paths use service DNS, not VIPs | Confirmed — the one live consumer (`ca.rye.ninja`) briefly broke during the pool swap and Service recreation, as expected; no other consumers affected |
+| Node-GUA NS mystery persists for node-initiated flows | out of scope here — client paths no longer depend on it; tracked for the M11 chaos/hardening pass | Not encountered during this work — the flakiness that did surface (ECMP + `externalTrafficPolicy: Local`) was a different, unrelated Calico bug (ADR-22 amendment), not this one |

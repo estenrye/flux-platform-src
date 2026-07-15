@@ -217,27 +217,25 @@ Workstation: re-run `step ca bootstrap` against `ca.rye.ninja` with the new
 fingerprint; memory doc rewritten. No IPv4 path — LAN clients use the ULA
 record; nothing off-LAN needs the CA until M6.
 
-**VIP on-link caveat — now has a full design:**
+**VIP on-link caveat — resolved 2026-07-15:**
 [2026-07-15-services-network-design.md](2026-07-15-services-network-design.md)
-(routed VIP subnets + client-VLAN move + zone firewall; execute before
-the step-10 soak). Original finding follows.
+executed: both BGP VIP pools relocated onto dedicated routed,
+not-on-link subnets (internal ULA `fd97:45c2:b3a1:f00::/112`, ingress GUA
+`2607:3640:1064:27f::/112`, carved from the confirmed `/60` PD). The M1
+"workstation can't self-test LB" limitation is gone, and the interim
+manual host routes (`docs/memory/workstation-nat64-route.md`, now
+retired) are no longer needed — validated from the client VLAN with zero
+manual routes: `ca.rye.ninja` 15/15, and the NAT64 path incidentally
+resolved by the same VLAN move. ADR-22 and ADR-23 carry the permanent
+record (amendments dated 2026-07-15). Zone-based firewall (design §2 item
+3) is a separate, still-open piece of that design — not blocking, since
+routing correctness didn't depend on it.
 
-**VIP on-link caveat (found at step-5 verification, 2026-07-15) and
-deferred fix:** both BGP VIP pools are carved from their VLAN-100 on-link
-/64s (GUA `…:270:ffff::/112`, ULA `…:100:ffff::/112`), so VLAN-100 hosts
-NDP for VIPs instead of routing via the gateway and get no answer — the
-M1 "workstation can't self-test LB" limitation, now understood precisely.
-Interim: manual /112 host routes via the gateway link-local on affected
-hosts (Mac, KVM host, TrueNAS if ever needed); documented in
-`docs/memory/workstation-nat64-route.md`. Deferred fix (M2 tail or M11):
-check TFiber's PD size in UniFi — if ≥/56, renumber both VIP pools onto
-routed-not-on-link prefixes (a spare /64 for GUA, an unassigned ULA
-subnet like `fd97:45c2:b3a1:1ff::/112`), deleting the manual routes and
-the M1 limitation outright. UniFi exposes no RA RIO/L-bit knobs, so RA
-cannot deliver these routes; a UniFi static route for `64:ff9b::/96` →
-appliance is a separate two-minute retest that would retire the manual
-NAT64 route for all hosts (M1 recorded the hairpin as dropped-asymmetric;
-worth revalidating once).
+A second, unrelated bug surfaced during validation and was also fixed:
+Calico advertises a LoadBalancer service's BGP route from every node
+regardless of `externalTrafficPolicy: Local` endpoint locality (no known-
+good Calico version fixes this in our case — see ADR-22 amendment).
+Mitigated by spreading Envoy across all 6 nodes with anti-affinity.
 
 ### 4.7 Change freeze
 
