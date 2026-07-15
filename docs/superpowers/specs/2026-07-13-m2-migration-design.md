@@ -217,6 +217,11 @@ Workstation: re-run `step ca bootstrap` against `ca.rye.ninja` with the new
 fingerprint; memory doc rewritten. No IPv4 path — LAN clients use the ULA
 record; nothing off-LAN needs the CA until M6.
 
+**VIP on-link caveat — now has a full design:**
+[2026-07-15-services-network-design.md](2026-07-15-services-network-design.md)
+(routed VIP subnets + client-VLAN move + zone firewall; execute before
+the step-10 soak). Original finding follows.
+
 **VIP on-link caveat (found at step-5 verification, 2026-07-15) and
 deferred fix:** both BGP VIP pools are carved from their VLAN-100 on-link
 /64s (GUA `…:270:ffff::/112`, ULA `…:100:ffff::/112`), so VLAN-100 hosts
