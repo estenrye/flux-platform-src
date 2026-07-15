@@ -1,48 +1,42 @@
 ---
 name: step-ca-connectivity-validation
-description: How to validate step-ca is reachable and serving the correct root CA certificate
+description: Health check and root fingerprint validation for https://ca.rye.ninja (controlplane; fresh root, M2)
 metadata:
   type: reference
 ---
 
 # step-ca Connectivity Validation
 
-Health endpoint: `https://ca.crossplane.rye.ninja/health`
+Endpoint: **`https://ca.rye.ninja`** (M2 design A3 — born on the fresh
+root; the old `ca.crossplane.rye.ninja` died with Spot). Envoy TLS
+passthrough on the GUA VIP; LAN resolution via UniFi/split-horizon DNS64.
 
-Use `-k` because step-ca serves a self-signed certificate.
+Root fingerprint (sha256, stable — offline 10y root, expires 2036-07-11):
 
-```bash
-curl -sk https://ca.crossplane.rye.ninja/health
-# expected: {"status":"ok"}
+```
+6cdc50debddfe67e200a3ef1e18297eece9e9b68ed5bd5036dd1f4d6e211815b
 ```
 
-Root CA fingerprint is in the `csi-driver-spiffe-ca` secret in the `step-ca` namespace (`tls.crt` key):
+Also pinned in `tests/platform-baseline/values/controlplane.env`.
 
 ```bash
-export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
-
-FINGERPRINT=$(kubectl get secret csi-driver-spiffe-ca -n step-ca \
-  -o jsonpath='{.data.tls\.crt}' \
-  | base64 -d \
-  | openssl x509 -noout -fingerprint -sha256 \
-  | sed 's/.*=//;s/://g' \
-  | tr '[:upper:]' '[:lower:]')
-
-curl -sk "https://ca.crossplane.rye.ninja/root/${FINGERPRINT}" | python3 -m json.tool
-# expected: {"ca": "-----BEGIN CERTIFICATE-----\n..."}
+curl -sk https://ca.rye.ninja/health
+# {"status":"ok"}
+curl -sk https://ca.rye.ninja/root/6cdc50debddfe67e200a3ef1e18297eece9e9b68ed5bd5036dd1f4d6e211815b
+# {"ca":"-----BEGIN CERTIFICATE-----..."} — 404 on any wrong fingerprint
 ```
 
-## Bootstrap step CLI
-
-To configure the local `step` CLI to target this CA:
+Workstation bootstrap (`step` CLI):
 
 ```bash
-step ca bootstrap \
-  --ca-url https://ca.crossplane.rye.ninja \
-  --fingerprint $FINGERPRINT
+step ca bootstrap --ca-url https://ca.rye.ninja \
+  --fingerprint 6cdc50debddfe67e200a3ef1e18297eece9e9b68ed5bd5036dd1f4d6e211815b
 ```
 
-Writes CA config and root cert to `~/.step`. Subsequent `step` commands use this CA by default.
+Serving chain: leaf `CN=Step Online CA` (24h) ← `CN=ryezone-labs
+Intermediate CA controlplane` (1y, in-cluster) ← offline root. In-cluster
+secret: `csi-driver-spiffe-ca` (cert-manager ns, ESO-mirrored to step-ca).
 
-See also: [[cluster-kubeconfig-lookup]] for kubeconfig path.
-Full validation procedure documented in [ADR 0005](../adr/0005-using-cert-manager-to-issue-spiffe-x-509-svid-certificates-for-iam-access-roles-anywhere.md).
+Gotchas from the workstation ([[workstation-nat64-route]]): needs the VIP
+/112 host route; first connection after ND-cache expiry may stall
+(asymmetric return + macOS MAC rotation) — retry once.
