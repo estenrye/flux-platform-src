@@ -12,6 +12,12 @@ spec:
   policyTypes:
   - Egress
   egress:
+  # apiserver targetPort - Calico evaluates egress post-DNAT
+  # (docs/memory/calico-networkpolicy-dnat.md). Talos serves the apiserver
+  # on 6443; the namespaceSelector rule below cannot match node endpoints.
+  - ports:
+    - protocol: TCP
+      port: 6443
   - to:
     - namespaceSelector:
         matchLabels:
