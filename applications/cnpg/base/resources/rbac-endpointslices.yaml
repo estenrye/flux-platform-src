@@ -1,0 +1,25 @@
+# Shim for operator image 1.29.2 on chart 0.28.3: 1.29.2 watches
+# EndpointSlices but no chart release pairs with it (the project went
+# 0.28.3/1.29.1 → 0.29.0/1.30.0). Remove when the chart is bumped to
+# ≥0.29.0, which ships this rule itself.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cnpg-cloudnative-pg-endpointslices
+rules:
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cnpg-cloudnative-pg-endpointslices
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cnpg-cloudnative-pg-endpointslices
+subjects:
+  - kind: ServiceAccount
+    name: cnpg-cloudnative-pg
+    namespace: cnpg-system
