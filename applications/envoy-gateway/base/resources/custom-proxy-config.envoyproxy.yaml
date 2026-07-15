@@ -21,6 +21,16 @@ spec:
     kubernetes:
       envoyDeployment:
         replicas: 3
+        # maxSurge:0/maxUnavailable:1 forces replace-in-place instead of the
+        # default surge-then-retire. With replicas == available worker
+        # nodes (3) and required anti-affinity, a surge pod has nowhere to
+        # schedule and every rollout deadlocks Pending otherwise (hit this
+        # on the first rollout after adding the anti-affinity rule above).
+        strategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 0
+            maxUnavailable: 1
         pod:
           affinity:
             podAntiAffinity:
