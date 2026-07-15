@@ -5,3 +5,27 @@ metadata:
   namespace: envoy-gateway-system
 spec:
   mergeGateways: true
+  # Mitigation for the ingress VIP flakiness root-caused 2026-07-15
+  # (docs/memory/vip-renumber-flakiness-investigation.md): Calico advertises
+  # a LoadBalancer service's BGP host route from every node regardless of
+  # externalTrafficPolicy: Local endpoint locality (known upstream bug,
+  # projectcalico/calico#6074, #8162, #5235 — not fixable via config in
+  # calico v3.32.1). With one replica, only 1 of 6 nodes has a working
+  # kube-proxy redirect, so ~5/6 of ECMP-selected paths silently drop.
+  # 3 replicas + required anti-affinity spreads one pod per worker node
+  # (the only schedulable nodes — control-plane is NoSchedule-tainted),
+  # raising the working-path fraction to 3/6. Not a full fix; the
+  # remaining 3 control-plane-side ECMP paths still lack a local endpoint.
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        replicas: 3
+        pod:
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      gateway.envoyproxy.io/owning-gatewayclass: merged-eg
+                  topologyKey: kubernetes.io/hostname
