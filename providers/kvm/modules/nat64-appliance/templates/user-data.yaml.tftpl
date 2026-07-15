@@ -101,6 +101,18 @@ write_files:
         prefetch: yes
         do-ip4: yes
         do-ip6: yes
+        # Forwarded LAN answers are unsigned even when the public zone is
+        # DNSSEC-signed; skip validation for the split-horizon domain.
+        domain-insecure: "${lan_forward_domain}"
+
+  - path: /etc/unbound/unbound.conf.d/lan-forward.conf
+    content: |
+      # Split horizon: site records (external-dns -> UniFi) must resolve for
+      # cluster pods and DNS64 clients, including during WAN outages
+      # (ca.rye.ninja is on the cold-start path from M2 on).
+      forward-zone:
+        name: "${lan_forward_domain}"
+        forward-addr: ${lan_dns_addr}
 
 runcmd:
   - sysctl --system

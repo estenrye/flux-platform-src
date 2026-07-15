@@ -32,6 +32,8 @@ module "nat64" {
   tayga_pool_cidr    = local.network.allocations.nat64_appliance.tayga_pool
   nat64_prefix       = local.network.allocations.nat64_appliance.nat64_prefix
   dns64_allowed_cidr = local.network.ula_prefix
+  lan_forward_domain = "rye.ninja"
+  lan_dns_addr       = local.network.vlan100.ipv6_gateway_ula
 
   authorized_ssh_keys = var.nat64_authorized_ssh_keys
 }

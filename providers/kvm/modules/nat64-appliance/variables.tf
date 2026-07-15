@@ -66,6 +66,16 @@ variable "dns64_allowed_cidr" {
   type        = string
 }
 
+variable "lan_forward_domain" {
+  description = "DNS zone forwarded to the LAN resolver instead of public recursion (split horizon for site records)"
+  type        = string
+}
+
+variable "lan_dns_addr" {
+  description = "LAN resolver (UniFi gateway ULA) that serves external-dns-published site records"
+  type        = string
+}
+
 variable "authorized_ssh_keys" {
   description = "SSH public keys for the break-glass admin user on the appliance"
   type        = list(string)

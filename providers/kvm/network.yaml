@@ -21,6 +21,9 @@ vlan100:
   ipv4_subnet: 10.45.0.0/16
   ipv4_gateway: 10.45.0.1
   ipv6_gateway_gua: 2607:3640:1064:270::1
+  # UniFi carries ::1 on the VLAN-100 ULA; it serves LAN DNS records
+  # (external-dns UniFi webhook) and the integrations API there.
+  ipv6_gateway_ula: fd97:45c2:b3a1:100::1
   ipv6_gateway_link_local: fe80::ae8b:a9ff:fe6e:13de
 
 allocations:
