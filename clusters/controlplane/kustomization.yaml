@@ -34,3 +34,15 @@ resources:
   - resources/external-dns.unifi-credentials.sops.yaml
   - resources/step-ca-intermediate.sops.yaml
   - resources/step-ca-root-cert.yaml
+
+patches:
+  - path: patches/step-ca.gateway.yaml
+    target:
+      kind: Gateway
+      name: step-ca
+      namespace: step-ca
+  - path: patches/step-ca.tls-route.yaml
+    target:
+      kind: TLSRoute
+      name: step-ca
+      namespace: step-ca

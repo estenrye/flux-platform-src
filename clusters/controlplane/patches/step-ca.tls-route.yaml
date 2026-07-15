@@ -1,0 +1,7 @@
+# SNI hostname for the passthrough route; must be a subset of the
+# listener hostname. external-dns (gateway-tlsroute source) creates the
+# LAN AAAA from this, targeting the Gateway's GUA VIP.
+- op: add
+  path: /spec/hostnames
+  value:
+    - ca.rye.ninja
