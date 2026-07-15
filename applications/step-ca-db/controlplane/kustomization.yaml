@@ -17,6 +17,10 @@ patches:
   # Postgres validates that it owns PGDATA; the default truenas-nfs class
   # mapalls to root and fails that check (see storage-classes.yaml,
   # truenas-nfs-pg header).
+  # imageName pin: without it the postgres image floats with the
+  # operator's compiled-in default (1.30.0 rolled instances to 18.3
+  # unannounced) and the dump job's pg_dump can silently fall behind the
+  # server major. Same digest as the dump container by construction.
   - target:
       kind: Cluster
       name: step-ca-db
@@ -25,3 +29,6 @@ patches:
       - op: add
         path: /spec/storage/storageClass
         value: truenas-nfs-pg
+      - op: add
+        path: /spec/imageName
+        value: ghcr.io/cloudnative-pg/postgresql:18.3@sha256:5e30290fba3d990b08a9caea6ddb49c661ad8246cbb2688adad7e6cc78df6c3f
