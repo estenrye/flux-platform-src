@@ -8,24 +8,26 @@ spec:
   # Mitigation for the ingress VIP flakiness root-caused 2026-07-15
   # (docs/memory/vip-renumber-flakiness-investigation.md): Calico advertises
   # a LoadBalancer service's BGP host route from every node regardless of
-  # externalTrafficPolicy: Local endpoint locality (known upstream bug,
-  # projectcalico/calico#6074, #8162, #5235 — not fixable via config in
-  # calico v3.32.1). With one replica, only 1 of 6 nodes has a working
-  # kube-proxy redirect, so ~5/6 of ECMP-selected paths silently drop.
-  # 3 replicas + required anti-affinity spreads one pod per worker node
-  # (the only schedulable nodes — control-plane is NoSchedule-tainted),
-  # raising the working-path fraction to 3/6. Not a full fix; the
-  # remaining 3 control-plane-side ECMP paths still lack a local endpoint.
+  # externalTrafficPolicy: Local endpoint locality. This looks like
+  # projectcalico/calico#6074/#8162, but those were fixed by v3.25.0/v3.30 —
+  # we're already on v3.32.1 and still hit it, and a related report against
+  # v3.30.5 (#11540) was closed "not planned", so there's no known-good
+  # version to upgrade to. Full node coverage (below) sidesteps the bug
+  # instead of fixing it.
+  #
+  # 6 replicas + required anti-affinity + a control-plane toleration spread
+  # one pod onto every node (all 6, not just the 3 workers), so every ECMP
+  # next-hop the gateway can pick has a working local kube-proxy redirect.
   provider:
     type: Kubernetes
     kubernetes:
       envoyDeployment:
-        replicas: 3
+        replicas: 6
         # maxSurge:0/maxUnavailable:1 forces replace-in-place instead of the
-        # default surge-then-retire. With replicas == available worker
-        # nodes (3) and required anti-affinity, a surge pod has nowhere to
-        # schedule and every rollout deadlocks Pending otherwise (hit this
-        # on the first rollout after adding the anti-affinity rule above).
+        # default surge-then-retire. With replicas == available nodes and
+        # required anti-affinity, a surge pod has nowhere to schedule and
+        # every rollout deadlocks Pending otherwise (hit this at replicas:3
+        # before adding the control-plane toleration below).
         strategy:
           type: RollingUpdate
           rollingUpdate:
@@ -39,3 +41,7 @@ spec:
                     matchLabels:
                       gateway.envoyproxy.io/owning-gatewayclass: merged-eg
                   topologyKey: kubernetes.io/hostname
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
