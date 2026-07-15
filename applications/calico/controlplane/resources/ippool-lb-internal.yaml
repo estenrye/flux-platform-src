@@ -3,13 +3,15 @@ kind: IPPool
 metadata:
   name: lb-internal-ula
 spec:
-  # LAN-internal LoadBalancer VIPs (site-stable ULA; never leaves the site —
-  # the gateway's outbound BGP prefix filters enforce this).
-  # Routed, not-on-link (services-network design, 2026-07-15): dedicated
-  # block, no VLAN, no RA — replaces the old on-link-carved
-  # fd97:45c2:b3a1:100:ffff::/112 (client NDP flakiness with on-link VLAN
-  # 100 hosts). Matches providers/kvm/network.yaml internal_lb_vip_pool.
-  cidr: fd97:45c2:b3a1:f00::/112
+  # DEPRECATED (services-network design, 2026-07-15): superseded by
+  # lb-internal-ula-routed (fd97:45c2:b3a1:f00::/112 — routed, not-on-link).
+  # Calico's IPPool.spec.cidr is immutable, so the renumber is a new-pool
+  # swap, not an in-place edit (learned the hard way: Flux dry-run rejected
+  # an in-place cidr change with "CIDR cannot be changed"). disabled: true
+  # stops new allocations; the gateway's FRR no longer routes this prefix
+  # anyway. Delete this pool once nothing references it (see migration
+  # order step 5, docs/superpowers/specs/2026-07-15-services-network-design.md).
+  cidr: fd97:45c2:b3a1:100:ffff::/112
   allowedUses:
     - LoadBalancer
   # Never used for pod addresses.
@@ -17,4 +19,4 @@ spec:
   # also disqualify the pool for the virtual load-balancer host (VIPs stay
   # pending). Keep all().
   nodeSelector: "all()"
-  disabled: false
+  disabled: true

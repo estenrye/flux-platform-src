@@ -22,6 +22,8 @@ resources:
   - resources/ippool-pods.yaml
   - resources/ippool-lb-internal.yaml
   - resources/ippool-lb-ingress.yaml
+  - resources/ippool-lb-internal-routed.yaml
+  - resources/ippool-lb-ingress-routed.yaml
 
 patches:
   # The chart's pre-delete helm hook renders as a plain Job under kustomize;

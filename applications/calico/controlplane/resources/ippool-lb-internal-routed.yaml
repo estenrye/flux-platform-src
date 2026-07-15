@@ -1,0 +1,20 @@
+apiVersion: crd.projectcalico.org/v1
+kind: IPPool
+metadata:
+  name: lb-internal-ula-routed
+spec:
+  # LAN-internal LoadBalancer VIPs (site-stable ULA; never leaves the site —
+  # the gateway's outbound BGP prefix filters enforce this).
+  # Routed, not-on-link (services-network design, 2026-07-15): dedicated
+  # block, no VLAN, no RA — supersedes lb-internal-ula
+  # (fd97:45c2:b3a1:100:ffff::/112, on-link-carved, client NDP flakiness).
+  # Matches providers/kvm/network.yaml internal_lb_vip_pool.
+  cidr: fd97:45c2:b3a1:f00::/112
+  allowedUses:
+    - LoadBalancer
+  # Never used for pod addresses.
+  # allowedUses:[LoadBalancer] already excludes pod IPAM; "!all()" here would
+  # also disqualify the pool for the virtual load-balancer host (VIPs stay
+  # pending). Keep all().
+  nodeSelector: "all()"
+  disabled: false
