@@ -28,6 +28,23 @@ resources:
   - ../../applications/cert-manager-trust-manager/controlplane
   - ../../applications/cert-manager-spiffe-issuer/controlplane
   - ../../applications/cert-manager-spiffe-csi-driver/controlplane
+  # M2 step 6: install layer only — ProviderConfigs, EnvironmentConfig,
+  # and Roles Anywhere bootstrap land as cluster resources in the next
+  # change (providers are Healthy without them).
+  - ../../applications/crossplane/base
+  - ../../applications/crossplane-providers/family-aws
+  - ../../applications/crossplane-providers/provider-aws-route53
+  - ../../applications/crossplane-providers/provider-aws-iam
+  - ../../applications/crossplane-providers/provider-aws-rolesanywhere
+  - ../../applications/crossplane-providers/family-cloudflare
+  - ../../applications/crossplane-providers/provider-cloudflare-dns
+  - ../../applications/crossplane-providers/provider-cloudflare-zone
+  - ../../applications/crossplane-providers/provider-github
+  - ../../applications/crossplane-providers/provider-kubernetes
+  - ../../applications/crossplane-functions/function-environment-configs
+  - ../../applications/crossplane-functions/function-go-templating
+  - ../../applications/crossplane-functions/function-auto-ready
+  - ../../applications/crossplane-resources/delegated-hosted-zone-aws
   - resources/flux.source.git.yaml
   - resources/flux.kustomization.yaml
   - resources/truenas-csi.api-credentials.sops.yaml
