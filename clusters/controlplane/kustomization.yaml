@@ -36,6 +36,11 @@ resources:
   - resources/step-ca-root-cert.yaml
 
 patches:
+  - path: patches/envoy-proxy.ipfamily.yaml
+    target:
+      kind: EnvoyProxy
+      name: custom-proxy-config
+      namespace: envoy-gateway-system
   - path: patches/step-ca.gateway.yaml
     target:
       kind: Gateway
