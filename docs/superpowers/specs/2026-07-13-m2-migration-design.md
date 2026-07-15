@@ -217,6 +217,23 @@ Workstation: re-run `step ca bootstrap` against `ca.rye.ninja` with the new
 fingerprint; memory doc rewritten. No IPv4 path — LAN clients use the ULA
 record; nothing off-LAN needs the CA until M6.
 
+**VIP on-link caveat (found at step-5 verification, 2026-07-15) and
+deferred fix:** both BGP VIP pools are carved from their VLAN-100 on-link
+/64s (GUA `…:270:ffff::/112`, ULA `…:100:ffff::/112`), so VLAN-100 hosts
+NDP for VIPs instead of routing via the gateway and get no answer — the
+M1 "workstation can't self-test LB" limitation, now understood precisely.
+Interim: manual /112 host routes via the gateway link-local on affected
+hosts (Mac, KVM host, TrueNAS if ever needed); documented in
+`docs/memory/workstation-nat64-route.md`. Deferred fix (M2 tail or M11):
+check TFiber's PD size in UniFi — if ≥/56, renumber both VIP pools onto
+routed-not-on-link prefixes (a spare /64 for GUA, an unassigned ULA
+subnet like `fd97:45c2:b3a1:1ff::/112`), deleting the manual routes and
+the M1 limitation outright. UniFi exposes no RA RIO/L-bit knobs, so RA
+cannot deliver these routes; a UniFi static route for `64:ff9b::/96` →
+appliance is a separate two-minute retest that would retire the manual
+NAT64 route for all hosts (M1 recorded the hairpin as dropped-asymmetric;
+worth revalidating once).
+
 ### 4.7 Change freeze
 
 From the start of the state migration (4.3) until decommission,

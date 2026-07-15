@@ -11,6 +11,6 @@
 - [Talos iSCSI + truenas-csi](talos-iscsi-truenas-csi.md) — iscsiadm lives at /usr/local/sbin on Talos; csi-lib-iscsi discovery is not idempotent (stale record → exit 7)
 - [Crossplane Credential Rotation](crossplane-credential-rotation.md) — Dual-key age rotation (Flux reads rendered repo); SA token must grant the `crossplane` vault; GitHub key via stable 1P field
 - [Rendered-Repo Auto-Merge Milestone](rendered-repo-automerge-milestone.md) — Auto-merge is off on rendered repos until a required-checks milestone; renders soft-warn and leave PRs for manual merge
-- [Workstation NAT64 Route](workstation-nat64-route.md) — Mac needs manual 64:ff9b::/96 route via the appliance; TLS timeouts to v4-only hosts = route dropped again
+- [Workstation Manual v6 Routes](workstation-nat64-route.md) — Mac needs NAT64 /96 + VIP /112 routes; TLS timeouts to v4-only hosts or unreachable VIPs = routes dropped again
 - [TrueNAS API Surface](truenas-api-surface.md) — JSON-RPC API cannot do zfs allow/canmount/umount even with Full Admin key; how to call it
 - [TrueNAS NFS Ownership Workaround](truenas-nfs-ownership-workaround.md) — truenas-csi mapall + root:755 dataset roots block non-root bootstrap; chown hook bridges; democratic-csi decision at M3
