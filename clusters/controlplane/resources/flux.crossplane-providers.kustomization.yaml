@@ -19,18 +19,22 @@ spec:
   # would report Ready as soon as the objects are created, before the
   # package is actually pulled and the pod running (docs/memory/
   # crossplane-bootstrap-phasing.md).
+  # Only `current` here — an earlier version also set `failed`, using the
+  # identical self.status.conditions.exists(...) pattern, and Flux
+  # reported "no such attribute(s): self.status.conditions" for every
+  # object even though the CRD schema and the live objects both have a
+  # well-formed status.conditions array. `current` alone avoids whatever
+  # is tripping that up.
   healthCheckExprs:
     - apiVersion: pkg.crossplane.io/v1
       kind: Provider
       current: >-
+        has(self.status) && has(self.status.conditions) &&
         self.status.conditions.exists(c, c.type == 'Healthy' && c.status == 'True') &&
         self.status.conditions.exists(c, c.type == 'Installed' && c.status == 'True')
-      failed: >-
-        self.status.conditions.exists(c, c.type == 'Healthy' && c.status == 'False')
     - apiVersion: pkg.crossplane.io/v1
       kind: Function
       current: >-
+        has(self.status) && has(self.status.conditions) &&
         self.status.conditions.exists(c, c.type == 'Healthy' && c.status == 'True') &&
         self.status.conditions.exists(c, c.type == 'Installed' && c.status == 'True')
-      failed: >-
-        self.status.conditions.exists(c, c.type == 'Healthy' && c.status == 'False')
