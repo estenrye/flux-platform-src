@@ -46,15 +46,20 @@ Resources:
         - !GetAtt IAMRole.Arn
       RequireInstanceProperties: false
       Enabled: true
+      # Deliberate no-op: AWS::RolesAnywhere::Profile's SessionPolicy
+      # intersects with the role's own attached policy. Omitting this
+      # property was tried first (2026-07-20) but CloudFormation does not
+      # clear a previously-set SessionPolicy when the property is absent
+      # from the template — the old value stuck around on update. A
+      # wildcard Allow never narrows anything, so ManagedPolicyArns on
+      # IAMRole above is the only thing that actually governs permissions.
       SessionPolicy: |
         {
           "Version": "2012-10-17",
           "Statement": [
             {
               "Effect": "Allow",
-              "Action": [
-                "iam:*"
-              ],
+              "Action": "*",
               "Resource": "*"
             }
           ]
