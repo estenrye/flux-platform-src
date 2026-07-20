@@ -17,3 +17,4 @@
 - [UniFi Gateway PD Discovery](unifi-gateway-pd-discovery.md) — root shell + odhcp6c log to confirm the real DHCPv6-PD grant; also BGP RIB/FIB and firewall-zone debugging commands used on the gateway
 - [VIP Renumber Flakiness Investigation](vip-renumber-flakiness-investigation.md) — RESOLVED: root-caused to externalTrafficPolicy:Local + a Calico BGP-advertisement bug; fixed via 6-way replica spread across all nodes
 - [M2 Step 6 Roles Anywhere/CFN Refactor](m2-step6-roles-anywhere-cfn-refactor.md) — Crossplane install + CloudFormation generalization exist to deploy a new AWS Roles Anywhere trust root for ca.rye.ninja
+- [Crossplane Bootstrap Phasing](crossplane-bootstrap-phasing.md) — first-ever Crossplane install needs 3 separate commits (core, then providers/functions, then provider-configs/XRDs) — Flux dry-runs atomically and Crossplane's CRDs are self-installed at runtime, not shipped in the chart

@@ -28,31 +28,22 @@ resources:
   - ../../applications/cert-manager-trust-manager/controlplane
   - ../../applications/cert-manager-spiffe-issuer/controlplane
   - ../../applications/cert-manager-spiffe-csi-driver/controlplane
-  # M2 step 6: install layer only — ProviderConfigs, EnvironmentConfig,
-  # and Roles Anywhere bootstrap land as cluster resources in the next
-  # change (providers are Healthy without them).
+  # M2 step 6, phase 1 of 3 — crossplane core ONLY. Crossplane self-installs
+  # its own CRDs (pkg.crossplane.io: Provider/Function; apiextensions.
+  # crossplane.io: CompositeResourceDefinition/Composition/EnvironmentConfig)
+  # at runtime — none are shipped in the Helm chart (confirmed via
+  # `helm template --include-crds`: zero CRDs). Flux's kustomize-controller
+  # dry-runs the whole Kustomization atomically before applying anything, so
+  # on a first-ever install, ANY resource of those kinds — Provider/Function
+  # themselves, not just things that depend on them — fails dry-run before
+  # Crossplane ever starts, blocking the ENTIRE Kustomization (hit this
+  # 2026-07-20: first with the XRD, then with a provider's
+  # ClusterProviderConfig once the XRD was removed — 0 pods, 0 CRDs each
+  # time, nothing applied at all). Providers/functions (phase 2) and
+  # provider-configs/XRDs (phase 3) get re-added once the prior phase is
+  # confirmed Healthy with its CRDs registered — see
+  # docs/memory/crossplane-bootstrap-phasing.md.
   - ../../applications/crossplane/base
-  - ../../applications/crossplane-providers/family-aws
-  - ../../applications/crossplane-providers/provider-aws-route53
-  - ../../applications/crossplane-providers/provider-aws-iam
-  - ../../applications/crossplane-providers/provider-aws-rolesanywhere
-  - ../../applications/crossplane-providers/family-cloudflare
-  - ../../applications/crossplane-providers/provider-cloudflare-dns
-  - ../../applications/crossplane-providers/provider-cloudflare-zone
-  - ../../applications/crossplane-providers/provider-github
-  - ../../applications/crossplane-providers/provider-kubernetes
-  - ../../applications/crossplane-functions/function-environment-configs
-  - ../../applications/crossplane-functions/function-go-templating
-  - ../../applications/crossplane-functions/function-auto-ready
-  # delegated-hosted-zone-aws XRD deliberately NOT included yet: Crossplane
-  # self-installs its own CRDs (CompositeResourceDefinition, Composition,
-  # etc.) at runtime — they aren't shipped in the Helm chart (confirmed via
-  # `helm template --include-crds`, zero CRDs). Flux dry-runs the whole
-  # Kustomization atomically before applying anything, so an XRD in the
-  # same apply as a first-time Crossplane install fails dry-run before
-  # Crossplane ever starts, blocking the entire Kustomization (hit this
-  # 2026-07-20 — 0 pods, 0 CRDs, nothing applied at all). Add this back
-  # once Crossplane is confirmed Healthy with its CRDs registered.
   - resources/flux.source.git.yaml
   - resources/flux.kustomization.yaml
   - resources/truenas-csi.api-credentials.sops.yaml
