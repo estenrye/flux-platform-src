@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IAM Roles Anywhere stack for Crossplane providers with SPIFFE identity integration'
+
+Parameters:
+  Base64DecodeFunctionArn:
+    Type: String
+    Description: 'ARN of the Lambda function that base64-decodes the certificate parameter'
+
+  CaX509Cert:
+    Type: String
+    Description: 'Base64 encoded PEM formatted X.509 certificate from external CA for the trust anchor'
+    NoEcho: true
+
+Resources:
+  DecodedCert:
+    Type: 'Custom::Base64Decode'
+    Properties:
+      ServiceToken: !Ref Base64DecodeFunctionArn
+      EncodedCert: !Ref CaX509Cert
+
+  # IAM Roles Anywhere Trust Anchor
+  TrustAnchor:
+    Type: 'AWS::RolesAnywhere::TrustAnchor'
+    Properties:
+      Name: !Sub '${AWS::StackName}'
+      Source:
+        SourceType: 'CERTIFICATE_BUNDLE'
+        SourceData:
+          X509CertificateData: !GetAtt DecodedCert.DecodedCert
+      Enabled: true
+      Tags:
+        - Key: 'Name'
+          Value: !Sub '${AWS::StackName}'
+        - Key: 'Purpose'
+          Value: 'Crossplane Provider Authentication'
+
+  
+Outputs:
+  TrustAnchorName:
+    Description: 'Name of the created trust anchor'
+    Value: !Sub '${AWS::StackName}'
+    Export:
+      Name: !Sub '${AWS::StackName}'
+
+  TrustAnchorId:
+    Description: 'ID of the created trust anchor'
+    Value: !Ref TrustAnchor
+    Export:
+      Name: !Sub '${AWS::StackName}-Id'
+
+  TrustAnchorArn:
+    Description: 'ARN of the created trust anchor'
+    Value: !GetAtt TrustAnchor.TrustAnchorArn
+    Export:
+      Name: !Sub '${AWS::StackName}-Arn'
