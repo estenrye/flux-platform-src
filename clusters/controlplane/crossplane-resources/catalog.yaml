@@ -1,0 +1,22 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-resources
+  description: |-
+    Each provider's own ClusterProviderConfig/ProviderConfig. Split into
+    its own Flux Kustomization, gated by dependsOn on crossplane-providers
+    being Healthy, so these don't get dry-run validated against a
+    provider-specific CRD (e.g. aws.m.upbound.io) that only exists once
+    that provider's pod has actually run once. See
+    docs/memory/crossplane-bootstrap-phasing.md.
+  tags:
+    - crossplane
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
+  subcomponentOf: crossplane
+  dependsOn:
+    - component:crossplane-providers

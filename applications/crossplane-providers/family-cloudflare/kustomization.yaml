@@ -3,6 +3,8 @@ kind: Kustomization
 
 resources:
   - ./provider.yaml
-  - ./cluster-provider-config.yaml
+  # cluster-provider-config.yaml deliberately not included here — it's
+  # applied by the crossplane-resources Flux Kustomization instead, gated
+  # on this provider being Healthy (docs/memory/crossplane-bootstrap-phasing.md).
   - ./network-policy.yaml
 

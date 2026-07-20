@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Split from the parent provider-aws-route53 directory so it can be
+# referenced as a directory (not a bare file) by clusters/controlplane/
+# crossplane-resources — kustomize's default load restrictor blocks
+# cross-tree references to individual files, only directories with their
+# own kustomization.yaml (docs/memory/crossplane-bootstrap-phasing.md).
+resources:
+  - ./cluster-provider-config.yaml

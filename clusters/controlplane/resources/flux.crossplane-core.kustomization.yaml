@@ -1,0 +1,14 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: crossplane-core
+  namespace: flux-system
+spec:
+  interval: 10m0s
+  path: ./clusters/controlplane/crossplane-core
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-platform-rendered
+  wait: true
+  timeout: 5m0s

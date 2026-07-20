@@ -1,6 +1,6 @@
 ---
 name: crossplane-bootstrap-phasing
-description: Crossplane's first-ever install must land in 3 separate commits/reconciles — core, then providers/functions, then provider-configs/XRDs
+description: Crossplane's self-installed CRDs race Flux's atomic dry-run on first install — solved permanently with 3 dependsOn-chained Flux Kustomizations
 metadata:
   type: project
 ---
@@ -19,37 +19,60 @@ before applying anything. On a cluster where Crossplane has never run, any
 resource of those kinds fails dry-run (`no matches for kind "X" in version
 "Y"`) — including `Provider`/`Function` resources themselves, not just
 things that reference them — because the CRD server-side registration
-that Crossplane would perform hasn't happened yet. Since this repo's
-convention (ADR-10) is one flat root Kustomization per cluster (`clusters/
-<name>/kustomization.yaml`, no `dependsOn`-chained sub-Kustomizations),
-this fails the *whole* apply — 0 pods, 0 CRDs, nothing at all lands, not
-even the parts that don't depend on Crossplane.
+that Crossplane would perform hasn't happened yet. With one flat root
+Kustomization per cluster (the original ADR-10 default), this failed the
+*whole* apply — 0 pods, 0 CRDs, nothing at all landed, not even the parts
+that don't depend on Crossplane.
 
 Hit this twice in a row on 2026-07-20 chasing it one resource at a time
 (first the `delegated-hosted-zone-aws` XRD, then a provider's
-`ClusterProviderConfig` once the XRD was removed) before recognizing the
-pattern and stripping `clusters/controlplane/kustomization.yaml` down to
-`applications/crossplane/base` alone.
+`ClusterProviderConfig` once the XRD was removed) via manual 3-phase
+commits before implementing the permanent fix below.
 
-**Required sequencing for a first-ever Crossplane install on any cluster:**
-1. **Core only** (`applications/crossplane/base`) — plain Deployments/RBAC/
-   NetworkPolicies, no CRD-dependent kinds. Merge, reconcile, confirm the
-   `crossplane` and `crossplane-rbac-manager` Deployments are `Available`
-   and `kubectl get providers.pkg.crossplane.io` no longer errors
-   ("doesn't have a resource type" → the CRD is now registered).
-2. **Providers + functions** (`crossplane-providers/*`, `crossplane-
-   functions/*`) — but each provider directory's `kustomization.yaml`
-   bundles the `Provider`/`ProviderConfig` resource together with its
-   `ClusterProviderConfig`/`ProviderConfig` CR in the same file list; the
-   latter needs the *provider's own* CRDs, registered only after that
-   specific provider pod starts. If this phase still fails dry-run on the
-   ProviderConfig, split provider install from provider-config within each
-   directory too, same principle one level down.
-3. **Provider-configs / EnvironmentConfig / XRDs / Compositions /
-   claims** — anything that assumes both Crossplane core and the specific
-   provider are already `Healthy`.
+## Permanent fix: 3 dependsOn-chained Flux Kustomizations
 
-Each phase needs its own commit → render → merge → Flux reconcile → verify
-cycle before adding the next. This is a one-time bootstrap cost — once
-everything is registered, further changes to existing types apply
-normally in a single Kustomization.
+ADR-10 amended (2026-07-20) to allow this as a documented exception to the
+one-Kustomization-per-cluster default, specifically for components with
+runtime-self-installed CRDs. Structure (see
+`clusters/controlplane/{crossplane-core,crossplane-providers,
+crossplane-resources}/` and `clusters/controlplane/resources/
+flux.crossplane-*.kustomization.yaml`):
+
+1. **`crossplane-core`** — `applications/crossplane/base` only. No
+   `dependsOn`. `wait: true` (built-in Deployment health check is enough —
+   Crossplane's init container installs its own CRDs before the main
+   container reports Ready).
+2. **`crossplane-providers`** — `dependsOn: [crossplane-core]`. All
+   provider/function install directories, but with each provider's own
+   `ClusterProviderConfig`/`ProviderConfig` excluded (moved to a
+   `provider-config/` subdirectory instead — see below). `wait: true` with
+   `healthCheckExprs` for `Provider`/`Function` (`pkg.crossplane.io/v1`),
+   since those kinds use `Installed`/`Healthy` conditions, not the generic
+   `Ready` kstatus expects by default:
+   ```yaml
+   current: >-
+     self.status.conditions.exists(c, c.type == 'Healthy' && c.status == 'True') &&
+     self.status.conditions.exists(c, c.type == 'Installed' && c.status == 'True')
+   ```
+3. **`crossplane-resources`** — `dependsOn: [crossplane-providers]`. Each
+   provider's `ClusterProviderConfig`/`ProviderConfig`, referenced from
+   each provider's own `provider-config/` subdirectory.
+
+**Kustomize file-reference gotcha hit along the way:** referencing a
+single file across a `..`-traversal (e.g. `../../../applications/
+crossplane-providers/provider-aws-iam/resources/cluster-provider-
+config.yaml` directly in a `resources:` list) fails kustomize's default
+load restrictor ("file is not in or below" the kustomization root) — it
+only allows crossing into another tree via a *directory* that has its own
+`kustomization.yaml`. Fixed by giving each provider-config file its own
+tiny subdirectory (`<provider>/provider-config/kustomization.yaml` wrapping
+just that one file) instead of referencing the bare file.
+
+Each child Kustomization needs its own `catalog.yaml` too — the render
+pipeline (`render-kustomize-base-and-patches.sh`) discovers and builds
+*every* `kustomization.yaml` it finds under `clusters/`, independently,
+and unconditionally copies `catalog.yaml` alongside each one.
+
+The original 3-commit manual-phase workaround (superseded) is not needed
+on any cluster using this structure — Flux's `dependsOn` + health checks
+handle the ordering automatically on a from-scratch bootstrap.

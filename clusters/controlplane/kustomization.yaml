@@ -28,30 +28,19 @@ resources:
   - ../../applications/cert-manager-trust-manager/controlplane
   - ../../applications/cert-manager-spiffe-issuer/controlplane
   - ../../applications/cert-manager-spiffe-csi-driver/controlplane
-  # M2 step 6, phase 1 of 3 (done 2026-07-20, Healthy): crossplane core.
-  # See docs/memory/crossplane-bootstrap-phasing.md for why this had to be
-  # separate from everything below.
-  - ../../applications/crossplane/base
-  # Phase 2 of 3 (done 2026-07-20, all 9 providers + 3 functions
-  # Installed=True/Healthy=True): providers + functions. family-aws and
-  # family-cloudflare initially crash-looped — both shipped with no
-  # NetworkPolicy at all, so the cluster's global default-deny blocked
-  # even apiserver egress; fixed by adding the same egress/ingress pattern
-  # every other provider already had.
-  - ../../applications/crossplane-providers/family-aws
-  - ../../applications/crossplane-providers/provider-aws-route53
-  - ../../applications/crossplane-providers/provider-aws-iam
-  - ../../applications/crossplane-providers/provider-aws-rolesanywhere
-  - ../../applications/crossplane-providers/family-cloudflare
-  - ../../applications/crossplane-providers/provider-cloudflare-dns
-  - ../../applications/crossplane-providers/provider-cloudflare-zone
-  - ../../applications/crossplane-providers/provider-github
-  - ../../applications/crossplane-providers/provider-kubernetes
-  - ../../applications/crossplane-functions/function-environment-configs
-  - ../../applications/crossplane-functions/function-go-templating
-  - ../../applications/crossplane-functions/function-auto-ready
+  # M2 step 6 crossplane install (2026-07-20): three ordered Flux
+  # Kustomizations (crossplane-core -> crossplane-providers ->
+  # crossplane-resources, resources/flux.crossplane-*.kustomization.yaml)
+  # replace direct inclusion here. Crossplane and its providers
+  # self-install their own CRDs at runtime — a single flat apply raced
+  # dry-run validation against CRDs that didn't exist yet on first
+  # bootstrap. See docs/memory/crossplane-bootstrap-phasing.md and the
+  # ADR-10 amendment.
   - resources/flux.source.git.yaml
   - resources/flux.kustomization.yaml
+  - resources/flux.crossplane-core.kustomization.yaml
+  - resources/flux.crossplane-providers.kustomization.yaml
+  - resources/flux.crossplane-resources.kustomization.yaml
   - resources/truenas-csi.api-credentials.sops.yaml
   - resources/external-dns.unifi-credentials.sops.yaml
   - resources/step-ca-intermediate.sops.yaml
@@ -73,11 +62,3 @@ patches:
       kind: TLSRoute
       name: step-ca
       namespace: step-ca
-  # Phase 2 deferrals removed 2026-07-20 (phase 3): every provider is now
-  # Installed=True/Healthy=True with its own CRDs registered, so these
-  # ClusterProviderConfigs/ProviderConfig are safe to apply. Note this
-  # only creates the config objects — the AWS ones use
-  # `credentials.source: PodIdentity`, which still needs the actual Roles
-  # Anywhere trust anchor/IAM roles deployed via
-  # .bin/deploy-aws-roles-anywhere.sh (M2 design §4.4) before those
-  # providers can authenticate; that's the next step, not this one.

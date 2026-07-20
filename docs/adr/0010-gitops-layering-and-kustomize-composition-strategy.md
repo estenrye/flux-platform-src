@@ -116,6 +116,55 @@ directly.
   file when adding applications. PRs that add a new application and wire it to
   a cluster should be reviewed with this file as the primary diff.
 
+## Amendment 2026-07-20 (dependsOn-chained Kustomizations for self-installed CRDs)
+
+The single-flat-Kustomization-per-cluster default breaks for components
+whose CRDs are self-installed by the running operator/provider at runtime
+rather than shipped in a Helm chart or static manifest — Crossplane is the
+first case (`pkg.crossplane.io`, `apiextensions.crossplane.io`, and each
+provider's own group like `aws.m.upbound.io`; see
+`docs/memory/crossplane-bootstrap-phasing.md`). Flux's kustomize-controller
+dry-runs a `Kustomization` atomically before applying anything, so on a
+first-ever install any resource of a not-yet-registered kind — including
+the `Provider`/`Function` objects themselves, not just things that
+reference them — fails dry-run and blocks the *entire* apply, not just the
+offending resource.
+
+**Exception to the single-aggregation-point rule:** a component in this
+situation gets split into N ordered Flux `Kustomization` objects
+(`kustomize.toolkit.fluxcd.io`, not to be confused with the plain
+`kustomization.yaml` build file) chained with `dependsOn`, each pointing at
+its own subdirectory under `clusters/<name>/`:
+
+```
+clusters/<name>/
+  <component>-core/          # kustomization.yaml + catalog.yaml
+  <component>-providers/     # depends on -core
+  <component>-resources/     # depends on -providers
+  resources/
+    flux.<component>-core.kustomization.yaml
+    flux.<component>-providers.kustomization.yaml
+    flux.<component>-resources.kustomization.yaml
+```
+
+The root `flux-platform` Kustomization still applies these child
+`Kustomization` objects like any other resource — no separate bootstrap
+step, since `kustomize.toolkit.fluxcd.io` CRDs are part of Flux itself and
+always already registered.
+
+Use `spec.wait: true` plus `spec.healthCheckExprs` (CEL) on the dependent
+Kustomizations when the underlying kind doesn't expose the generic `Ready`
+condition kstatus expects by default — Crossplane's `Provider`/`Function`
+use `Installed`/`Healthy` instead. Each new subdirectory needs its own
+`catalog.yaml`: the render pipeline discovers and builds *every*
+`kustomization.yaml` under `clusters/`, independently, and unconditionally
+copies `catalog.yaml` alongside each one.
+
+Only use this pattern when a component actually has this bootstrap race —
+it's more files and moving parts than the flat-list default, so it isn't
+worth it for components whose CRDs are just regular static manifests or
+Helm-chart-bundled.
+
 ## References
 
 - [ADR-8: Source vs. Rendered Repository Pattern](0008-source-vs-rendered-repository-pattern.md)

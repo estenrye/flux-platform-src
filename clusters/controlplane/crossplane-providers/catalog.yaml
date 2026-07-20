@@ -1,0 +1,21 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-providers
+  description: |-
+    Crossplane provider and function packages (install only — each
+    provider's own ClusterProviderConfig/ProviderConfig lives in
+    crossplane-resources, gated on this Kustomization's Flux dependsOn so
+    it only applies once every provider's own self-installed CRDs are
+    registered). See docs/memory/crossplane-bootstrap-phasing.md.
+  tags:
+    - crossplane
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
+  subcomponentOf: crossplane
+  dependsOn:
+    - component:crossplane-core

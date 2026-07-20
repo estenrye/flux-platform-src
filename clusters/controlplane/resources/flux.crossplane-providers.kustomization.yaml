@@ -1,0 +1,36 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: crossplane-providers
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: crossplane-core
+  interval: 10m0s
+  path: ./clusters/controlplane/crossplane-providers
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-platform-rendered
+  wait: true
+  timeout: 10m0s
+  # Provider/Function use Installed/Healthy conditions, not the generic
+  # Ready condition kstatus expects by default — without these, `wait: true`
+  # would report Ready as soon as the objects are created, before the
+  # package is actually pulled and the pod running (docs/memory/
+  # crossplane-bootstrap-phasing.md).
+  healthCheckExprs:
+    - apiVersion: pkg.crossplane.io/v1
+      kind: Provider
+      current: >-
+        self.status.conditions.exists(c, c.type == 'Healthy' && c.status == 'True') &&
+        self.status.conditions.exists(c, c.type == 'Installed' && c.status == 'True')
+      failed: >-
+        self.status.conditions.exists(c, c.type == 'Healthy' && c.status == 'False')
+    - apiVersion: pkg.crossplane.io/v1
+      kind: Function
+      current: >-
+        self.status.conditions.exists(c, c.type == 'Healthy' && c.status == 'True') &&
+        self.status.conditions.exists(c, c.type == 'Installed' && c.status == 'True')
+      failed: >-
+        self.status.conditions.exists(c, c.type == 'Healthy' && c.status == 'False')
