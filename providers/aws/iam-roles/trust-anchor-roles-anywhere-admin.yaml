@@ -26,7 +26,7 @@ Resources:
               - 'sts:TagSession'
             Condition:
               StringEquals:
-                'aws:PrincipalTag/x509SAN/URI': !Sub '"spiffe://${ClusterCN}/ns/crossplane-system/sa/aws-rolesanywhere-admin-provider"'
+                'aws:PrincipalTag/x509SAN/URI': !Sub 'spiffe://${ClusterCN}/ns/crossplane-system/sa/aws-rolesanywhere-admin-provider'
       ManagedPolicyArns:
         - !Ref RolesAnywhereAdminPolicyArn
       
