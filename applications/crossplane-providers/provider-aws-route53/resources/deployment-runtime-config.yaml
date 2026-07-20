@@ -42,11 +42,18 @@ spec:
                 - --intermediates
                 - /var/run/configmaps/trust-bundle/intermediate.crt
                 - --trust-anchor-arn
-                - arn:aws:rolesanywhere:us-east-2:832767337984:trust-anchor/1433b5ab-1a7a-4134-9d84-baa79f94d093
+                # controlplane-Trust-Anchor (cd5fb251-...), created 2026-07-16 by the
+                # generalized .bin/deploy-aws-roles-anywhere.sh stack, registered with
+                # the current ryezone-labs Root CA. The previous value here
+                # (1433b5ab-..., "crossplane-provider-trust-anchor") was a stale
+                # pre-generalization trust anchor from April, registered with the old
+                # csi-driver-spiffe-ca self-signed cert — every CreateSession failed
+                # 403 "Untrusted signing certificate" against it (found 2026-07-20).
+                - arn:aws:rolesanywhere:us-east-2:832767337984:trust-anchor/cd5fb251-c748-4b08-8f94-d58dcaab0178
                 - --profile-arn
-                - arn:aws:rolesanywhere:us-east-2:832767337984:profile/9b0b8194-30a0-4a44-a53c-8be64d2f821a
+                - arn:aws:rolesanywhere:us-east-2:832767337984:profile/ac84ada9-16b1-475e-9b57-acbbca089a73
                 - --role-arn
-                - arn:aws:iam::832767337984:role/crossplane-provider-route53-admin
+                - arn:aws:iam::832767337984:role/controlplane-Route53-Admin-crossplane-provider-route53-admin
               imagePullPolicy: IfNotPresent
               ports:
                 - containerPort: 9911

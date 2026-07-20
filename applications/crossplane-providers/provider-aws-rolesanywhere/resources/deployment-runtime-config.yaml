@@ -42,16 +42,18 @@ spec:
                 - --intermediates
                 - /var/run/configmaps/trust-bundle/intermediate.crt
                 - --trust-anchor-arn
-                - arn:aws:rolesanywhere:us-east-2:832767337984:trust-anchor/1433b5ab-1a7a-4134-9d84-baa79f94d093
+                # controlplane-Trust-Anchor (cd5fb251-...), created 2026-07-16 by the
+                # generalized .bin/deploy-aws-roles-anywhere.sh stack, registered with
+                # the current ryezone-labs Root CA. The previous value here
+                # (1433b5ab-..., "crossplane-provider-trust-anchor") was a stale
+                # pre-generalization trust anchor from April, registered with the old
+                # csi-driver-spiffe-ca self-signed cert — every CreateSession failed
+                # 403 "Untrusted signing certificate" against it (found 2026-07-20).
+                - arn:aws:rolesanywhere:us-east-2:832767337984:trust-anchor/cd5fb251-c748-4b08-8f94-d58dcaab0178
                 - --profile-arn
-                # Bootstrap required: create an IAM Roles Anywhere profile that references
-                # the crossplane-provider-rolesanywhere-admin role, then replace the placeholder below.
-                - arn:aws:rolesanywhere:us-east-2:832767337984:profile/14d6a23d-cc8b-480c-8ae2-5d006359bf25
+                - arn:aws:rolesanywhere:us-east-2:832767337984:profile/4fd037e6-551a-4a06-ae7d-44f808a0f1de
                 - --role-arn
-                # Bootstrap required: create an IAM role named crossplane-provider-rolesanywhere-admin
-                # with permissions to create and manage Roles Anywhere profiles,
-                # then replace the placeholder below.
-                - arn:aws:iam::832767337984:role/crossplane-provider-rolesanywhere-admin
+                - arn:aws:iam::832767337984:role/controlplane-RA-Admin-crossplane-provider-roles-anywhere-admin
               imagePullPolicy: IfNotPresent
               ports:
                 - containerPort: 9911
