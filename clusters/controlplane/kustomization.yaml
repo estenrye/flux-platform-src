@@ -32,13 +32,12 @@ resources:
   # See docs/memory/crossplane-bootstrap-phasing.md for why this had to be
   # separate from everything below.
   - ../../applications/crossplane/base
-  # Phase 2 of 3: providers + functions. Provider/Function/
-  # DeploymentRuntimeConfig are pkg.crossplane.io (crossplane-core CRDs,
-  # registered after phase 1) so they're safe now. Each provider's own
-  # ClusterProviderConfig/ProviderConfig needs THAT PROVIDER's own CRDs,
-  # which only exist after the provider pod itself has run once — deleted
-  # below via patches, same phasing problem one level down. Re-add in
-  # phase 3 once every provider shows Healthy=True.
+  # Phase 2 of 3 (done 2026-07-20, all 9 providers + 3 functions
+  # Installed=True/Healthy=True): providers + functions. family-aws and
+  # family-cloudflare initially crash-looped — both shipped with no
+  # NetworkPolicy at all, so the cluster's global default-deny blocked
+  # even apiserver egress; fixed by adding the same egress/ingress pattern
+  # every other provider already had.
   - ../../applications/crossplane-providers/family-aws
   - ../../applications/crossplane-providers/provider-aws-route53
   - ../../applications/crossplane-providers/provider-aws-iam
@@ -74,47 +73,11 @@ patches:
       kind: TLSRoute
       name: step-ca
       namespace: step-ca
-  # Phase 2 deferrals (docs/memory/crossplane-bootstrap-phasing.md): each
-  # provider's own ClusterProviderConfig/ProviderConfig needs that
-  # provider's self-installed CRDs, which don't exist until the provider
-  # pod has run once. Remove these patches in phase 3.
-  - patch: |-
-      $patch: delete
-      apiVersion: aws.m.upbound.io/v1beta1
-      kind: ClusterProviderConfig
-      metadata:
-        name: iam-admin
-        namespace: crossplane-system
-  - patch: |-
-      $patch: delete
-      apiVersion: aws.m.upbound.io/v1beta1
-      kind: ClusterProviderConfig
-      metadata:
-        name: rolesanywhere-admin
-        namespace: crossplane-system
-  - patch: |-
-      $patch: delete
-      apiVersion: aws.m.upbound.io/v1beta1
-      kind: ClusterProviderConfig
-      metadata:
-        name: dns-admin
-        namespace: crossplane-system
-  - patch: |-
-      $patch: delete
-      apiVersion: github.m.upbound.io/v1beta1
-      kind: ClusterProviderConfig
-      metadata:
-        name: default
-  - patch: |-
-      $patch: delete
-      apiVersion: kubernetes.crossplane.io/v1alpha1
-      kind: ProviderConfig
-      metadata:
-        name: kubernetes-provider
-        namespace: crossplane-system
-  - patch: |-
-      $patch: delete
-      apiVersion: upjet-cloudflare.m.upbound.io/v1beta1
-      kind: ClusterProviderConfig
-      metadata:
-        name: cloudflare-provider-config
+  # Phase 2 deferrals removed 2026-07-20 (phase 3): every provider is now
+  # Installed=True/Healthy=True with its own CRDs registered, so these
+  # ClusterProviderConfigs/ProviderConfig are safe to apply. Note this
+  # only creates the config objects — the AWS ones use
+  # `credentials.source: PodIdentity`, which still needs the actual Roles
+  # Anywhere trust anchor/IAM roles deployed via
+  # .bin/deploy-aws-roles-anywhere.sh (M2 design §4.4) before those
+  # providers can authenticate; that's the next step, not this one.
