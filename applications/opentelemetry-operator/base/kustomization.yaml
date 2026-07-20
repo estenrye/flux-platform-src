@@ -37,4 +37,4 @@ images:
   - name: quay.io/brancz/kube-rbac-proxy
     digest: sha256:147cb28fea35473b2cf8697892d375bbe0aec237c5740b0368719b4c0d71b290
   - name: busybox
-    digest: sha256:1487d0af5f52b4ba31c7e465126ee2123fe3f2305d638e7827681e7cf6c83d5e
+    digest: sha256:fd8d9aa63ba2f0982b5304e1ee8d3b90a210bc1ffb5314d980eb6962f1a9715d
