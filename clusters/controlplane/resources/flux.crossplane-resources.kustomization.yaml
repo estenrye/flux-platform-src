@@ -14,3 +14,11 @@ spec:
     name: flux-platform-rendered
   wait: true
   timeout: 5m0s
+  # platform-iam-rolesanywhere EnvironmentConfig's trustAnchorArn is
+  # cluster-specific (see the matching comment on
+  # flux.crossplane-providers.kustomization.yaml) — same ConfigMap, same
+  # flux-system-namespace requirement.
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: roles-anywhere-arns

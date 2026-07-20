@@ -1,0 +1,26 @@
+apiVersion: apiextensions.crossplane.io/v1beta1
+kind: EnvironmentConfig
+metadata:
+  name: platform-iam-rolesanywhere
+data:
+  trustAnchorArn: ${AWS_ROLESANYWHERE_TRUST_ANCHOR_ARN}
+  delegatedZoneProviderConfigRef:
+    kind: ClusterProviderConfig
+    name: dns-admin
+  iamProviderConfigRef:
+    kind: ClusterProviderConfig
+    name: iam-admin
+  rolesAnywhereProviderConfigRef:
+    kind: ClusterProviderConfig
+    name: rolesanywhere-admin
+---
+apiVersion: apiextensions.crossplane.io/v1beta1
+kind: EnvironmentConfig
+metadata:
+  name: platform-cloudflare
+data:
+  cloudflareProviderConfigRef:
+    kind: ClusterProviderConfig
+    name: cloudflare-provider-config
+  zoneName: rye.ninja
+  zoneId: 186a0fa51e8dd54ee6910d0f35d5f0c8
