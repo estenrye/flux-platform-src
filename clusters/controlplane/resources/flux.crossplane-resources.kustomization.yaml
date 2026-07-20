@@ -5,7 +5,7 @@ metadata:
   namespace: flux-system
 spec:
   dependsOn:
-    - name: crossplane-providers
+    - name: crossplane-xrds
   interval: 10m0s
   path: ./clusters/controlplane/crossplane-resources
   prune: true

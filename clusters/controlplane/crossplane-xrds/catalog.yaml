@@ -1,0 +1,24 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-xrds
+  description: |-
+    CompositeResourceDefinitions and Compositions only. Crossplane
+    registers each XRD's CRD asynchronously after the XRD object is
+    created — the same self-installed-CRD race already solved for
+    Provider/Function packages (crossplane-core -> crossplane-providers).
+    Split into its own Flux Kustomization so claims in crossplane-resources
+    (which dependsOn this one) don't get dry-run validated against a kind
+    that doesn't exist in the API server yet on first bootstrap. See
+    docs/memory/crossplane-bootstrap-phasing.md.
+  tags:
+    - crossplane
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
+  subcomponentOf: crossplane
+  dependsOn:
+    - component:crossplane-providers

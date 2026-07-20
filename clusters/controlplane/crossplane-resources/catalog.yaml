@@ -3,11 +3,12 @@ kind: Component
 metadata:
   name: crossplane-resources
   description: |-
-    Each provider's own ClusterProviderConfig/ProviderConfig. Split into
-    its own Flux Kustomization, gated by dependsOn on crossplane-providers
-    being Healthy, so these don't get dry-run validated against a
-    provider-specific CRD (e.g. aws.m.upbound.io) that only exists once
-    that provider's pod has actually run once. See
+    Each provider's own ClusterProviderConfig/ProviderConfig, plus
+    platform EnvironmentConfigs and XR/claim instances. Split into its own
+    Flux Kustomization, gated by dependsOn on crossplane-xrds being ready,
+    so these don't get dry-run validated against a provider-specific CRD
+    (e.g. aws.m.upbound.io) or a claim's own XRD-defined kind that only
+    exists once the owning package/XRD has actually registered it. See
     docs/memory/crossplane-bootstrap-phasing.md.
   tags:
     - crossplane
@@ -19,4 +20,4 @@ spec:
   owner: platform-engineering
   subcomponentOf: crossplane
   dependsOn:
-    - component:crossplane-providers
+    - component:crossplane-xrds

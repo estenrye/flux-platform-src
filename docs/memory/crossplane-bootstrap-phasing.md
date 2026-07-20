@@ -1,6 +1,6 @@
 ---
 name: crossplane-bootstrap-phasing
-description: Crossplane's self-installed CRDs race Flux's atomic dry-run on first install — solved permanently with 3 dependsOn-chained Flux Kustomizations
+description: Crossplane's self-installed CRDs race Flux's atomic dry-run on first install — solved permanently with 4 dependsOn-chained Flux Kustomizations
 metadata:
   type: project
 ---
@@ -29,14 +29,14 @@ Hit this twice in a row on 2026-07-20 chasing it one resource at a time
 `ClusterProviderConfig` once the XRD was removed) via manual 3-phase
 commits before implementing the permanent fix below.
 
-## Permanent fix: 3 dependsOn-chained Flux Kustomizations
+## Permanent fix: 4 dependsOn-chained Flux Kustomizations
 
 ADR-10 amended (2026-07-20) to allow this as a documented exception to the
 one-Kustomization-per-cluster default, specifically for components with
 runtime-self-installed CRDs. Structure (see
 `clusters/controlplane/{crossplane-core,crossplane-providers,
-crossplane-resources}/` and `clusters/controlplane/resources/
-flux.crossplane-*.kustomization.yaml`):
+crossplane-xrds,crossplane-resources}/` and `clusters/controlplane/
+resources/flux.crossplane-*.kustomization.yaml`):
 
 1. **`crossplane-core`** — `applications/crossplane/base` only. No
    `dependsOn`. `wait: true` (built-in Deployment health check is enough —
@@ -69,9 +69,40 @@ flux.crossplane-*.kustomization.yaml`):
      running" gate just means `crossplane-resources` may need one extra
      automatic dependsOn retry cycle (self-healing) rather than the
      original all-or-nothing failure.
-3. **`crossplane-resources`** — `dependsOn: [crossplane-providers]`. Each
-   provider's `ClusterProviderConfig`/`ProviderConfig`, referenced from
-   each provider's own `provider-config/` subdirectory.
+3. **`crossplane-xrds`** — `dependsOn: [crossplane-providers]`.
+   `CompositeResourceDefinition`/`Composition` pairs only (e.g.
+   `delegated-hosted-zone-aws`). Same self-installed-CRD race as
+   Provider/Function: Crossplane registers an XRD's CRD asynchronously
+   after the XRD object lands, so a claim of that XRD's kind applied in
+   the *same* atomic dry-run as the XRD itself can fail on first
+   bootstrap (added 2026-07-20, M2 step 7, once a second XRD/claim pair
+   was added beyond the original `crossplane.rye.ninja` one that had been
+   hand-migrated).
+4. **`crossplane-resources`** — `dependsOn: [crossplane-xrds]`. Each
+   provider's `ClusterProviderConfig`/`ProviderConfig` (referenced from
+   each provider's own `provider-config/` subdirectory), platform
+   `EnvironmentConfig`s, and XR/claim instances of the XRDs defined in
+   `crossplane-xrds`.
+
+**`postBuild.substituteFrom` + `${...}`-braced doc strings don't mix:**
+hit this shipping the `controlplane.rye.ninja` claim (M2 step 7,
+2026-07-20). `crossplane-resources` needs `postBuild.substituteFrom` (the
+`platform-iam-rolesanywhere` EnvironmentConfig's `trustAnchorArn` is
+cluster-specific, same `roles-anywhere-arns` ConfigMap as
+`crossplane-providers`). Flux's substitution only expands *braced*
+`${VAR}` tokens (bare `$var` — e.g. the Go template variables inside
+`delegated-hosted-zone-aws`'s `Composition` pipeline — is left alone by
+design, confirmed against the Flux docs). But the `delegated-hosted-zone-
+aws` XRD's own OpenAPI `description` field used `${spec.subdomain}.
+${zoneName}` as illustrative text; once `substituteFrom` was enabled on
+the Kustomization that rendered it, envsubst tried to expand that
+literal doc string too and failed ("missing closing brace" — dots aren't
+valid in an env var name), blocking the whole Kustomization. Fixed by
+rewording the XRD description to prose instead of `${...}` notation, and
+by moving the XRD/Composition itself out to `crossplane-xrds` (which has
+no `substituteFrom`) so this class of collision can't recur for it
+specifically — but any future doc string with `${...}` syntax in a
+Kustomization that *does* have `substituteFrom` will hit the same thing.
 
 **Kustomize file-reference gotcha hit along the way:** referencing a
 single file across a `..`-traversal (e.g. `../../../applications/

@@ -147,6 +147,16 @@ clusters/<name>/
     flux.<component>-resources.kustomization.yaml
 ```
 
+The chain grows by one link for each additional kind of self-installed CRD
+in the dependency path — e.g. Crossplane's `crossplane-resources` also
+holds XR/claim instances of XRD-defined kinds, which race the same way
+against the XRD's own asynchronously-registered CRD, so `controlplane`
+inserts a `crossplane-xrds` link between `-providers` and `-resources`
+(`CompositeResourceDefinition`/`Composition` only, `dependsOn:
+[crossplane-providers]`; `crossplane-resources` then `dependsOn:
+[crossplane-xrds]` instead of `-providers` directly). See
+`docs/memory/crossplane-bootstrap-phasing.md`.
+
 The root `flux-platform` Kustomization still applies these child
 `Kustomization` objects like any other resource — no separate bootstrap
 step, since `kustomize.toolkit.fluxcd.io` CRDs are part of Flux itself and
