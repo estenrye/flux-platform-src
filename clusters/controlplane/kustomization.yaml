@@ -44,7 +44,15 @@ resources:
   - ../../applications/crossplane-functions/function-environment-configs
   - ../../applications/crossplane-functions/function-go-templating
   - ../../applications/crossplane-functions/function-auto-ready
-  - ../../applications/crossplane-resources/delegated-hosted-zone-aws
+  # delegated-hosted-zone-aws XRD deliberately NOT included yet: Crossplane
+  # self-installs its own CRDs (CompositeResourceDefinition, Composition,
+  # etc.) at runtime — they aren't shipped in the Helm chart (confirmed via
+  # `helm template --include-crds`, zero CRDs). Flux dry-runs the whole
+  # Kustomization atomically before applying anything, so an XRD in the
+  # same apply as a first-time Crossplane install fails dry-run before
+  # Crossplane ever starts, blocking the entire Kustomization (hit this
+  # 2026-07-20 — 0 pods, 0 CRDs, nothing applied at all). Add this back
+  # once Crossplane is confirmed Healthy with its CRDs registered.
   - resources/flux.source.git.yaml
   - resources/flux.kustomization.yaml
   - resources/truenas-csi.api-credentials.sops.yaml
