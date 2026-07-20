@@ -28,22 +28,29 @@ resources:
   - ../../applications/cert-manager-trust-manager/controlplane
   - ../../applications/cert-manager-spiffe-issuer/controlplane
   - ../../applications/cert-manager-spiffe-csi-driver/controlplane
-  # M2 step 6, phase 1 of 3 — crossplane core ONLY. Crossplane self-installs
-  # its own CRDs (pkg.crossplane.io: Provider/Function; apiextensions.
-  # crossplane.io: CompositeResourceDefinition/Composition/EnvironmentConfig)
-  # at runtime — none are shipped in the Helm chart (confirmed via
-  # `helm template --include-crds`: zero CRDs). Flux's kustomize-controller
-  # dry-runs the whole Kustomization atomically before applying anything, so
-  # on a first-ever install, ANY resource of those kinds — Provider/Function
-  # themselves, not just things that depend on them — fails dry-run before
-  # Crossplane ever starts, blocking the ENTIRE Kustomization (hit this
-  # 2026-07-20: first with the XRD, then with a provider's
-  # ClusterProviderConfig once the XRD was removed — 0 pods, 0 CRDs each
-  # time, nothing applied at all). Providers/functions (phase 2) and
-  # provider-configs/XRDs (phase 3) get re-added once the prior phase is
-  # confirmed Healthy with its CRDs registered — see
-  # docs/memory/crossplane-bootstrap-phasing.md.
+  # M2 step 6, phase 1 of 3 (done 2026-07-20, Healthy): crossplane core.
+  # See docs/memory/crossplane-bootstrap-phasing.md for why this had to be
+  # separate from everything below.
   - ../../applications/crossplane/base
+  # Phase 2 of 3: providers + functions. Provider/Function/
+  # DeploymentRuntimeConfig are pkg.crossplane.io (crossplane-core CRDs,
+  # registered after phase 1) so they're safe now. Each provider's own
+  # ClusterProviderConfig/ProviderConfig needs THAT PROVIDER's own CRDs,
+  # which only exist after the provider pod itself has run once — deleted
+  # below via patches, same phasing problem one level down. Re-add in
+  # phase 3 once every provider shows Healthy=True.
+  - ../../applications/crossplane-providers/family-aws
+  - ../../applications/crossplane-providers/provider-aws-route53
+  - ../../applications/crossplane-providers/provider-aws-iam
+  - ../../applications/crossplane-providers/provider-aws-rolesanywhere
+  - ../../applications/crossplane-providers/family-cloudflare
+  - ../../applications/crossplane-providers/provider-cloudflare-dns
+  - ../../applications/crossplane-providers/provider-cloudflare-zone
+  - ../../applications/crossplane-providers/provider-github
+  - ../../applications/crossplane-providers/provider-kubernetes
+  - ../../applications/crossplane-functions/function-environment-configs
+  - ../../applications/crossplane-functions/function-go-templating
+  - ../../applications/crossplane-functions/function-auto-ready
   - resources/flux.source.git.yaml
   - resources/flux.kustomization.yaml
   - resources/truenas-csi.api-credentials.sops.yaml
@@ -67,3 +74,47 @@ patches:
       kind: TLSRoute
       name: step-ca
       namespace: step-ca
+  # Phase 2 deferrals (docs/memory/crossplane-bootstrap-phasing.md): each
+  # provider's own ClusterProviderConfig/ProviderConfig needs that
+  # provider's self-installed CRDs, which don't exist until the provider
+  # pod has run once. Remove these patches in phase 3.
+  - patch: |-
+      $patch: delete
+      apiVersion: aws.m.upbound.io/v1beta1
+      kind: ClusterProviderConfig
+      metadata:
+        name: iam-admin
+        namespace: crossplane-system
+  - patch: |-
+      $patch: delete
+      apiVersion: aws.m.upbound.io/v1beta1
+      kind: ClusterProviderConfig
+      metadata:
+        name: rolesanywhere-admin
+        namespace: crossplane-system
+  - patch: |-
+      $patch: delete
+      apiVersion: aws.m.upbound.io/v1beta1
+      kind: ClusterProviderConfig
+      metadata:
+        name: dns-admin
+        namespace: crossplane-system
+  - patch: |-
+      $patch: delete
+      apiVersion: github.m.upbound.io/v1beta1
+      kind: ClusterProviderConfig
+      metadata:
+        name: default
+  - patch: |-
+      $patch: delete
+      apiVersion: kubernetes.crossplane.io/v1alpha1
+      kind: ProviderConfig
+      metadata:
+        name: kubernetes-provider
+        namespace: crossplane-system
+  - patch: |-
+      $patch: delete
+      apiVersion: upjet-cloudflare.m.upbound.io/v1beta1
+      kind: ClusterProviderConfig
+      metadata:
+        name: cloudflare-provider-config
