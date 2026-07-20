@@ -1,0 +1,29 @@
+# Distributes the controlplane intermediate (the cert that actually signs
+# workload SVIDs) to every namespace, alongside the root bundle above.
+# Needed for AWS Roles Anywhere: the SPIFFE CSI driver's tls.crt is the
+# workload's leaf cert only (no chain), but Roles Anywhere validates the
+# full chain up to the registered Trust Anchor (the root) — the
+# aws-signing-helper sidecar needs this intermediate for its
+# --intermediates flag or every CreateSession call gets rejected with
+# "Untrusted signing certificate" (found 2026-07-20 deploying the AWS
+# Roles Anywhere trust anchor, M2 design §4.4).
+#
+# Source is a Secret, not a ConfigMap, because cert-manager's ClusterIssuer
+# stores the intermediate cert+key together as csi-driver-spiffe-ca's
+# tls.crt/tls.key (ca.crt in the same secret is the root, sourced by
+# root-bundle.yaml instead). trust-manager can read Secrets in its own
+# trust namespace (cert-manager) as sources without enabling
+# secretTargets — confirmed via the existing trust-manager Role's `get`
+# verb on secrets.
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: ryezone-labs-intermediate-controlplane
+spec:
+  sources:
+    - secret:
+        name: csi-driver-spiffe-ca
+        key: tls.crt
+  target:
+    configMap:
+      key: intermediate.crt

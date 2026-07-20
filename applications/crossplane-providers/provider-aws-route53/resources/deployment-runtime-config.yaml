@@ -39,6 +39,8 @@ spec:
                 - /var/run/secrets/spiffe.io/tls.crt
                 - --private-key
                 - /var/run/secrets/spiffe.io/tls.key
+                - --intermediates
+                - /var/run/configmaps/trust-bundle/intermediate.crt
                 - --trust-anchor-arn
                 - arn:aws:rolesanywhere:us-east-2:832767337984:trust-anchor/1433b5ab-1a7a-4134-9d84-baa79f94d093
                 - --profile-arn
@@ -53,8 +55,13 @@ spec:
               volumeMounts:
                 - mountPath: "/var/run/secrets/spiffe.io"
                   name: spiffe
+                - mountPath: "/var/run/configmaps/trust-bundle"
+                  name: trust-bundle
           volumes:
             - name: spiffe
               csi:
                 driver: spiffe.csi.cert-manager.io
                 readOnly: true
+            - name: trust-bundle
+              configMap:
+                name: ryezone-labs-intermediate-controlplane

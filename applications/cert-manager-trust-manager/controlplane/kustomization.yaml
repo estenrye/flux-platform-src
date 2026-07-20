@@ -5,6 +5,7 @@ namespace: cert-manager
 resources:
   - network-policy.yaml
   - root-bundle.yaml
+  - intermediate-bundle.yaml
 
 helmCharts:
   - name: trust-manager
