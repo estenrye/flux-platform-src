@@ -28,4 +28,4 @@ patches:
 
 images:
   - name: ghcr.io/stakater/reloader
-    digest: sha256:da67d9cfaee638e7309f5697e39f4a2669af5d89c4224e19406146095ffcda1e
+    digest: sha256:0530cf462fa3ba530fab887372e3b79caf608d0093ffc2fded9fa33bac8b74cd
