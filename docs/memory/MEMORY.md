@@ -16,3 +16,4 @@
 - [TrueNAS NFS Ownership Workaround](truenas-nfs-ownership-workaround.md) — truenas-csi mapall + root:755 dataset roots block non-root bootstrap; chown hook bridges; democratic-csi decision at M3
 - [UniFi Gateway PD Discovery](unifi-gateway-pd-discovery.md) — root shell + odhcp6c log to confirm the real DHCPv6-PD grant; also BGP RIB/FIB and firewall-zone debugging commands used on the gateway
 - [VIP Renumber Flakiness Investigation](vip-renumber-flakiness-investigation.md) — RESOLVED: root-caused to externalTrafficPolicy:Local + a Calico BGP-advertisement bug; fixed via 6-way replica spread across all nodes
+- [M2 Step 6 Roles Anywhere/CFN Refactor](m2-step6-roles-anywhere-cfn-refactor.md) — Crossplane install + CloudFormation generalization exist to deploy a new AWS Roles Anywhere trust root for ca.rye.ninja
