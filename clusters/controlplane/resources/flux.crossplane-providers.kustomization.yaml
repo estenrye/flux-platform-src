@@ -13,28 +13,20 @@ spec:
     kind: GitRepository
     name: flux-platform-rendered
   wait: true
-  timeout: 10m0s
-  # Provider/Function use Installed/Healthy conditions, not the generic
-  # Ready condition kstatus expects by default — without these, `wait: true`
-  # would report Ready as soon as the objects are created, before the
-  # package is actually pulled and the pod running (docs/memory/
-  # crossplane-bootstrap-phasing.md).
-  # Only `current` here — an earlier version also set `failed`, using the
-  # identical self.status.conditions.exists(...) pattern, and Flux
-  # reported "no such attribute(s): self.status.conditions" for every
-  # object even though the CRD schema and the live objects both have a
-  # well-formed status.conditions array. `current` alone avoids whatever
-  # is tripping that up.
-  healthCheckExprs:
-    - apiVersion: pkg.crossplane.io/v1
-      kind: Provider
-      current: >-
-        has(self.status) && has(self.status.conditions) &&
-        self.status.conditions.exists(c, c.type == 'Healthy' && c.status == 'True') &&
-        self.status.conditions.exists(c, c.type == 'Installed' && c.status == 'True')
-    - apiVersion: pkg.crossplane.io/v1
-      kind: Function
-      current: >-
-        has(self.status) && has(self.status.conditions) &&
-        self.status.conditions.exists(c, c.type == 'Healthy' && c.status == 'True') &&
-        self.status.conditions.exists(c, c.type == 'Installed' && c.status == 'True')
+  timeout: 5m0s
+  # Tried healthCheckExprs (CEL) for Provider/Function's Installed/Healthy
+  # conditions — every variant (current+failed, current-only, current with
+  # has() guards) failed with "no such attribute(s): self.status[...]"
+  # even though the CRD schema and the live objects both have a
+  # well-formed status.conditions array, and even after restarting
+  # kustomize-controller to rule out a stale/cached CEL program. This
+  # looks like a genuine limitation in how this Flux version's CEL
+  # evaluation sees Provider/Function status, not a caching bug or a bad
+  # expression. Dropped the health check entirely and rely on wait: true's
+  # default behavior + dependsOn — that combination already solves the
+  # actual problem (Flux's atomic dry-run racing Crossplane's runtime CRD
+  # registration on first bootstrap), just without fine-grained "is the
+  # package actually running" gating. crossplane-resources retries on its
+  # own dependsOn cadence if it's attempted before a provider's specific
+  # CRD is registered — self-healing, not the original all-or-nothing
+  # failure. See docs/memory/crossplane-bootstrap-phasing.md.
