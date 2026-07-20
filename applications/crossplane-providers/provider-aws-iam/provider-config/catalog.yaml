@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-provider-aws-iam-config
+  description: |-
+    ClusterProviderConfig for the Crossplane AWS IAM provider, split into
+    its own directory so it can be applied by the crossplane-resources
+    Flux Kustomization once the provider itself is Healthy (docs/memory/
+    crossplane-bootstrap-phasing.md).
+  tags:
+    - crossplane
+    - crossplane-provider
+    - aws
+    - iam
+spec:
+  type: operator
+  lifecycle: production
+  owner: platform-engineering
+  subcomponentOf: crossplane-provider-aws-iam
