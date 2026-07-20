@@ -4,8 +4,8 @@ kind: Kustomization
 # Baseline for the IPv6-only controlplane cluster (M1 design §7.2). Calico
 # first: Talos installs with CNI none, nodes stay NotReady until it lands.
 # M2 migration in progress (2026-07-13 design): step-ca stack landed in
-# step 3, cert-manager stack in step 4; still absent: crossplane (step 6),
-# ESO 1Password store (step 9).
+# step 3, cert-manager stack in step 4, crossplane in step 6, delegated
+# zone claim + ESO 1Password store in step 9.
 resources:
   - ../../applications/calico/controlplane
   - ../../applications/global-network-policy-default-deny/controlplane
@@ -47,6 +47,15 @@ resources:
   # .bin/deploy-aws-roles-anywhere.sh, consumed via postBuild.substituteFrom
   # on flux.crossplane-providers.kustomization.yaml.
   - resources/roles-anywhere-arns.yaml
+  # ESO -> 1Password wiring (M2 step 9): SDK token bootstrapped via
+  # .bin/bootstrap-cluster-secret-store.sh into the dedicated "controlplane"
+  # 1Password vault, ClusterSecretStore pointed at it, ExternalSecrets pull
+  # the shared github-auth-app/cloudflare-api-token items (same 1Password
+  # item paths as the crossplane cluster's, just a different vault).
+  - resources/eso.service-account-secret.yaml
+  - resources/eso.cluster-secret-store.yaml
+  - resources/eso.external-secret.github.yaml
+  - resources/eso.external-secret.cloudflare.yaml
   - resources/truenas-csi.api-credentials.sops.yaml
   - resources/external-dns.unifi-credentials.sops.yaml
   - resources/step-ca-intermediate.sops.yaml

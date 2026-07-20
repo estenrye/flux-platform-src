@@ -139,6 +139,9 @@ bootstrap-cluster-rendered-repo:
 bootstrap-cluster-sops-key:
 	CLUSTER=$(CLUSTER) .bin/bootstrap-cluster-sops-key.sh
 
+bootstrap-cluster-secret-store:
+	CLUSTER=$(CLUSTER) KUBECONFIG=$(KUBECONFIG) VAULT_USERS=$(VAULT_USERS) .bin/bootstrap-cluster-secret-store.sh
+
 bootstrap-cluster-deploy-key:
 	CLUSTER=$(CLUSTER) .bin/bootstrap-cluster-deploy-key.sh
 
