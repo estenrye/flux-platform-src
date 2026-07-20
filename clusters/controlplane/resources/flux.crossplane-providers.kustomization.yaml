@@ -12,21 +12,31 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-platform-rendered
-  wait: true
   timeout: 5m0s
-  # Tried healthCheckExprs (CEL) for Provider/Function's Installed/Healthy
-  # conditions — every variant (current+failed, current-only, current with
-  # has() guards) failed with "no such attribute(s): self.status[...]"
-  # even though the CRD schema and the live objects both have a
-  # well-formed status.conditions array, and even after restarting
-  # kustomize-controller to rule out a stale/cached CEL program. This
-  # looks like a genuine limitation in how this Flux version's CEL
-  # evaluation sees Provider/Function status, not a caching bug or a bad
-  # expression. Dropped the health check entirely and rely on wait: true's
-  # default behavior + dependsOn — that combination already solves the
-  # actual problem (Flux's atomic dry-run racing Crossplane's runtime CRD
-  # registration on first bootstrap), just without fine-grained "is the
-  # package actually running" gating. crossplane-resources retries on its
-  # own dependsOn cadence if it's attempted before a provider's specific
-  # CRD is registered — self-healing, not the original all-or-nothing
-  # failure. See docs/memory/crossplane-bootstrap-phasing.md.
+  # wait: true left off deliberately. Tried healthCheckExprs (CEL) for
+  # Provider/Function's Installed/Healthy conditions — every variant
+  # (current+failed, current-only, current with has() guards) failed with
+  # "no such attribute(s): self.status[...]" even though the CRD schema
+  # and live objects both have a well-formed status.conditions array, and
+  # persisted across a kustomize-controller restart (rules out a stale/
+  # cached CEL program). Then tried wait: true with no custom
+  # healthCheckExprs (kstatus's generic/default check) — the Kustomization
+  # sat "Reconciliation in progress" for 8+ minutes past its own 5m
+  # timeout despite every Provider/Function already showing
+  # Installed=True/Healthy=True in kubectl, so kstatus's default handling
+  # of these conditions appears to hit the same underlying issue as the
+  # CEL path. Genuine limitation in this Flux version for these CRDs, not
+  # a caching or config bug — not pursued further.
+  #
+  # Without any waiting, this Kustomization reports Ready as soon as
+  # apply succeeds (confirmed: providers/functions were actually created
+  # and became Healthy long before the wait loop would have finished).
+  # dependsOn still gates crossplane-providers behind crossplane-core and
+  # crossplane-resources behind crossplane-providers, which is what
+  # actually matters — that solves the real problem (Flux's atomic
+  # dry-run racing Crossplane's runtime CRD registration on first
+  # bootstrap). crossplane-resources may attempt its own dry-run before a
+  # provider's specific CRD is registered; if so it fails that one
+  # attempt and retries on its own interval — self-healing, not the
+  # original all-or-nothing failure. See
+  # docs/memory/crossplane-bootstrap-phasing.md.

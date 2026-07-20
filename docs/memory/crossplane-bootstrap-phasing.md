@@ -45,21 +45,30 @@ flux.crossplane-*.kustomization.yaml`):
 2. **`crossplane-providers`** — `dependsOn: [crossplane-core]`. All
    provider/function install directories, but with each provider's own
    `ClusterProviderConfig`/`ProviderConfig` excluded (moved to a
-   `provider-config/` subdirectory instead — see below). `wait: true`,
-   **no `healthCheckExprs`** — tried CEL health checks for
-   `Provider`/`Function`'s `Installed`/`Healthy` conditions (every variant:
-   `current`+`failed`, `current`-only, `current` with `has()` guards) and
-   every one failed with `no such attribute(s): self.status[...]`, even
-   though the CRD schema and live objects both have a well-formed
-   `status.conditions` array, and even after restarting
-   `kustomize-controller` to rule out a stale/cached CEL program. This
-   looks like a genuine limitation in how this Flux version's CEL
-   evaluation sees status on these CRDs, not a caching bug or a bad
-   expression — not pursued further. `dependsOn` + default `wait: true`
-   already solve the actual problem (the atomic dry-run race); losing the
-   fine-grained "is the package actually running" gate just means
-   `crossplane-resources` may need one extra automatic dependsOn retry
-   cycle (self-healing) rather than the original all-or-nothing failure.
+   `provider-config/` subdirectory instead — see below). **No `wait`, no
+   `healthCheckExprs`.** Tried both, in order, before giving up on
+   fine-grained health gating for this Kustomization:
+   - CEL health checks for `Provider`/`Function`'s `Installed`/`Healthy`
+     conditions (every variant: `current`+`failed`, `current`-only,
+     `current` with `has()` guards) failed with `no such attribute(s):
+     self.status[...]`, even though the CRD schema and live objects both
+     have a well-formed `status.conditions` array, and even after
+     restarting `kustomize-controller` to rule out a stale/cached CEL
+     program.
+   - `wait: true` with no custom `healthCheckExprs` (kstatus's generic
+     default check) sat "Reconciliation in progress" for 8+ minutes past
+     its own 5m `timeout`, despite every Provider/Function already
+     showing `Installed=True`/`Healthy=True` in `kubectl` — kstatus's
+     default handling of these conditions appears to hit the same
+     underlying issue as the CEL path.
+   - Genuine limitation in this Flux version for these CRDs, not a
+     caching or config bug. Not pursued further. Without any waiting,
+     this Kustomization reports Ready as soon as apply succeeds.
+     `dependsOn` alone still solves the actual problem (the atomic
+     dry-run race); losing the fine-grained "is the package actually
+     running" gate just means `crossplane-resources` may need one extra
+     automatic dependsOn retry cycle (self-healing) rather than the
+     original all-or-nothing failure.
 3. **`crossplane-resources`** — `dependsOn: [crossplane-providers]`. Each
    provider's `ClusterProviderConfig`/`ProviderConfig`, referenced from
    each provider's own `provider-config/` subdirectory.
@@ -80,5 +89,6 @@ pipeline (`render-kustomize-base-and-patches.sh`) discovers and builds
 and unconditionally copies `catalog.yaml` alongside each one.
 
 The original 3-commit manual-phase workaround (superseded) is not needed
-on any cluster using this structure — Flux's `dependsOn` + health checks
-handle the ordering automatically on a from-scratch bootstrap.
+on any cluster using this structure — Flux's `dependsOn` alone handles
+the ordering automatically on a from-scratch bootstrap (fine-grained
+health-check gating didn't pan out for these CRDs, see above).

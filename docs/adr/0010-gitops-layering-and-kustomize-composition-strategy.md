@@ -152,11 +152,20 @@ The root `flux-platform` Kustomization still applies these child
 step, since `kustomize.toolkit.fluxcd.io` CRDs are part of Flux itself and
 always already registered.
 
-Use `spec.wait: true` plus `spec.healthCheckExprs` (CEL) on the dependent
-Kustomizations when the underlying kind doesn't expose the generic `Ready`
-condition kstatus expects by default — Crossplane's `Provider`/`Function`
-use `Installed`/`Healthy` instead. Each new subdirectory needs its own
-`catalog.yaml`: the render pipeline discovers and builds *every*
+`spec.wait: true` plus `spec.healthCheckExprs` (CEL) is the theoretically
+correct way to gate a dependent Kustomization on a kind that doesn't
+expose the generic `Ready` condition kstatus expects by default — but for
+Crossplane's `Provider`/`Function` (`Installed`/`Healthy` conditions),
+neither `healthCheckExprs` (every variant errored with `no such
+attribute(s): self.status[...]`, even against live objects with a
+well-formed `status.conditions`) nor plain `wait: true` (sat "in
+progress" for 8+ minutes past its own timeout on objects already
+`Healthy=True`) actually worked in this Flux version — see
+`docs/memory/crossplane-bootstrap-phasing.md`. `dependsOn` alone still
+provides the ordering guarantee that matters (the dry-run race); treat
+health-check gating as a nice-to-have to attempt, not something to block
+on if it doesn't cooperate for a given CRD. Each new subdirectory needs
+its own `catalog.yaml`: the render pipeline discovers and builds *every*
 `kustomization.yaml` under `clusters/`, independently, and unconditionally
 copies `catalog.yaml` alongside each one.
 
