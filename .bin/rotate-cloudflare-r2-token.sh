@@ -86,7 +86,7 @@ trap cleanup EXIT
 info "Looking up R2 bucket permission group IDs..."
 PERM_GROUPS=$(curl -sf \
   -H "Authorization: Bearer ${CF_API_TOKEN}" \
-  "https://api.cloudflare.com/client/v4/user/tokens/permission_groups")
+  "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/tokens/permission_groups")
 echo "${PERM_GROUPS}" | jq -r '.success' | grep -q '^true$' \
   || { error "Failed to list permission groups — check CF_API_TOKEN permissions"; exit 1; }
 
@@ -117,7 +117,7 @@ TOKEN_RESPONSE=$(curl -sf -X POST \
         permission_groups: [{id: $read_id}, {id: $write_id}]
       }]
     }')" \
-  "https://api.cloudflare.com/client/v4/user/tokens")
+  "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/tokens")
 
 echo "${TOKEN_RESPONSE}" > "${TMP}/token-response.json"
 
@@ -181,7 +181,7 @@ success "SOPS Secret re-encrypted at ${SECRET_OUT}."
 info "Deleting old R2 token (id: ${OLD_TOKEN_ID})..."
 DELETE_RESULT=$(curl -sf -X DELETE \
   -H "Authorization: Bearer ${CF_API_TOKEN}" \
-  "https://api.cloudflare.com/client/v4/user/tokens/${OLD_TOKEN_ID}")
+  "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/tokens/${OLD_TOKEN_ID}")
 echo "${DELETE_RESULT}" | jq -r '.success' | grep -q '^true$' \
   || { error "Old token deletion failed: $(echo "${DELETE_RESULT}" | jq -r '.errors')"; exit 1; }
 success "Old token deleted."
