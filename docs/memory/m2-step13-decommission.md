@@ -94,6 +94,14 @@ Kustomizations *before or atomically with* scaling deployments to zero,
 never after — and to keep them suspended for the entire orphaned-state
 window, not just during the initial migration.
 
+**Applied retroactively (2026-07-21)**: all 5 remaining Spot MRs (Zone,
+Role, Policy, RolePolicyAttachment, Profile — the 4 Records were deleted
+outright, not left in place) patched to `managementPolicies: ["Observe"]`.
+Combined with all 14 `crossplane-system` deployments at 0 replicas and
+both Flux Kustomizations suspended, Spot's copy of this stack is now
+triple-defended against any further recreation until item 6 destroys the
+cloudspace entirely.
+
 ## Item 2 — delete old Roles Anywhere trust anchor + profiles
 
 Status: not started.
