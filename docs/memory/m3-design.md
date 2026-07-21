@@ -44,8 +44,13 @@ so it may unblock IPv6 iSCSI on the cluster.
   token in SOPS. Free egress, S3-compatible, no Crossplane dependency, no
   SPIFFE in CronJob. **[H] before step 7**: create bucket + token in
   Cloudflare dashboard, SOPS-encrypt under `clusters/controlplane/`.
-- **Realm/group names** (before step 8): confirm `platform-admin`, `viewer`,
-  tenant group naming — baked into declarative config, hard to rename post-Pinniped RBAC
+- ~~**Realm/group names**~~ CLOSED: per-app model, realm `ryezone-labs`.
+  M3 groups: `k8s-admin` (cluster-admin), `k8s-viewer` (view),
+  `keycloak-admin` (realm-admin role), `openbao-admin` (full vault),
+  `openbao-operator` (read/list secret/* only). Local Keycloak admin
+  credential stored in OpenBao as break-glass. Future groups reserved
+  (grafana-*, backstage-admin, dispatch-*, nats-admin, tenant-*) but not
+  created until their respective milestones.
 
 ## Execution order (11 steps)
 
