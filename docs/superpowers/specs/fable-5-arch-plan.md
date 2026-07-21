@@ -221,6 +221,17 @@ Goal: OpenBao, Keycloak, Pinniped Supervisor, and Garage running HA on
 `controlplane`; ESO consuming OpenBao; humans SSO into the first OIDC
 client. Runs on reliable local infra with real TrueNAS-backed storage.
 
+**Detailed design (2026-07-21, draft):**
+[2026-07-21-m3-identity-secrets-design.md](2026-07-21-m3-identity-secrets-design.md)
+— amends M3 in two approved ways: swap truenas-csi → democratic-csi 0.15.1
+at kickoff (iSCSI IPv6 unblock + NFS fsGroupPolicy:File ownership fix,
+retiring the nfs-pg-owner CronJob bridge); migrate step-ca-db from dump
+CronJob to barman targeting Garage before OpenBao is wired up. Three
+[H]-gated decisions remain open: public exposure path for id.rye.ninja /
+sso.rye.ninja, off-site backup destination for OpenBao snapshots, and
+confirmation of Keycloak realm group names. The design doc supersedes the
+task list below where they differ.
+
 Tasks:
 1. `applications/garage/`: 3-node Garage on the control plane cluster,
    volumes on TrueNAS iSCSI — the fleet S3 endpoint for backups, LGTM chunks
