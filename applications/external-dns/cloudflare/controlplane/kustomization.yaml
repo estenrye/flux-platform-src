@@ -15,7 +15,10 @@ helmCharts:
     repo: https://kubernetes-sigs.github.io/external-dns/
     version: 1.20.0
     releaseName: external-dns-cloudflare
-    includeCRDs: true
+    # false: external-dns/unifi/base (same cluster, same namespace) already
+    # brings the DNSEndpoint CRD via its own includeCRDs: true. Kustomize
+    # refuses to accumulate the same CRD id from two sources in one build.
+    includeCRDs: false
     valuesInline: {}
     valuesFile: values.yaml
 

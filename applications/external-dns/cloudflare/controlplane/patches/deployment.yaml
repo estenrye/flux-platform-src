@@ -12,6 +12,9 @@
   path: /spec/template/spec/dnsPolicy
   value: Default
 - op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+  value: "Single-host homelab cluster; no zone or role topology to express affinity against."
+- op: add
   path: /metadata/annotations/ignore-check.kube-linter.io~1read-secret-from-env-var
   value: "This is not a custom application."
 - op: add
