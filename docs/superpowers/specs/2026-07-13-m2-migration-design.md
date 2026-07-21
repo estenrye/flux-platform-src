@@ -286,7 +286,7 @@ window (soak dominates the calendar).
 | 7 | New `controlplane.rye.ninja` delegated-zone claim | claim Ready; `delegated-zone/` suite green with new trust domain |
 | 8 | State migration of the `crossplane.rye.ninja` stack (4.3, Orphan → pause → export → import → observe); reconcile the live export against the 2026-07-11 snapshot before importing | external-name diff zero; no new cloud-side IDs; deletionPolicy restored |
 | 9 | ESO + public external-dns variant (4.5) | `eso/` suite green; a test record reconciles |
-| 10 | Full baseline runner x2 against `controlplane`; start 7-day soak; change freeze on `clusters/crossplane/` | both runs green, `STEP_CA_EXTERNAL_GATE=gate` |
+| 10 | Full baseline runner x2 against `controlplane`; start 7-day soak; change freeze on `clusters/crossplane/` | **Done 2026-07-21** — both runs green, `STEP_CA_EXTERNAL_GATE=gate`; freeze declared, soak clock started (`docs/memory/m2-change-freeze.md`) |
 | 11 | Restore drill: step-ca-db from a scheduled dump onto a scratch CNPG cluster | step-ca starts against restored DB |
 | 12 | **[H]** Go/no-go review of soak evidence | sign-off |
 | 13 | Decommission (section 5, includes **[H]** repo archive + Spot deletion) | GC verified; invoice $0 |

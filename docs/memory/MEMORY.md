@@ -20,3 +20,4 @@
 - [Crossplane Bootstrap Phasing](crossplane-bootstrap-phasing.md) — Crossplane's runtime-self-installed CRDs race Flux's atomic dry-run; permanently solved with 4 dependsOn-chained Flux Kustomizations (ADR-10 amendment), not manual phased commits
 - [UniFi Zone-Based Firewall](unifi-zone-firewall.md) — Routed subnets (VIPs, NAT64) aren't bound to any UniFi zone; WireGuard clients land in External not VPN; DMZ-Kubernetes zone build-out for VLAN 100
 - [External-DNS Multi-Instance Collision](external-dns-multi-instance-collision.md) — Two external-dns Helm releases in one cluster/namespace need distinct releaseName, not just kustomize nameSuffix, or pod selector labels collide
+- [M2 Change Freeze](m2-change-freeze.md) — Change freeze on `clusters/crossplane/` declared 2026-07-21 (M2 step 10); 7-day soak clock started
