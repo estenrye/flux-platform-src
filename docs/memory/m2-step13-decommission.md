@@ -102,9 +102,35 @@ both Flux Kustomizations suspended, Spot's copy of this stack is now
 triple-defended against any further recreation until item 6 destroys the
 cloudspace entirely.
 
-## Item 2 — delete old Roles Anywhere trust anchor + profiles
+## Item 2 — delete old Roles Anywhere trust anchor + profiles: DONE (2026-07-21)
 
-Status: not started.
+Deleted via CloudFormation, not raw AWS API calls: `aws cloudformation
+delete-stack --stack-name crossplane-provider-dns-admin` (stack created
+2026-04-19, matching the trust anchor's own `createdAt`). This single
+stack owned the old trust anchor (`1433b5ab-1a7a-4134-9d84-baa79f94d093`,
+`cluster.local` ABAC), 3 profiles named after their roles
+(`crossplane-provider-rolesanywhere-admin`, `crossplane-provider-iam-admin`,
+`crossplane-provider-route53-admin`), and the 3 matching IAM roles.
+
+**Near-catch worth flagging**: `aws cloudformation list-stacks` also
+turned up 3 *separate* stacks (`crossplane-provider-{roles-anywhere,
+route53,iam}-admin-policy`) that looked like part of the same old
+bootstrap by naming convention alone. They are not — `aws iam
+list-entities-for-policy` on each showed their managed policies are
+actually attached to the **new** `controlplane-*` roles, i.e. shared,
+live infrastructure reused across old and new trust anchors. Deleting
+them would have broken controlplane's current AWS provider
+authentication. Left untouched, confirmed still `CREATE_COMPLETE` and
+still attached to `controlplane-RA-Admin-crossplane-provider-roles-anywhere-admin`
+after the real deletion. **Lesson**: matching name prefixes on AWS
+resources/stacks is not sufficient evidence of what's safe to delete —
+check actual attachment/usage (`list-entities-for-policy`,
+`list-attached-role-policies`) before deleting anything found by a
+naming-convention search, even when a design doc says "delete the old
+X."
+
+Verified via direct AWS API: `ResourceNotFoundException` for the trust
+anchor and all 3 profiles, `NoSuchEntity` for all 3 roles.
 
 ## Item 3 [H] — close out SOPS key-exposure incident
 
