@@ -33,8 +33,10 @@ so it may unblock IPv6 iSCSI on the cluster.
 
 ## Open [H] decisions (needed before indicated steps)
 
-- **A5** (before step 9): public exposure for `id.rye.ninja` / `sso.rye.ninja`
-  — UniFi port-forward (existing pattern) vs Cloudflare Tunnel (cleaner for M6+)
+- ~~**A5**~~ CLOSED: replicate `ca.rye.ninja` pattern — Envoy Gateway `merged-eg`
+  HTTPS terminate listener + HTTPRoute + external-dns AAAA from GUA VIP. No
+  port-forward rules, no Cloudflare Tunnel. `mode: Terminate` instead of
+  Passthrough since Keycloak/Pinniped use cert-manager certs not self-TLS.
 - **A6** (before step 7): off-site OpenBao snapshot destination
   — Cloudflare R2 (recommended, pattern established) vs AWS S3
 - **Realm/group names** (before step 8): confirm `platform-admin`, `viewer`,

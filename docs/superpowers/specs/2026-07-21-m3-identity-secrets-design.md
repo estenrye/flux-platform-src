@@ -103,22 +103,24 @@ for now — those are only needed during cluster cold start, before OpenBao is
 reachable. Full SOPS→OpenBao migration of non-bootstrap items is an M11
 hardening step.
 
-### A5 — Public exposure path for id.rye.ninja and sso.rye.ninja **[H: decide]**
+### A5 — Public exposure path for id.rye.ninja and sso.rye.ninja: same as ca.rye.ninja
 
-Two options:
+Replicate the `ca.rye.ninja` pattern exactly:
 
-| Option | Pros | Cons |
-|---|---|---|
-| UniFi port-forward (existing pattern for ca.rye.ninja) | No new infrastructure; already proven | IPv4 hairpin only; requires UniFi port-forward rule; exposing two more services |
-| Cloudflare Tunnel (cloudflared) | No inbound port-forward; native IPv4 + IPv6; zero-trust by default | New component (`cloudflared` deployment); Cloudflare account dependency |
+- Envoy Gateway (`merged-eg`) listener with hostname patched at the cluster
+  level (same `clusters/controlplane/patches/` pattern)
+- external-dns reads the Gateway/Route source and creates a public AAAA
+  pointing at the Envoy Gateway GUA VIP — no UniFi port-forward rules, no
+  Cloudflare Tunnel
+- The GUA VIP is already publicly routable on IPv6 (same as `ca.rye.ninja`)
 
-The `ca.rye.ninja` endpoint was exposed via UniFi port-forward + Envoy Gateway.
-For identity endpoints (id.rye.ninja, sso.rye.ninja) the same path works but
-adds two more port-forward rules. Cloudflare Tunnel is cleaner long-term (M6+
-cloud clusters need publicly reachable SSO and CA anyway).
+The only implementation difference from step-ca: Keycloak and Pinniped
+Supervisor terminate TLS themselves via cert-manager-issued certs, so these
+use `mode: Terminate` HTTPS listeners + HTTPRoutes rather than TLS Passthrough
++ TLSRoutes. The Gateway class, external-dns mechanism, and DNS record type
+are identical.
 
-**[H] Choose before step 7** — the Keycloak and Pinniped Gateway configs
-depend on this choice.
+No new infrastructure required. **This decision is closed; no [H] gate needed.**
 
 ### A6 — Off-site backup destination for OpenBao raft snapshots **[H: decide]**
 
@@ -147,7 +149,7 @@ proceeding.
 | 6 | Wire ESO ClusterSecretStore → OpenBao (Kubernetes auth); migrate `aws-account-creds` to OpenBao break-glass path; create proof-of-concept ExternalSecret | | ESO ClusterSecretStore Healthy; ExternalSecret syncs; `aws sts get-caller-identity` from the synced creds succeeds |
 | 7 | OpenBao raft snapshot CronJob → Garage `openbao-snapshots` bucket (+ off-site copy per A6) | | Snapshot appears in Garage; restore drill: unseal a scratch OpenBao from the snapshot |
 | 8 | `keycloak-db` CNPG cluster on `democratic-csi-nfs-pg`; barman to Garage `keycloak-db-barman` bucket | H: confirm realm/group names | keycloak-db CNPG Cluster Ready; barman backup active |
-| 9 | Keycloak: deploy on `controlplane`, wire to keycloak-db; realm `ryezone-labs` + groups (`platform-admin`, `viewer`) bootstrapped declaratively; expose at `id.rye.ninja` per A5 | H: confirm exposure choice (A5) | Keycloak admin UI reachable at `https://id.rye.ninja`; realm exists; declarative config re-applies cleanly |
+| 9 | Keycloak: deploy on `controlplane`, wire to keycloak-db; realm `ryezone-labs` + groups (`platform-admin`, `viewer`) bootstrapped declaratively; expose at `id.rye.ninja` via Envoy Gateway HTTPS terminate + external-dns AAAA (same pattern as ca.rye.ninja, A5) | | Keycloak admin UI reachable at `https://id.rye.ninja`; realm exists; declarative config re-applies cleanly |
 | 10 | Pinniped Supervisor + Concierge on `controlplane`; OIDC backend: Keycloak `ryezone-labs`; issuer `https://sso.rye.ninja` | H: run `pinniped get kubeconfig` + `kubectl get pods` | Authenticated `kubectl get pods -n kube-system` succeeds via Pinniped+Keycloak login |
 | 11 | ADRs: ADR-21 amendment (democratic-csi swap, iSCSI unblocked), ADR-25 (OpenBao), ADR-26 (Keycloak+Pinniped); runbooks: OpenBao unseal, OpenBao restore, Keycloak realm restore, Garage node replacement | | ADRs merged; runbooks in `docs/runbooks/` |
 
@@ -189,8 +191,8 @@ proceeding.
 
 ## 7. Human prerequisites (before M3 starts)
 
-- **[H] A5**: Choose public exposure path for `id.rye.ninja` / `sso.rye.ninja`
-  (UniFi port-forward vs Cloudflare Tunnel). Needed before step 9.
+- ~~**[H] A5**~~: Closed — replicate the `ca.rye.ninja` Envoy Gateway + external-dns
+  AAAA pattern. No new infrastructure needed.
 - **[H] A6**: Confirm off-site backup destination for OpenBao snapshots
   (Cloudflare R2 recommended; AWS S3 alternative). Needed before step 7.
 - **[H] Realm/group names**: Confirm or amend the group model from the spec
