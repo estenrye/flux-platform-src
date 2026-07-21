@@ -4,14 +4,27 @@ Date: 2026-07-13
 
 ## Status
 
-Accepted — execution in progress. Steps 0-11 of the [design's execution
+Accepted — execution in progress. Steps 0-12 of the [design's execution
 sequence](../superpowers/specs/2026-07-13-m2-migration-design.md#6-execution-sequence)
 are complete as of 2026-07-21 (design, PKI ceremony, step-ca, cert-manager
 stack, DNS cutover, Crossplane install, new delegated zone, delegated-zone
-state migration, ESO/public DNS, soak gate, restore drill). The 7-day soak
-runs through ~2026-07-28; steps 12 (go/no-go review), 13 (decommission),
-and closing this ADR out as fully executed remain. This ADR will be
-updated (not superseded) when decommission completes.
+state migration, ESO/public DNS, soak gate, restore drill, go/no-go
+review). Step 13 (decommission) remains before this ADR can be closed out
+as fully executed. This ADR will be updated (not superseded) when
+decommission completes.
+
+**Step 12 (go/no-go) deviation from the design, recorded plainly**: the
+design's exit criterion was a 7-day soak (2026-07-21 through ~2026-07-28)
+with the baseline runner staying green and zero unintended
+managed-resource recreations. Esten made the go/no-go call on 2026-07-21,
+less than a day into that window, on the evidence available at that
+point: two consecutive clean `.bin/run-platform-baseline.sh controlplane`
+runs (`STEP_CA_EXTERNAL_GATE=gate`), the step 8 delegated-zone migration
+verified against AWS ground truth with zero external-name diff, and the
+step 11 restore drill passing. This is a deliberate acceptance of less
+soak evidence than the design called for, not a completed 7-day soak —
+noted here so a future reader doesn't mistake this for the full window
+having elapsed.
 
 Finalizes the *placement* migration [ADR-20](0020-control-plane-on-talos-on-kvm.md)
 declared but deferred ("Control plane services migrate from Spot in M2").
