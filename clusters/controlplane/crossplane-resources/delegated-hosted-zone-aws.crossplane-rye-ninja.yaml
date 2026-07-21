@@ -1,0 +1,7 @@
+apiVersion: dns.platform.rye.ninja/v1alpha1
+kind: XDelegatedHostedZoneAWS
+metadata:
+  name: crossplane-rye-ninja
+  namespace: crossplane-controlplane-cluster
+spec:
+  subdomain: crossplane

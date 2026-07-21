@@ -10,3 +10,5 @@ resources:
   - ../../../applications/crossplane-providers/family-cloudflare/provider-config
   - crossplane.environment-config.yaml
   - delegated-hosted-zone-aws.controlplane-rye-ninja.yaml
+  - namespace.crossplane-controlplane-cluster.yaml
+  - delegated-hosted-zone-aws.crossplane-rye-ninja.yaml
