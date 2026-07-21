@@ -33,10 +33,13 @@ so it may unblock IPv6 iSCSI on the cluster.
 
 ## Open [H] decisions (needed before indicated steps)
 
-- ~~**A5**~~ CLOSED: replicate `ca.rye.ninja` pattern — Envoy Gateway `merged-eg`
-  HTTPS terminate listener + HTTPRoute + external-dns AAAA from GUA VIP. No
-  port-forward rules, no Cloudflare Tunnel. `mode: Terminate` instead of
-  Passthrough since Keycloak/Pinniped use cert-manager certs not self-TLS.
+- ~~**A5**~~ CLOSED: Envoy Gateway `merged-eg` HTTPS terminate + HTTPRoute +
+  external-dns AAAA from GUA VIP (same as ca.rye.ninja). Certs must be
+  publicly trusted (browser-facing OIDC) — Let's Encrypt DNS-01 via Cloudflare,
+  new `cert-manager-acme` Kustomization with `letsencrypt-prod` +
+  `letsencrypt-staging` ClusterIssuers. Reuses existing Cloudflare token
+  (`cloudflare-api-token/credential` in 1Password) via ESO ExternalSecret in
+  cert-manager namespace. No new Cloudflare token, no port 80 inbound needed.
 - **A6** CLOSED on R2: Cloudflare R2 bucket `openbao-snapshots`, scoped API
   token in SOPS. Free egress, S3-compatible, no Crossplane dependency, no
   SPIFFE in CronJob. **[H] before step 7**: create bucket + token in

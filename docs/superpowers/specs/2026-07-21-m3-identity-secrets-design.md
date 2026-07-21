@@ -105,22 +105,37 @@ hardening step.
 
 ### A5 — Public exposure path for id.rye.ninja and sso.rye.ninja: same as ca.rye.ninja
 
-Replicate the `ca.rye.ninja` pattern exactly:
+Replicate the `ca.rye.ninja` pattern for DNS and Gateway:
 
 - Envoy Gateway (`merged-eg`) listener with hostname patched at the cluster
   level (same `clusters/controlplane/patches/` pattern)
 - external-dns reads the Gateway/Route source and creates a public AAAA
   pointing at the Envoy Gateway GUA VIP — no UniFi port-forward rules, no
   Cloudflare Tunnel
-- The GUA VIP is already publicly routable on IPv6 (same as `ca.rye.ninja`)
+- The GUA VIP is already publicly routable on IPv6
 
-The only implementation difference from step-ca: Keycloak and Pinniped
-Supervisor terminate TLS themselves via cert-manager-issued certs, so these
-use `mode: Terminate` HTTPS listeners + HTTPRoutes rather than TLS Passthrough
-+ TLSRoutes. The Gateway class, external-dns mechanism, and DNS record type
-are identical.
+Implementation difference from step-ca: Keycloak and Pinniped terminate TLS
+at Envoy Gateway (`mode: Terminate` HTTPS listeners + HTTPRoutes, not TLS
+Passthrough + TLSRoutes).
 
-No new infrastructure required. **This decision is closed; no [H] gate needed.**
+**Certificates must be publicly trusted** — these are browser-facing OIDC
+endpoints; step-ca-issued certs are not valid here. Use Let's Encrypt via
+cert-manager ACME DNS-01:
+
+- New `applications/cert-manager-acme/` Kustomization: one
+  `letsencrypt-prod` ClusterIssuer (ACME DNS-01, Cloudflare solver) and one
+  `letsencrypt-staging` ClusterIssuer for testing
+- Cloudflare API token: reuse the existing `cloudflare-api-token/credential`
+  from 1Password — it already has `Zone:Read` + `DNS:Edit` on `rye.ninja`
+  (same permissions cert-manager DNS-01 needs). Sync via a new ESO
+  ExternalSecret in the `cert-manager` namespace.
+- Each service gets a cert-manager `Certificate` resource referencing
+  `letsencrypt-prod`; Envoy Gateway reads the resulting Secret via
+  `certificateRefs` on the HTTPS listener.
+- No new Cloudflare token needed; no inbound port 80 required (DNS-01 is
+  purely out-of-band via the Cloudflare API).
+
+**This decision is closed; no [H] gate needed.**
 
 ### A6 — Off-site backup destination for OpenBao raft snapshots: Cloudflare R2
 
@@ -156,7 +171,8 @@ proceeding.
 | 6 | Wire ESO ClusterSecretStore → OpenBao (Kubernetes auth); migrate `aws-account-creds` to OpenBao break-glass path; create proof-of-concept ExternalSecret | | ESO ClusterSecretStore Healthy; ExternalSecret syncs; `aws sts get-caller-identity` from the synced creds succeeds |
 | 7 | OpenBao raft snapshot CronJob → Garage `openbao-snapshots` bucket (+ off-site copy per A6) | | Snapshot appears in Garage; restore drill: unseal a scratch OpenBao from the snapshot |
 | 8 | `keycloak-db` CNPG cluster on `democratic-csi-nfs-pg`; barman to Garage `keycloak-db-barman` bucket | H: confirm realm/group names | keycloak-db CNPG Cluster Ready; barman backup active |
-| 9 | Keycloak: deploy on `controlplane`, wire to keycloak-db; realm `ryezone-labs` + groups (`platform-admin`, `viewer`) bootstrapped declaratively; expose at `id.rye.ninja` via Envoy Gateway HTTPS terminate + external-dns AAAA (same pattern as ca.rye.ninja, A5) | | Keycloak admin UI reachable at `https://id.rye.ninja`; realm exists; declarative config re-applies cleanly |
+| 9a | `cert-manager-acme`: deploy `letsencrypt-staging` + `letsencrypt-prod` ClusterIssuers (ACME DNS-01, Cloudflare); ESO ExternalSecret for the Cloudflare token in `cert-manager` namespace | | staging ClusterIssuer issues a test Certificate successfully |
+| 9b | Keycloak: deploy on `controlplane`, wire to keycloak-db; realm `ryezone-labs` + groups (`platform-admin`, `viewer`) bootstrapped declaratively; expose at `id.rye.ninja` via Envoy Gateway HTTPS terminate + Let's Encrypt cert (A5) | | Keycloak admin UI reachable at `https://id.rye.ninja` with a browser-trusted cert; realm exists; declarative config re-applies cleanly |
 | 10 | Pinniped Supervisor + Concierge on `controlplane`; OIDC backend: Keycloak `ryezone-labs`; issuer `https://sso.rye.ninja` | H: run `pinniped get kubeconfig` + `kubectl get pods` | Authenticated `kubectl get pods -n kube-system` succeeds via Pinniped+Keycloak login |
 | 11 | ADRs: ADR-21 amendment (democratic-csi swap, iSCSI unblocked), ADR-25 (OpenBao), ADR-26 (Keycloak+Pinniped); runbooks: OpenBao unseal, OpenBao restore, Keycloak realm restore, Garage node replacement | | ADRs merged; runbooks in `docs/runbooks/` |
 
@@ -198,8 +214,9 @@ proceeding.
 
 ## 7. Human prerequisites (before M3 starts)
 
-- ~~**[H] A5**~~: Closed — replicate the `ca.rye.ninja` Envoy Gateway + external-dns
-  AAAA pattern. No new infrastructure needed.
+- ~~**[H] A5**~~: Closed — Envoy Gateway HTTPS terminate + external-dns AAAA (same
+  as ca.rye.ninja). Certs from Let's Encrypt DNS-01 via Cloudflare (new
+  `cert-manager-acme` Kustomization; reuses existing Cloudflare token).
 - **[H] A6** (before step 7): Create Cloudflare R2 bucket `openbao-snapshots`
   + scoped API token (Object Read & Write on that bucket only); SOPS-encrypt
   under `clusters/controlplane/`. Decision closed on R2; bucket doesn't exist yet.
