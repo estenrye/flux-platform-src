@@ -24,5 +24,6 @@
 - [M2 Step 8 Delegated-Zone Migration](m2-step8-delegated-zone-migration.md) — crossplane-rye-ninja stack moved to controlplane 2026-07-21; managementPolicies replaced deletionPolicy, 3 resource kinds stall under partial policy lists
 - [M2 Step 11 Restore Drill](m2-step11-restore-drill.md) — step-ca-db restore drill passed 2026-07-21; scratch CNPG clusters need explicit ingress+egress NetworkPolicies under default-deny
 - [M2 Step 14 ADR and Runbooks](m2-step14-adr-and-runbooks.md) — migration ADR-24 drafted 2026-07-21, ADR-15/20 amended, generalized state-migration runbook written; memory/openbrain updates remain decommission-gated
+- [M3 Design](m3-design.md) — democratic-csi swap, Garage, OpenBao, Keycloak, Pinniped; three open [H] decisions (exposure path, off-site backup, realm groups)
 - [M2 Step 12 Go Decision](m2-step12-go-decision.md) — Esten decided GO 2026-07-21, soak curtailed from planned 7 days to <1 day; step 13 decommission now unblocked
 - [M2 Step 13 Decommission Tracker](m2-step13-decommission.md) — live tracker of 7 decommission items; item 1 done 2026-07-21; controlplane's Flux reconciles from the rendered repo, not flux-platform-src directly
