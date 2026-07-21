@@ -182,7 +182,7 @@ near-miss (item 1) is permanently closed — there's no cluster left for
 Flux to un-suspend or a provider to reconcile against, regardless of any
 remaining `["Observe"]`-only Kubernetes objects that existed there.
 
-## Item 7 — memory/openbrain updates: PARTIAL (2026-07-21)
+## Item 7 — memory/openbrain updates: DONE (2026-07-21)
 
 Memory docs done: [[cluster-kubeconfig-lookup]] updated to flag the Spot
 path as removed. `step-ca-connectivity-validation` needed no change — it
@@ -191,9 +191,9 @@ already read as historical/accurate rather than needing a fresh edit.
 `m1-implementation-status` given a superseded-note pointing at this
 tracker and ADR-24.
 
-**openbrain not done — blocked, needs Esten.** No Open Brain MCP tool
-was available in this session; per the session's own system note, those
-connectors need authorization via claude.ai connector settings (or `/mcp`
-in an interactive session), which can't be done headlessly. The design
-wants `environment=home-lab`, `project=flux-platform` set there. This is
-the one item of all 7 that's still fully open.
+openbrain done: M2 completion thought captured (2026-07-21, session with
+Open Brain MCP available) — standalone observation covering all 14 steps,
+key outcomes (step-ca root fp, Crossplane SVID auth, state-migration
+pattern, Spot deletion), the soak deviation, and the mid-decommission
+near-miss lesson. Tags: `[environment=home-lab] [project=flux-platform]`.
+Next milestone pointer (M3: democratic-csi/Garage/OpenBao) included.
