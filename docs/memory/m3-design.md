@@ -37,8 +37,10 @@ so it may unblock IPv6 iSCSI on the cluster.
   HTTPS terminate listener + HTTPRoute + external-dns AAAA from GUA VIP. No
   port-forward rules, no Cloudflare Tunnel. `mode: Terminate` instead of
   Passthrough since Keycloak/Pinniped use cert-manager certs not self-TLS.
-- **A6** (before step 7): off-site OpenBao snapshot destination
-  — Cloudflare R2 (recommended, pattern established) vs AWS S3
+- **A6** CLOSED on R2: Cloudflare R2 bucket `openbao-snapshots`, scoped API
+  token in SOPS. Free egress, S3-compatible, no Crossplane dependency, no
+  SPIFFE in CronJob. **[H] before step 7**: create bucket + token in
+  Cloudflare dashboard, SOPS-encrypt under `clusters/controlplane/`.
 - **Realm/group names** (before step 8): confirm `platform-admin`, `viewer`,
   tenant group naming — baked into declarative config, hard to rename post-Pinniped RBAC
 

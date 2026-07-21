@@ -122,17 +122,24 @@ are identical.
 
 No new infrastructure required. **This decision is closed; no [H] gate needed.**
 
-### A6 — Off-site backup destination for OpenBao raft snapshots **[H: decide]**
+### A6 — Off-site backup destination for OpenBao raft snapshots: Cloudflare R2
 
-Options (both already have credentials in the cluster):
+Cloudflare R2: static API token in SOPS (same bootstrap-credential pattern
+as other pre-OpenBao secrets; avoids the circular dependency of storing the
+off-site backup credential inside the thing being backed up), free egress,
+S3-compatible API, well within R2's free tier at home-lab snapshot volumes
+(snapshot size is a few MB; 30-day retention stays under 300 MB indefinitely).
 
-| Option | Notes |
-|---|---|
-| Cloudflare R2 | step-ca-db barman used R2 as the interim target in M0; credential pattern already exists |
-| AWS S3 (Crossplane-provisioned bucket) | AWS access already present; adds a dependency on Crossplane being healthy |
+AWS S3 was the alternative. Cost is negligible for both (~$0/mo). S3 was
+rejected because the cleanest auth path (Roles Anywhere + SPIFFE) adds a
+SPIFFE volume mount to the snapshot CronJob, and a Crossplane-provisioned
+bucket adds a Crossplane-healthy dependency to a DR artifact. A static IAM
+key in SOPS would work but adds another static credential to manage.
 
-R2 is the lower-friction path — credential pattern is established, no Crossplane
-dependency for the backup path. **[H] Confirm before step 5.**
+**[H] Before step 7**: create the Cloudflare R2 bucket (`openbao-snapshots`)
+and a scoped API token (Object Read & Write on that bucket only); SOPS-encrypt
+the token under `clusters/controlplane/`. The R2 bucket for step-ca-db barman
+(PR #64, draft, never merged) was never created — this is a fresh bucket.
 
 ## 3. Execution sequence
 
@@ -193,8 +200,9 @@ proceeding.
 
 - ~~**[H] A5**~~: Closed — replicate the `ca.rye.ninja` Envoy Gateway + external-dns
   AAAA pattern. No new infrastructure needed.
-- **[H] A6**: Confirm off-site backup destination for OpenBao snapshots
-  (Cloudflare R2 recommended; AWS S3 alternative). Needed before step 7.
+- **[H] A6** (before step 7): Create Cloudflare R2 bucket `openbao-snapshots`
+  + scoped API token (Object Read & Write on that bucket only); SOPS-encrypt
+  under `clusters/controlplane/`. Decision closed on R2; bucket doesn't exist yet.
 - **[H] Realm/group names**: Confirm or amend the group model from the spec
   (`platform-admin`, `viewer`, tenant groups) before step 8. Names are baked
   into declarative config and hard to rename after Pinniped RBAC bindings
