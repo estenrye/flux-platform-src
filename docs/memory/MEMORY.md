@@ -18,3 +18,5 @@
 - [VIP Renumber Flakiness Investigation](vip-renumber-flakiness-investigation.md) — RESOLVED: root-caused to externalTrafficPolicy:Local + a Calico BGP-advertisement bug; fixed via 6-way replica spread across all nodes
 - [M2 Step 6 Roles Anywhere/CFN Refactor](m2-step6-roles-anywhere-cfn-refactor.md) — Crossplane install + CloudFormation generalization exist to deploy a new AWS Roles Anywhere trust root for ca.rye.ninja
 - [Crossplane Bootstrap Phasing](crossplane-bootstrap-phasing.md) — Crossplane's runtime-self-installed CRDs race Flux's atomic dry-run; permanently solved with 4 dependsOn-chained Flux Kustomizations (ADR-10 amendment), not manual phased commits
+- [UniFi Zone-Based Firewall](unifi-zone-firewall.md) — Routed subnets (VIPs, NAT64) aren't bound to any UniFi zone; WireGuard clients land in External not VPN; DMZ-Kubernetes zone build-out for VLAN 100
+- [External-DNS Multi-Instance Collision](external-dns-multi-instance-collision.md) — Two external-dns Helm releases in one cluster/namespace need distinct releaseName, not just kustomize nameSuffix, or pod selector labels collide

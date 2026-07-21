@@ -1,10 +1,16 @@
 # Services-Network Design: Routed VIP Subnets + Zone Firewall
 
 Date: 2026-07-15
-Status: **Partially executed 2026-07-15.** Routed VIP subnets (design §2
-items 1–2, migration steps 1–5) are done and validated. Zone-based
-firewall (§2 item 3) is still open — not blocking, routing correctness
-didn't depend on it.
+Status: **Executed.** Routed VIP subnets (design §2 items 1–2, migration
+steps 1–5) done and validated 2026-07-15. Zone-based firewall (§2 item 3)
+executed 2026-07-20/21: `DMZ-Kubernetes` zone created for VLAN 100
+(`ryezone-labs-ipv6`), Policy Table rules built for Internal↔DMZ-Kubernetes,
+External→DMZ-Kubernetes (ingress VIP pool, port 443), and the NAT64
+prefix (found to need the same routed-subnet-not-bound-to-zone fix as
+the ingress VIP). See [[unifi-zone-firewall]] for the findings —
+notably that WireGuard remote-access clients classify as External, not
+the more-permissive built-in VPN zone (that zone has no networks bound
+to it yet; left as a follow-up, not fixed here).
 Parent: [M2 design](2026-07-13-m2-migration-design.md) §4.6 deferred item; amends ADR-22 (UniFi BGP) and ADR-23 (IPv6-only), both amended 2026-07-15
 Execute: before the M2 step-10 soak (steps 6-8 are network-indifferent and proceed in parallel)
 
@@ -50,17 +56,19 @@ so no firewall policy can be expressed for client→service traffic.
 | `providers/kvm/network.yaml` | `gua_pd_prefix` added; `internal_lb_vip_pool` + `ingress_vip_subnet`/`ingress_vip_pool` replace the `:ffff::/112` entries | Done |
 | Calico (`applications/calico/controlplane`) | **Not an in-place re-CIDR** — `IPPool.spec.cidr` is immutable (Flux dry-run rejected the original attempt). New pools `lb-internal-ula-routed`/`lb-ingress-gua-routed` added; old `lb-internal-ula`/`lb-ingress-gua` disabled, not deleted; `BGPConfiguration.serviceLoadBalancerIPs` points at the new pools | Done |
 | `providers/kvm/unifi-frr.conf` | `CALICO-VIPS-IN` regenerated for the new prefixes | Done, uploaded and applied |
-| UniFi | client-VLAN move ✓, PD size check ✓; zones/policies still open | Partial |
+| UniFi | client-VLAN move ✓, PD size check ✓, zones/policies ✓ (`DMZ-Kubernetes` zone + Policy Table rules, 2026-07-20/21) | Done |
 | Cleanup | `workstation-nat64-route.md` rewritten (retired, not deleted); this doc and the M2 design §4.6 caveat updated to reflect execution | Done |
 | ADRs | ADR-22/ADR-23 amended directly (not deferred to M2 ADR pass step 14 — done now while the context is fresh) | Done |
 | Envoy Gateway (`applications/envoy-gateway`) | *(not in original scope — found during step 4 validation)* `EnvoyProxy` custom-proxy-config: 6 replicas, required anti-affinity, control-plane taint toleration, `maxSurge:0`/`maxUnavailable:1`; mitigates a separate Calico BGP-advertisement bug for `externalTrafficPolicy: Local` services (ADR-22 amendment) | Done |
 
 ## 4. Migration order (VIP churn is LAN-only; no fleet consumers yet)
 
-1. **[Done, partial]** UniFi prep: PD check ✓ (`/60`, confirmed via
+1. **Done.** UniFi prep: PD check ✓ (`/60`, confirmed via
    odhcp6c — `docs/memory/unifi-gateway-pd-discovery.md`), client VLAN ✓
-   (VLAN 101). Zones: **not done** — VLAN 100 and 101 both still in
-   UniFi's default "internal" zone; tracked separately, not blocking.
+   (VLAN 101). Zones ✓ (2026-07-20/21): `DMZ-Kubernetes` zone created for
+   VLAN 100 (`ryezone-labs-ipv6`); Policy Table rules for
+   Internal↔DMZ-Kubernetes, External→DMZ-Kubernetes (ingress VIP pool),
+   and the NAT64 prefix — see `docs/memory/unifi-zone-firewall.md`.
 2. **Done.** PR: network.yaml + Calico pools + BGPConfig + FRR regen.
    Calico's `IPPool.spec.cidr` is immutable — this became a new-pool
    swap (old pools disabled, not deleted) rather than an in-place edit;
@@ -84,6 +92,6 @@ so no firewall policy can be expressed for client→service traffic.
 | Risk | Handling | Outcome |
 |---|---|---|
 | PD is /64-only | ULA-only LAN VIPs; public-GUA question moves to M6 where its consumers live | N/A — PD confirmed `/60`, both pools routed |
-| UniFi zone semantics for routed BGP prefixes unclear | address-group firewall rules as fallback; validate in step 1 | Still open — zones not yet configured for VLAN 100/101; the routed VIP `/64`s aren't bound to any UniFi network at all, so this needs the address-group fallback when tackled |
+| UniFi zone semantics for routed BGP prefixes unclear | address-group firewall rules as fallback; validate in step 1 | Resolved 2026-07-20/21 — confirmed routed prefixes (VIP pools, NAT64) aren't bound to any UniFi network/zone regardless; fixed with IP-scoped (not zone-scoped) Policy Table destination rules. See `docs/memory/unifi-zone-firewall.md` |
 | VIP churn breaks something mid-migration | do before the soak; only LAN consumers exist; step-ca in-cluster paths use service DNS, not VIPs | Confirmed — the one live consumer (`ca.rye.ninja`) briefly broke during the pool swap and Service recreation, as expected; no other consumers affected |
 | Node-GUA NS mystery persists for node-initiated flows | out of scope here — client paths no longer depend on it; tracked for the M11 chaos/hardening pass | Not encountered during this work — the flakiness that did surface (ECMP + `externalTrafficPolicy: Local`) was a different, unrelated Calico bug (ADR-22 amendment), not this one |

@@ -37,6 +37,21 @@ Serving chain: leaf `CN=Step Online CA` (24h) ← `CN=ryezone-labs
 Intermediate CA controlplane` (1y, in-cluster) ← offline root. In-cluster
 secret: `csi-driver-spiffe-ca` (cert-manager ns, ESO-mirrored to step-ca).
 
+**Root vs. intermediate gotcha (bit three chainsaw suites, 2026-07-21):**
+`csi-driver-spiffe-ca`'s `tls.crt` is the **intermediate**, not the root
+(`Issuer: CN=ryezone-labs Root CA`, `Subject: CN=ryezone-labs Intermediate
+CA controlplane`). Any script computing "the live root fingerprint" from
+that secret is comparing the wrong cert — it'll never match the pinned
+value above, and `step ca certificate --root <file>` actively rejects a
+non-root file (the CA server checks the given cert's fingerprint against
+what it declares as its own trusted root, not just chain validity). The
+actual root, trust-manager's fleet-distributed Bundle, lives at
+`configmap/ryezone-labs-root` (any namespace, key `root.crt`, plain text —
+no base64 decode, unlike a Secret). Fixed in
+`tests/platform-baseline/step-ca/chainsaw-test.yaml`,
+`tests/step-ca/internal/chainsaw-test.yaml`, and
+`tests/step-ca/external/chainsaw-test.yaml`.
+
 Gotchas from the workstation ([[workstation-nat64-route]]): needs the VIP
 /112 host route; first connection after ND-cache expiry may stall
 (asymmetric return + macOS MAC rotation) — retry once.
