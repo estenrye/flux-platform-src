@@ -128,6 +128,14 @@ Spot cloudspace once a 7-day soak passes clean. The plan amendments:
 - `ca.crossplane.rye.ninja` and the `crossplane.rye.ninja` zone are
   transitional — both retire at decommission (§5 of the design). Anything
   still resolving them after that point is a bug, not a slow migration.
+- `clusters/crossplane/` (source repo, §5 item 5): moved, not deleted, to
+  `docs/migration/archive/crossplane/` — the design left this as an
+  implementer's choice. Moving preserves git blame/history on the
+  manifests and gives a stable place to link from this ADR and the
+  inventory doc; nothing referenced it by path outside `clusters/`, so
+  the move required no other changes. `tests/platform-baseline/values/
+  crossplane.env` stays in place, marked decommissioned in a header
+  comment, per the design's explicit instruction to keep it for history.
 - Several operational gotchas surfaced during execution, generalized into
   memory/runbooks rather than left as tribal knowledge: `deletionPolicy`
   doesn't exist on this Crossplane version (replaced by

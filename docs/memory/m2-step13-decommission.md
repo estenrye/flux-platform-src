@@ -152,9 +152,19 @@ Crossplane is fully paused/suspended/Observe-only (see item 1's
 near-miss writeup), so it was already inert; archiving the GitHub repo
 itself is what actually matters here.
 
-## Item 5 — archive `clusters/crossplane/` in source repo
+## Item 5 — archive `clusters/crossplane/` in source repo: DONE (2026-07-21)
 
-Status: not started.
+Chose **move**, not delete (design left this as an implementer's choice):
+`git mv clusters/crossplane docs/migration/archive/crossplane`, plus a
+new `ARCHIVED.md` in that directory pointing back to ADR-24/this tracker.
+Nothing else in the repo referenced `clusters/crossplane` by path —
+CI's cluster discovery (`.bin/render/render-discover-clusters.sh`) walks
+`clusters/*/catalog.yaml` dynamically, confirmed it now returns only
+`controlplane`. `tests/platform-baseline/values/crossplane.env` was kept
+in place (not moved) with a decommissioned-header comment, exactly per
+the design's instruction — the portable suites under `tests/
+platform-baseline/{crossplane,delegated-zone,eso,...}/` are shared with
+`controlplane` and were not touched.
 
 ## Item 6 [H] — delete Rackspace Spot cloudspace
 
