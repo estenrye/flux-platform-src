@@ -50,7 +50,7 @@ SECRET_NAME="cloudflare-r2-${BUCKET_NAME}"
 SECRET_OUT="${CLUSTER_PATH}/secrets/${SECRET_NAME}.sops.yaml"
 
 # ── Prereqs ───────────────────────────────────────────────────────────────────
-for cmd in curl jq sops op age-keygen; do
+for cmd in curl jq sops op openssl; do
   command -v "${cmd}" >/dev/null || { error "Required command not found: ${cmd}"; exit 1; }
 done
 
@@ -114,6 +114,28 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# ── Look up R2 permission group IDs ──────────────────────────────────────────
+# R2 S3-compatible tokens are standard Cloudflare API tokens with R2 permission
+# policies. accessKeyId = token.id; secretAccessKey = SHA-256(token.value).
+info "Looking up R2 bucket permission group IDs..."
+PERM_GROUPS=$(curl -sf \
+  -H "Authorization: Bearer ${CF_API_TOKEN}" \
+  "https://api.cloudflare.com/client/v4/user/tokens/permission_groups")
+echo "${PERM_GROUPS}" | jq -r '.success' | grep -q '^true$' \
+  || { error "Failed to list permission groups — check CF_API_TOKEN permissions"; exit 1; }
+
+BUCKET_READ_ID=$(echo "${PERM_GROUPS}" | jq -r '.result[] | select(.name == "Workers R2 Storage Bucket Item Read") | .id')
+BUCKET_WRITE_ID=$(echo "${PERM_GROUPS}" | jq -r '.result[] | select(.name == "Workers R2 Storage Bucket Item Write") | .id')
+
+[ -n "${BUCKET_READ_ID}" ]  || { error "Could not find 'Workers R2 Storage Bucket Item Read' permission group"; exit 1; }
+[ -n "${BUCKET_WRITE_ID}" ] || { error "Could not find 'Workers R2 Storage Bucket Item Write' permission group"; exit 1; }
+info "Read group ID:  ${BUCKET_READ_ID}"
+info "Write group ID: ${BUCKET_WRITE_ID}"
+
+# Jurisdiction is "default" for buckets created without a location restriction.
+CF_R2_JURISDICTION="${CF_R2_JURISDICTION:-default}"
+RESOURCE_KEY="com.cloudflare.edge.r2.bucket.${CF_ACCOUNT_ID}_${CF_R2_JURISDICTION}_${BUCKET_NAME}"
+
 # ── Create scoped R2 API token ────────────────────────────────────────────────
 info "Creating scoped R2 API token for bucket '${BUCKET_NAME}'..."
 TOKEN_RESPONSE=$(curl -sf -X POST \
@@ -121,14 +143,18 @@ TOKEN_RESPONSE=$(curl -sf -X POST \
   -H "Content-Type: application/json" \
   --data "$(jq -n \
     --arg name "${CLUSTER_NAME}-${BUCKET_NAME}-rw" \
-    --arg bucket "${BUCKET_NAME}" \
+    --arg resource_key "${RESOURCE_KEY}" \
+    --arg read_id "${BUCKET_READ_ID}" \
+    --arg write_id "${BUCKET_WRITE_ID}" \
     '{
       name: $name,
-      permissions: ["admin:read", "admin:write"],
-      buckets: [$bucket],
-      ttlSeconds: 0
+      policies: [{
+        effect: "allow",
+        resources: {($resource_key): "*"},
+        permission_groups: [{id: $read_id}, {id: $write_id}]
+      }]
     }')" \
-  "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/r2/tokens")
+  "https://api.cloudflare.com/client/v4/user/tokens")
 
 echo "${TOKEN_RESPONSE}" > "${TMP}/token-response.json"
 
@@ -136,17 +162,18 @@ echo "${TOKEN_RESPONSE}" | jq -r '.success' | grep -q '^true$' \
   || { error "R2 token creation failed: $(echo "${TOKEN_RESPONSE}" | jq -r '.errors')"; exit 1; }
 
 TOKEN_ID=$(jq -r '.result.id' "${TMP}/token-response.json")
-ACCESS_KEY_ID=$(jq -r '.result.accessKeyId' "${TMP}/token-response.json")
-SECRET_ACCESS_KEY=$(jq -r '.result.value' "${TMP}/token-response.json")
+TOKEN_VALUE=$(jq -r '.result.value' "${TMP}/token-response.json")
 
-[ -n "${TOKEN_ID}" ] && [ "${TOKEN_ID}" != "null" ] \
-  || { error "R2 token response missing 'id' — API shape may have changed"; exit 1; }
-[ -n "${ACCESS_KEY_ID}" ] && [ "${ACCESS_KEY_ID}" != "null" ] \
-  || { error "R2 token response missing 'accessKeyId' — API shape may have changed"; exit 1; }
-[ -n "${SECRET_ACCESS_KEY}" ] && [ "${SECRET_ACCESS_KEY}" != "null" ] \
-  || { error "R2 token response missing 'value' — API shape may have changed"; exit 1; }
+[ -n "${TOKEN_ID}" ]    && [ "${TOKEN_ID}" != "null" ]    \
+  || { error "Token response missing 'id' — API shape may have changed"; exit 1; }
+[ -n "${TOKEN_VALUE}" ] && [ "${TOKEN_VALUE}" != "null" ] \
+  || { error "Token response missing 'value' — API shape may have changed"; exit 1; }
 
-success "R2 token created (id: ${TOKEN_ID}, accessKeyId: ${ACCESS_KEY_ID})"
+# S3 access key = token id; S3 secret = SHA-256 hex of token value
+ACCESS_KEY_ID="${TOKEN_ID}"
+SECRET_ACCESS_KEY=$(printf '%s' "${TOKEN_VALUE}" | openssl dgst -sha256 | awk '{print $NF}')
+
+success "R2 token created (access-key-id: ${ACCESS_KEY_ID})"
 
 # ── Store in 1Password ────────────────────────────────────────────────────────
 info "Storing credentials in 1Password (vault: ${CLUSTER_NAME}, item: ${OP_ITEM_NAME})..."

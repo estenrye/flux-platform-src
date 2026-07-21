@@ -40,7 +40,7 @@ SECRET_NAME="cloudflare-r2-${BUCKET_NAME}"
 SECRET_OUT="${CLUSTER_PATH}/secrets/${SECRET_NAME}.sops.yaml"
 
 # ── Prereqs ───────────────────────────────────────────────────────────────────
-for cmd in curl jq sops op; do
+for cmd in curl jq sops op openssl; do
   command -v "${cmd}" >/dev/null || { error "Required command not found: ${cmd}"; exit 1; }
 done
 
@@ -82,6 +82,23 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# ── Look up R2 permission group IDs ──────────────────────────────────────────
+info "Looking up R2 bucket permission group IDs..."
+PERM_GROUPS=$(curl -sf \
+  -H "Authorization: Bearer ${CF_API_TOKEN}" \
+  "https://api.cloudflare.com/client/v4/user/tokens/permission_groups")
+echo "${PERM_GROUPS}" | jq -r '.success' | grep -q '^true$' \
+  || { error "Failed to list permission groups — check CF_API_TOKEN permissions"; exit 1; }
+
+BUCKET_READ_ID=$(echo "${PERM_GROUPS}" | jq -r '.result[] | select(.name == "Workers R2 Storage Bucket Item Read") | .id')
+BUCKET_WRITE_ID=$(echo "${PERM_GROUPS}" | jq -r '.result[] | select(.name == "Workers R2 Storage Bucket Item Write") | .id')
+
+[ -n "${BUCKET_READ_ID}" ]  || { error "Could not find 'Workers R2 Storage Bucket Item Read' permission group"; exit 1; }
+[ -n "${BUCKET_WRITE_ID}" ] || { error "Could not find 'Workers R2 Storage Bucket Item Write' permission group"; exit 1; }
+
+CF_R2_JURISDICTION="${CF_R2_JURISDICTION:-default}"
+RESOURCE_KEY="com.cloudflare.edge.r2.bucket.${CF_ACCOUNT_ID}_${CF_R2_JURISDICTION}_${BUCKET_NAME}"
+
 # ── Create new scoped R2 token ────────────────────────────────────────────────
 info "Creating new R2 API token for bucket '${BUCKET_NAME}'..."
 TOKEN_RESPONSE=$(curl -sf -X POST \
@@ -89,14 +106,18 @@ TOKEN_RESPONSE=$(curl -sf -X POST \
   -H "Content-Type: application/json" \
   --data "$(jq -n \
     --arg name "${CLUSTER_NAME}-${BUCKET_NAME}-rw" \
-    --arg bucket "${BUCKET_NAME}" \
+    --arg resource_key "${RESOURCE_KEY}" \
+    --arg read_id "${BUCKET_READ_ID}" \
+    --arg write_id "${BUCKET_WRITE_ID}" \
     '{
       name: $name,
-      permissions: ["admin:read", "admin:write"],
-      buckets: [$bucket],
-      ttlSeconds: 0
+      policies: [{
+        effect: "allow",
+        resources: {($resource_key): "*"},
+        permission_groups: [{id: $read_id}, {id: $write_id}]
+      }]
     }')" \
-  "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/r2/tokens")
+  "https://api.cloudflare.com/client/v4/user/tokens")
 
 echo "${TOKEN_RESPONSE}" > "${TMP}/token-response.json"
 
@@ -104,17 +125,17 @@ echo "${TOKEN_RESPONSE}" | jq -r '.success' | grep -q '^true$' \
   || { error "R2 token creation failed: $(echo "${TOKEN_RESPONSE}" | jq -r '.errors')"; exit 1; }
 
 NEW_TOKEN_ID=$(jq -r '.result.id' "${TMP}/token-response.json")
-NEW_ACCESS_KEY_ID=$(jq -r '.result.accessKeyId' "${TMP}/token-response.json")
-NEW_SECRET_ACCESS_KEY=$(jq -r '.result.value' "${TMP}/token-response.json")
+NEW_TOKEN_VALUE=$(jq -r '.result.value' "${TMP}/token-response.json")
 
-[ -n "${NEW_TOKEN_ID}" ] && [ "${NEW_TOKEN_ID}" != "null" ] \
-  || { error "R2 token response missing 'id' — API shape may have changed"; exit 1; }
-[ -n "${NEW_ACCESS_KEY_ID}" ] && [ "${NEW_ACCESS_KEY_ID}" != "null" ] \
-  || { error "R2 token response missing 'accessKeyId' — API shape may have changed"; exit 1; }
-[ -n "${NEW_SECRET_ACCESS_KEY}" ] && [ "${NEW_SECRET_ACCESS_KEY}" != "null" ] \
-  || { error "R2 token response missing 'value' — API shape may have changed"; exit 1; }
+[ -n "${NEW_TOKEN_ID}" ]    && [ "${NEW_TOKEN_ID}" != "null" ]    \
+  || { error "Token response missing 'id' — API shape may have changed"; exit 1; }
+[ -n "${NEW_TOKEN_VALUE}" ] && [ "${NEW_TOKEN_VALUE}" != "null" ] \
+  || { error "Token response missing 'value' — API shape may have changed"; exit 1; }
 
-success "New token created (id: ${NEW_TOKEN_ID}, accessKeyId: ${NEW_ACCESS_KEY_ID})"
+NEW_ACCESS_KEY_ID="${NEW_TOKEN_ID}"
+NEW_SECRET_ACCESS_KEY=$(printf '%s' "${NEW_TOKEN_VALUE}" | openssl dgst -sha256 | awk '{print $NF}')
+
+success "New token created (access-key-id: ${NEW_ACCESS_KEY_ID})"
 
 # ── Update 1Password ──────────────────────────────────────────────────────────
 info "Updating 1Password item '${OP_ITEM_NAME}'..."
@@ -160,7 +181,7 @@ success "SOPS Secret re-encrypted at ${SECRET_OUT}."
 info "Deleting old R2 token (id: ${OLD_TOKEN_ID})..."
 DELETE_RESULT=$(curl -sf -X DELETE \
   -H "Authorization: Bearer ${CF_API_TOKEN}" \
-  "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/r2/tokens/${OLD_TOKEN_ID}")
+  "https://api.cloudflare.com/client/v4/user/tokens/${OLD_TOKEN_ID}")
 echo "${DELETE_RESULT}" | jq -r '.success' | grep -q '^true$' \
   || { error "Old token deletion failed: $(echo "${DELETE_RESULT}" | jq -r '.errors')"; exit 1; }
 success "Old token deleted."
