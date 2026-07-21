@@ -173,3 +173,9 @@ rotate-github-app-credentials:
 
 rotate-ci-service-account:
 	.bin/rotate-ci-service-account.sh
+
+provision-cloudflare-r2-bucket:
+	CLUSTER=$(CLUSTER) BUCKET_NAME=$(BUCKET_NAME) SECRET_NS=$(SECRET_NS) CF_API_TOKEN=$(CF_API_TOKEN) .bin/provision-cloudflare-r2-bucket.sh
+
+rotate-cloudflare-r2-token:
+	CLUSTER=$(CLUSTER) BUCKET_NAME=$(BUCKET_NAME) CF_API_TOKEN=$(CF_API_TOKEN) .bin/rotate-cloudflare-r2-token.sh
