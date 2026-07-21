@@ -128,13 +128,25 @@ Spot cloudspace once a 7-day soak passes clean. The plan amendments:
 - `ca.crossplane.rye.ninja` and the `crossplane.rye.ninja` zone are
   transitional — both retire at decommission (§5 of the design). Anything
   still resolving them after that point is a bug, not a slow migration.
-- Two operational gotchas surfaced during execution, generalized into
+- Several operational gotchas surfaced during execution, generalized into
   memory/runbooks rather than left as tribal knowledge: `deletionPolicy`
   doesn't exist on this Crossplane version (replaced by
-  `managementPolicies`; see the state-migration runbook), and any new
+  `managementPolicies`; see the state-migration runbook), any new
   `cnpg.io/cluster` name on `controlplane` starts with zero traffic under
   the namespace's default-deny NetworkPolicy posture (see the restore
-  runbook).
+  runbook), and — the most consequential — a source cluster's
+  `crossplane-system` deployments scaled to zero without also suspending
+  that cluster's Flux is not actually paused. This caused a real incident
+  at step 13: Spot's Flux silently reconciled the pause away, and once
+  the delegated zone's AWS resources were deleted on `controlplane`,
+  Spot's still-`Create`-enabled provider recreated the whole stack —
+  including, briefly, live production DNS records — three times before
+  being fully stopped. No lasting damage (caught and cleaned up each
+  time, verified against AWS and public DNS directly), but it's the
+  clearest evidence in this migration that Crossplane's own status
+  conditions are not sufficient ground truth on their own. Full account:
+  [[m2-step13-decommission]] (memory); fix folded into the state-migration
+  runbook's phase 2.
 
 ## References
 

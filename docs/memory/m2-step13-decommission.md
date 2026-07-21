@@ -47,6 +47,53 @@ Crossplane claim can be blocked by non-Crossplane-managed records
 `aws route53 list-resource-record-sets` before assuming a stuck deletion
 is a Crossplane bug.
 
+### Near-miss: Spot's Crossplane recreated the whole stack three times
+
+**What happened.** Step 8 (2026-07-21, earlier the same day) scaled
+Spot's `crossplane-system` deployments to 0 as the "pause" half of the
+Orphan-protect-and-pause step, but never suspended Spot's own Flux
+Kustomizations (`flux-platform`,
+`flux-platform-external-dns-aws-rolesanywhere`). Sometime between step 8
+and step 13, Spot's Flux reconciled those deployments back to their
+desired (non-zero) replica counts — the exact "Gotcha 3" pattern already
+documented in [[m2-step8-delegated-zone-migration]] for manual Deployment
+patches, just not recognized in time as applying to replica *counts* too,
+not only container args.
+
+With Spot's providers running again and Spot's own copies of the 9
+managed resources still present (Orphan-protected — `Delete` excluded
+from `managementPolicies`, but `Create` still allowed), each provider's
+next `Observe()` found nothing to do *until* item 1's claim deletion on
+`controlplane` removed the AWS-side originals out from under them. At
+that point Spot's standalone MRs saw "resource does not exist" and
+called `Create()` — recreating the IAM role, policy, RolesAnywhere
+profile, Route53 zone, and (once) the 4 Cloudflare NS records, live in
+production DNS, mid-decommission. This repeated **three times** (06:14,
+06:15-ish after a partial re-pause, and 06:22 after a second partial
+re-pause) because each re-pause attempt scaled some but not all 14
+deployments before Flux itself was suspended, and Flux kept re-reverting
+whichever ones I hadn't gotten to yet in the gap before suspension
+landed.
+
+**Resolution**: scaled all 14 `crossplane-system` deployments to 0 *and*
+suspended both Flux Kustomizations (`kubectl patch kustomization ...
+--type merge -p '{"spec":{"suspend":true}}'`) — suspend first, or scale
+everything in one pass before checking Flux, not the other way around.
+Cleaned up all three rounds of recreated AWS/Cloudflare resources
+directly via `aws iam`/`aws rolesanywhere`/`aws route53` and, for the one
+round of Cloudflare records, by briefly re-enabling just Spot's
+`wildbitca-provider-cloudflare-dns` (with Flux already suspended) to
+delete them through Crossplane rather than hunting for a raw Cloudflare
+API token. Verified clean via direct AWS API calls and `dig NS
+crossplane.rye.ninja @1.1.1.1` (public authoritative check) after each
+round, not just Crossplane/kubectl status.
+
+**Generalized fix, now in the runbook**: [docs/runbooks/crossplane-state-migration.md](../runbooks/crossplane-state-migration.md)'s
+"pause the source" step now says to suspend the source cluster's Flux
+Kustomizations *before or atomically with* scaling deployments to zero,
+never after — and to keep them suspended for the entire orphaned-state
+window, not just during the initial migration.
+
 ## Item 2 — delete old Roles Anywhere trust anchor + profiles
 
 Status: not started.

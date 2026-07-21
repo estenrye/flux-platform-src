@@ -31,12 +31,20 @@ doesn't match the inventory — fix or investigate that first.
 
 **`deletionPolicy` doesn't exist on current Crossplane** — it's been
 replaced by `spec.managementPolicies` (array of `Observe|Create|Update|
-Delete|LateInitialize|*`, default `["*"]`). To protect a resource from
-deletion while it's mid-migration, patch it to exclude `Delete`:
+Delete|LateInitialize|*`, default `["*"]`). Patch every resource being
+migrated to **`["Observe"]` only** — not the fuller
+`["Observe","Create","Update","LateInitialize"]` that merely mirrors the
+old `deletionPolicy: Orphan` semantics. This matters: if the source's
+external resource is ever deleted (deliberately, at the corresponding
+step on the destination, or by anything else) while the source's copy
+still has `Create` allowed, the source will recreate it on its very next
+reconcile. `["Observe"]` makes the source cluster's copy a pure read-only
+mirror for the rest of the migration — it can never create, update, or
+delete anything, no matter what else goes wrong.
 
 ```sh
 kubectl -n <ns> patch <kind>.<group> <name> --type merge \
-  -p '{"spec":{"managementPolicies":["Observe","Create","Update","LateInitialize"]}}'
+  -p '{"spec":{"managementPolicies":["Observe"]}}'
 ```
 
 Do this to every resource being migrated, one `kubectl patch` at a time
@@ -44,10 +52,33 @@ Do this to every resource being migrated, one `kubectl patch` at a time
 trip permission classifiers than one-at-a-time equivalents, and one-at-a-
 time gives you a clean per-resource error if something's wrong).
 
-Then pause the source cluster's Crossplane so it can't fight over the
-resources or delete them out from under you: scale `crossplane-system`
-deployments (core, rbac-manager, every provider and function pod) to 0
-replicas, one deployment at a time.
+Then pause the source cluster's Crossplane, **in this order**:
+
+1. **Suspend the source cluster's Flux Kustomization(s) that manage
+   `crossplane-system` first** — `kubectl patch kustomization <name> -n
+   flux-system --type merge -p '{"spec":{"suspend":true}}'` for every
+   Kustomization that could touch it. Do this *before* scaling anything.
+2. Only then scale `crossplane-system` deployments (core, rbac-manager,
+   every provider and function pod — all of them, not just the ones
+   directly touching the migrated resources) to 0 replicas, one at a
+   time.
+
+**Why this order, specifically**: scaling deployments to zero without
+suspending Flux first is not a pause — Flux will reconcile them back to
+their desired (non-zero) replica count on its next pass, typically within
+about a minute. This isn't hypothetical: it happened mid-migration during
+the M2 delegated-zone decommission
+([[m2-step13-decommission]]) — Spot's Flux silently undid a step-8 scale-
+down, and once the corresponding AWS resources were deleted on the
+destination side, Spot's still-running, still-`Create`-enabled provider
+recreated the entire stack (IAM role, policy, RolesAnywhere profile,
+Route53 zone, and — worse — 4 live Cloudflare NS records back in
+production DNS) not once but three times, because each recovery attempt
+scaled some deployments before getting to suspend Flux, and Flux kept
+re-reverting whatever hadn't been caught yet. Scaling *and* suspending
+Flux in the same pass, Flux first, closes this gap. `["Observe"]`-only
+management policy closes it a second, independent way — treat both as
+required, not either-or.
 
 ### 3. Export, then reconcile against the inventory
 
@@ -109,12 +140,18 @@ and — because the external-name annotation is already set — call
 
 ### 5. Restore full management, or roll back
 
-Once verified, patch `managementPolicies` back to `["*"]` on every
-migrated resource (both destination and, if not already retired, the
-now-superseded source copies get deleted at the actual decommission
-step, not here). Full management restores `Delete` capability, which is
-also required for the composition to behave identically to a
-natively-created instance going forward.
+Once verified, patch `managementPolicies` back to `["*"]` on the
+**destination's** migrated resources only. Full management restores
+`Delete` capability, which is also required for the composition to
+behave identically to a natively-created instance going forward.
+
+**Never restore the source copies to `["*"]` or anything past
+`["Observe"]`.** They stay `["Observe"]`-only (per step 2) for the rest
+of their existence — either until the source's Kubernetes objects are
+deleted with an explicit, deliberate policy change at the actual
+decommission step, or, more simply, until the source cluster itself is
+destroyed wholesale. There is no point in this pattern where the source
+copies should ever regain `Create` or `Update`.
 
 **Rollback**, if step 4's verification fails: the imported resources on
 the destination are still Orphan-protected (`Delete` excluded from
@@ -125,6 +162,12 @@ paused and its resources still exist — nothing was lost.
 
 ## Gotchas encountered so far (add to this list when you hit a new one)
 
+- **"Pausing" the source by scaling deployments to zero isn't a pause if
+  its Flux isn't also suspended — see step 2.** Caused a real,
+  three-times-repeated production DNS incident during M2 decommission.
+  Suspend Flux first, scale second, and keep the source's managed
+  resources at `["Observe"]` (not a fuller policy list) as a second,
+  independent guard.
 - **Manual patches to Flux-managed Deployments get reverted.** If you're
   tempted to add `--debug` to a provider pod to see what's happening,
   don't bother if that Deployment is Flux-managed — the next

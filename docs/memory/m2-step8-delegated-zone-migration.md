@@ -23,6 +23,17 @@ soak, per design step 8's "pause" requirement. The 9 MRs on Spot were
 also switched to a Delete-excluding `managementPolicies` before export as
 an orphan safety net.
 
+**Correction, added at step 13**: the scale-to-zero pause described above
+did *not* hold — Spot's own Flux reconciled the deployments back up at
+some point between step 8 and step 13, and because the MRs' policy
+excluded only `Delete` (not `Create`), this caused a real incident when
+the delegated zone was deleted at decommission. Full account:
+[[m2-step13-decommission]]. The generalized runbook now specifies
+suspending the source's Flux *and* using `["Observe"]`-only (not the
+fuller list used here) — treat this doc's "orphan safety net" framing as
+superseded by that guidance, not as the recommended approach for future
+migrations.
+
 **Gotcha 1 — `deletionPolicy` is gone.** This Crossplane version replaced
 the old `spec.deletionPolicy: Orphan/Delete` field entirely with
 `spec.managementPolicies` (array of `Observe|Create|Update|Delete|
