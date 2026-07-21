@@ -166,13 +166,34 @@ the design's instruction — the portable suites under `tests/
 platform-baseline/{crossplane,delegated-zone,eso,...}/` are shared with
 `controlplane` and were not touched.
 
-## Item 6 [H] — delete Rackspace Spot cloudspace
+## Item 6 [H] — delete Rackspace Spot cloudspace: DONE (Esten, 2026-07-21)
 
-Status: not started. Needs `spotctl` OIDC browser login (same blocker
-pattern as the kubeconfig refresh earlier in this session).
+Deleted directly by Esten (needed `spotctl` OIDC browser auth Claude
+can't do headlessly, per the [H] marking). Verified from this side: the
+Spot kubeconfig's apiserver hostname
+(`hcp-e7e12912-c7b3-4dfb-9005-5da5b0d93a6a.spot.rackspace.com`) no longer
+resolves (`no such host`) — consistent with the cloudspace being gone.
+Invoice-$0 confirmation is a Rackspace billing question outside what
+Claude can check; take Esten's word plus the DNS evidence as sufficient
+here.
 
-## Item 7 — memory/openbrain updates
+With this, the entire Spot-side risk from the [[m2-step13-decommission]]
+near-miss (item 1) is permanently closed — there's no cluster left for
+Flux to un-suspend or a provider to reconcile against, regardless of any
+remaining `["Observe"]`-only Kubernetes objects that existed there.
 
-Status: not started. `cluster-kubeconfig-lookup` (Spot path removal),
-`step-ca-connectivity-validation` rewrite, openbrain
-`environment=home-lab`/`project=flux-platform`.
+## Item 7 — memory/openbrain updates: PARTIAL (2026-07-21)
+
+Memory docs done: [[cluster-kubeconfig-lookup]] updated to flag the Spot
+path as removed. `step-ca-connectivity-validation` needed no change — it
+was already fully rewritten for `ca.rye.ninja` back at step 5, correctly
+already read as historical/accurate rather than needing a fresh edit.
+`m1-implementation-status` given a superseded-note pointing at this
+tracker and ADR-24.
+
+**openbrain not done — blocked, needs Esten.** No Open Brain MCP tool
+was available in this session; per the session's own system note, those
+connectors need authorization via claude.ai connector settings (or `/mcp`
+in an interactive session), which can't be done headlessly. The design
+wants `environment=home-lab`, `project=flux-platform` set there. This is
+the one item of all 7 that's still fully open.

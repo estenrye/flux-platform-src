@@ -5,6 +5,15 @@ metadata:
   type: project
 ---
 
+**Superseded 2026-07-21**: M1 delivered the `controlplane` cluster this
+doc describes; M2 has since migrated every service onto it and
+decommissioned Rackspace Spot entirely (cloudspace deleted, `clusters/
+crossplane/` archived). See [ADR-24](../adr/0024-m2-control-plane-service-migration-off-spot.md)
+and [[m2-step13-decommission]] for the current state. The M1 build/DR
+details below remain accurate as history — nothing here was factually
+undone by M2 — but "the crossplane cluster" and "Spot" references
+throughout are now purely historical, not live infrastructure.
+
 M1 implementation started 2026-07-11 on branch `m1-controlplane-cluster`
 (design: docs/superpowers/specs/2026-07-11-m1-controlplane-cluster-design.md).
 
