@@ -22,3 +22,4 @@
 - [External-DNS Multi-Instance Collision](external-dns-multi-instance-collision.md) — Two external-dns Helm releases in one cluster/namespace need distinct releaseName, not just kustomize nameSuffix, or pod selector labels collide
 - [M2 Change Freeze](m2-change-freeze.md) — Change freeze on `clusters/crossplane/` declared 2026-07-21 (M2 step 10); 7-day soak clock started
 - [M2 Step 8 Delegated-Zone Migration](m2-step8-delegated-zone-migration.md) — crossplane-rye-ninja stack moved to controlplane 2026-07-21; managementPolicies replaced deletionPolicy, 3 resource kinds stall under partial policy lists
+- [M2 Step 11 Restore Drill](m2-step11-restore-drill.md) — step-ca-db restore drill passed 2026-07-21; scratch CNPG clusters need explicit ingress+egress NetworkPolicies under default-deny
