@@ -4,14 +4,18 @@ Date: 2026-07-13
 
 ## Status
 
-Accepted — execution in progress. Steps 0-12 of the [design's execution
-sequence](../superpowers/specs/2026-07-13-m2-migration-design.md#6-execution-sequence)
-are complete as of 2026-07-21 (design, PKI ceremony, step-ca, cert-manager
-stack, DNS cutover, Crossplane install, new delegated zone, delegated-zone
-state migration, ESO/public DNS, soak gate, restore drill, go/no-go
-review). Step 13 (decommission) remains before this ADR can be closed out
-as fully executed. This ADR will be updated (not superseded) when
-decommission completes.
+Accepted — execution effectively complete as of 2026-07-21. All 14
+steps of the [design's execution sequence](../superpowers/specs/2026-07-13-m2-migration-design.md#6-execution-sequence)
+have run (design, PKI ceremony, step-ca, cert-manager stack, DNS
+cutover, Crossplane install, new delegated zone, delegated-zone state
+migration, ESO/public DNS, soak gate, restore drill, go/no-go review,
+decommission). Rackspace Spot's cloudspace is deleted; `controlplane` is
+the sole fleet control plane. One item is not yet closed: openbrain
+updates (`environment=home-lab`, `project=flux-platform`), blocked on
+Esten authorizing the Open Brain MCP connector — everything else in
+decommission's 7-item checklist is done (see
+[[m2-step13-decommission]] for the full account, including a real
+mid-decommission incident that was caught and fully resolved).
 
 **Step 12 (go/no-go) deviation from the design, recorded plainly**: the
 design's exit criterion was a 7-day soak (2026-07-21 through ~2026-07-28)
