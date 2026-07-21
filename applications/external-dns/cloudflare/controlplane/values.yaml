@@ -1,0 +1,82 @@
+logLevel: debug
+logFormat: json
+interval: 3m
+triggerLoopOnEvent: true
+registry: txt
+txtPrefix: edns.
+
+extraArgs:
+  - --enable-leader-election
+
+serviceAccount:
+  create: true
+  name: external-dns-cloudflare
+sources:
+  - gateway-grpcroute
+  - gateway-httproute
+  - gateway-tlsroute
+  - gateway-udproute
+  - gateway-tcproute
+  - service
+  - ingress
+  - crd
+policy: sync
+provider:
+  name: cloudflare
+serviceMonitor:
+  enabled: true
+  interval: 60s
+
+env:
+  - name: CF_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: dns-credentials
+        key: password
+        optional: false
+  - name: EXTERNAL_DNS_DOMAIN_FILTER
+    valueFrom:
+      secretKeyRef:
+        name: dns-credentials
+        key: zone_name
+        optional: false
+  - name: EXTERNAL_DNS_ZONE_ID_FILTER
+    valueFrom:
+      secretKeyRef:
+        name: dns-credentials
+        key: zone_id
+        optional: false
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 1024Mi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  unhealthyPodEvictionPolicy: AlwaysAllow
+
+# No nodeAffinity/tolerations here (unlike the Rackspace Spot cloudflare/base
+# values): controlplane's Talos nodes don't use Spot's "role: system-critical"
+# labeling scheme, and there's no equivalent taint requiring a toleration.
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: external-dns
+          topologyKey: kubernetes.io/hostname
+        weight: 100
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: external-dns

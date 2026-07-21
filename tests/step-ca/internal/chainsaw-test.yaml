@@ -41,8 +41,12 @@ spec:
             timeout: 30s
             content: |
               set -e
-              FINGERPRINT=$(kubectl get secret csi-driver-spiffe-ca -n step-ca \
-                -o jsonpath='{.data.tls\.crt}' | base64 -d \
+              # csi-driver-spiffe-ca holds the intermediate (issued by the
+              # root, not the root itself) -- the root is trust-manager's
+              # fleet-distributed ryezone-labs-root Bundle, a plain
+              # ConfigMap so no base64 decode is needed.
+              FINGERPRINT=$(kubectl get configmap ryezone-labs-root -n step-ca \
+                -o jsonpath='{.data.root\.crt}' \
                 | openssl x509 -noout -fingerprint -sha256 \
                 | sed 's/.*=//;s/://g' | tr '[:upper:]' '[:lower:]')
               echo "Live root fingerprint: $FINGERPRINT"

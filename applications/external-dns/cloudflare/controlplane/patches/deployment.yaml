@@ -1,0 +1,28 @@
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: Always
+- op: add
+  path: /spec/strategy
+  value:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+- op: add
+  path: /spec/template/spec/dnsPolicy
+  value: Default
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1read-secret-from-env-var
+  value: "This is not a custom application."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1env-value-from
+  value: "Secret comes from an external source."
+- op: replace
+  path: /spec/replicas
+  value: 3
+- op: add
+  path: /metadata/annotations/checkov.io~1skip1
+  value: "CKV_K8S_38=external-dns requires the service account token to watch Services and Ingresses and manage DNS records."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip2
+  value: "CKV_K8S_35=external-dns cloudflare provider consumes API credentials via environment variables sourced from a Kubernetes Secret (dns-credentials). This is an upstream controller pattern and credentials are not hardcoded in manifests."

@@ -52,8 +52,13 @@ spec:
               set -e
               : "${STEP_CA_URL:?STEP_CA_URL must be set (values/<cluster>.env via the runner)}"
               RETRIES=${STEP_CA_HEALTH_RETRIES:-20}
-              FINGERPRINT=$(kubectl get secret csi-driver-spiffe-ca -n step-ca \
-                -o jsonpath='{.data.tls\.crt}' | base64 -d \
+              # csi-driver-spiffe-ca holds the intermediate (issued by the
+              # root, not the root itself) -- the /root/<fp> endpoint serves
+              # by root fingerprint specifically, so this needs the root:
+              # trust-manager's fleet-distributed ryezone-labs-root Bundle,
+              # a plain ConfigMap so no base64 decode is needed.
+              FINGERPRINT=$(kubectl get configmap ryezone-labs-root -n step-ca \
+                -o jsonpath='{.data.root\.crt}' \
                 | openssl x509 -noout -fingerprint -sha256 \
                 | sed 's/.*=//;s/://g' | tr '[:upper:]' '[:lower:]')
               echo "Fingerprint: $FINGERPRINT"
@@ -74,9 +79,14 @@ spec:
             content: |
               set -e
               : "${STEP_CA_URL:?STEP_CA_URL must be set (values/<cluster>.env via the runner)}"
-              # Extract root CA cert for TLS validation and X5C auth cert/key
-              kubectl get secret csi-driver-spiffe-ca -n step-ca \
-                -o jsonpath='{.data.tls\.crt}' | base64 -d > /tmp/root-ca-${NAMESPACE}.crt
+              # Extract root CA cert for TLS validation and X5C auth cert/key.
+              # step ca certificate --root verifies the given cert's own
+              # fingerprint against what the CA server declares as its
+              # trusted root -- csi-driver-spiffe-ca holds the intermediate,
+              # which fails that check. Use trust-manager's fleet-distributed
+              # ryezone-labs-root Bundle (plain ConfigMap, no base64 decode).
+              kubectl get configmap ryezone-labs-root -n step-ca \
+                -o jsonpath='{.data.root\.crt}' > /tmp/root-ca-${NAMESPACE}.crt
               kubectl get secret step-ca-x5c-test-cert -n ${NAMESPACE} \
                 -o jsonpath='{.data.tls\.crt}' | base64 -d > /tmp/x5c-${NAMESPACE}.crt
               kubectl get secret step-ca-x5c-test-cert -n ${NAMESPACE} \
