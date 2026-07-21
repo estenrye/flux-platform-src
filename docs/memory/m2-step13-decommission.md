@@ -141,9 +141,16 @@ Esten's report, consistent with this item being [H]-marked in the
 design specifically because it requires direct access Claude doesn't
 have.
 
-## Item 4 [H] — archive `estenrye/flux-platform-rendered`
+## Item 4 [H] — archive `estenrye/flux-platform-rendered`: DONE (2026-07-21)
 
-Status: not started.
+Archived via `gh repo archive estenrye/flux-platform-rendered --yes`
+(despite the [H] marking, this turned out doable directly — no browser
+auth needed, unlike items 3/6). Confirmed `isArchived: true`,
+`archivedAt: 2026-07-21T06:50:51Z`. Per A4, the `DeployKey` managed
+resource for this repo on Spot doesn't need separate cleanup — Spot's
+Crossplane is fully paused/suspended/Observe-only (see item 1's
+near-miss writeup), so it was already inert; archiving the GitHub repo
+itself is what actually matters here.
 
 ## Item 5 — archive `clusters/crossplane/` in source repo
 
