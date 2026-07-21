@@ -132,9 +132,14 @@ X."
 Verified via direct AWS API: `ResourceNotFoundException` for the trust
 anchor and all 3 profiles, `NoSuchEntity` for all 3 roles.
 
-## Item 3 [H] — close out SOPS key-exposure incident
+## Item 3 [H] — close out SOPS key-exposure incident: DONE (Esten, 2026-07-21)
 
-Status: not started. Human action (1Password token revocation).
+Human action, done directly by Esten (1Password crossplane-scoped
+service-account token revocation, Cloudflare token rotation
+confirmation). Not independently verified by Claude — recorded per
+Esten's report, consistent with this item being [H]-marked in the
+design specifically because it requires direct access Claude doesn't
+have.
 
 ## Item 4 [H] — archive `estenrye/flux-platform-rendered`
 
