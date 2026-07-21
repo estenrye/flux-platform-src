@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# controlplane variant: base unchanged (its chart-native NetworkPolicies
+# already allow apiserver egress on 6443) plus the PodSecurity label —
+# csi-driver-spiffe's node DaemonSet mounts host paths in this namespace,
+# which Talos's baseline PSA enforcement rejects (truenas-csi precedent).
+resources:
+  - ../base
+
+patches:
+  - patch: |-
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: cert-manager
+        labels:
+          pod-security.kubernetes.io/enforce: privileged

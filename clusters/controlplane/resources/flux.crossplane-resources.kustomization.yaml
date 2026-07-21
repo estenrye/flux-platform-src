@@ -1,0 +1,24 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: crossplane-resources
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: crossplane-xrds
+  interval: 10m0s
+  path: ./clusters/controlplane/crossplane-resources
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-platform-rendered
+  wait: true
+  timeout: 5m0s
+  # platform-iam-rolesanywhere EnvironmentConfig's trustAnchorArn is
+  # cluster-specific (see the matching comment on
+  # flux.crossplane-providers.kustomization.yaml) — same ConfigMap, same
+  # flux-system-namespace requirement.
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: roles-anywhere-arns

@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-core
+  description: |-
+    Crossplane operator install (deployment + rbac-manager) only, split
+    into its own Flux Kustomization so its self-installed CRDs
+    (pkg.crossplane.io, apiextensions.crossplane.io) are registered before
+    anything that depends on them is dry-run validated — see
+    docs/memory/crossplane-bootstrap-phasing.md and ADR-10 amendment.
+  tags:
+    - crossplane
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
+  subcomponentOf: crossplane

@@ -9,7 +9,7 @@ resources:
 helmCharts:
   - name: cloudnative-pg
     repo: oci://ghcr.io/cloudnative-pg/charts
-    version: 0.28.3
+    version: 0.29.0
     releaseName: cnpg
     namespace: cnpg-system
     includeCRDs: true
@@ -27,6 +27,10 @@ patches:
     path: patches/cluster-role-binding.yaml
 
 images:
+  # ≥1.29.2 is required on IPv6-only clusters: 1.29.1 built the instance
+  # status URL with an unbracketed pod IP (upstream #10713, fix #10682),
+  # sticking clusters at "Instance Status Extraction Error". Chart 0.29.0
+  # pairs with 1.30.0 and ships the EndpointSlice RBAC that 1.29.2+ needs.
   - name: ghcr.io/cloudnative-pg/cloudnative-pg
-    newTag: "1.29.1"
-    digest: sha256:0dfff19ba7b52ca25851a1010028b6940fff2e233290465af1cfb08a5f3f4661
+    newTag: "1.30.0"
+    digest: sha256:a2701eb97cdd2a34b1fdb2cb51987f544b706e40bec72ae7146cd8580efefebb

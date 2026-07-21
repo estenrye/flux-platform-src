@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IAM Admin Roles Anywhere stack for Crossplane providers with SPIFFE identity integration'
+
+Parameters:
+  ClusterCN:
+    Type: String
+    Description: 'Common Name (CN) of the SPIFFE identity for the cluster, used in trust relationships for IAM and Roles Anywhere admin roles'
+  Route53AdminPolicyArn:
+    Type: String
+    Description: 'ARN of the Route53 Admin policy for the Roles Anywhere admin role'
+Resources:
+  # Roles Anywhere admin role for provider-aws-rolesanywhere
+  IAMRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-crossplane-provider-route53-admin'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 'rolesanywhere.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+              - 'sts:SetSourceIdentity'
+              - 'sts:TagSession'
+            Condition:
+              StringEquals:
+                'aws:PrincipalTag/x509SAN/URI': !Sub 'spiffe://${ClusterCN}/ns/crossplane-system/sa/aws-route53-dns-provider'
+      ManagedPolicyArns:
+        - !Ref Route53AdminPolicyArn
+      
+      Tags:
+        - Key: 'Name'
+          Value: !Sub '${AWS::StackName}-crossplane-provider-route53-admin'
+        - Key: 'Purpose'
+          Value: !Sub 'Crossplane AWS Route53 Provider Admin Role for Cloudformation Stack ${AWS::StackName}'
+
+  # Roles Anywhere profile for Roles Anywhere admin role
+  RolesAnywhereProfile:
+    Type: 'AWS::RolesAnywhere::Profile'
+    Properties:
+      Name: !Sub '${AWS::StackName}-crossplane-provider-route53-admin'
+      RoleArns:
+        - !GetAtt IAMRole.Arn
+      RequireInstanceProperties: false
+      Enabled: true
+      # Deliberate no-op: AWS::RolesAnywhere::Profile's SessionPolicy
+      # intersects with the role's own attached policy. Omitting this
+      # property was tried first (2026-07-20) but CloudFormation does not
+      # clear a previously-set SessionPolicy when the property is absent
+      # from the template — the old value stuck around on update. A
+      # wildcard Allow never narrows anything, so ManagedPolicyArns on
+      # IAMRole above is the only thing that actually governs permissions.
+      SessionPolicy: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "*",
+              "Resource": "*"
+            }
+          ]
+        }
+      Tags:
+        - Key: 'Name'
+          Value: !Sub '${AWS::StackName}-crossplane-provider-route53-admin'
+        - Key: 'Purpose'
+          Value: !Sub 'Crossplane Route53 Admin Roles Anywhere Profile for Cloudformation Stack ${AWS::StackName}'
+
+Outputs:
+  IAMRoleName:
+    Description: 'Name of the created IAM admin role'
+    Value: !Ref IAMRole
+    Export:
+      Name: !Sub '${AWS::StackName}-IAMRoleName'
+
+  IAMRoleArn:
+    Description: 'ARN of the created IAM admin role'
+    Value: !GetAtt IAMRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-IAMRoleArn'
+
+  RolesAnywhereProfileId:
+    Description: 'ID of the created Roles Anywhere profile'
+    Value: !Ref RolesAnywhereProfile
+    Export:
+      Name: !Sub '${AWS::StackName}-RolesAnywhereProfileId'
+
+  RolesAnywhereProfileArn:
+    Description: 'ARN of the created Roles Anywhere profile'
+    Value: !GetAtt RolesAnywhereProfile.ProfileArn
+    Export:
+      Name: !Sub '${AWS::StackName}-RolesAnywhereProfileArn'

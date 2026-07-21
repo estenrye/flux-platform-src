@@ -27,18 +27,20 @@ spec:
             timeout: 300s
             content: |
               set -e
+              : "${STEP_CA_URL:?STEP_CA_URL must be set (values/<cluster>.env via the runner)}"
+              RETRIES=${STEP_CA_HEALTH_RETRIES:-20}
               # Explicit retry loop: curl's --max-time caps the WHOLE operation
               # including --retry attempts, so the old single-invocation retry
               # had only a 15s budget. The public endpoint on Spot has known
               # intermittent outage windows (M0 audit finding, 2026-07-11).
               ok=0
-              for attempt in $(seq 1 20); do
-                RESPONSE=$(curl -sk --max-time 10 https://ca.crossplane.rye.ninja/health || true)
+              for attempt in $(seq 1 "$RETRIES"); do
+                RESPONSE=$(curl -sk --max-time 10 "${STEP_CA_URL}/health" || true)
                 if echo "$RESPONSE" | grep -q '"status":"ok"'; then ok=1; break; fi
                 echo "Attempt $attempt failed, retrying..."
                 sleep 3
               done
-              [ "$ok" = "1" ] || { echo "health endpoint never returned ok in 20 attempts"; exit 1; }
+              [ "$ok" = "1" ] || { echo "health endpoint never returned ok in $RETRIES attempts"; exit 1; }
               [ "$attempt" = "1" ] || echo "ADVISORY: health needed $attempt attempts (endpoint flakiness finding)"
               echo "health: ok"
 
@@ -48,20 +50,26 @@ spec:
             timeout: 300s
             content: |
               set -e
-              export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
-              FINGERPRINT=$(kubectl get secret csi-driver-spiffe-ca -n step-ca \
-                -o jsonpath='{.data.tls\.crt}' | base64 -d \
+              : "${STEP_CA_URL:?STEP_CA_URL must be set (values/<cluster>.env via the runner)}"
+              RETRIES=${STEP_CA_HEALTH_RETRIES:-20}
+              # csi-driver-spiffe-ca holds the intermediate (issued by the
+              # root, not the root itself) -- the /root/<fp> endpoint serves
+              # by root fingerprint specifically, so this needs the root:
+              # trust-manager's fleet-distributed ryezone-labs-root Bundle,
+              # a plain ConfigMap so no base64 decode is needed.
+              FINGERPRINT=$(kubectl get configmap ryezone-labs-root -n step-ca \
+                -o jsonpath='{.data.root\.crt}' \
                 | openssl x509 -noout -fingerprint -sha256 \
                 | sed 's/.*=//;s/://g' | tr '[:upper:]' '[:lower:]')
               echo "Fingerprint: $FINGERPRINT"
               ok=0
-              for attempt in $(seq 1 20); do
-                RESPONSE=$(curl -sk --max-time 10 "https://ca.crossplane.rye.ninja/root/${FINGERPRINT}" || true)
+              for attempt in $(seq 1 "$RETRIES"); do
+                RESPONSE=$(curl -sk --max-time 10 "${STEP_CA_URL}/root/${FINGERPRINT}" || true)
                 if echo "$RESPONSE" | grep -q '"ca"'; then ok=1; break; fi
                 echo "Attempt $attempt failed, retrying..."
                 sleep 3
               done
-              [ "$ok" = "1" ] || { echo "root endpoint never served the CA in 20 attempts"; exit 1; }
+              [ "$ok" = "1" ] || { echo "root endpoint never served the CA in $RETRIES attempts"; exit 1; }
               echo "root-ca: ok"
 
     - name: x5c-provisioner
@@ -70,10 +78,15 @@ spec:
             timeout: 600s
             content: |
               set -e
-              export KUBECONFIG=~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml
-              # Extract root CA cert for TLS validation and X5C auth cert/key
-              kubectl get secret csi-driver-spiffe-ca -n step-ca \
-                -o jsonpath='{.data.tls\.crt}' | base64 -d > /tmp/root-ca-${NAMESPACE}.crt
+              : "${STEP_CA_URL:?STEP_CA_URL must be set (values/<cluster>.env via the runner)}"
+              # Extract root CA cert for TLS validation and X5C auth cert/key.
+              # step ca certificate --root verifies the given cert's own
+              # fingerprint against what the CA server declares as its
+              # trusted root -- csi-driver-spiffe-ca holds the intermediate,
+              # which fails that check. Use trust-manager's fleet-distributed
+              # ryezone-labs-root Bundle (plain ConfigMap, no base64 decode).
+              kubectl get configmap ryezone-labs-root -n step-ca \
+                -o jsonpath='{.data.root\.crt}' > /tmp/root-ca-${NAMESPACE}.crt
               kubectl get secret step-ca-x5c-test-cert -n ${NAMESPACE} \
                 -o jsonpath='{.data.tls\.crt}' | base64 -d > /tmp/x5c-${NAMESPACE}.crt
               kubectl get secret step-ca-x5c-test-cert -n ${NAMESPACE} \
@@ -89,7 +102,7 @@ spec:
                   --provisioner x5c \
                   --x5c-cert /tmp/x5c-${NAMESPACE}.crt \
                   --x5c-key /tmp/x5c-${NAMESPACE}.key \
-                  --ca-url https://ca.crossplane.rye.ninja \
+                  --ca-url "${STEP_CA_URL}" \
                   --root /tmp/root-ca-${NAMESPACE}.crt \
                   --password-file /tmp/step-pass-${NAMESPACE}.txt; then
                   issued=1
@@ -109,13 +122,14 @@ spec:
             timeout: 300s
             content: |
               set -e
+              : "${STEP_CA_URL:?STEP_CA_URL must be set (values/<cluster>.env via the runner)}"
               STEP=$(git rev-parse --show-toplevel)/.venv/bin/step
               revoked=0
               for attempt in $(seq 1 10); do
                 if $STEP ca revoke \
                   --cert /tmp/issued-${NAMESPACE}.crt \
                   --key /tmp/issued-${NAMESPACE}.key \
-                  --ca-url https://ca.crossplane.rye.ninja \
+                  --ca-url "${STEP_CA_URL}" \
                   --root /tmp/root-ca-${NAMESPACE}.crt; then
                   revoked=1
                   break
@@ -132,16 +146,18 @@ spec:
             timeout: 300s
             content: |
               set -e
+              : "${STEP_CA_URL:?STEP_CA_URL must be set (values/<cluster>.env via the runner)}"
+              RETRIES=${STEP_CA_HEALTH_RETRIES:-20}
               # Extract serial from revoked cert
               SERIAL=$(openssl x509 -serial -noout -in /tmp/issued-${NAMESPACE}.crt | sed 's/serial=//')
               echo "Revoked serial: $SERIAL"
               # Fetch CRL (DER) and convert to text, check serial appears
               ok=0
-              for attempt in $(seq 1 20); do
-                if curl -sk --max-time 10 https://ca.crossplane.rye.ninja/1.0/crl -o /tmp/crl-${NAMESPACE}.der; then ok=1; break; fi
+              for attempt in $(seq 1 "$RETRIES"); do
+                if curl -sk --max-time 10 "${STEP_CA_URL}/1.0/crl" -o /tmp/crl-${NAMESPACE}.der; then ok=1; break; fi
                 echo "Attempt $attempt failed, retrying..."
                 sleep 3
               done
-              [ "$ok" = "1" ] || { echo "CRL fetch failed in 20 attempts"; exit 1; }
+              [ "$ok" = "1" ] || { echo "CRL fetch failed in $RETRIES attempts"; exit 1; }
               openssl crl -inform DER -text -noout -in /tmp/crl-${NAMESPACE}.der | grep -qi "$SERIAL"
               echo "crl-contains-revoked: ok"

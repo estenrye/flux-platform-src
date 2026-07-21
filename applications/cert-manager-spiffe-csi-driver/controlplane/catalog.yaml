@@ -1,0 +1,39 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cert-manager-spiffe-csi-driver-controlplane
+  description: |-
+    approver-policy is a cert-manager approver that will approve or deny 
+    CertificateRequests based on policies defined in the CertificateRequestPolicy
+    custom resource.
+  tags:
+    - certificates
+    - crds
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://cert-manager.io/docs/usage/csi-driver-spiffe/
+      title: cert-manager SPIFFE CSI Driver documentation
+      icon: docs
+      type: documentation
+    - url: https://github.com/cert-manager/csi-driver-spiffe
+      title: cert-manager SPIFFE CSI Driver source repository
+      icon: github
+      type: source
+    - url: https://github.com/estenrye/flux-platform-src/blob/main/doc/runbooks/spiffe-csi-driver-tmpfiles-cleanup-failure.md
+      title: "Runbook: SPIFFE CSI Driver Failing to Provision Volumes After systemd-tmpfiles Cleanup"
+      icon: warning
+      type: runbook
+    - url: https://github.com/estenrye/flux-platform-src/blob/main/doc/runbooks/csi-driver-spiffe-ca-emergency-rollover.md
+      title: "Runbook: csi-driver-spiffe-ca Emergency Key Compromise Rollover"
+      icon: warning
+      type: runbook
+    - url: https://github.com/estenrye/flux-platform-src/blob/main/doc/runbooks/csi-driver-spiffe-ca-scheduled-rotation.md
+      title: "Runbook: csi-driver-spiffe-ca Scheduled CA Rotation"
+      icon: docs
+      type: runbook
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   

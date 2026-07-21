@@ -4,11 +4,25 @@
 - [Memory Location Preference](feedback-memory-location.md) — Memory files live in docs/memory in this repo, not the default ~/.claude path
 - [Project Skills Location](project-skills-location.md) — Skills live in .claude/skills/ in this repo, not ~/.claude/skills/
 - [Cluster Kubeconfig Lookup](cluster-kubeconfig-lookup.md) — Authoritative kubeconfig path for any cluster is the `rye.ninja/kubeconfig` annotation in `clusters/<name>/catalog.yaml`
-- [step-ca Connectivity Validation](step-ca-connectivity-validation.md) — Health check and root CA fingerprint validation commands for `https://ca.crossplane.rye.ninja`
+- [step-ca Connectivity Validation](step-ca-connectivity-validation.md) — Health check and root fingerprint validation for `https://ca.rye.ninja` (fresh root, M2)
 - [Calico NetworkPolicy and DNAT](calico-networkpolicy-dnat.md) — Calico evaluates egress post-DNAT; egress rules must use pod targetPort, not service port
 - [M1 Implementation Status](m1-implementation-status.md) — controlplane-on-KVM progress, pins (Talos v1.13.5, libvirt provider 0.8.x), and what remains
 - [SOPS Creation Rule Input Path](sops-creation-rule-input-path.md) — sops -e matches rules against the plaintext input path; temp-file encryption can silently skip encryption
 - [Talos iSCSI + truenas-csi](talos-iscsi-truenas-csi.md) — iscsiadm lives at /usr/local/sbin on Talos; csi-lib-iscsi discovery is not idempotent (stale record → exit 7)
 - [Crossplane Credential Rotation](crossplane-credential-rotation.md) — Dual-key age rotation (Flux reads rendered repo); SA token must grant the `crossplane` vault; GitHub key via stable 1P field
 - [Rendered-Repo Auto-Merge Milestone](rendered-repo-automerge-milestone.md) — Auto-merge is off on rendered repos until a required-checks milestone; renders soft-warn and leave PRs for manual merge
+- [Workstation Manual v6 Routes](workstation-nat64-route.md) — RETIRED 2026-07-15: manual NAT64/VIP routes no longer needed after the client-VLAN move + VIP renumber
 - [TrueNAS API Surface](truenas-api-surface.md) — JSON-RPC API cannot do zfs allow/canmount/umount even with Full Admin key; how to call it
+- [TrueNAS NFS Ownership Workaround](truenas-nfs-ownership-workaround.md) — truenas-csi mapall + root:755 dataset roots block non-root bootstrap; chown hook bridges; democratic-csi decision at M3
+- [UniFi Gateway PD Discovery](unifi-gateway-pd-discovery.md) — root shell + odhcp6c log to confirm the real DHCPv6-PD grant; also BGP RIB/FIB and firewall-zone debugging commands used on the gateway
+- [VIP Renumber Flakiness Investigation](vip-renumber-flakiness-investigation.md) — RESOLVED: root-caused to externalTrafficPolicy:Local + a Calico BGP-advertisement bug; fixed via 6-way replica spread across all nodes
+- [M2 Step 6 Roles Anywhere/CFN Refactor](m2-step6-roles-anywhere-cfn-refactor.md) — Crossplane install + CloudFormation generalization exist to deploy a new AWS Roles Anywhere trust root for ca.rye.ninja
+- [Crossplane Bootstrap Phasing](crossplane-bootstrap-phasing.md) — Crossplane's runtime-self-installed CRDs race Flux's atomic dry-run; permanently solved with 4 dependsOn-chained Flux Kustomizations (ADR-10 amendment), not manual phased commits
+- [UniFi Zone-Based Firewall](unifi-zone-firewall.md) — Routed subnets (VIPs, NAT64) aren't bound to any UniFi zone; WireGuard clients land in External not VPN; DMZ-Kubernetes zone build-out for VLAN 100
+- [External-DNS Multi-Instance Collision](external-dns-multi-instance-collision.md) — Two external-dns Helm releases in one cluster/namespace need distinct releaseName, not just kustomize nameSuffix, or pod selector labels collide
+- [M2 Change Freeze](m2-change-freeze.md) — Change freeze on `clusters/crossplane/` declared 2026-07-21 (M2 step 10); 7-day soak clock started
+- [M2 Step 8 Delegated-Zone Migration](m2-step8-delegated-zone-migration.md) — crossplane-rye-ninja stack moved to controlplane 2026-07-21; managementPolicies replaced deletionPolicy, 3 resource kinds stall under partial policy lists
+- [M2 Step 11 Restore Drill](m2-step11-restore-drill.md) — step-ca-db restore drill passed 2026-07-21; scratch CNPG clusters need explicit ingress+egress NetworkPolicies under default-deny
+- [M2 Step 14 ADR and Runbooks](m2-step14-adr-and-runbooks.md) — migration ADR-24 drafted 2026-07-21, ADR-15/20 amended, generalized state-migration runbook written; memory/openbrain updates remain decommission-gated
+- [M2 Step 12 Go Decision](m2-step12-go-decision.md) — Esten decided GO 2026-07-21, soak curtailed from planned 7 days to <1 day; step 13 decommission now unblocked
+- [M2 Step 13 Decommission Tracker](m2-step13-decommission.md) — live tracker of 7 decommission items; item 1 done 2026-07-21; controlplane's Flux reconciles from the rendered repo, not flux-platform-src directly

@@ -6,5 +6,7 @@ resources:
   - resources/network-policy.yaml
   - resources/provider-runtime-config.yaml
   - resources/cluster-role-binding.yaml
-  - resources/provider-config.in-cluster.yaml
+  # provider-config.in-cluster.yaml deliberately not included here — it's
+  # applied by the crossplane-resources Flux Kustomization instead, gated
+  # on this provider being Healthy (docs/memory/crossplane-bootstrap-phasing.md).
 

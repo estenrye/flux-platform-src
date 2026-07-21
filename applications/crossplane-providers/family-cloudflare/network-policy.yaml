@@ -1,0 +1,59 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wildbitca-provider-family-cloudflare-allow-egress
+  namespace: crossplane-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This policy addresses a pod that is dynamically created by the provider and cannot be referenced by a static analysis of the NetworkPolicy."
+spec:
+  podSelector:
+    matchLabels:
+      pkg.crossplane.io/provider: wildbitca-provider-family-cloudflare
+  policyTypes:
+  - Egress
+  egress:
+  # apiserver targetPort - Calico evaluates egress post-DNAT
+  # (docs/memory/calico-networkpolicy-dnat.md). Talos serves the apiserver
+  # on 6443; the namespaceSelector rule below cannot match node endpoints.
+  - ports:
+    - protocol: TCP
+      port: 6443
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: default
+    ports:
+    - protocol: TCP
+      port: 443
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  - ports:
+    - protocol: TCP
+      port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wildbitca-provider-family-cloudflare-allow-ingress
+  namespace: crossplane-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This policy addresses a pod that is dynamically created by the provider and cannot be referenced by a static analysis of the NetworkPolicy."
+spec:
+  ingress:
+  - ports:
+    - port: webhook
+      protocol: TCP
+    - port: metrics
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      pkg.crossplane.io/provider: wildbitca-provider-family-cloudflare
+  policyTypes:
+  - Ingress

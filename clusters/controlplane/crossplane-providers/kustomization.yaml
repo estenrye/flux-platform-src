@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../applications/crossplane-providers/family-aws
+  - ../../../applications/crossplane-providers/provider-aws-route53
+  - ../../../applications/crossplane-providers/provider-aws-iam
+  - ../../../applications/crossplane-providers/provider-aws-rolesanywhere
+  - ../../../applications/crossplane-providers/family-cloudflare
+  - ../../../applications/crossplane-providers/provider-cloudflare-dns
+  - ../../../applications/crossplane-providers/provider-cloudflare-zone
+  - ../../../applications/crossplane-providers/provider-github
+  - ../../../applications/crossplane-providers/provider-kubernetes
+  - ../../../applications/crossplane-functions/function-environment-configs
+  - ../../../applications/crossplane-functions/function-go-templating
+  - ../../../applications/crossplane-functions/function-auto-ready

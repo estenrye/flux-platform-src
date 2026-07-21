@@ -3,9 +3,14 @@ kind: IPPool
 metadata:
   name: lb-ingress-gua
 spec:
-  # Internet-facing LoadBalancer VIPs. GUA RENUMBER: derived from gua_prefix
-  # in providers/kvm/network.yaml (<gua_prefix>:ffff::/112) — update on ISP
-  # re-delegation (docs/runbooks/gua-prefix-renumber.md).
+  # DEPRECATED (services-network design, 2026-07-15): superseded by
+  # lb-ingress-gua-routed (2607:3640:1064:27f::/112 — routed, not-on-link).
+  # Calico's IPPool.spec.cidr is immutable, so the renumber is a new-pool
+  # swap, not an in-place edit (learned the hard way: Flux dry-run rejected
+  # an in-place cidr change with "CIDR cannot be changed"). disabled: true
+  # stops new allocations; the gateway's FRR no longer routes this prefix
+  # anyway. Delete this pool once nothing references it (see migration
+  # order step 5, docs/superpowers/specs/2026-07-15-services-network-design.md).
   cidr: 2607:3640:1064:270:ffff::/112
   allowedUses:
     - LoadBalancer
@@ -13,4 +18,4 @@ spec:
   # also disqualify the pool for the virtual load-balancer host (VIPs stay
   # pending). Keep all().
   nodeSelector: "all()"
-  disabled: false
+  disabled: true

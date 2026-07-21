@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create an IAM Policy
+
+Resources:
+  # Define the IAM Policy
+  IAMPolicy:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      ManagedPolicyName: CrossplaneProviderRolesAnywhereAdminPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'rolesanywhere:CreateTrustAnchor'
+              - 'rolesanywhere:UpdateTrustAnchor'
+              - 'rolesanywhere:DeleteTrustAnchor'
+              - 'rolesanywhere:GetTrustAnchor'
+              - 'rolesanywhere:ListTrustAnchors'
+              - 'rolesanywhere:TagResource'
+              - 'rolesanywhere:UntagResource'
+              - 'rolesanywhere:ListTagsForResource'
+              - 'rolesanywhere:CreateProfile'
+              - 'rolesanywhere:UpdateProfile'
+              - 'rolesanywhere:DeleteProfile'
+              - 'rolesanywhere:GetProfile'
+              - 'rolesanywhere:ListProfiles'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'iam:GetRole'
+              - 'iam:ListRoles'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'iam:PassRole'
+            Resource:
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/delegated-zone-*'
+            Condition:
+              StringEquals:
+                'iam:PassedToService': 'rolesanywhere.amazonaws.com'
+Outputs:
+  IAMPolicyArn:
+    Description: 'ARN of the created IAM Policy'
+    Value: !Ref IAMPolicy

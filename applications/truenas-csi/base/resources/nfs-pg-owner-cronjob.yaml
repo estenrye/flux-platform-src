@@ -1,0 +1,83 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nfs-pg-owner
+  namespace: truenas-csi
+  annotations:
+    ignore-check.kube-linter.io/no-node-affinity: "Single-zone home lab cluster; node affinity not required."
+    ignore-check.kube-linter.io/no-liveness-probe: "One-shot reconciliation job; liveness probe not applicable."
+    ignore-check.kube-linter.io/no-readiness-probe: "One-shot reconciliation job; readiness probe not applicable."
+    ignore-check.kube-linter.io/restart-policy: "Never is correct here: retries come from the Job backoffLimit as fresh pods, preserving each attempt's logs."
+    checkov.io/skip1: "CKV_K8S_38=The job lists PersistentVolumes via the Kubernetes API; the ServiceAccount token mount is required."
+spec:
+  # Frequent on purpose: a new postgres PVC cannot bootstrap until its
+  # dataset root is chowned; CNPG retries initdb on its own cadence.
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 300
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: nfs-pg-owner
+        spec:
+          serviceAccountName: nfs-pg-owner
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: owner
+              image: python:3.13-slim@sha256:bffeb7bd6a85767587059c6ba23e1e9122078e3aa3fa836099171b9bb5a9bb00
+              command:
+                - /bin/sh
+                - -ceu
+                - |
+                  pip install -q --no-cache-dir --no-deps --target /tmp/pkgs websockets==15.0.1
+                  PYTHONPATH=/tmp/pkgs exec python /scripts/nfs-pg-owner.py
+              env:
+                - name: TRUENAS_URL
+                  value: "wss://nas.rye.ninja/api/current"
+                - name: MAPALL_USER
+                  value: "k8s-postgres"
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                  readOnly: true
+                - name: api-key
+                  mountPath: /etc/truenas
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 128Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+          volumes:
+            - name: script
+              configMap:
+                name: nfs-pg-owner-script
+            - name: api-key
+              secret:
+                secretName: truenas-api-credentials
+                items:
+                  - key: api-key
+                    path: api-key
+            - name: tmp
+              emptyDir: {}

@@ -11,6 +11,12 @@
 # implementation; changing it after bootstrap requires a cluster rebuild.
 ula_prefix: fd97:45c2:b3a1::/48
 
+# Full TFiber DHCPv6-PD delegation (confirmed via odhcp6c IA_PD lease on
+# the gateway, 2026-07-15: docs/memory/unifi-gateway-pd-discovery.md).
+# vlan100's /64 and the ingress VIP /64 are both carved from this block.
+# Variable by design — see renumbering caveat above.
+gua_pd_prefix: 2607:3640:1064:270::/60
+
 # Delegated GUA prefix on VLAN 100 (TFiber via UniFi "Internet 1").
 # Variable by design — see renumbering caveat above.
 gua_prefix: 2607:3640:1064:270::/64
@@ -21,6 +27,9 @@ vlan100:
   ipv4_subnet: 10.45.0.0/16
   ipv4_gateway: 10.45.0.1
   ipv6_gateway_gua: 2607:3640:1064:270::1
+  # UniFi carries ::1 on the VLAN-100 ULA; it serves LAN DNS records
+  # (external-dns UniFi webhook) and the integrations API there.
+  ipv6_gateway_ula: fd97:45c2:b3a1:100::1
   ipv6_gateway_link_local: fe80::ae8b:a9ff:fe6e:13de
 
 allocations:
@@ -45,12 +54,23 @@ allocations:
     hostname: nas.rye.ninja
   kvm_host:
     ula: fd97:45c2:b3a1:100::2000
-  internal_lb_vip_pool: fd97:45c2:b3a1:100:ffff::/112 # Calico BGP-advertised, LAN-internal services
+  # Routed, not-on-link VIP subnet (services-network design, 2026-07-15):
+  # dedicated site-stable ULA block, no VLAN, no RA — reachable only via the
+  # gateway's BGP routes. Replaces the old on-link-carved
+  # fd97:45c2:b3a1:100:ffff::/112 (client NDP flakiness; see
+  # docs/superpowers/specs/2026-07-15-services-network-design.md).
+  internal_lb_vip_pool: fd97:45c2:b3a1:f00::/112 # Calico BGP-advertised, LAN-internal services
   pod_cidr: fd97:45c2:b3a1:1100::/56 # Calico IPv6 pool, /64 per node
   service_cidr: fd97:45c2:b3a1:2000::/112 # kube service network
-  # Ingress GUA VIP pool is <gua_prefix>:ffff::/112 — derived from gua_prefix
-  # at render/apply time, never written out here (renumber-exposed by design).
-  ingress_vip_pool_suffix: "ffff::/112"
+  # Dedicated routed GUA /64 for ingress VIPs (services-network design,
+  # 2026-07-15): carved from gua_pd_prefix's spare space, nibble "27f"
+  # chosen 2026-07-15 (14 more spares in 272..27e). No VLAN, no RA, on-link
+  # nowhere — reachable only via BGP. Replaces the old on-link-carved
+  # <gua_prefix>:ffff::/112. GUA RENUMBER: this is a manual pick from
+  # gua_pd_prefix, not a formula — re-derive on ISP re-delegation
+  # (docs/runbooks/gua-prefix-renumber.md).
+  ingress_vip_subnet: 2607:3640:1064:27f::/64
+  ingress_vip_pool: 2607:3640:1064:27f::/112
 
 bgp:
   gateway_asn: 64512

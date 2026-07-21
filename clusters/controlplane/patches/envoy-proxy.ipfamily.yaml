@@ -1,0 +1,8 @@
+# The EnvoyProxy fleet defaults to IPv4-only listeners; on this v6-only
+# cluster the proxy's readiness listener bound v4-any and kubelet's probe
+# to the pod's v6 IP was refused — 142 restarts before the first Gateway
+# ever programmed (M2 step 5). Cluster-level patch: the base is shared
+# with the v4 Spot cluster.
+- op: add
+  path: /spec/ipFamily
+  value: IPv6

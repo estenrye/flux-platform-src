@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create an IAM Policy
+
+Resources:
+  # Define the IAM Policy
+  IAMPolicy:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      ManagedPolicyName: CrossplaneProviderIAMAdminPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'iam:CreateRole'
+              - 'iam:UpdateRole'
+              - 'iam:DeleteRole'
+              - 'iam:GetRole'
+              - 'iam:ListRoles'
+              - 'iam:CreatePolicy'
+              - 'iam:UpdateAssumeRolePolicy'
+              - 'iam:DeletePolicy'
+              - 'iam:GetPolicy'
+              - 'iam:ListPolicies'
+              - 'iam:AttachRolePolicy'
+              - 'iam:DetachRolePolicy'
+              - 'iam:ListAttachedRolePolicies'
+              - 'iam:PutRolePolicy'
+              - 'iam:DeleteRolePolicy'
+              - 'iam:GetRolePolicy'
+              - 'iam:ListRolePolicies'
+              - 'iam:TagRole'
+              - 'iam:UntagRole'
+              - 'iam:ListRoleTags'
+              - 'iam:TagPolicy'
+              - 'iam:UntagPolicy'
+              - 'iam:ListPolicyTags'
+            Resource: '*'
+Outputs:
+  IAMPolicyArn:
+    Description: 'ARN of the created IAM Policy'
+    Value: !Ref IAMPolicy

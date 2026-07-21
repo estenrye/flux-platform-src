@@ -115,7 +115,7 @@ spec:
                 description: "The zone ID of the created delegated hosted zone."
               trustDomain:
                 type: string
-                description: "The SPIFFE trust domain for this delegation, derived from the resolved SPIFFE URI prefix. By default this is '${spec.subdomain}.${zoneName}', where zoneName is resolved from spec.zoneName when set, otherwise from the platform-cloudflare EnvironmentConfig. The prefix can be overridden via platform configuration with spiffeURIPrefix. Use as the --trust-domain flag value for cert-manager-spiffe-csi-driver and as the basis for IAM Roles Anywhere SPIFFE URI conditions."
+                description: "The SPIFFE trust domain for this delegation, derived from the resolved SPIFFE URI prefix. By default this is spec.subdomain joined with a dot to the resolved zoneName (spec.zoneName when set, otherwise the platform-cloudflare EnvironmentConfig). The prefix can be overridden via platform configuration with spiffeURIPrefix. Use as the --trust-domain flag value for cert-manager-spiffe-csi-driver and as the basis for IAM Roles Anywhere SPIFFE URI conditions."
               trustAnchorArn:
                 type: string
                 description: "Resolved IAM Roles Anywhere trust anchor ARN. Sourced from spec.trustAnchorArn when set, otherwise from the platform-iam-rolesanywhere EnvironmentConfig. Included in status so downstream consumers can read all IAM Roles Anywhere credential-helper inputs from a single status block."

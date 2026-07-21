@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../applications/crossplane-providers/provider-aws-iam/provider-config
+  - ../../../applications/crossplane-providers/provider-aws-rolesanywhere/provider-config
+  - ../../../applications/crossplane-providers/provider-aws-route53/provider-config
+  - ../../../applications/crossplane-providers/provider-github/provider-config
+  - ../../../applications/crossplane-providers/provider-kubernetes/provider-config
+  - ../../../applications/crossplane-providers/family-cloudflare/provider-config
+  - crossplane.environment-config.yaml
+  - delegated-hosted-zone-aws.controlplane-rye-ninja.yaml

@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nfs-pg-owner
+  namespace: truenas-csi
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "The owner-job pods are created by the CronJob at run time and do not exist in the static rendered manifest."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nfs-pg-owner
+  policyTypes:
+    - Egress
+  egress:
+    # NAS wss API + PyPI (both direct 443, no in-cluster DNAT)
+    - ports:
+        - protocol: TCP
+          port: 443
+    # apiserver targetPort — Calico evaluates egress post-DNAT
+    # (docs/memory/calico-networkpolicy-dnat.md). Talos serves 6443.
+    - ports:
+        - protocol: TCP
+          port: 6443
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

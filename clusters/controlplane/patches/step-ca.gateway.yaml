@@ -1,0 +1,12 @@
+# Cluster-level hostname binding (mirrors the Spot pattern): the CA's
+# public name is a cluster decision, not an application default. TLS
+# passthrough needs the hostname for SNI routing, and the UniFi
+# external-dns gateway sources publish the record from it.
+# A3 (M2 design): ca.rye.ninja is born on the new CA; the old
+# ca.crossplane.rye.ninja name never points here.
+- op: add
+  path: /spec/listeners/0/hostname
+  value: ca.rye.ninja
+- op: add
+  path: /spec/listeners/1/hostname
+  value: ca.rye.ninja

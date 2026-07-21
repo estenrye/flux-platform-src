@@ -1,0 +1,18 @@
+apiVersion: v1
+data:
+  root.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIBgDCCASWgAwIBAgIRAPJom4eTEoPWsuJDCN+pKl4wCgYIKoZIzj0EAwIwHzEd
+    MBsGA1UEAxMUcnllem9uZS1sYWJzIFJvb3QgQ0EwHhcNMjYwNzE0MDE0NzUzWhcN
+    MzYwNzExMDE0NzUzWjAfMR0wGwYDVQQDExRyeWV6b25lLWxhYnMgUm9vdCBDQTBZ
+    MBMGByqGSM49AgEGCCqGSM49AwEHA0IABG5Z9e4fMjceotciVpdUQqcZ9mXviiG/
+    G49x9c+D+8bcTlwjkqeD8aikLCKR90hvk1Jx5xGNBHk4ELZq2LHFioSjQjBAMA4G
+    A1UdDwEB/wQEAwIBBjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBT5Q7mpRUMV
+    QrQHJWxaMT/UDkBIcTAKBggqhkjOPQQDAgNJADBGAiEA4JttTW2OB6ZN0CSrecBm
+    NnMrALYFOuzpzxuwQeDldJoCIQDrteDHwFYvm3eJcnBXxg5EeKKP8p0lqe7tQee4
+    PeyOVg==
+    -----END CERTIFICATE-----
+kind: ConfigMap
+metadata:
+  name: step-ca-root-ca
+  namespace: cert-manager

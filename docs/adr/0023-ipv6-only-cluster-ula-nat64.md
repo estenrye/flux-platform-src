@@ -48,3 +48,22 @@ model and a NAT64/DNS64 appliance for the v4-only internet:
 - Anything terminating raw mTLS for v4-only clients cannot hide behind
   Cloudflare's proxy (it terminates TLS); that decision is deferred to the
   first out-of-LAN consumer (M5/M6).
+
+## Amendment 2026-07-15 (PD confirmed; ingress VIP no longer a gua_prefix suffix)
+
+Full design: [2026-07-15-services-network-design.md](../superpowers/specs/2026-07-15-services-network-design.md).
+
+- TFiber's actual delegation is confirmed as `2607:3640:1064:270::/60`
+  (odhcp6c `IA_PD` lease, `docs/memory/unifi-gateway-pd-discovery.md`) —
+  16 `/64`s, of which VLAN 100 (`gua_prefix`) and VLAN 101 (the client
+  network) use two, leaving 14 spares. `providers/kvm/network.yaml` now
+  carries this as `gua_pd_prefix`, distinct from `gua_prefix`.
+- The claim above that "everything GUA derives from a single `gua_prefix`
+  variable" is no longer accurate for the ingress VIP pool. It was
+  originally `<gua_prefix>:ffff::/112` (a suffix of VLAN 100's own `/64`)
+  but that turned out to be an on-link-nested routing bug, not a valid
+  pattern (ADR-22 amendment). The ingress pool is now
+  `2607:3640:1064:27f::/112`, a manually-chosen spare `/64` from
+  `gua_pd_prefix` — a genuinely separate prefix from `gua_prefix`, not
+  derived from it. A PD re-delegation now means re-picking a spare nibble,
+  not just updating one variable (`docs/runbooks/gua-prefix-renumber.md`).

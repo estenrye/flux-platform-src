@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: step-ca-controlplane
+  description: |-
+    Smallstep step-ca on the controlplane cluster (M2 design A5):
+    serves the offline ryezone-labs root and issues from the 1-year
+    controlplane intermediate; X5C provisioner signs workload-cluster
+    intermediates from M4. Endpoint ca.rye.ninja. Backed by a CNPG
+    PostgreSQL cluster.
+  tags:
+    - certificates
+    - pki
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

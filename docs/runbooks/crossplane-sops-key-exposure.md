@@ -59,8 +59,10 @@ eso.service-account-secret.yaml  →  1Password service-account token
    generated and stored in 1Password. **DONE.***
 3. **1Password service-account token** (`crossplane` vault) — read access to
    the whole vault; the pivot that unlocks 1 and 2. **Crossplane-scoped.**
+   Revoked 2026-07-21 as part of M2 decommission closeout. **DONE.**
 4. **Crossplane age key** — decrypts the cluster's SOPS secrets. This is the
-   leaked artifact itself. **Crossplane-scoped.**
+   leaked artifact itself. **Crossplane-scoped.** Retired (not rotated) with
+   the cluster at M2 decommission, 2026-07-21. **MOOT.**
 
 ### Not exposed by this key
 
@@ -145,6 +147,18 @@ Use a **dual-key transition** instead (zero gap):
 Status (2026-07-13): steps 1–2 DONE (new recipient
 `age18zfz6h2nt…`, dual-key secret live, re-wrapped file on PR #68, new key in
 1Password `sops-age-key`). Steps 3–4 pending PR #68 merge + render.
+
+**Status (2026-07-21) — moot by decommission.** M2 step 13 is deleting
+the `crossplane` cluster entirely (Spot cloudspace destroyed, `clusters/
+crossplane/` archived out of the live tree — see [ADR-24](../adr/0024-m2-control-plane-service-migration-off-spot.md)
+and [[m2-step13-decommission]]). Completing steps 3–4 (dual-key
+re-encryption merge/render) for a cluster about to stop existing buys
+nothing — the leaked key's blast radius is closed by decommission itself,
+not by finishing the transition. **Priority 3 (1Password service-account
+token) rotation was completed directly by Esten as part of step 13's
+incident closeout.** Priority 4 (crossplane age key) is retired, not
+rotated — the key, the secret it protects, and the cluster it decrypts
+for all cease to exist together.
 
 ### 5. Git history
 

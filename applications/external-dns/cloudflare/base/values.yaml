@@ -5,9 +5,6 @@ triggerLoopOnEvent: true
 registry: txt
 txtPrefix: edns.
 
-extraArgs:
-  - --enable-leader-election
-
 serviceAccount:
   create: true
   name: external-dns

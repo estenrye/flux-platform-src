@@ -34,7 +34,7 @@ spec:
               kubectl run np-client-deny -n "${NAMESPACE}" --restart=Never \
                 --labels=app=np-client \
                 --image=busybox:1.37.0@sha256:1487d0af5f52b4ba31c7e465126ee2123fe3f2305d638e7827681e7cf6c83d5e \
-                --command -- wget -q -T 5 -O /dev/null "http://${IP}:8080"
+                --command -- wget -q -T 5 -O /dev/null "http://[${IP}]:8080"
               kubectl wait pod np-client-deny -n "${NAMESPACE}" \
                 --for=jsonpath='{.status.phase}'=Failed --timeout=90s \
                 || { echo "FAIL: connection succeeded without an allow policy (default-deny not enforced)"; exit 1; }
@@ -51,7 +51,7 @@ spec:
               kubectl run np-client-allow -n "${NAMESPACE}" --restart=Never \
                 --labels=app=np-client \
                 --image=busybox:1.37.0@sha256:1487d0af5f52b4ba31c7e465126ee2123fe3f2305d638e7827681e7cf6c83d5e \
-                --command -- wget -q -T 10 -O /dev/null "http://${IP}:8080"
+                --command -- wget -q -T 10 -O /dev/null "http://[${IP}]:8080"
               kubectl wait pod np-client-allow -n "${NAMESPACE}" \
                 --for=jsonpath='{.status.phase}'=Succeeded --timeout=90s \
                 || { echo "FAIL: connection failed despite allow policies"; kubectl describe pod np-client-allow -n "${NAMESPACE}" | tail -20; exit 1; }

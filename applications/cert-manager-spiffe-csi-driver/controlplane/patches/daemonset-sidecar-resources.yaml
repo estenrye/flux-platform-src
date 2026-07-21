@@ -1,0 +1,18 @@
+- op: add
+  path: /spec/template/spec/containers/0/resources
+  value:
+    requests:
+      memory: "20Mi"
+      cpu: "10m"
+    limits:
+      memory: "50Mi"
+      cpu: "100m"
+- op: add
+  path: /spec/template/spec/containers/1/resources
+  value:
+    requests:
+      memory: "20Mi"
+      cpu: "10m"
+    limits:
+      memory: "50Mi"
+      cpu: "100m"
