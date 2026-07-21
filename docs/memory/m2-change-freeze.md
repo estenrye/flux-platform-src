@@ -23,8 +23,13 @@ after the zone-firewall and public-DNS work landed (see
 **Soak clock**: starts 2026-07-21, 7 days per the design (through
 ~2026-07-28), plus margin before the step 12 go/no-go review.
 
-**Status of the frozen stack**: `crossplane-rye-ninja` delegated-zone
-claim is still fully live (no `deletionPolicy: Orphan` set) — step 8
-(state migration) has not started. The freeze does not block step 8
-work in `clusters/controlplane/` or the source repo's other paths, only
-changes that would render into `clusters/crossplane/`.
+**Status of the frozen stack**: step 8 (state migration) executed
+2026-07-21 — see [[m2-step8-delegated-zone-migration]]. The
+`crossplane-rye-ninja` delegated-zone stack now lives on `controlplane`
+with full `managementPolicies` restored; Spot's own Crossplane is
+scaled to zero for the remainder of the soak. The freeze does not block
+step 8 work in `clusters/controlplane/` or the source repo's other
+paths, only changes that would render into `clusters/crossplane/` — and
+step 8 touched only Spot's live cluster state (imperatively, to
+Orphan-protect and pause) plus `clusters/controlplane/`, not the frozen
+source-repo path.

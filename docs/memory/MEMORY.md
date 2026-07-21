@@ -21,3 +21,4 @@
 - [UniFi Zone-Based Firewall](unifi-zone-firewall.md) — Routed subnets (VIPs, NAT64) aren't bound to any UniFi zone; WireGuard clients land in External not VPN; DMZ-Kubernetes zone build-out for VLAN 100
 - [External-DNS Multi-Instance Collision](external-dns-multi-instance-collision.md) — Two external-dns Helm releases in one cluster/namespace need distinct releaseName, not just kustomize nameSuffix, or pod selector labels collide
 - [M2 Change Freeze](m2-change-freeze.md) — Change freeze on `clusters/crossplane/` declared 2026-07-21 (M2 step 10); 7-day soak clock started
+- [M2 Step 8 Delegated-Zone Migration](m2-step8-delegated-zone-migration.md) — crossplane-rye-ninja stack moved to controlplane 2026-07-21; managementPolicies replaced deletionPolicy, 3 resource kinds stall under partial policy lists
