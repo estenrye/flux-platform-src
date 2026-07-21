@@ -23,3 +23,4 @@
 - [M2 Change Freeze](m2-change-freeze.md) — Change freeze on `clusters/crossplane/` declared 2026-07-21 (M2 step 10); 7-day soak clock started
 - [M2 Step 8 Delegated-Zone Migration](m2-step8-delegated-zone-migration.md) — crossplane-rye-ninja stack moved to controlplane 2026-07-21; managementPolicies replaced deletionPolicy, 3 resource kinds stall under partial policy lists
 - [M2 Step 11 Restore Drill](m2-step11-restore-drill.md) — step-ca-db restore drill passed 2026-07-21; scratch CNPG clusters need explicit ingress+egress NetworkPolicies under default-deny
+- [M2 Step 14 ADR and Runbooks](m2-step14-adr-and-runbooks.md) — migration ADR-24 drafted 2026-07-21, ADR-15/20 amended, generalized state-migration runbook written; memory/openbrain updates remain decommission-gated

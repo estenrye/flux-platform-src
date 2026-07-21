@@ -62,6 +62,11 @@ get-profile --profile-id ...` gave authoritative ground truth independent
 of Crossplane's status reporting — this is the fallback when Crossplane's
 own Synced/Ready conditions are ambiguous or silent.
 
+This procedure is now generalized as
+[docs/runbooks/crossplane-state-migration.md](../runbooks/crossplane-state-migration.md)
+(M2 step 14 deliverable) — reuse it rather than re-deriving the pattern
+at M6+.
+
 See also [[m2-change-freeze]] (freeze on `clusters/crossplane/` does not
 block this `clusters/controlplane/`-only change) and
 [[crossplane-bootstrap-phasing]] for the general composition/XRD

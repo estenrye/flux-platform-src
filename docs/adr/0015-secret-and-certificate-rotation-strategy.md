@@ -124,3 +124,41 @@ We define rotation cadence and mechanism per secret category:
 - [Runbook: Trust anchor bootstrap](../runbooks/csi-driver-spiffe-ca-trustanchor-bootstrap.md)
 - [Mozilla SOPS](https://github.com/getsops/sops)
 - [age encryption](https://github.com/FiloSottile/age)
+
+## Amendment 2026-07-21 (fresh offline root on `controlplane`, M2)
+
+The SPIFFE CA certificates section above described the deployed reality
+on Rackspace Spot, which the M0 audit found was not what ADR-5 intended:
+there was no step-ca-owned root at all. The fleet trust anchor was
+`csi-driver-spiffe-ca`, a cert-manager self-signed Certificate
+auto-rotating every 90 days; ESO copied it to step-ca's namespace and
+step-ca merely mounted and served it. That 90-day churn would have
+forced every AWS Roles Anywhere trust anchor — and, from M4 on, every
+workload cluster's chained intermediate — to re-anchor quarterly.
+
+[ADR-24](0024-m2-control-plane-service-migration-off-spot.md) (M2)
+replaces this on `controlplane` with a **stable offline root**
+(`ryezone-labs Root CA`, 10 years, ECDSA P-256, SOPS-encrypted, private
+key never applied to any cluster) and a **1-year `controlplane`
+intermediate** (`maxPathLen=1`). The `csi-driver-spiffe-ca` Secret name
+and the ESO cert-manager→step-ca sync pattern are unchanged — only the
+key material and its provenance changed, so chart mounts and
+`ClusterIssuer` wiring didn't need to move.
+
+Revised rotation cadence for `controlplane`:
+
+- **Root**: no automated rotation. Rotates only by deliberate ceremony
+  (`.bin/generate-controlplane-pki.sh`, run by a human so the root key
+  never touches an agent session).
+- **Intermediate**: annual, or by drill (plan M11 quarterly rotation
+  drills apply to the intermediate, not the root).
+- The pinned-fingerprint-goes-stale failure mode from the 90-day-rotating
+  root is gone — the fingerprint recorded in `values/controlplane.env`
+  and this repo's memory is now stable for the root's 10-year lifetime.
+
+This amendment applies to `controlplane` only. `docs/runbooks/
+csi-driver-spiffe-ca-scheduled-rotation.md` and the emergency-rollover
+runbook still apply verbatim to the *intermediate*; they were written
+against the old 90-day cert-manager-rotated model and should be reread
+with "the rotating certificate" now meaning the intermediate, not a
+self-signed root.

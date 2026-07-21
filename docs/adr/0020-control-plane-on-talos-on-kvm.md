@@ -39,8 +39,8 @@ provisioned by OpenTofu (`providers/kvm/`), bootstrapped by
   single host (balloon + KSM + capped ZFS ARC); the single-host SPOF is
   accepted and bounded by etcd snapshots, SOPS-encrypted secrets, and ZFS
   replication (DR posture in the M1 design).
-- Control plane services migrate from Spot in M2 (parallel run, step-ca
-  root preserved, Spot decommissioned last).
+- Control plane services migrate from Spot in M2 (parallel run, Spot
+  decommissioned last).
 
 ## Consequences
 
@@ -54,3 +54,16 @@ provisioned by OpenTofu (`providers/kvm/`), bootstrapped by
 - Rackspace Spot remains only until M2 completes; its cluster's ADRs and
   variants (e.g. `global-network-policy-default-deny/rackspace-spot`)
   retire with it.
+
+## Amendment 2026-07-21 (step-ca root was NOT preserved — corrects the line above)
+
+The "step-ca root preserved" clause above was written before the M0
+audit ran and turned out to be wrong: the M0 audit found the live trust
+domain was `cluster.local` (an ADR-16 violation), which forces every
+Roles Anywhere trust anchor to re-enroll regardless of whether the root
+identity changes, and found the "root" was actually a cert-manager
+self-signed Certificate auto-rotating every 90 days, not a stable
+root worth preserving. [ADR-24](0024-m2-control-plane-service-migration-off-spot.md)
+mints a fresh 10-year offline root on `controlplane` instead — see that
+ADR and [ADR-15's 2026-07-21 amendment](0015-secret-and-certificate-rotation-strategy.md#amendment-2026-07-21-fresh-offline-root-on-controlplane-m2)
+for the full decision.
