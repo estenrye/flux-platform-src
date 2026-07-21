@@ -66,6 +66,7 @@ resources:
   - resources/external-dns.unifi-credentials.sops.yaml
   - resources/step-ca-intermediate.sops.yaml
   - resources/step-ca-root-cert.yaml
+  - secrets/cloudflare-r2-openbao-snapshots.sops.yaml
 
 patches:
   - path: patches/envoy-proxy.ipfamily.yaml
