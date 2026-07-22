@@ -30,6 +30,12 @@ spec:
       - name: garage
         image: dxflrs/garage:v1.0.0
         imagePullPolicy: Always
+        env:
+        # Kubernetes secret volumes mount as 0644 (pod-isolated tmpfs). Garage
+        # treats group/other-readable files as unsafe; this flag overrides that
+        # check since K8s volumes are not accessible outside the pod.
+        - name: GARAGE_ALLOW_WORLD_READABLE_SECRETS
+          value: "true"
         ports:
         - name: rpc
           containerPort: 3901
