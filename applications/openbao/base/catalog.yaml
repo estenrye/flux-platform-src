@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: openbao
+  description: |-
+    OpenBao HA raft secret store (M3 step 5). Namespace stub deployed early
+    to allow R2 snapshot credentials (cloudflare-r2-openbao-snapshots) to land
+    before the full deployment. TLS from cert-manager; SOPS-encrypted unseal
+    keys; ESO ClusterSecretStore consumer.
+  tags:
+    - secrets
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: pre-production
+  owner: platform-engineering
