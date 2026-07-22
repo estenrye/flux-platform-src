@@ -126,7 +126,7 @@ stringData:
       # fsGroupPolicy: File handles CNPG uid 26 ownership at mount time instead.
 
     nfs:
-      shareHost: "${NFS_SERVER_ULA}"
+      shareHost: "[${NFS_SERVER_ULA}]"
       shareAlldirs: false
       shareAllowedHosts: []
       shareAllowedNetworks: []
