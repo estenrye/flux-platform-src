@@ -20,8 +20,11 @@ node:
   driver:
     image:
       tag: next
-    # Talos iscsi-tools extension path (not /etc/iscsi).
-    iscsiDirHostPath: /usr/local/etc/iscsi
+    # Talos exposes /etc/iscsi via kubelet extraMounts (same path truenas-csi
+    # uses). /usr/local/etc/iscsi does not exist as a pre-created directory on
+    # these nodes, causing containerd to fail with read-only filesystem when
+    # trying to mkdir the mount target.
+    iscsiDirHostPath: /etc/iscsi
     iscsiDirHostPathType: ""
 
 storageClasses:
