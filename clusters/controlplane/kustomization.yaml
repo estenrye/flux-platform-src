@@ -18,6 +18,9 @@ resources:
   - ../../applications/external-dns/unifi/base
   - ../../applications/external-dns/cloudflare/controlplane
   - ../../applications/truenas-csi/base
+  # M3 step 3: Garage 3-node S3 cluster (50 GiB iSCSI per node). Layout and
+  # bucket provisioning handled by the bucket-init job in the controlplane overlay.
+  - ../../applications/garage/controlplane
   # M3 step 5 stub: openbao namespace only — full HA raft deployment comes in
   # step 5. Stub deployed early so the R2 snapshot secret (below) can land.
   - ../../applications/openbao/base
@@ -79,6 +82,9 @@ resources:
   - resources/step-ca-intermediate.sops.yaml
   - resources/step-ca-root-cert.yaml
   - secrets/cloudflare-r2-openbao-snapshots.sops.yaml
+  # Garage RPC secret + admin token (M3 step 3). Break-glass; to be rotated
+  # into OpenBao once step 5 completes. See A2 in the M3 design spec.
+  - secrets/garage-admin.sops.yaml
 
 patches:
   - path: patches/envoy-proxy.ipfamily.yaml

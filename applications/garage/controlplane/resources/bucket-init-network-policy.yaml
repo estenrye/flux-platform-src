@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: garage-bucket-init
+  namespace: garage
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "Job pod created dynamically; label is valid but pods do not exist in the static rendered manifest."
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "Job pod created dynamically; label is valid but pods do not exist in the static rendered manifest."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: garage-bucket-init
+  policyTypes:
+  - Egress
+  egress:
+  # Admin API on garage pods.
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: garage
+    ports:
+    - protocol: TCP
+      port: 3903
+  # DNS.
+  - ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53

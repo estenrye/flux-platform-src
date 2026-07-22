@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: garage
+  namespace: garage
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: garage
+  serviceName: garage-headless
+  replicas: 3
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: garage
+    spec:
+      serviceAccountName: garage
+      restartPolicy: Always
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: garage
+        image: dxflrs/garage:v1.0.0
+        imagePullPolicy: Always
+        ports:
+        - name: rpc
+          containerPort: 3901
+          protocol: TCP
+        - name: s3
+          containerPort: 3900
+          protocol: TCP
+        - name: admin
+          containerPort: 3903
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3900
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3900
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+        - name: config
+          mountPath: /etc/garage.toml
+          subPath: garage.toml
+          readOnly: true
+        - name: secrets
+          mountPath: /var/secrets
+          readOnly: true
+        - name: data
+          mountPath: /var/lib/garage
+      volumes:
+      - name: config
+        configMap:
+          name: garage-config
+      - name: secrets
+        secret:
+          secretName: garage-secrets
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: democratic-csi-iscsi
+      resources:
+        requests:
+          storage: 50Gi

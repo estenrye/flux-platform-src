@@ -1,0 +1,164 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: garage-bucket-init
+  namespace: garage
+  annotations:
+    # Re-run by deleting the job: kubectl delete job garage-bucket-init -n garage
+    ignore-check.kube-linter.io/unset-cpu-requirements: "One-shot init job; resource envelope not needed."
+    ignore-check.kube-linter.io/unset-memory-requirements: "One-shot init job; resource envelope not needed."
+    ignore-check.kube-linter.io/no-node-affinity: "Single-host homelab cluster; no zone or role topology to express affinity against."
+    ignore-check.kube-linter.io/no-read-only-root-fs: "curlimages/curl writes to a temp filesystem at runtime; readOnlyRootFilesystem is not supported."
+    ignore-check.kube-linter.io/no-liveness-probe: "One-shot init job; liveness probes are not meaningful for batch workloads."
+    ignore-check.kube-linter.io/no-readiness-probe: "One-shot init job; readiness probes are not meaningful for batch workloads."
+    ignore-check.kube-linter.io/env-value-from: "garage-secrets is a SOPS-encrypted secret applied at bootstrap; not present as a static resource."
+    ignore-check.kube-linter.io/read-secret-from-env-var: "Admin token read from mounted secret file, not directly from env var."
+    ignore-check.kube-linter.io/default-service-account: "Init job does not need API server access; automountServiceAccountToken disabled."
+    checkov.io/skip01: "CKV_K8S_10=One-shot init job; resource requests not needed."
+    checkov.io/skip02: "CKV_K8S_11=One-shot init job; resource limits not needed."
+    checkov.io/skip03: "CKV_K8S_12=One-shot init job; memory requests not needed."
+    checkov.io/skip04: "CKV_K8S_13=One-shot init job; memory limits not needed."
+    checkov.io/skip05: "CKV_K8S_22=curlimages/curl writes temp state; readOnlyRootFilesystem not supported."
+    checkov.io/skip06: "CKV_K8S_38=automountServiceAccountToken disabled; SA token is not mounted."
+    checkov.io/skip07: "CKV_K8S_43=Image digest pinning deferred; tag-only reference sufficient for homelab."
+    checkov.io/skip08: "CKV_K8S_40=UID 1000 is standard non-root; high-UID (>10000) would require upstream changes to curlimages/curl."
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: garage-bucket-init
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      serviceAccountName: default
+      securityContext:
+        runAsUser: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: init
+        image: curlimages/curl:8.9.1
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+        env:
+        - name: ADMIN_URL
+          value: "http://garage-admin.garage.svc.cluster.local:3903"
+        volumeMounts:
+        - name: secrets
+          mountPath: /var/secrets
+          readOnly: true
+        command:
+        - sh
+        - -c
+        - |
+          set -eu
+
+          # Read admin token from file (not env var).
+          GARAGE_ADMIN_TOKEN=$(cat /var/secrets/admin-token)
+
+          # Wait for Garage admin API to be reachable.
+          echo "Waiting for Garage admin API..."
+          for i in $(seq 1 60); do
+            if curl -sf -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
+                "${ADMIN_URL}/v1/health" > /dev/null 2>&1; then
+              echo "Admin API reachable"
+              break
+            fi
+            echo "Attempt $i/60: not ready yet, retrying in 10s..."
+            sleep 10
+            if [ "$i" -eq 60 ]; then
+              echo "ERROR: Timed out waiting for Garage admin API"
+              exit 1
+            fi
+          done
+
+          # Wait for all 3 nodes to be up.
+          echo "Waiting for 3 Garage nodes..."
+          for i in $(seq 1 30); do
+            UP=$(curl -sf -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
+              "${ADMIN_URL}/v1/status" | \
+              grep -o '"isUp":true' | wc -l | tr -d ' ')
+            echo "Nodes up: ${UP}/3"
+            if [ "${UP}" -ge 3 ]; then
+              echo "All 3 nodes are up"
+              break
+            fi
+            sleep 10
+            if [ "$i" -eq 30 ]; then
+              echo "ERROR: Timed out waiting for 3 nodes"
+              exit 1
+            fi
+          done
+
+          # Check if layout is already applied (layoutVersion > 0).
+          LAYOUT_VERSION=$(curl -sf -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
+            "${ADMIN_URL}/v1/status" | \
+            grep -o '"layoutVersion":[0-9]*' | grep -o '[0-9]*' || echo "0")
+          echo "Current layout version: ${LAYOUT_VERSION}"
+
+          if [ "${LAYOUT_VERSION:-0}" -eq 0 ]; then
+            echo "Assigning layout to nodes..."
+            # Get node IDs from status (full 64-char hex IDs).
+            NODE_IDS=$(curl -sf -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
+              "${ADMIN_URL}/v1/status" | \
+              grep -o '"id":"[^"]*"' | sed 's/"id":"//g;s/"//g')
+
+            IDX=0
+            ZONES="zone-a zone-b zone-c"
+            for NODE_ID in ${NODE_IDS}; do
+              ZONE=$(echo "${ZONES}" | awk "{print \$$((IDX+1))}")
+              echo "Assigning node ${NODE_ID} to zone ${ZONE} (capacity 45 GiB)..."
+              curl -sf -X POST \
+                -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d "[{\"id\":\"${NODE_ID}\",\"zone\":\"${ZONE}\",\"capacity\":48318382080}]" \
+                "${ADMIN_URL}/v1/layout"
+              IDX=$((IDX+1))
+            done
+
+            echo "Applying layout (version 1)..."
+            curl -sf -X POST \
+              -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{"version":1}' \
+              "${ADMIN_URL}/v1/layout/apply"
+            echo "Layout applied"
+          else
+            echo "Layout already applied (version ${LAYOUT_VERSION}), skipping"
+          fi
+
+          # Create buckets (409 = already exists, not an error).
+          for BUCKET in step-ca-db-barman openbao-snapshots lgtm jwks; do
+            echo "Creating bucket ${BUCKET}..."
+            HTTP_CODE=$(curl -sf -X POST \
+              -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "{\"globalAlias\":\"${BUCKET}\"}" \
+              -o /dev/null \
+              -w "%{http_code}" \
+              "${ADMIN_URL}/v1/bucket" || echo "000")
+            if [ "${HTTP_CODE}" = "200" ] || [ "${HTTP_CODE}" = "409" ]; then
+              echo "Bucket ${BUCKET}: OK (${HTTP_CODE})"
+            else
+              echo "ERROR: Failed to create bucket ${BUCKET} (HTTP ${HTTP_CODE})"
+              exit 1
+            fi
+          done
+
+          echo ""
+          echo "Garage initialization complete."
+          echo "Access keys for consuming services:"
+          echo "  Step 4 (barman): kubectl exec -n garage garage-0 -- /garage key create barman-step-ca-db"
+          echo "                   kubectl exec -n garage garage-0 -- /garage bucket allow --read --write --owner step-ca-db-barman --key <key-id>"
+          echo "  Step 7 (openbao): kubectl exec -n garage garage-0 -- /garage key create openbao-snapshots"
+          echo "                    kubectl exec -n garage garage-0 -- /garage bucket allow --read --write --owner openbao-snapshots --key <key-id>"
+      volumes:
+      - name: secrets
+        secret:
+          secretName: garage-secrets
