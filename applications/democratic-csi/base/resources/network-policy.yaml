@@ -1,0 +1,24 @@
+# Controller egress to TrueNAS HTTPS API and the apiserver. Node plugins run
+# with hostNetwork so NetworkPolicy does not apply to them; the namespace is
+# exempted from the default-deny GlobalNetworkPolicy for that reason.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: democratic-csi-controller-egress
+  namespace: democratic-csi
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: controller-linux
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443  # TrueNAS HTTPS REST API
+        - protocol: TCP
+          port: 6443  # kube-apiserver (CSI sidecars: leader election, PVC watch)
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

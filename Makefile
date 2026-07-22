@@ -174,6 +174,9 @@ rotate-github-app-credentials:
 rotate-ci-service-account:
 	.bin/rotate-ci-service-account.sh
 
+provision-democratic-csi:
+	CLUSTER=$(CLUSTER) NFS_SERVER_ULA=$(NFS_SERVER_ULA) .bin/provision-democratic-csi.sh
+
 provision-cloudflare-r2-bucket:
 	CLUSTER=$(CLUSTER) BUCKET_NAME=$(BUCKET_NAME) SECRET_NS=$(SECRET_NS) CF_API_TOKEN=$(CF_API_TOKEN) .bin/provision-cloudflare-r2-bucket.sh
 

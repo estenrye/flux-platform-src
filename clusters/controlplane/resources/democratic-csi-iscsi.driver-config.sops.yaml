@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: democratic-csi-iscsi-driver-config
+    namespace: democratic-csi
+    annotations:
+        ignore-check.kube-linter.io/schema-validation: SOPS-encrypted secret; top-level sops field is expected and non-standard by design
+stringData:
+    driver-config-file.yaml: ENC[AES256_GCM,data:cf/xsXgWzXtF0tE7j1U9RQbVLNUod5OJlndmOsyMSOC9PGed+s0w3R6O0Ne32eEVyepKzYs3WUJK1XgkzqP1ny32aY1kbQSd+ho+WsRMtWro5/AEJ6bFG7cSaEgwgqWJvTIHlXyKM+7C9OWIT/JbUPqEblDFaQ+lfgGoCTNqpa9gojpN2nOTvSvTOmnzMt3nqrOgCUOg056IneVkF4T2uufAKEhhTlw0Zfyb4lIY3V2p/e0rWWjiy723e4y2G36n8gpVK4ml/SWegVlKtYTS76ingjHegpYA9a1UR6L/hwJQK0bkvxnFBwYmBl7NlowTrdB+lhQUpD20l7ZY0cOGwZ2UYeaO/D/E2wZ/EmrH4d3+KekTbeHOktw2FAFA6jf2CrHVu9FJJ/K8eFRWT+TCuuIfQfBMYP+uRdOnNYQng50rEDhcK+l8zz+OXmeeUKyleRaIZoLNEwQclgTk3sx44I57dVdzpNPG6FX6NF6aq9rEup8ea70Za19OpVxKGGzi6HTVwoAjcwyamOgtdNl7zCa/EfbKVTbX7Fyig3EYDKJCpdpBKG0HaenFTzoGMusLSobig4iINVso+qN8XIDaMnk+9HJUMeXPrM/fPWmq5xxKkfZY3lZVA0sr8VnqrAen0hIK7BUtN5S8ljAyNjd42CZRsvR+EHIqo76Sd/xEulG6gBeLbR7RiLh5EZoTKGAaR9SoFQc71/R4oyH58JQctvFsFXvaZzoNIT4mq4HbPknCEdDWWyQiEnZ4pIs+riDz9qr9sDaoMeWcID5k0TWWIpW3IGphaR62XAgCy2COfW70TaRkN3X0Y1cG67RGLIF1rg1+xZuudxWsYii6bhVciwYvjFxov3JLrPzd9JUzWB6KvuSXRJiFNsat4zqWy73sRg5x/HCTGScHbj86MYig0nrt9EESTqP7BF5aSqk/Lbls25HpC32xHu6BB4qoYTKt/guekhErbUQ84njAIhdg1UnRQVaq7extX4FMI3ulSeGZKWSjFtzJYOx75FI+GsO5a1hhpyX348ZfFnN0qLMnWi4qPVzASg2cytfaLw8qsF3+YoL/G0bDIx+huwB5q4JoxlBnMMbc17I4STNEvCEyLkvT35MyK4sbxY6aqv4QW01iz+zeibUnv03IoFJBwKMV/NwbwFaIj77rcFZVfLziScLxrTePHmbM7+DAsdeerv4+VjCIK2l2Yv4=,iv:CZGXFfKTAnfJzI2+GXWPn7mwXGvjpMWiTgaaIY0zvk8=,tag:trHJ8EkorD3b4ufakvIGjA==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBIZzRXQStMNVE1YjRUcEp6
+            ZDhtKzZwLzhOVkEzbUpKdXlZajBRek40WTNvCkZ3L1BYcnZUVnluSGFGWEd2dHg5
+            Nk1KUVBJQzhGenRkbUYyekxMM2hDY2sKLS0tIEhJbkxtUThJS1NPdE5EQUNXdTFR
+            VS84RUdBYW9Wbm01aUc2djkybmt4NG8Kp9fjetGTfAgYImcT3JiQMrYxZBdgpX4z
+            O6lTfcOhAtEQZFv9qO/UUu2HN41yWClXWz30fCxNA+KtmsVZhF+cfw==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age16p6p30le4wlka4gpvjafnr87sunrynwseegl7gvf234qk53hv49q4tl0e7
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-07-22T03:50:16Z"
+    mac: ENC[AES256_GCM,data:npLbAx+EZkGAqSPqSb0gtFzxaQpxLz0U1/8J3AlVHpabM4t3vc8nEJXBKTO6JZXK2jca8gLrgxEsoh1O5E8GUn7FQmIyNDxj6tSf78bAsu0fkLhDqbGRTwUK3NSxvAC0WgwRH8DWk0+NiNMFepPfFdN5VWlYu7xNKIoVB5XhWjM=,iv:P19EgEm2vLi6M1iv3Cx91wuAFLRkPIwInbWswrdEc1k=,tag:I1jsnL14LZTq0B03uvuWpA==,type:str]
+    version: 3.13.2

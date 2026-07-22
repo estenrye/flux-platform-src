@@ -1,0 +1,418 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Two democratic-csi driver instances on the same cluster:
+#   democratic-csi-nfs   — freenas-api-nfs, StorageClasses: democratic-csi-nfs + democratic-csi-nfs-pg
+#   democratic-csi-iscsi — freenas-api-iscsi, StorageClass: democratic-csi-iscsi
+#
+# Replaces truenas-csi to unblock iSCSI over IPv6 (csi-lib-iscsi#94) and
+# work around broken datasetPermissions* on TrueNAS SCALE 25.10.x (#564).
+# Driver config secrets are SOPS-encrypted at clusters/<cluster>/resources/
+# and created by .bin/provision-democratic-csi.sh.
+
+resources:
+  - resources/namespace.yaml
+  - resources/network-policy.yaml
+
+helmCharts:
+  - name: democratic-csi
+    repo: https://democratic-csi.github.io/charts
+    version: 0.15.1
+    releaseName: democratic-csi-nfs
+    namespace: democratic-csi
+    includeCRDs: false
+    valuesFile: values-nfs.yaml
+
+  - name: democratic-csi
+    repo: https://democratic-csi.github.io/charts
+    version: 0.15.1
+    releaseName: democratic-csi-iscsi
+    namespace: democratic-csi
+    includeCRDs: false
+    valuesFile: values-iscsi.yaml
+
+images:
+  # Driver image: 'next' tag is a rolling pre-release build. Digest-pinned to
+  # the sha256 current at 2026-07-21 for both NFS and iSCSI instances.
+  - name: ghcr.io/democratic-csi/democratic-csi
+    digest: sha256:0f308ae601474cb9633f90dc96f59dbd23440b0ed0e77d70e224465246a12dfa
+  # CSI sidecars: versioned tags pinned to digest for reproducibility.
+  - name: registry.k8s.io/sig-storage/csi-attacher
+    digest: sha256:dbded4ebe299973e31d0ef55815eb07a990fc67872b14900a8e69232acae4f2d
+  - name: registry.k8s.io/sig-storage/csi-provisioner
+    digest: sha256:6de50bacfd72627ffe4209e3db8ad7391d04ea6fb741bf51feab6c5dcfd80002
+  - name: registry.k8s.io/sig-storage/csi-resizer
+    digest: sha256:f1f352df97874442624fcef23eab04aa038f66cb0e361212f6ec09e92998184d
+  - name: registry.k8s.io/sig-storage/csi-snapshotter
+    digest: sha256:5f4bb469fec51147ce157329dab598c758da1b018bad6dad26f0ff469326d769
+  - name: registry.k8s.io/sig-storage/csi-node-driver-registrar
+    digest: sha256:cd21e19cd8bbd5bc56f1b4f1398a436e7897da2995d6d036c9729be3f4e456e6
+  - name: ghcr.io/democratic-csi/csi-grpc-proxy
+    digest: sha256:0240d0fba3cedd598036766b1865e88aa2eac9c16822df03d5d912a81128ebb6
+
+patches:
+  # ── NFS controller Deployment ──────────────────────────────────────────────
+  - target:
+      kind: Deployment
+      name: democratic-csi-nfs
+    patch: |-
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
+        value: "CSI controller uses leader election for HA; active/active replicas are not supported by the CSI spec."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-liveness-probe
+        value: "Liveness probe is implemented inside the driver container via bin/liveness-probe; separate sidecar is not used."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-readiness-probe
+        value: "CSI controller components serve no pod traffic; readiness is not a functional gate."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1run-as-non-root
+        value: "Upstream democratic-csi controller runs as root; non-root operation requires upstream changes."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-read-only-root-fs
+        value: "The democratic-csi driver writes runtime state inside the container; readOnlyRootFilesystem is not supported upstream."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+        value: "Single-host homelab cluster; no zone or role topology to express affinity against."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1unset-cpu-requirements
+        value: "CSI sidecar resource envelopes deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1unset-memory-requirements
+        value: "CSI sidecar resource envelopes deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip01
+        value: "CKV_K8S_8=Liveness probe is inside the driver container (bin/liveness-probe); no separate sidecar."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip02
+        value: "CKV_K8S_9=CSI controller serves no pod traffic; readiness probes are not a functional gate."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip03
+        value: "CKV_K8S_10=CSI sidecar resource requests deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip04
+        value: "CKV_K8S_11=CSI sidecar resource limits deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip05
+        value: "CKV_K8S_12=CSI sidecar memory requests deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip06
+        value: "CKV_K8S_13=CSI sidecar memory limits deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip07
+        value: "CKV_K8S_20=Upstream democratic-csi does not set allowPrivilegeEscalation for CSI sidecars."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip08
+        value: "CKV_K8S_22=The democratic-csi driver writes runtime state; readOnlyRootFilesystem is not supported upstream."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip09
+        value: "CKV_K8S_23=Upstream democratic-csi controller runs as root; non-root operation requires upstream changes."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip10
+        value: "CKV_K8S_28=Upstream democratic-csi does not drop NET_RAW for CSI sidecars."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip11
+        value: "CKV_K8S_29=Upstream democratic-csi controller runs as root; pod securityContext not set upstream."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip12
+        value: "CKV_K8S_30=Upstream democratic-csi does not set container securityContext for CSI sidecars."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip13
+        value: "CKV_K8S_31=Upstream democratic-csi does not set seccompProfile; runtime default applies via kubelet."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip14
+        value: "CKV_K8S_37=Upstream democratic-csi does not support dropping all capabilities on CSI sidecars."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip15
+        value: "CKV_K8S_38=The CSI controller requires the service account token to watch PVCs and manage PVs."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip16
+        value: "CKV_K8S_40=Upstream democratic-csi controller runs as root (UID 0); high-UID operation not supported upstream."
+
+  # ── NFS node DaemonSet ─────────────────────────────────────────────────────
+  - target:
+      kind: DaemonSet
+      name: democratic-csi-nfs
+    patch: |-
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1privileged-container
+        value: "The CSI node plugin requires privileged mode for bidirectional mount propagation into the kubelet pods directory (CSI specification)."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1privilege-escalation-container
+        value: "Privileged CSI node containers implicitly allow privilege escalation; cannot be overridden."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1run-as-non-root
+        value: "The CSI node plugin must run as root to mount NFS shares on the host."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1host-network
+        value: "The node plugin uses hostNetwork so NFS sessions originate from the node's ULA (required for TrueNAS-side access control)."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1host-ipc
+        value: "hostIPC is required by the iSCSI initiator tooling shipped via the Talos iscsi-tools extension."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1writable-host-mount
+        value: "The CSI node plugin writes to /var/lib/kubelet to stage and publish volumes (CSI specification)."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1sensitive-host-mounts
+        value: "The CSI node plugin mounts host paths (/var/lib/kubelet, /dev) as required to attach and format volumes."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1non-isolated-pod
+        value: "The node plugin is hostNetwork; pod-network NetworkPolicy does not apply."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-liveness-probe
+        value: "Liveness probe is implemented inside the driver container via bin/liveness-probe."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-readiness-probe
+        value: "CSI node components serve no pod traffic; readiness is not a functional gate."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-read-only-root-fs
+        value: "The node plugin formats and mounts filesystems, writing device and mount state inside the container."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+        value: "Node plugin DaemonSet must run on every node by design."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1unset-cpu-requirements
+        value: "CSI node plugin resource envelopes deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1unset-memory-requirements
+        value: "CSI node plugin resource envelopes deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip01
+        value: "CKV_K8S_8=Liveness probe is inside the driver container (bin/liveness-probe)."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip02
+        value: "CKV_K8S_9=CSI node serves no pod traffic; readiness probes are not a functional gate."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip03
+        value: "CKV_K8S_10=CSI node resource requests deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip04
+        value: "CKV_K8S_11=CSI node resource limits deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip05
+        value: "CKV_K8S_12=CSI node memory requests deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip06
+        value: "CKV_K8S_13=CSI node memory limits deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip07
+        value: "CKV_K8S_16=The CSI node plugin requires privileged mode for bidirectional mount propagation."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip08
+        value: "CKV_K8S_17=hostNetwork is required so NFS sessions originate from the node's ULA."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip09
+        value: "CKV_K8S_18=hostIPC is required by the iSCSI initiator tooling on Talos."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip10
+        value: "CKV_K8S_20=Privileged CSI node containers implicitly allow privilege escalation; cannot be overridden."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip11
+        value: "CKV_K8S_22=The node plugin writes device and mount state inside the container."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip12
+        value: "CKV_K8S_23=The CSI node plugin must run as root to mount NFS shares."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip13
+        value: "CKV_K8S_28=Privileged CSI node containers retain NET_RAW; capability tuning not supported upstream."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip14
+        value: "CKV_K8S_29=The CSI node plugin must run as root; pod securityContext not set upstream."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip15
+        value: "CKV_K8S_30=Upstream democratic-csi does not set container securityContext for node plugin sidecars."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip16
+        value: "CKV_K8S_31=Privileged CSI node containers cannot use a confined seccomp profile for mount syscalls."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip17
+        value: "CKV_K8S_37=The CSI node plugin requires mount-related capabilities; dropping all is not possible."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip18
+        value: "CKV_K8S_38=The node plugin requires the service account token for CSI node registration."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip19
+        value: "CKV_K8S_40=The CSI node plugin must run as root (UID 0) for host mount operations."
+
+  # ── iSCSI controller Deployment — same suppressions as NFS controller ──────
+  - target:
+      kind: Deployment
+      name: democratic-csi-iscsi
+    patch: |-
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
+        value: "CSI controller uses leader election for HA; active/active replicas are not supported by the CSI spec."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-liveness-probe
+        value: "Liveness probe is implemented inside the driver container via bin/liveness-probe; separate sidecar is not used."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-readiness-probe
+        value: "CSI controller components serve no pod traffic; readiness is not a functional gate."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1run-as-non-root
+        value: "Upstream democratic-csi controller runs as root; non-root operation requires upstream changes."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-read-only-root-fs
+        value: "The democratic-csi driver writes runtime state inside the container; readOnlyRootFilesystem not supported upstream."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+        value: "Single-host homelab cluster; no zone or role topology to express affinity against."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1unset-cpu-requirements
+        value: "CSI sidecar resource envelopes deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1unset-memory-requirements
+        value: "CSI sidecar resource envelopes deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip01
+        value: "CKV_K8S_8=Liveness probe is inside the driver container (bin/liveness-probe); no separate sidecar."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip02
+        value: "CKV_K8S_9=CSI controller serves no pod traffic; readiness probes are not a functional gate."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip03
+        value: "CKV_K8S_10=CSI sidecar resource requests deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip04
+        value: "CKV_K8S_11=CSI sidecar resource limits deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip05
+        value: "CKV_K8S_12=CSI sidecar memory requests deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip06
+        value: "CKV_K8S_13=CSI sidecar memory limits deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip07
+        value: "CKV_K8S_20=Upstream democratic-csi does not set allowPrivilegeEscalation for CSI sidecars."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip08
+        value: "CKV_K8S_22=The democratic-csi driver writes runtime state; readOnlyRootFilesystem not supported upstream."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip09
+        value: "CKV_K8S_23=Upstream democratic-csi controller runs as root; non-root requires upstream changes."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip10
+        value: "CKV_K8S_28=Upstream democratic-csi does not drop NET_RAW for CSI sidecars."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip11
+        value: "CKV_K8S_29=Upstream democratic-csi controller runs as root; pod securityContext not set upstream."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip12
+        value: "CKV_K8S_30=Upstream democratic-csi does not set container securityContext for CSI sidecars."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip13
+        value: "CKV_K8S_31=Upstream democratic-csi does not set seccompProfile; runtime default applies via kubelet."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip14
+        value: "CKV_K8S_37=Upstream democratic-csi does not support dropping all capabilities on CSI sidecars."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip15
+        value: "CKV_K8S_38=The CSI controller requires the service account token to watch PVCs and manage PVs."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip16
+        value: "CKV_K8S_40=Upstream democratic-csi controller runs as root (UID 0); high-UID operation not supported upstream."
+
+  # ── iSCSI node DaemonSet — same suppressions as NFS node ──────────────────
+  - target:
+      kind: DaemonSet
+      name: democratic-csi-iscsi
+    patch: |-
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1privileged-container
+        value: "The CSI node plugin requires privileged mode for bidirectional mount propagation and iSCSI device attachment."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1privilege-escalation-container
+        value: "Privileged CSI node containers implicitly allow privilege escalation; cannot be overridden."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1run-as-non-root
+        value: "The CSI node plugin must run as root to mount block devices and iSCSI targets on the host."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1host-network
+        value: "The node plugin uses hostNetwork so iSCSI sessions originate from the node's ULA (required for TrueNAS-side access control)."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1host-ipc
+        value: "hostIPC is required by the iSCSI initiator tooling shipped via the Talos iscsi-tools extension."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1writable-host-mount
+        value: "The CSI node plugin writes to /var/lib/kubelet to stage and publish volumes (CSI specification)."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1sensitive-host-mounts
+        value: "The CSI node plugin mounts host paths (/var/lib/kubelet, /dev, iSCSI state) as required to attach and format volumes."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1non-isolated-pod
+        value: "The node plugin is hostNetwork; pod-network NetworkPolicy does not apply."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-liveness-probe
+        value: "Liveness probe is implemented inside the driver container via bin/liveness-probe."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-readiness-probe
+        value: "CSI node components serve no pod traffic; readiness is not a functional gate."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-read-only-root-fs
+        value: "The node plugin formats and mounts filesystems, writing device and mount state inside the container."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+        value: "Node plugin DaemonSet must run on every node by design."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1unset-cpu-requirements
+        value: "CSI node plugin resource envelopes deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1unset-memory-requirements
+        value: "CSI node plugin resource envelopes deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip01
+        value: "CKV_K8S_8=Liveness probe is inside the driver container (bin/liveness-probe)."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip02
+        value: "CKV_K8S_9=CSI node serves no pod traffic; readiness probes are not a functional gate."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip03
+        value: "CKV_K8S_10=CSI node resource requests deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip04
+        value: "CKV_K8S_11=CSI node resource limits deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip05
+        value: "CKV_K8S_12=CSI node memory requests deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip06
+        value: "CKV_K8S_13=CSI node memory limits deferred until M3 storage baseline data is available."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip07
+        value: "CKV_K8S_16=The CSI node plugin requires privileged mode for iSCSI device attachment and mount propagation."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip08
+        value: "CKV_K8S_17=hostNetwork is required so iSCSI sessions originate from the node's ULA."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip09
+        value: "CKV_K8S_18=hostIPC is required by the iSCSI initiator tooling on Talos."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip10
+        value: "CKV_K8S_20=Privileged CSI node containers implicitly allow privilege escalation; cannot be overridden."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip11
+        value: "CKV_K8S_22=The node plugin writes device and mount state inside the container."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip12
+        value: "CKV_K8S_23=The CSI node plugin must run as root to mount block devices and iSCSI targets."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip13
+        value: "CKV_K8S_28=Privileged CSI node containers retain NET_RAW; capability tuning not supported upstream."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip14
+        value: "CKV_K8S_29=The CSI node plugin must run as root; pod securityContext not set upstream."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip15
+        value: "CKV_K8S_30=Upstream democratic-csi does not set container securityContext for node plugin sidecars."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip16
+        value: "CKV_K8S_31=Privileged CSI node containers cannot use a confined seccomp profile for mount syscalls."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip17
+        value: "CKV_K8S_37=The CSI node plugin requires mount-related capabilities; dropping all is not possible."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip18
+        value: "CKV_K8S_38=The node plugin requires the service account token for CSI node registration."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip19
+        value: "CKV_K8S_40=The CSI node plugin must run as root (UID 0) for host mount operations."
