@@ -6,7 +6,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: truenas-nfs
+  storageClassName: democratic-csi-nfs
   resources:
     requests:
       storage: 20Gi
