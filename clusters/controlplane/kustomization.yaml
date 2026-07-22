@@ -18,6 +18,9 @@ resources:
   - ../../applications/external-dns/unifi/base
   - ../../applications/external-dns/cloudflare/controlplane
   - ../../applications/truenas-csi/base
+  # M3 step 5 stub: openbao namespace only — full HA raft deployment comes in
+  # step 5. Stub deployed early so the R2 snapshot secret (below) can land.
+  - ../../applications/openbao/base
   # M3 step 1: democratic-csi deployed alongside truenas-csi as shadow classes.
   # truenas-csi remains until smoke test confirms democratic-csi-nfs-pg works
   # for CNPG uid 26 without the nfs-pg-owner CronJob (M3 step 2 cutover).
