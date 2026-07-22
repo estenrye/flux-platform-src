@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: democratic-csi
+  description: |-
+    democratic-csi 0.15.1: two CSI driver instances (NFS + iSCSI) backed by
+    TrueNAS SCALE 25.10.x via freenas-api-nfs and freenas-api-iscsi.
+    Replaces truenas-csi to unblock iSCSI over IPv6 (csi-lib-iscsi#94).
+    fsGroupPolicy: File; no datasetPermissions* (democratic-csi#564 workaround).
+  tags:
+    - storage
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

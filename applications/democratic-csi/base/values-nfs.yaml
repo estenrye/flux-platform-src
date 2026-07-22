@@ -1,0 +1,64 @@
+csiDriver:
+  # Unique per cluster; two democratic-csi instances co-exist on the same cluster
+  # (NFS + iSCSI), each with a distinct name.
+  name: "org.democratic-csi.nfs"
+  # File: kubelet applies fsGroup at mount time per pod spec. CNPG sets
+  # fsGroup: 26 natively so Postgres volumes get uid/gid 26 without
+  # driver-side chown (which is broken on TrueNAS SCALE 25.10.x — #564).
+  fsGroupPolicy: File
+
+driver:
+  # Secret created by .bin/provision-democratic-csi.sh (SOPS-encrypted);
+  # referenced here so the chart does not render its own Secret.
+  existingConfigSecret: democratic-csi-nfs-driver-config
+  config:
+    # Must match the driver field in the secret even when existingConfigSecret
+    # is set — the chart uses this value for its own templating logic.
+    driver: freenas-api-nfs
+
+controller:
+  priorityClassName: platform-critical
+  driver:
+    image:
+      tag: next
+
+node:
+  priorityClassName: platform-critical
+  driver:
+    image:
+      tag: next
+    # Talos iscsi-tools extension installs iscsi config under /usr/local/etc/iscsi,
+    # not the FHS /etc/iscsi. The NFS node plugin doesn't run iscsiadm but the
+    # chart mounts this path regardless; set it correctly for the iSCSI instance.
+    iscsiDirHostPath: /usr/local/etc/iscsi
+    # Empty = accept any host path type (symlink-safe on Talos's immutable rootfs).
+    iscsiDirHostPathType: ""
+
+storageClasses:
+  - name: democratic-csi-nfs
+    defaultClass: false
+    reclaimPolicy: Delete
+    volumeBindingMode: Immediate
+    allowVolumeExpansion: true
+    parameters:
+      fsType: nfs
+    mountOptions:
+      - hard
+      - noatime
+      - nfsvers=4.2
+
+  # Shadow class for Postgres/CNPG workloads. Smoke test verifies that
+  # fsGroupPolicy: File alone (without NAS-side mapall) is sufficient for
+  # CNPG uid 26 ownership (M3 step 1 [H]). If mapall is required, a second
+  # NFS driver instance with shareMapallUser/Group will be added.
+  - name: democratic-csi-nfs-pg
+    defaultClass: false
+    reclaimPolicy: Delete
+    volumeBindingMode: Immediate
+    allowVolumeExpansion: true
+    parameters:
+      fsType: nfs
+    mountOptions:
+      - hard
+      - noatime
+      - nfsvers=4.2

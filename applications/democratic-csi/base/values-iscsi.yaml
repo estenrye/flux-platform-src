@@ -1,0 +1,38 @@
+csiDriver:
+  name: "org.democratic-csi.iscsi"
+  # Block volumes: standard policy; kubelet delegates fsGroup to driver only for
+  # RWO block volumes on nodes that support it.
+  fsGroupPolicy: ReadWriteOnceWithFSType
+
+driver:
+  existingConfigSecret: democratic-csi-iscsi-driver-config
+  config:
+    driver: freenas-api-iscsi
+
+controller:
+  priorityClassName: platform-critical
+  driver:
+    image:
+      tag: next
+
+node:
+  priorityClassName: platform-critical
+  driver:
+    image:
+      tag: next
+    # Talos iscsi-tools extension path (not /etc/iscsi).
+    iscsiDirHostPath: /usr/local/etc/iscsi
+    iscsiDirHostPathType: ""
+
+storageClasses:
+  # Shadow class: not default until smoke test confirms iSCSI over IPv6 works
+  # (R1: democratic-csi freenas-api-iscsi on IPv6-only cluster — unverified).
+  # If R1 fires, Garage uses democratic-csi-nfs instead; this class idles.
+  - name: democratic-csi-iscsi
+    defaultClass: false
+    reclaimPolicy: Delete
+    volumeBindingMode: Immediate
+    allowVolumeExpansion: true
+    parameters:
+      fsType: ext4
+    mountOptions: []

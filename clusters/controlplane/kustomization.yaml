@@ -18,6 +18,10 @@ resources:
   - ../../applications/external-dns/unifi/base
   - ../../applications/external-dns/cloudflare/controlplane
   - ../../applications/truenas-csi/base
+  # M3 step 1: democratic-csi deployed alongside truenas-csi as shadow classes.
+  # truenas-csi remains until smoke test confirms democratic-csi-nfs-pg works
+  # for CNPG uid 26 without the nfs-pg-owner CronJob (M3 step 2 cutover).
+  - ../../applications/democratic-csi/base
   - ../../applications/flux/base
   - ../../applications/flux-monitoring/base
   - ../../applications/external-secrets-operator/base
@@ -63,6 +67,11 @@ resources:
   # provider-cloudflare, not external-dns.
   - resources/eso.external-secret.cloudflare-dns.yaml
   - resources/truenas-csi.api-credentials.sops.yaml
+  # democratic-csi driver config secrets (M3 step 1): SOPS-encrypted YAML
+  # blobs containing TrueNAS API key + ZFS dataset paths + NFS/iSCSI settings.
+  # Created by: CLUSTER=controlplane NFS_SERVER_ULA=<ula> make provision-democratic-csi
+  - resources/democratic-csi-nfs.driver-config.sops.yaml
+  - resources/democratic-csi-iscsi.driver-config.sops.yaml
   - resources/external-dns.unifi-credentials.sops.yaml
   - resources/step-ca-intermediate.sops.yaml
   - resources/step-ca-root-cert.yaml
