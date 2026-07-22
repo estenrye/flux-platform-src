@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: garage-controlplane
+  description: |-
+    Garage v1.0.0 controlplane overlay: bucket init job that assigns node layout
+    (3 zones × 45 GiB) and creates step-ca-db-barman, openbao-snapshots, lgtm,
+    and jwks buckets. Inherits the 3-node StatefulSet on democratic-csi-iscsi
+    from the base.
+  tags:
+    - storage
+    - platform
+    - infrastructure
+    - s3
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

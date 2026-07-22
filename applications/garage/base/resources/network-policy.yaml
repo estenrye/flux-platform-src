@@ -1,0 +1,52 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: garage
+  namespace: garage
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: garage
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Peer-to-peer RPC between Garage nodes.
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: garage
+    ports:
+    - protocol: TCP
+      port: 3901
+  # S3 API: open to all namespaces (barman, openbao snapshot job, smoke tests).
+  - ports:
+    - protocol: TCP
+      port: 3900
+  # Admin API: restricted to the garage namespace (init job).
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: garage
+    ports:
+    - protocol: TCP
+      port: 3903
+  egress:
+  # Peer-to-peer RPC between Garage nodes.
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: garage
+    ports:
+    - protocol: TCP
+      port: 3901
+  # Kubernetes API for kubernetes_discovery (pod list/watch).
+  - ports:
+    - protocol: TCP
+      port: 6443
+  # DNS.
+  - ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53

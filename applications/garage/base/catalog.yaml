@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: garage
+  description: |-
+    Garage v1.0.0: 3-node S3-compatible distributed object store (Rust).
+    Volumes on democratic-csi-iscsi (50 GiB per node). Kubernetes peer
+    discovery. Used as the barman target for CNPG clusters and raft snapshot
+    destination for OpenBao. Admin token SOPS-encrypted at bootstrap.
+  tags:
+    - storage
+    - platform
+    - infrastructure
+    - s3
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

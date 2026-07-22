@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage-headless
+  namespace: garage
+  labels:
+    app.kubernetes.io/name: garage
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: garage
+  ports:
+  - name: rpc
+    port: 3901
+    protocol: TCP
+  - name: s3
+    port: 3900
+    protocol: TCP
+  - name: admin
+    port: 3903
+    protocol: TCP
+---
+# S3 API endpoint for consuming services (barman, openbao snapshot job).
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage-s3
+  namespace: garage
+  labels:
+    app.kubernetes.io/name: garage
+spec:
+  selector:
+    app.kubernetes.io/name: garage
+  ports:
+  - name: s3
+    port: 3900
+    protocol: TCP
+    targetPort: 3900
+---
+# Admin API endpoint for the init job.
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage-admin
+  namespace: garage
+  labels:
+    app.kubernetes.io/name: garage
+spec:
+  selector:
+    app.kubernetes.io/name: garage
+  ports:
+  - name: admin
+    port: 3903
+    protocol: TCP
+    targetPort: 3903
