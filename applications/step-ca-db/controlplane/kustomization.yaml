@@ -3,8 +3,7 @@ kind: Kustomization
 
 # controlplane variant (M2 design §4.1): base cluster plus the interim
 # logical-dump backup path — barman needs S3, which arrives with Garage in
-# M3. Dumps land on a truenas-nfs PVC (iSCSI is blocked on IPv6, R2) and
-# ride the NAS's own ZFS snapshot schedule off-host.
+# M3. Dumps land on a democratic-csi-nfs PVC.
 
 resources:
   - ../base
@@ -14,13 +13,10 @@ resources:
   - resources/backup-network-policy.yaml
 
 patches:
-  # Postgres validates that it owns PGDATA; the default truenas-nfs class
-  # mapalls to root and fails that check (see storage-classes.yaml,
-  # truenas-nfs-pg header).
-  # imageName pin: without it the postgres image floats with the
-  # operator's compiled-in default (1.30.0 rolled instances to 18.3
-  # unannounced) and the dump job's pg_dump can silently fall behind the
-  # server major. Same digest as the dump container by construction.
+  # democratic-csi-nfs-pg: fsGroupPolicy: File handles CNPG uid 26 ownership
+  # at mount time. No NAS-side mapall or nfs-pg-owner CronJob needed.
+  # imageName pin: prevents the postgres image from floating with the
+  # operator's compiled-in default; same digest as the dump container.
   - target:
       kind: Cluster
       name: step-ca-db
@@ -28,7 +24,7 @@ patches:
     patch: |-
       - op: add
         path: /spec/storage/storageClass
-        value: truenas-nfs-pg
+        value: democratic-csi-nfs-pg
       - op: add
         path: /spec/imageName
         value: ghcr.io/cloudnative-pg/postgresql:18.3@sha256:5e30290fba3d990b08a9caea6ddb49c661ad8246cbb2688adad7e6cc78df6c3f
