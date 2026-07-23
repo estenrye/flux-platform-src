@@ -11,6 +11,7 @@ kind: Kustomization
 
 resources:
   - resources/namespace.yaml
+  - resources/crd.yaml
   - resources/rbac.yaml
   - resources/configmap.yaml
   - resources/statefulset.yaml
