@@ -1,0 +1,29 @@
+# cert-manager-approver-policy is installed cluster-wide; any
+# CertificateRequest sits WaitingForApproval forever unless a
+# CertificateRequestPolicy matches it (see
+# applications/cert-manager-spiffe-issuer for the sibling pattern). The
+# plugin's own selfSigned Issuer (in resources/manifest.yaml) has none by
+# default.
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: barman-cloud-plugin-policy
+spec:
+  allowed:
+    commonName:
+      required: true
+      value: "barman-cloud*"
+    dnsNames:
+      values:
+        - barman-cloud
+    usages:
+      - server auth
+      - client auth
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: Issuer
+      name: selfsigned-issuer
+    namespace:
+      matchNames:
+        - cnpg-system
