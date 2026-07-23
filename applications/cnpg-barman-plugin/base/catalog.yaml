@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cnpg-barman-plugin
+  description: |-
+    CNPG-I Barman Cloud plugin — replaces CNPG's in-tree barmanObjectStore
+    API (deprecated, removed in CNPG 1.31.0) with the supported
+    ObjectStore CRD + plugin-based backup/archive/restore path.
+  tags:
+    - database
+    - postgresql
+    - backup
+    - operators
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

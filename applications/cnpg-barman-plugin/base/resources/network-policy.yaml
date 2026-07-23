@@ -1,0 +1,70 @@
+# cnpg-system runs default-deny; the vendored manifest.yaml carries no
+# NetworkPolicy of its own. Three policies:
+#  1. Ingress to the plugin from the CNPG operator (gRPC, port 9090) —
+#     the operator is the gRPC client, dialing out to the plugin's Service.
+#  2. Egress from the plugin to the apiserver (controller-manager, leader
+#     election, ObjectStore/Secret/Backup watches) + DNS.
+#  3. A supplementary egress rule on the CNPG operator pods (same
+#     podSelector as applications/cnpg's own policy — NetworkPolicies are
+#     additive) so the operator can dial the plugin on 9090; kept here
+#     rather than patching the cnpg app so this app stays self-contained.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: barman-plugin-allow-ingress
+  namespace: cnpg-system
+spec:
+  podSelector:
+    matchLabels:
+      app: barman-cloud
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cloudnative-pg
+      ports:
+        - protocol: TCP
+          port: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: barman-plugin-allow-egress
+  namespace: cnpg-system
+spec:
+  podSelector:
+    matchLabels:
+      app: barman-cloud
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 6443
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cnpg-operator-allow-egress-barman-plugin
+  namespace: cnpg-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: cloudnative-pg
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: barman-cloud
+      ports:
+        - protocol: TCP
+          port: 9090

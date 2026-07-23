@@ -32,6 +32,11 @@ resources:
   - ../../applications/flux-monitoring/base
   - ../../applications/external-secrets-operator/base
   - ../../applications/cnpg/base
+  # CNPG-I Barman Cloud plugin: replaces the in-tree barmanObjectStore API
+  # (deprecated, removed in CNPG 1.31.0; cluster is on 1.30.0). Must come
+  # after cnpg/base (shares cnpg-system namespace + depends on the operator
+  # being present for the plugin registration Service to matter).
+  - ../../applications/cnpg-barman-plugin/base
   - ../../applications/step-ca-db/controlplane
   - ../../applications/step-ca/controlplane
   - ../../applications/cert-manager/controlplane
