@@ -8,5 +8,5 @@ spec:
   backupOwnerReference: self
   cluster:
     name: step-ca-db
-  target: prefer-standby
+  target: primary
   immediate: true

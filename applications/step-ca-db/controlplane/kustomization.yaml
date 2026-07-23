@@ -44,4 +44,4 @@ patches:
             data:
               compression: gzip
           retentionPolicy: "30d"
-          target: prefer-standby
+          target: primary
