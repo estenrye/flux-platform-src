@@ -1,0 +1,83 @@
+garage:
+  dbEngine: lmdb
+  replicationFactor: "3"
+  consistencyMode: consistent
+  rpcBindAddr: "[::]:3901"
+  existingRpcSecret: garage-secrets
+  kubernetesSkipCrd: false
+  s3:
+    api:
+      region: garage
+      bindAddr: "[::]:3900"
+      rootDomain: ".s3.garage.svc.cluster.local"
+    web:
+      bindAddr: "[::]:3902"
+      rootDomain: ".web.garage.svc.cluster.local"
+  admin:
+    apiBindAddr: "[::]:3903"
+  additionalTopLevelConfig: |-
+    allow_world_readable_secrets = true
+    admin_token_file = "/run/secrets/admin-token"
+
+image:
+  repository: dxflrs/garage
+  tag: v2.3.0
+  pullPolicy: Always
+
+deployment:
+  replicaCount: 3
+  podManagementPolicy: Parallel
+
+persistence:
+  enabled: true
+  meta:
+    storageClass: democratic-csi-iscsi
+    size: 1Gi
+  data:
+    storageClass: democratic-csi-iscsi
+    size: 50Gi
+
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 3900
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 3900
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+
+extraVolumes:
+  - name: admin-secret
+    secret:
+      secretName: garage-secrets
+      items:
+        - key: admin-token
+          path: admin-token
+
+extraVolumeMounts:
+  - name: admin-secret
+    mountPath: /run/secrets
+    readOnly: true
