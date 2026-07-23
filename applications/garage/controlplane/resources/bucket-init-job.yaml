@@ -62,11 +62,11 @@ spec:
           # Read admin token from file (not env var).
           GARAGE_ADMIN_TOKEN=$(cat /var/secrets/admin-token)
 
-          # Wait for Garage admin API to be reachable.
+          # Wait for Garage admin API to be reachable (v2: GetClusterStatus requires auth).
           echo "Waiting for Garage admin API..."
           for i in $(seq 1 60); do
             if curl -sf -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
-                "${ADMIN_URL}/v1/health" > /dev/null 2>&1; then
+                "${ADMIN_URL}/v2/GetClusterStatus" > /dev/null 2>&1; then
               echo "Admin API reachable"
               break
             fi
@@ -79,11 +79,13 @@ spec:
           done
 
           # Wait for all 3 nodes to be up.
+          # v2 JSON has spaces after colons; tr -d strips them before grep.
           echo "Waiting for 3 Garage nodes..."
+          STATUS=""
           for i in $(seq 1 30); do
-            UP=$(curl -sf -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
-              "${ADMIN_URL}/v1/status" | \
-              grep -o '"isUp":true' | wc -l | tr -d ' ')
+            STATUS=$(curl -sf -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
+              "${ADMIN_URL}/v2/GetClusterStatus" 2>/dev/null || echo "")
+            UP=$(echo "${STATUS}" | tr -d " \n" | grep -o '"isUp":true' | wc -l | tr -d ' ')
             echo "Nodes up: ${UP}/3"
             if [ "${UP}" -ge 3 ]; then
               echo "All 3 nodes are up"
@@ -97,16 +99,14 @@ spec:
           done
 
           # Check if layout is already applied (layoutVersion > 0).
-          LAYOUT_VERSION=$(curl -sf -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
-            "${ADMIN_URL}/v1/status" | \
+          LAYOUT_VERSION=$(echo "${STATUS}" | tr -d " \n" | \
             grep -o '"layoutVersion":[0-9]*' | grep -o '[0-9]*' || echo "0")
           echo "Current layout version: ${LAYOUT_VERSION}"
 
           if [ "${LAYOUT_VERSION:-0}" -eq 0 ]; then
             echo "Assigning layout to nodes..."
             # Get node IDs from status (full 64-char hex IDs).
-            NODE_IDS=$(curl -sf -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
-              "${ADMIN_URL}/v1/status" | \
+            NODE_IDS=$(echo "${STATUS}" | tr -d " \n" | \
               grep -o '"id":"[^"]*"' | sed 's/"id":"//g;s/"//g')
 
             IDX=0
@@ -114,11 +114,12 @@ spec:
             for NODE_ID in ${NODE_IDS}; do
               ZONE=$(echo "${ZONES}" | awk "{print \$$((IDX+1))}")
               echo "Assigning node ${NODE_ID} to zone ${ZONE} (capacity 45 GiB)..."
+              # v2: body is {"roles":[{...}]} (not a plain array); "tags":[] is required.
               curl -sf -X POST \
                 -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
                 -H "Content-Type: application/json" \
-                -d "[{\"id\":\"${NODE_ID}\",\"zone\":\"${ZONE}\",\"capacity\":48318382080}]" \
-                "${ADMIN_URL}/v1/layout"
+                -d "{\"roles\":[{\"id\":\"${NODE_ID}\",\"zone\":\"${ZONE}\",\"capacity\":48318382080,\"tags\":[]}]}" \
+                "${ADMIN_URL}/v2/UpdateClusterLayout"
               IDX=$((IDX+1))
             done
 
@@ -127,7 +128,7 @@ spec:
               -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
               -H "Content-Type: application/json" \
               -d '{"version":1}' \
-              "${ADMIN_URL}/v1/layout/apply"
+              "${ADMIN_URL}/v2/ApplyClusterLayout"
             echo "Layout applied"
           else
             echo "Layout already applied (version ${LAYOUT_VERSION}), skipping"
@@ -136,13 +137,13 @@ spec:
           # Create buckets (409 = already exists, not an error).
           for BUCKET in step-ca-db-barman openbao-snapshots lgtm jwks; do
             echo "Creating bucket ${BUCKET}..."
-            HTTP_CODE=$(curl -sf -X POST \
+            HTTP_CODE=$(curl -s -X POST \
               -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
               -H "Content-Type: application/json" \
               -d "{\"globalAlias\":\"${BUCKET}\"}" \
               -o /dev/null \
               -w "%{http_code}" \
-              "${ADMIN_URL}/v1/bucket" || echo "000")
+              "${ADMIN_URL}/v2/CreateBucket" || echo "000")
             if [ "${HTTP_CODE}" = "200" ] || [ "${HTTP_CODE}" = "409" ]; then
               echo "Bucket ${BUCKET}: OK (${HTTP_CODE})"
             else
