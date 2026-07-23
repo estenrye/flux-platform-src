@@ -54,8 +54,7 @@ securityContext:
   readOnlyRootFilesystem: true
 
 livenessProbe:
-  httpGet:
-    path: /health
+  tcpSocket:
     port: 3903
   initialDelaySeconds: 10
   periodSeconds: 30
