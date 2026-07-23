@@ -1,22 +1,19 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# controlplane variant (M2 design §4.1): base cluster plus the interim
-# logical-dump backup path — barman needs S3, which arrives with Garage in
-# M3. Dumps land on a democratic-csi-nfs PVC.
+# controlplane variant: CNPG cluster with barman continuous WAL archiving
+# to Garage S3 (M3 step 4). Retired: pg_dump CronJob + NFS PVC (M2 interim).
 
 resources:
   - ../base
   - resources/apiserver-egress-network-policy.yaml
-  - resources/backup-pvc.yaml
-  - resources/backup-cronjob.yaml
-  - resources/backup-network-policy.yaml
+  - resources/barman-network-policy.yaml
 
 patches:
   # democratic-csi-nfs-pg: fsGroupPolicy: File handles CNPG uid 26 ownership
   # at mount time. No NAS-side mapall or nfs-pg-owner CronJob needed.
   # imageName pin: prevents the postgres image from floating with the
-  # operator's compiled-in default; same digest as the dump container.
+  # operator's compiled-in default.
   - target:
       kind: Cluster
       name: step-ca-db
@@ -28,3 +25,22 @@ patches:
       - op: add
         path: /spec/imageName
         value: ghcr.io/cloudnative-pg/postgresql:18.3@sha256:5e30290fba3d990b08a9caea6ddb49c661ad8246cbb2688adad7e6cc78df6c3f
+      - op: add
+        path: /spec/backup
+        value:
+          barmanObjectStore:
+            destinationPath: s3://step-ca-db-barman/
+            endpointURL: http://garage.garage.svc.cluster.local:3900
+            s3Credentials:
+              accessKeyId:
+                name: step-ca-db-barman-credentials
+                key: access-key-id
+              secretAccessKey:
+                name: step-ca-db-barman-credentials
+                key: secret-access-key
+            wal:
+              compression: gzip
+            data:
+              compression: gzip
+          retentionPolicy: "30d"
+          target: prefer-standby
