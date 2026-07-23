@@ -62,8 +62,7 @@ livenessProbe:
   failureThreshold: 3
 
 readinessProbe:
-  httpGet:
-    path: /health
+  tcpSocket:
     port: 3903
   initialDelaySeconds: 5
   periodSeconds: 10
