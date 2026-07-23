@@ -1,6 +1,6 @@
 ---
 name: m3-step-tracker
-description: Live tracker of M3's 11 execution steps — steps 1-4 done and restore-drill verified; barman in-tree API deprecation open as a non-urgent follow-up
+description: Live tracker of M3's 11 execution steps — steps 1-4 done, restore-drill verified, and barman in-tree API migrated to the CNPG-I plugin
 metadata:
   type: project
 ---
@@ -53,32 +53,64 @@ this decays fast, keep it current rather than trusting it blindly.
   - Live production `Cluster.spec.backup.target` and
     `ScheduledBackup.spec.target` both confirmed `primary` post-deploy.
 
-### Barman in-tree API deprecation (open, not urgent)
+### Barman in-tree API deprecation — RESOLVED 2026-07-23
 
-Production's CNPG `Cluster` backup config uses the in-tree
-`barmanObjectStore` API, which CNPG deprecates and removes in 1.31.0.
-Cluster is on 1.30.0 — about one minor version of runway. Researched the
-migration to the Barman Cloud Plugin (`plugin-barman-cloud`,
-`ObjectStore` CRD, `spec.plugins[].name: barman-cloud.cloudnative-pg.io`)
-and found a real open question worth resolving carefully before touching
-production: the official v0.13.0 release `manifest.yaml`
-(`ghcr.io/cloudnative-pg/plugin-barman-cloud`) ships a Deployment whose
-`SIDECAR_IMAGE` env var reads from a Secret (`plugin-barman-cloud-<hash>`)
-that has **no `data` field in the downloaded artifact** — either a
-packaging quirk in how that release asset was fetched/generated, or a
-genuine gap that would leave the plugin unable to inject its sidecar into
-CNPG pods. The `main` branch's raw `config/manager/manager.yaml` doesn't
-reference `SIDECAR_IMAGE` at all, suggesting release-time templating I
-haven't fully traced.
+Migrated `step-ca-db` off the in-tree `spec.backup.barmanObjectStore` API
+(removed in CNPG 1.31.0; cluster was on 1.30.0) to the CNPG-I Barman
+Cloud Plugin, same day as discovery, at the user's explicit direction
+(not deferred). PRs #104–#106.
 
-This also lands in the *shared* `cnpg-system` namespace — blast radius is
-every CNPG cluster on `controlplane`, not just step-ca-db, and the
-Cluster-side cutover triggers a rolling restart. Given it's not urgent,
-treat as its own properly-scoped follow-up: confirm the SIDECAR_IMAGE
-mechanism (check a fresh non-cached download, or ask upstream) before
-vendoring the plugin, deploy the plugin as a standalone addition first
-and confirm it's healthy, *then* do the Cluster/ScheduledBackup/
-externalClusters cutover as a separate, reviewable change.
+**Correction on the earlier "SIDECAR_IMAGE Secret has no data" finding**:
+that was my own investigation error, not a real gap. The Secret's `data:`
+key sorts alphabetically *before* `kind`/`metadata` in the downloaded
+manifest, and an early `grep -A6` only looked *after* the `name:` line —
+missing it entirely. The value was present and decodes cleanly to
+`ghcr.io/cloudnative-pg/plugin-barman-cloud-sidecar:v0.13.0`. Lesson: always
+re-verify a "the artifact seems broken" conclusion with a full-file
+`grep`/`sed` before trusting it, especially before deferring real work on
+that basis.
+
+**What shipped**:
+- New `applications/cnpg-barman-plugin` app: vendors the upstream v0.13.0
+  release manifest into `cnpg-system`. Controller image + the
+  `SIDECAR_IMAGE` secret value both digest-pinned. NetworkPolicies added
+  (cnpg-system runs default-deny; needed both an ingress rule on the
+  plugin for the operator's gRPC calls, and a supplementary egress rule
+  on the *operator's* existing podSelector, since NetworkPolicies are
+  additive and the operator's own policy file lives in a different app).
+- `step-ca-db`: added an `ObjectStore` CR (direct translation of the old
+  config), switched `Cluster.spec.plugins` (`isWALArchiver: true`) and
+  `ScheduledBackup.spec.method: plugin`. No `serverName` override needed
+  — defaults to the Cluster's own name, preserving the existing
+  `step-ca-db/...` prefix in Garage.
+- **Two follow-up fixes needed post-deploy, both because this cluster runs
+  `cert-manager-approver-policy`** (blocks any cert-manager
+  `CertificateRequest` with zero content-based matching unless something
+  explicitly grants it):
+  1. The plugin's Certificates (`barman-cloud-client`/`-server`, via its
+     own bundled `selfSigned` Issuer) had no matching
+     `CertificateRequestPolicy` → stuck `WaitingForApproval` forever →
+     `barman-cloud` pod stuck `ContainerCreating` (`FailedMount: secret
+     not found`) → `step-ca-db` Cluster reconciliation stalled
+     ("cannot proceed... unknown plugin being required"). **No outage** —
+     existing pods kept running fine, just blocked from progressing.
+     Fixed by adding a `CertificateRequestPolicy` scoped to the plugin's
+     `selfsigned-issuer` (mirrors the existing
+     `csi-driver-spiffe-ca-policy` pattern).
+  2. A matching policy alone wasn't enough: approver-policy *also*
+     requires an explicit RBAC `use` grant (a `ClusterRole` naming the
+     specific policy in `resourceNames`, bound to the `cert-manager`
+     ServiceAccount) — content-matching a Ready policy is necessary but
+     not sufficient. Fixed by mirroring
+     `csi-driver-spiffe-ca.clusterrole(binding).yaml` exactly. **If any
+     future app adds its own cert-manager Issuer under approver-policy,
+     budget for both pieces up front.**
+- Verified end-to-end on production: plugin pod Running/Ready, all 3
+  `step-ca-db` instances rolled cleanly (2/2 containers, sidecar
+  injected, zero WAL-archiving gap across the restart — confirmed
+  segments 4D–52 all present in Garage with no missing numbers), step-ca
+  `/health` still 200 post-rollout, and a fresh `method: plugin` Backup
+  completed with `beginWal == endWal` on current WAL.
 
 See [[m3-render-lint-ci-fix]] for a separate, now-resolved finding from
 this same session: `render-and-lint` CI had been failing on every commit
