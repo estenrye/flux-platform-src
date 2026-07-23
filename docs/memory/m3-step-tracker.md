@@ -1,6 +1,6 @@
 ---
 name: m3-step-tracker
-description: Live tracker of M3's 11 execution steps — current status, what's actually verified vs. assumed
+description: Live tracker of M3's 11 execution steps — steps 1-4 done and restore-drill verified; barman in-tree API deprecation open as a non-urgent follow-up
 metadata:
   type: project
 ---
@@ -18,45 +18,67 @@ this decays fast, keep it current rather than trusting it blindly.
 | 4 | step-ca-db barman → Garage, retire pg_dump CronJob | Partially done — see detail below |
 | 5–11 | OpenBao, ESO migration, snapshots, Keycloak, Pinniped, ADRs | Not started |
 
-### Step 4 detail (2026-07-23)
+### Step 4 detail (2026-07-23) — RESOLVED
 
 - WAL archiving wired and base backups now actually run: PR #98 wired
   `barmanObjectStore` but never added a `Backup`/`ScheduledBackup`, so no
   base backup had ever executed. Fixed in #99 (`ScheduledBackup`,
-  daily 03:00 UTC + `immediate: true`). Confirmed live: `Backup
-  step-ca-db-backup-20260723063144` completed, `firstRecoverabilityPoint`
-  set, 4.3MB `data.tar.gz` + `backup.info` in the `step-ca-db-barman`
-  Garage bucket.
-- **Restore drill NOT yet passing.** `pg_stat_archiver` on production
-  reports 11 successful WAL archives (last: `...048` at 04:24 UTC), but
-  the Garage bucket has **zero WAL objects** — only the base backup.
-  A scratch-cluster restore attempt fails with `WAL not found` for the
-  segment the backup needs to reach consistency. Root cause (probable,
-  not confirmed): Garage's buckets all show creation date 2026-07-23
-  (today), consistent with Garage's PV data having been wiped by one of
-  the several redeploys during step 3's iteration (health-probe fixes,
-  v2 API fixes, etc. — PRs #85–#97). WAL archived before that reset is
-  gone; the base backup (taken after, at 06:31) is on stable storage and
-  persisted fine — but it's currently **not restorable** because its
-  required starting WAL isn't durably stored anywhere.
-  - step-ca-db is low-write (CA issuance is infrequent), so a WAL
-    segment may not roll for a long time under normal operation.
-  - **Next action to actually close step 4**: force a fresh WAL segment
-    (a throwaway write + `pg_switch_wal()`, or wait for real cert
-    issuance), confirm it lands and persists in Garage, take a new base
-    backup against that state, then retry the restore drill (procedure:
-    externalCluster recovery, NOT the old pg_dump-based
-    [[m2-step11-restore-drill]] runbook — need `serverName: step-ca-db`
-    explicitly set on the externalCluster's `barmanObjectStore`, since it
-    otherwise defaults to the externalCluster's own reference name and
-    silently looks in the wrong S3 prefix).
-- **Also discovered**: production's CNPG `Cluster` backup config uses the
-  in-tree `barmanObjectStore` API, which CNPG deprecates and removes in
-  1.31.0. Cluster is on 1.30.0 now — about one minor version of runway
-  before this needs migrating to the Barman Cloud Plugin. Not urgent, not
-  blocking M3, but should be a tracked fast-follow (new plugin deployment
-  + `ObjectStore` CRD + `plugin:` config on the Cluster, replacing
-  `barmanObjectStore:` directly).
+  daily 03:00 UTC + `immediate: true`).
+- **Restore drill now passes.** Root-caused two stacked issues:
+  1. Garage's buckets all showed creation date 2026-07-23 (today),
+     consistent with Garage's PV data having been wiped by one of the
+     several redeploys during step 3's iteration (health-probe fixes, v2
+     API fixes — PRs #85–#97). Any WAL archived before that reset was
+     gone.
+  2. **Real bug, fixed in #102**: `target: prefer-standby` (both the
+     Cluster default and the ScheduledBackup) anchors the backup's
+     `beginWal` to the *standby's own* checkpoint/restart-point — which
+     on this low-traffic cluster was stuck at an old WAL segment for
+     hours with no sign of advancing, even though streaming replication
+     itself was healthy and caught up. Every `prefer-standby` backup
+     needed that stale WAL for consistency, and it was gone. Switched
+     `target: primary` on both. Verified end-to-end: forced a fresh WAL
+     segment (`pg_logical_emit_message` + `pg_switch_wal`, zero schema
+     impact), confirmed it persisted in Garage, took a `target: primary`
+     backup (`beginWal == endWal`, both fresh), restored it onto a
+     scratch CNPG cluster via the barman `externalCluster` path, and
+     confirmed all 24 tables + real row data (6 certs) present. Scratch
+     cluster and NetworkPolicies fully torn down afterward.
+  - Restore procedure note (NOT the old pg_dump-based
+    [[m2-step11-restore-drill]] runbook): externalCluster recovery needs
+    `serverName: step-ca-db` explicitly set on the `barmanObjectStore`
+    block — it otherwise defaults to the externalCluster's own reference
+    name and silently looks in the wrong S3 prefix, failing with "no
+    target backup found".
+  - Live production `Cluster.spec.backup.target` and
+    `ScheduledBackup.spec.target` both confirmed `primary` post-deploy.
+
+### Barman in-tree API deprecation (open, not urgent)
+
+Production's CNPG `Cluster` backup config uses the in-tree
+`barmanObjectStore` API, which CNPG deprecates and removes in 1.31.0.
+Cluster is on 1.30.0 — about one minor version of runway. Researched the
+migration to the Barman Cloud Plugin (`plugin-barman-cloud`,
+`ObjectStore` CRD, `spec.plugins[].name: barman-cloud.cloudnative-pg.io`)
+and found a real open question worth resolving carefully before touching
+production: the official v0.13.0 release `manifest.yaml`
+(`ghcr.io/cloudnative-pg/plugin-barman-cloud`) ships a Deployment whose
+`SIDECAR_IMAGE` env var reads from a Secret (`plugin-barman-cloud-<hash>`)
+that has **no `data` field in the downloaded artifact** — either a
+packaging quirk in how that release asset was fetched/generated, or a
+genuine gap that would leave the plugin unable to inject its sidecar into
+CNPG pods. The `main` branch's raw `config/manager/manager.yaml` doesn't
+reference `SIDECAR_IMAGE` at all, suggesting release-time templating I
+haven't fully traced.
+
+This also lands in the *shared* `cnpg-system` namespace — blast radius is
+every CNPG cluster on `controlplane`, not just step-ca-db, and the
+Cluster-side cutover triggers a rolling restart. Given it's not urgent,
+treat as its own properly-scoped follow-up: confirm the SIDECAR_IMAGE
+mechanism (check a fresh non-cached download, or ask upstream) before
+vendoring the plugin, deploy the plugin as a standalone addition first
+and confirm it's healthy, *then* do the Cluster/ScheduledBackup/
+externalClusters cutover as a separate, reviewable change.
 
 See [[m3-render-lint-ci-fix]] for a separate, now-resolved finding from
 this same session: `render-and-lint` CI had been failing on every commit
