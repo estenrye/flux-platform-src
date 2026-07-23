@@ -14,12 +14,14 @@ controller:
   driver:
     image:
       tag: next
+      pullPolicy: Always
 
 node:
   priorityClassName: platform-critical
   driver:
     image:
       tag: next
+      pullPolicy: Always
     # Talos exposes /etc/iscsi via kubelet extraMounts (same path truenas-csi
     # uses). /usr/local/etc/iscsi does not exist as a pre-created directory on
     # these nodes, causing containerd to fail with read-only filesystem when

@@ -21,12 +21,14 @@ controller:
   driver:
     image:
       tag: next
+      pullPolicy: Always
 
 node:
   priorityClassName: platform-critical
   driver:
     image:
       tag: next
+      pullPolicy: Always
     # Talos iscsi-tools extension installs iscsi config under /usr/local/etc/iscsi,
     # not the FHS /etc/iscsi. The NFS node plugin doesn't run iscsiadm but the
     # chart mounts this path regardless; set it correctly for the iSCSI instance.

@@ -49,12 +49,15 @@ images:
     digest: sha256:cd21e19cd8bbd5bc56f1b4f1398a436e7897da2995d6d036c9729be3f4e456e6
   - name: ghcr.io/democratic-csi/csi-grpc-proxy
     digest: sha256:0240d0fba3cedd598036766b1865e88aa2eac9c16822df03d5d912a81128ebb6
+  # node.cleanup initContainer: not covered by the driver.image tag override above.
+  - name: docker.io/busybox
+    digest: sha256:9532d8c39891ca2ecde4d30d7710e01fb739c87a8b9299685c63704296b16028
 
 patches:
   # ── NFS controller Deployment ──────────────────────────────────────────────
   - target:
       kind: Deployment
-      name: democratic-csi-nfs
+      name: democratic-csi-nfs-controller
     patch: |-
       - op: add
         path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
@@ -128,11 +131,32 @@ patches:
       - op: add
         path: /metadata/annotations/checkov.io~1skip16
         value: "CKV_K8S_40=Upstream democratic-csi controller runs as root (UID 0); high-UID operation not supported upstream."
+      - op: remove
+        path: /spec/template/spec/serviceAccount
+      - op: add
+        path: /spec/template/spec/serviceAccountName
+        value: democratic-csi-nfs-controller-sa
+      - op: add
+        path: /spec/strategy
+        value:
+          type: RollingUpdate
+      - op: add
+        path: /spec/template/spec/restartPolicy
+        value: Always
+
+  # ── NFS controller ClusterRoleBinding ──────────────────────────────────────
+  - target:
+      kind: ClusterRoleBinding
+      name: democratic-csi-nfs-controller-rb
+    patch: |-
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-secrets
+        value: "The CSI controller must read StorageClass-referenced secrets (driver connection config, S3 credentials for backup targets) per the CSI provisioning spec."
 
   # ── NFS node DaemonSet ─────────────────────────────────────────────────────
   - target:
       kind: DaemonSet
-      name: democratic-csi-nfs
+      name: democratic-csi-nfs-node
     patch: |-
       - op: add
         path: /metadata/annotations/ignore-check.kube-linter.io~1privileged-container
@@ -199,7 +223,7 @@ patches:
         value: "CKV_K8S_16=The CSI node plugin requires privileged mode for bidirectional mount propagation."
       - op: add
         path: /metadata/annotations/checkov.io~1skip08
-        value: "CKV_K8S_17=hostNetwork is required so NFS sessions originate from the node's ULA."
+        value: "CKV_K8S_19=hostNetwork is required so NFS sessions originate from the node's ULA."
       - op: add
         path: /metadata/annotations/checkov.io~1skip09
         value: "CKV_K8S_18=hostIPC is required by the iSCSI initiator tooling on Talos."
@@ -233,11 +257,35 @@ patches:
       - op: add
         path: /metadata/annotations/checkov.io~1skip19
         value: "CKV_K8S_40=The CSI node plugin must run as root (UID 0) for host mount operations."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip20
+        value: "CKV_K8S_25=The node plugin's securityContext (SYS_ADMIN) is hardcoded in the upstream chart template; not configurable via values."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip21
+        value: "CKV_K8S_39=CAP_SYS_ADMIN is required for bidirectional mount propagation; hardcoded upstream, not configurable via values."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip22
+        value: "CKV_K8S_15=All node containers except the cleanup initContainer are digest-pinned; pull policy is immaterial for immutable digest references. The csi-node-driver-registrar and csi-proxy sidecars don't expose a pullPolicy hook in the upstream chart."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1drop-net-raw-capability
+        value: "The csi-driver container runs privileged:true (required for host mount operations); explicit capability drop lists have no effect under privileged mode, so NET_RAW is implicitly available regardless."
+      - op: remove
+        path: /spec/template/spec/serviceAccount
+      - op: add
+        path: /spec/template/spec/serviceAccountName
+        value: democratic-csi-nfs-node-sa
+      - op: add
+        path: /spec/template/spec/restartPolicy
+        value: Always
+      - op: add
+        path: /spec/updateStrategy
+        value:
+          type: RollingUpdate
 
   # ── iSCSI controller Deployment — same suppressions as NFS controller ──────
   - target:
       kind: Deployment
-      name: democratic-csi-iscsi
+      name: democratic-csi-iscsi-controller
     patch: |-
       - op: add
         path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
@@ -311,11 +359,32 @@ patches:
       - op: add
         path: /metadata/annotations/checkov.io~1skip16
         value: "CKV_K8S_40=Upstream democratic-csi controller runs as root (UID 0); high-UID operation not supported upstream."
+      - op: remove
+        path: /spec/template/spec/serviceAccount
+      - op: add
+        path: /spec/template/spec/serviceAccountName
+        value: democratic-csi-iscsi-controller-sa
+      - op: add
+        path: /spec/strategy
+        value:
+          type: RollingUpdate
+      - op: add
+        path: /spec/template/spec/restartPolicy
+        value: Always
+
+  # ── iSCSI controller ClusterRoleBinding ─────────────────────────────────────
+  - target:
+      kind: ClusterRoleBinding
+      name: democratic-csi-iscsi-controller-rb
+    patch: |-
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-secrets
+        value: "The CSI controller must read StorageClass-referenced secrets (driver connection config, S3 credentials for backup targets) per the CSI provisioning spec."
 
   # ── iSCSI node DaemonSet — same suppressions as NFS node ──────────────────
   - target:
       kind: DaemonSet
-      name: democratic-csi-iscsi
+      name: democratic-csi-iscsi-node
     patch: |-
       - op: add
         path: /metadata/annotations/ignore-check.kube-linter.io~1privileged-container
@@ -382,7 +451,7 @@ patches:
         value: "CKV_K8S_16=The CSI node plugin requires privileged mode for iSCSI device attachment and mount propagation."
       - op: add
         path: /metadata/annotations/checkov.io~1skip08
-        value: "CKV_K8S_17=hostNetwork is required so iSCSI sessions originate from the node's ULA."
+        value: "CKV_K8S_19=hostNetwork is required so iSCSI sessions originate from the node's ULA."
       - op: add
         path: /metadata/annotations/checkov.io~1skip09
         value: "CKV_K8S_18=hostIPC is required by the iSCSI initiator tooling on Talos."
@@ -416,3 +485,27 @@ patches:
       - op: add
         path: /metadata/annotations/checkov.io~1skip19
         value: "CKV_K8S_40=The CSI node plugin must run as root (UID 0) for host mount operations."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip20
+        value: "CKV_K8S_25=The node plugin's securityContext (SYS_ADMIN) is hardcoded in the upstream chart template; not configurable via values."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip21
+        value: "CKV_K8S_39=CAP_SYS_ADMIN is required for bidirectional mount propagation and iSCSI device attachment; hardcoded upstream, not configurable via values."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip22
+        value: "CKV_K8S_15=All node containers except the cleanup initContainer are digest-pinned; pull policy is immaterial for immutable digest references. The csi-node-driver-registrar and csi-proxy sidecars don't expose a pullPolicy hook in the upstream chart."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1drop-net-raw-capability
+        value: "The csi-driver container runs privileged:true (required for iSCSI device attachment and host mount operations); explicit capability drop lists have no effect under privileged mode, so NET_RAW is implicitly available regardless."
+      - op: remove
+        path: /spec/template/spec/serviceAccount
+      - op: add
+        path: /spec/template/spec/serviceAccountName
+        value: democratic-csi-iscsi-node-sa
+      - op: add
+        path: /spec/template/spec/restartPolicy
+        value: Always
+      - op: add
+        path: /spec/updateStrategy
+        value:
+          type: RollingUpdate

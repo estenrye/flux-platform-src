@@ -24,6 +24,11 @@ image:
   tag: v2.3.0
   pullPolicy: Always
 
+initImage:
+  repository: busybox
+  tag: stable
+  pullPolicy: Always
+
 deployment:
   replicaCount: 3
   podManagementPolicy: Parallel
