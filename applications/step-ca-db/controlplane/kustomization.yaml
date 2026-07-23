@@ -9,6 +9,7 @@ resources:
   - resources/apiserver-egress-network-policy.yaml
   - resources/barman-network-policy.yaml
   - resources/scheduled-backup.yaml
+  - resources/barman-objectstore.yaml
 
 patches:
   # democratic-csi-nfs-pg: fsGroupPolicy: File handles CNPG uid 26 ownership
@@ -27,21 +28,9 @@ patches:
         path: /spec/imageName
         value: ghcr.io/cloudnative-pg/postgresql:18.3@sha256:5e30290fba3d990b08a9caea6ddb49c661ad8246cbb2688adad7e6cc78df6c3f
       - op: add
-        path: /spec/backup
+        path: /spec/plugins
         value:
-          barmanObjectStore:
-            destinationPath: s3://step-ca-db-barman/
-            endpointURL: http://garage.garage.svc.cluster.local:3900
-            s3Credentials:
-              accessKeyId:
-                name: step-ca-db-barman-credentials
-                key: access-key-id
-              secretAccessKey:
-                name: step-ca-db-barman-credentials
-                key: secret-access-key
-            wal:
-              compression: gzip
-            data:
-              compression: gzip
-          retentionPolicy: "30d"
-          target: primary
+          - name: barman-cloud.cloudnative-pg.io
+            isWALArchiver: true
+            parameters:
+              barmanObjectName: step-ca-db-barman

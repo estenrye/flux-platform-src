@@ -1,0 +1,21 @@
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: step-ca-db-barman
+  namespace: step-ca
+spec:
+  configuration:
+    destinationPath: s3://step-ca-db-barman/
+    endpointURL: http://garage.garage.svc.cluster.local:3900
+    s3Credentials:
+      accessKeyId:
+        name: step-ca-db-barman-credentials
+        key: access-key-id
+      secretAccessKey:
+        name: step-ca-db-barman-credentials
+        key: secret-access-key
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+  retentionPolicy: "30d"
