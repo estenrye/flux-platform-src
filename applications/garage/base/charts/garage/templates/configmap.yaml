@@ -56,6 +56,9 @@ data:
 
     [admin]
     api_bind_addr = "{{ .Values.garage.admin.apiBindAddr }}"
+    {{- if .Values.garage.admin.adminTokenFile }}
+    admin_token_file = "{{ .Values.garage.admin.adminTokenFile }}"
+    {{- end }}
     {{- if .Values.monitoring.tracing.sink }}
     trace_sink = "{{ .Values.monitoring.tracing.sink }}"
     {{- end }}

@@ -15,9 +15,9 @@ garage:
       rootDomain: ".web.garage.svc.cluster.local"
   admin:
     apiBindAddr: "[::]:3903"
+    adminTokenFile: /run/secrets/admin-token
   additionalTopLevelConfig: |-
     allow_world_readable_secrets = true
-    admin_token_file = "/run/secrets/admin-token"
 
 image:
   repository: dxflrs/garage
