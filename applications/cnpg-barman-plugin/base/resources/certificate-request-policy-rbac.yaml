@@ -1,0 +1,27 @@
+# cert-manager-approver-policy requires an explicit `use` grant naming
+# the policy, bound to the cert-manager controller's own ServiceAccount —
+# a policy existing and matching by content is not enough on its own.
+# Mirrors applications/cert-manager-spiffe-issuer's
+# csi-driver-spiffe-ca.clusterrole(binding).yaml pattern.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cert-manager-policy:barman-cloud-plugin-policy
+rules:
+  - apiGroups: ["policy.cert-manager.io"]
+    resources: ["certificaterequestpolicies"]
+    verbs: ["use"]
+    resourceNames: ["barman-cloud-plugin-policy"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cert-manager-policy:barman-cloud-plugin-policy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cert-manager-policy:barman-cloud-plugin-policy
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager
+    namespace: cert-manager

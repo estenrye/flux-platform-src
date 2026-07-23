@@ -12,6 +12,7 @@ resources:
   - resources/manifest.yaml
   - resources/network-policy.yaml
   - resources/certificate-request-policy.yaml
+  - resources/certificate-request-policy-rbac.yaml
 
 images:
   - name: ghcr.io/cloudnative-pg/plugin-barman-cloud
