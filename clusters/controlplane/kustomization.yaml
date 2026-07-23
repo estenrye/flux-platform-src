@@ -85,6 +85,8 @@ resources:
   # Garage RPC secret + admin token (M3 step 3). Break-glass; to be rotated
   # into OpenBao once step 5 completes. See A2 in the M3 design spec.
   - secrets/garage-admin.sops.yaml
+  # Garage S3 access key for step-ca-db barman WAL archiving (M3 step 4).
+  - secrets/step-ca-db-barman-credentials.sops.yaml
 
 patches:
   - path: patches/envoy-proxy.ipfamily.yaml
