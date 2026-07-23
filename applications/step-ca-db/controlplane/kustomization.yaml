@@ -8,6 +8,7 @@ resources:
   - ../base
   - resources/apiserver-egress-network-policy.yaml
   - resources/barman-network-policy.yaml
+  - resources/scheduled-backup.yaml
 
 patches:
   # democratic-csi-nfs-pg: fsGroupPolicy: File handles CNPG uid 26 ownership
