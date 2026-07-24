@@ -1,6 +1,6 @@
 ---
 name: m3-step-tracker
-description: Live tracker of M3's 11 execution steps — steps 1-5 done; OpenBao runs on a CNPG/Postgres backend, not Raft, with real-Certificate TLS after a SPIFFE-CSI false start
+description: Live tracker of M3's 11 execution steps — steps 1-5 fully done including the OpenBao unseal ceremony; step 6 (ESO → OpenBao) not started
 metadata:
   type: project
 ---
@@ -8,7 +8,7 @@ metadata:
 Tracks [[m3-design]]'s 11-step execution order. Update as steps complete —
 this decays fast, keep it current rather than trusting it blindly.
 
-## Status as of 2026-07-23
+## Status as of 2026-07-24
 
 | # | Step | Status |
 |---|---|---|
@@ -16,7 +16,7 @@ this decays fast, keep it current rather than trusting it blindly.
 | 2 | Flip default SC, migrate step-ca-db, retire nfs-pg-owner CronJob | Done (#84) |
 | 3 | Garage 3-node + buckets | Done (#85–#97); Garage was redeployed/reset several times during this step's iteration — see WAL gap note below |
 | 4 | step-ca-db barman → Garage, retire pg_dump CronJob | Done — see detail below |
-| 5 | OpenBao HA on CNPG/Postgres backend | Done — see detail below; unseal ceremony `[H]` and openbao-db-barman credentials still open |
+| 5 | OpenBao HA on CNPG/Postgres backend | **Fully done 2026-07-24**, including the unseal ceremony `[H]` — see detail below and [docs/runbooks/openbao-unseal.md](../runbooks/openbao-unseal.md) |
 | 6–11 | ESO migration, snapshots, Keycloak, Pinniped, ADRs | Not started |
 
 ### Step 4 detail (2026-07-23) — RESOLVED
@@ -273,3 +273,58 @@ retention-policy enforcement — which requires authenticated `List` calls
   dependency of this app. Needs a follow-up wording fix (harmless, not
   functionally wrong — `cert-manager-spiffe-csi-driver` still needs to
   come first for unrelated apps).
+
+### Step 5's `[H]` unseal ceremony — RESOLVED 2026-07-24
+
+First-ever init + unseal ran clean: 5 shares/3 threshold, all 3 pods
+unsealed, HA formed (`openbao-0` active, others standby), key shares +
+root token SOPS-encrypted at
+`clusters/controlplane/secrets/openbao-unseal.sops.yaml` per a new
+whole-file `.sops.yaml` rule (mirrors `step-ca-root`/`talos-secrets`).
+Full step-by-step procedure now lives in
+[docs/runbooks/openbao-unseal.md](../runbooks/openbao-unseal.md),
+written this session (#118).
+
+One real bug found on first run: `bao audit enable` over the API is
+rejected outright on this OpenBao version (`cannot enable audit device
+via API; use declarative, config-based audit device management
+instead` — deliberate upstream, since `file`/`socket` audit devices can
+write arbitrary paths). Fixed by declaring the device directly in
+`applications/openbao/base/values.yaml`'s `server.ha.config` instead
+(#119); since the StatefulSet is `OnDelete`, each pod needed a manual
+`kubectl delete pod` to pick up the config and re-emit through the
+unseal cycle. Verified end-to-end via `kubectl logs`: audit backend
+enabled, live JSON audit entries flowing to stdout. Ceremony log with
+both runs (init + the audit-fix restart) captured in the runbook (#120).
+
+M3 step 5 has no more open items. Step 6 (ESO `ClusterSecretStore` →
+OpenBao; migrate `aws-account-creds`) is next and has not been started.
+
+### Step 6 pre-flight finding (2026-07-24) — `aws-account-creds` never existed; the M2/M3 design's premise was wrong
+
+Before starting step 6, checked for the secret the M3 design (A4) names
+as the thing to migrate — no live Secret in any namespace, no SOPS
+file under `clusters/controlplane/secrets/`, no trace in git history
+beyond the design docs themselves. Initially read this as "quarantined
+or lost." **Corrected by the user**: it's neither. The Roles Anywhere
+trust-anchor bootstrap (M2 §4.4) was never done via a stored static
+`aws-account-creds` IAM key at all — it was done interactively using
+the user's own AWS SAML SSO credentials. The M2/M3 design docs'
+description of a "static bootstrap credential" that gets "moved" then
+"quarantined" then "migrated to OpenBao break-glass" describes a
+mechanism that was planned but never actually built; the real bootstrap
+path left no credential object behind to migrate, by design.
+
+**How to apply**: step 6 as originally scoped (A4: "migrate
+`aws-account-creds` to OpenBao break-glass path") has no source
+material and should be dropped or re-scoped, not treated as blocked or
+recoverable. If a break-glass AWS credential in OpenBao is still
+wanted for future manual bootstraps (e.g. a new trust anchor at some
+future root rotation), that would need to be freshly minted and scoped
+for that purpose — it is a new decision, not a migration. The
+proof-of-concept `ExternalSecret` half of step 6 (validate the
+ESO+OpenBao pattern with one existing SOPS secret) is unaffected and
+can proceed on its own. [[m3-design]]'s A4 section needs a matching
+correction. See [[m3-step6-secret-migration-eligibility]] for the
+dependency-analysis rule (never migrate a secret on OpenBao's own boot
+chain) and the confirmed-clean candidate secrets.

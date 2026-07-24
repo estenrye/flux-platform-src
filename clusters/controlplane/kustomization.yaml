@@ -76,6 +76,11 @@ resources:
   # item paths as the crossplane cluster's, just a different vault).
   - resources/eso.service-account-secret.yaml
   - resources/eso.cluster-secret-store.yaml
+  # M3 step 6: github-token/cloudflare-creds below now source from this
+  # store instead of 1password-sdk. OpenBao's own kv-v2/kubernetes-auth/
+  # policy/role config lives outside GitOps — OpenBao has no CRD surface —
+  # see .bin/configure-openbao-crossplane-secrets.sh.
+  - resources/eso.cluster-secret-store.openbao.yaml
   - resources/eso.external-secret.github.yaml
   - resources/eso.external-secret.cloudflare.yaml
   # Public DNS (M2 §4.5): publishes ca.rye.ninja's AAAA into the
