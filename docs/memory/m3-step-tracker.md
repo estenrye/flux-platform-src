@@ -208,20 +208,51 @@ Fixed once, platform-wide, in the shared render script
 `kustomize build` invocation. Any future chart with its own
 `kubeVersion` gate is already covered.
 
-**Still open / follow-up needed**:
-- `openbao-db-barman-credentials` Secret does not exist on-cluster yet
-  — unlike `step-ca-db-barman-credentials`, the Garage access key was
-  never created for it (`garage key create` + `garage bucket allow` +
-  SOPS-encrypt into `clusters/controlplane/secrets/`). Until this is
-  done, `openbao-db`'s WAL archiving/backup path is non-functional, and
-  the plan's own verification criterion (a `target: primary` backup
-  landing in `openbao-db-barman`) is unmet.
-  - Next step: `kubectl exec -n garage garage-0 -- /garage key create
-    barman-openbao-db`; `... /garage bucket allow --read --write --owner
-    openbao-db-barman --key <key-id>`; SOPS-encrypt into
-    `clusters/controlplane/secrets/openbao-db-barman-credentials.sops.yaml`
-    (mirror `step-ca-db-barman-credentials.sops.yaml`); PR, merge,
-    reconcile; then confirm a base backup lands in Garage.
+**RESOLVED 2026-07-24 — `openbao-db-barman-credentials` created, plus a
+second real bug found and fixed (region signing)**: created the Garage
+key (`barman-openbao-db`), granted it `RWO` on `openbao-db-barman`, and
+SOPS-encrypted it (PRs #113–#114). That alone wasn't enough — `openbao-db`'s
+very first WAL archive attempt then failed with `error 400 Bad Request,
+Authorization header malformed, unexpected scope:
+'.../us-east-1/s3/aws4_request', expected: '.../garage/s3/aws4_request'`.
+
+**Root cause**: Garage's `s3_api.s3_region` is set to the non-default
+value `"garage"`, but neither `openbao-db-barman`'s nor `step-ca-db-barman`'s
+`ObjectStore` ever set `s3Credentials.region`, so barman-cloud's boto3
+client signed requests with the SDK default (`us-east-1`) instead.
+**This was a real, live latent bug on `step-ca-db` too** — not just an
+openbao-specific gap. It only "worked" there because the one-time WAL
+archive destination check had already succeeded in the past (before
+this was investigated) and wasn't being re-validated on every push;
+`openbao-db`'s brand-new cluster had no such cached success and failed
+immediately. Lesson: **a currently-healthy backup path is not proof a
+Garage `ObjectStore` is fully correct** — the destination check doesn't
+necessarily re-run every time, so a latent signing bug can hide behind
+a stale cache indefinitely until something (a pod restart, a fresh
+cluster) forces re-validation.
+
+Fixed by adding `s3Credentials.region` (a secretKeySelector, sibling to
+`accessKeyId`/`secretAccessKey` in the `ObjectStore` CRD schema) pointing
+at a new `region: garage` key in both credentials Secrets (PRs #115–#116).
+For `openbao-db` this was a straight edit. For `step-ca-db`, the existing
+Secret couldn't be edited in place — the private SOPS age key isn't
+available in this working environment (by design; it lives in the
+`controlplane` 1Password vault, not committed) — so instead of trying to
+recover the old plaintext, the Garage access key was **rotated**
+(`barman-step-ca-db` → `barman-step-ca-db-v2`): create new key, grant it
+on the bucket, write a fresh Secret, verify the new key works, then
+`garage bucket deny` + `garage key delete` the old one. **General
+takeaway for any future SOPS Secret that needs a field added without the
+private key on hand: rotate the underlying credential rather than trying
+to patch the encrypted file.**
+
+Verified end-to-end post-fix: `openbao-db-1`'s `plugin-barman-cloud`
+sidecar archives WAL cleanly (`Archived WAL file`, no more `400` errors),
+and the `openbao-db-barman` Garage bucket has real objects (11 objects,
+~2.9 MiB) for the first time. `step-ca-db-2` (primary)'s periodic
+retention-policy enforcement — which requires authenticated `List` calls
+— keeps succeeding cleanly on the new key/region with zero errors.
+
 - `openbao-server-test` Pod's own TLS verification against the *new*
   cert failed with `certificate signed by unknown authority` (the test
   hook only sets `VAULT_ADDR`, no `VAULT_CACERT`/`BAO_CACERT`) — not
