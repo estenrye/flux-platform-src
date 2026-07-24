@@ -20,3 +20,7 @@ creation_rules:
     encrypted_regex: ^(data|stringData)$
     age: >-
       age16p6p30le4wlka4gpvjafnr87sunrynwseegl7gvf234qk53hv49q4tl0e7
+  # OpenBao unseal key shares: whole-file encryption, never applied to a cluster.
+  - path_regex: secrets/openbao-unseal\.sops\.yaml$
+    age: >-
+      age16p6p30le4wlka4gpvjafnr87sunrynwseegl7gvf234qk53hv49q4tl0e7

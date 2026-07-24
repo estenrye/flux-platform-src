@@ -44,6 +44,19 @@ server:
 
       service_registration "kubernetes" {}
 
+      # OpenBao no longer allows `bao audit enable` over the API (a
+      # deliberate security change — audit devices of type file/socket can
+      # write to arbitrary paths, so the API is disabled and only the
+      # server's own config file can declare one). See
+      # https://openbao.org/docs/configuration/audit/. Declared here,
+      # applied on next process start (OnDelete strategy — needs a manual
+      # `kubectl delete pod` per replica to pick it up).
+      audit "file" "to-stdout" {
+        options {
+          file_path = "stdout"
+        }
+      }
+
   extraSecretEnvironmentVars:
     - envName: BAO_PG_CONNECTION_URL
       secretName: openbao-db-app
