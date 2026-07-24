@@ -55,6 +55,9 @@ resources:
   # Garage's openbao-db-barman bucket, to Cloudflare R2 instead. See
   # docs/memory/m3-step-tracker.md.
   - ../../applications/openbao-snapshots-sync/base
+  # Same pattern, applied to step-ca-db: mirrors Garage's step-ca-db-barman
+  # bucket off-site to its own dedicated Cloudflare R2 bucket.
+  - ../../applications/step-ca-db-snapshots-sync/base
   # M2 step 6 crossplane install (2026-07-20): four ordered Flux
   # Kustomizations (crossplane-core -> crossplane-providers ->
   # crossplane-xrds -> crossplane-resources,
@@ -113,6 +116,10 @@ resources:
   # Garage S3 access key (read-only) for openbao-snapshots-sync's off-site
   # mirror to Cloudflare R2 (M3 step 7).
   - secrets/openbao-snapshots-sync-credentials.sops.yaml
+  # Cloudflare R2 credential + Garage read-only key for step-ca-db's own
+  # off-site mirror (same pattern as step 7, applied to step-ca-db).
+  - secrets/cloudflare-r2-step-ca-db-snapshots.sops.yaml
+  - secrets/step-ca-db-snapshots-sync-credentials.sops.yaml
 
 patches:
   - path: patches/envoy-proxy.ipfamily.yaml

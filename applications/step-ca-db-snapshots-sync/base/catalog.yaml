@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: step-ca-db-snapshots-sync
+  description: |-
+    CronJob mirroring step-ca-db's CNPG barman backup data (Garage
+    step-ca-db-barman bucket) to Cloudflare R2 for off-site DR redundancy.
+  tags:
+    - backup
+    - step-ca
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

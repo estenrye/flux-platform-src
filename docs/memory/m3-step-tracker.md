@@ -76,6 +76,43 @@ ever-growing pile.
   root-token handling). Flux will create the real Secret from the
   committed SOPS file on merge.
 
+### Step 7 extended to step-ca-db (2026-07-24) — same pattern, second bucket
+
+At the user's request, replicated the exact same off-site-sync pattern for
+`step-ca-db`: new `applications/step-ca-db-snapshots-sync` app, new R2
+bucket `step-ca-db-snapshots`, new dedicated read-only Garage key on
+`step-ca-db-barman`. Two things worth remembering:
+
+- **`step-ca-db` (the CNPG cluster) runs in the `step-ca` namespace, not
+  `step-ca-db`** — same pattern as `openbao-db` running in `openbao`, not
+  `openbao-db`. Got this wrong on the first pass (namespace-not-found on
+  apply); the app-name-vs-namespace split is the rule to check first next
+  time, not assume symmetry from the resource name.
+- **R2 bucket + scoped token were created programmatically**, not via
+  dashboard — the user pointed me at an account-admin-scoped Cloudflare API
+  token (`op://psqynbegdx52mzknfzo55zmlwi/nfpyakcyihmxgg5uh7sp23agam/credential`,
+  outside the `controlplane` 1Password vault) after I initially assumed
+  dashboard access was required (mirroring how A6's original openbao bucket
+  was provisioned). See [[cloudflare-r2-token-derivation]] for the
+  Access-Key-ID/Secret-Access-Key derivation formula this required (got it
+  wrong once, verified the fix live before trusting it).
+- R2 side verified via direct `aws s3 ls`/`cp`/`rm` round-trip *before*
+  encrypting (proves the credential works, scoped correctly to just this
+  bucket).
+- **In-cluster CronJob dry-run completed 2026-07-24** (deferred earlier in
+  the same session when 1Password locked out mid-task, then finished once
+  it came back): minted a throwaway R2 token scoped identically to the
+  committed one, applied it as a temporary live `cloudflare-r2-
+  step-ca-db-snapshots` Secret in `step-ca`, ran `kubectl create job -n
+  step-ca step-ca-db-snapshots-sync-test --from=cronjob/
+  step-ca-db-snapshots-sync`. First run copied all WAL segments + 5 base
+  backups (~21 MiB) from Garage to R2; second run reported "nothing to
+  transfer" — confirmed idempotent. Temp token revoked after. The live
+  Secret in-cluster now holds that revoked temp credential's values until
+  Flux applies the real one from the committed SOPS file post-merge — not
+  a problem, just don't be surprised if `cloudflare-r2-step-ca-db-snapshots`
+  looks "wrong" in-cluster before this PR merges.
+
 ### Step 4 detail (2026-07-23) — RESOLVED
 
 - WAL archiving wired and base backups now actually run: PR #98 wired
