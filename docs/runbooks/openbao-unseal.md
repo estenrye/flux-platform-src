@@ -39,6 +39,12 @@ All commands assume:
 export KUBECONFIG=~/.kube/homelab/controlplane.yaml
 ```
 
+### 0. Check status
+
+```sh
+kubectl exec -n openbao openbao-0 -c openbao -- bao status -tls-skip-verify
+```
+
 ### 1. Initialize — once only, against whichever pod is up first
 
 Skip this step entirely if `bao status` already shows
@@ -140,18 +146,47 @@ kubectl get pods -n openbao   # expect 3/3 Running, 1/1 Ready each
 All three should report `Sealed: false`; exactly one reports
 `HA Mode: active`, the other two `standby`.
 
-### 8. Enable the audit log (first-ever init only)
+### 8. Audit log to stdout — declared in config, not enabled via API
 
-Run against whichever pod is currently `active` (check via `bao status`
-above):
+**Correction (found 2026-07-24, first real run of this runbook):**
+`bao audit enable` over the API fails outright on this OpenBao version:
+
+```
+Error enabling audit device: Error making API request.
+URL: PUT https://127.0.0.1:8200/v1/sys/audit/file
+Code: 400. Errors:
+* cannot enable audit device via API; use declarative, config-based audit device management instead
+```
+
+This is deliberate upstream (audit devices of type `file`/`socket` can
+write to arbitrary paths, so imperative API creation was removed —
+see [openbao.org/docs/configuration/audit](https://openbao.org/docs/configuration/audit/)).
+Audit devices are declared in the server's own HCL config instead, so
+there's nothing to run by hand — it's already wired into
+`applications/openbao/base/values.yaml`'s `server.ha.config`:
+
+```hcl
+audit "file" "to-stdout" {
+  options {
+    file_path = "stdout"
+  }
+}
+```
+
+Because the StatefulSet uses `OnDelete`, existing pods don't pick up a
+config change automatically — after this lands (or on any future config
+edit), roll each pod manually and it re-applies the declared audit
+device on that process's next start:
 
 ```sh
-kubectl exec -n openbao openbao-0 -c openbao -- bao login -tls-skip-verify <root-token>
-kubectl exec -n openbao openbao-0 -c openbao -- bao audit enable -tls-skip-verify file file_path=stdout
+kubectl delete pod openbao-0 -n openbao   # wait for Ready before the next
+kubectl delete pod openbao-1 -n openbao
+kubectl delete pod openbao-2 -n openbao
 ```
 
 Confirm entries land in `kubectl logs -n openbao openbao-0 -c openbao`
-on subsequent requests.
+(or whichever pod is `active`) on subsequent requests — no login/root
+token needed for this step at all.
 
 ## Post-ceremony hygiene
 
@@ -172,3 +207,4 @@ on subsequent requests.
 
 | Date | Type (init / restart) | Pods unsealed | Result |
 |---|---|---|---|
+| 2026-07-24 | init (first-ever) | openbao-0, openbao-1, openbao-2 | Pass — all 3 report `Sealed: false`, `Initialized: true`, `Total Shares: 5`/`Threshold: 3`, `Storage Type: postgresql`, `HA Enabled: true`. `openbao-0` active, `openbao-1`/`openbao-2` standby. Key shares + root token SOPS-encrypted. Step 8 (audit log) hit the `bao audit enable` API-removal error below on first attempt — fixed by declaring the audit device in `values.yaml` instead; pending a pod roll to confirm. |
