@@ -1,0 +1,19 @@
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: letsencrypt-policy
+spec:
+  allowed:
+    dnsNames:
+      required: true
+      values: ["*.rye.ninja"]
+    isCA: false
+    usages:
+      - digital signature
+      - key encipherment
+      - server auth
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: ClusterIssuer
+      name: "letsencrypt-*"

@@ -41,6 +41,11 @@ resources:
   - ../../applications/cert-manager-trust-manager/controlplane
   - ../../applications/cert-manager-spiffe-issuer/controlplane
   - ../../applications/cert-manager-spiffe-csi-driver/controlplane
+  # M3 step 9a: Let's Encrypt ACME DNS-01 ClusterIssuers, needed before
+  # step 9b (Keycloak) since browser-facing OIDC endpoints can't use
+  # step-ca's self-signed chain. Cloudflare token via ESO -> OpenBao
+  # (resources/eso.cluster-secret-store.openbao-cert-manager.yaml below).
+  - ../../applications/cert-manager-acme/base
   # M3 step 5: OpenBao HA on a CNPG/PostgreSQL backend (not integrated
   # Raft — see docs/memory/m3-step-tracker.md). openbao-db must come
   # first (CNPG cluster + barman plugin wiring, same pattern as
@@ -96,6 +101,10 @@ resources:
   - resources/eso.cluster-secret-store.openbao.yaml
   - resources/eso.external-secret.github.yaml
   - resources/eso.external-secret.cloudflare.yaml
+  # M3 step 9a: separate ClusterSecretStore/role from the crossplane one
+  # above — see docs/memory/m3-step6-secret-migration-eligibility.md.
+  - resources/eso.cluster-secret-store.openbao-cert-manager.yaml
+  - resources/eso.external-secret.cloudflare-api-token.yaml
   # Public DNS (M2 §4.5): publishes ca.rye.ninja's AAAA into the
   # Cloudflare-hosted rye.ninja zone. Separate from
   # eso.external-secret.cloudflare.yaml above, which feeds Crossplane's
