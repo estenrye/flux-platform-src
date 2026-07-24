@@ -85,5 +85,11 @@ server:
       mountPath: /openbao/tls
       readOnly: true
 
+  # Both long (FQDN) and short forms are needed: BAO_CLUSTER_ADDR
+  # (pod-to-pod HA coordination) and VAULT_ADDR (helm test hook, and
+  # anything using the chart's own conventions) use the short
+  # <name>.<namespace>.svc / <pod>.openbao-internal forms, not the FQDN.
+  # Confirmed live: a cert covering only the FQDN form fails TLS
+  # hostname verification against openbao.openbao.svc.
   annotations:
-    csi.cert-manager.io/dns-names: "openbao.openbao.svc.cluster.local,${POD_NAME}.openbao-internal.openbao.svc.cluster.local"
+    csi.cert-manager.io/dns-names: "openbao.openbao.svc.cluster.local,openbao.openbao.svc,${POD_NAME}.openbao-internal.openbao.svc.cluster.local,${POD_NAME}.openbao-internal"
