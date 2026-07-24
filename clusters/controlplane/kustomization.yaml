@@ -44,8 +44,10 @@ resources:
   # M3 step 5: OpenBao HA on a CNPG/PostgreSQL backend (not integrated
   # Raft — see docs/memory/m3-step-tracker.md). openbao-db must come
   # first (CNPG cluster + barman plugin wiring, same pattern as
-  # step-ca-db); openbao's own SPIFFE-CSI TLS volume needs
-  # cert-manager-spiffe-csi-driver, already present above.
+  # step-ca-db). OpenBao's server TLS is a real cert-manager Certificate
+  # issued by csi-driver-spiffe-ca (SPIFFE CSI itself was tried first but
+  # doesn't support DNS SANs — see memory); cert-manager-spiffe-csi-driver
+  # above is still a prerequisite for other apps, not for this one.
   - ../../applications/openbao-db/controlplane
   - ../../applications/openbao/base
   # M2 step 6 crossplane install (2026-07-20): four ordered Flux
