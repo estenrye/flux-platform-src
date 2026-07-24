@@ -1,0 +1,24 @@
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: keycloak-db-barman
+  namespace: keycloak
+spec:
+  configuration:
+    destinationPath: s3://keycloak-db-barman/
+    endpointURL: http://garage.garage.svc.cluster.local:3900
+    s3Credentials:
+      accessKeyId:
+        name: keycloak-db-barman-credentials
+        key: access-key-id
+      secretAccessKey:
+        name: keycloak-db-barman-credentials
+        key: secret-access-key
+      region:
+        name: keycloak-db-barman-credentials
+        key: region
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+  retentionPolicy: "30d"

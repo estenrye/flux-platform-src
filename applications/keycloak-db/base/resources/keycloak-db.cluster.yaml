@@ -1,0 +1,27 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: keycloak-db
+  namespace: keycloak
+spec:
+  instances: 3
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+
+  # database/owner names need to match whatever the Keycloak chart's DB
+  # connection settings use (M3 step 9b) -- keeping this symmetric with
+  # openbao-db/step-ca-db's own-name convention.
+  bootstrap:
+    initdb:
+      database: keycloak
+      owner: keycloak
+
+  storage:
+    size: 10Gi
+
+  primaryUpdateStrategy: unsupervised
+
+  monitoring:
+    enablePodMonitor: true

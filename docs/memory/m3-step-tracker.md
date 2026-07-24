@@ -1,6 +1,6 @@
 ---
 name: m3-step-tracker
-description: Live tracker of M3's 11 execution steps — steps 1-7 fully done (unseal ceremony, ESO→OpenBao, Garage→R2 off-site sync); step 8 (keycloak-db) not started
+description: Live tracker of M3's 11 execution steps — steps 1-8 fully done (unseal ceremony, ESO→OpenBao, Garage→R2 off-site sync x2, keycloak-db CNPG); step 9a (cert-manager-acme) not started
 metadata:
   type: project
 ---
@@ -19,7 +19,41 @@ this decays fast, keep it current rather than trusting it blindly.
 | 5 | OpenBao HA on CNPG/Postgres backend | **Fully done 2026-07-24**, including the unseal ceremony `[H]` — see detail below and [docs/runbooks/openbao-unseal.md](../runbooks/openbao-unseal.md) |
 | 6 | ESO ClusterSecretStore → OpenBao | Done — see [[m3-step6-secret-migration-eligibility]] |
 | 7 | Off-site backup sync (Garage → Cloudflare R2) | Done — see detail below |
-| 8–11 | Keycloak, Pinniped, ADRs | Not started |
+| 8 | `keycloak-db` CNPG cluster | Done — see detail below |
+| 9–11 | Keycloak, Pinniped, ADRs | Not started |
+
+### Step 8 detail (2026-07-24) — keycloak-db CNPG cluster, RESOLVED
+
+New `applications/keycloak-db` app, structured identically to `openbao-db`
+(base + controlplane split, same `imageName`/`storageClass`/plugin JSON
+patch, same CNPG-I barman-cloud plugin wiring) — deliberately copied the
+already-fixed pattern rather than step-ca-db's older one, so the
+region-signing bug ([[m3-step-tracker]]'s step 5 section) never had a
+chance to recur: `region: garage` was in the credentials Secret from the
+very first apply.
+
+**Namespace ownership, decided proactively this time**: `keycloak-db`
+(the CNPG cluster) owns creation of the `keycloak` namespace via
+`applications/keycloak-db/base/resources/namespace.yaml` — same split as
+`step-ca-db` owning `step-ca` and `openbao-db` (indirectly, via the
+sibling `openbao` app) owning `openbao`. The future Keycloak app (step
+9b) will just reuse this namespace, not create its own. Checked this
+*before* writing any manifest, instead of discovering it live via a
+`NotFound` error (see the step-ca-db-snapshots-sync mistake earlier this
+session) — worth continuing to check namespace-vs-app-name explicitly
+every time rather than assuming symmetry.
+
+**One placeholder worth flagging for step 9b**: the `keycloak-db`
+NetworkPolicy's ingress rule assumes the future Keycloak server pods carry
+label `app.kubernetes.io/name: keycloak` (the common Helm chart
+convention) — this hasn't been verified against whatever chart actually
+gets vendored yet. Check/adjust when step 9b lands.
+
+Verified end-to-end live before merge: all 3 instances `Running 2/2`,
+`Cluster in healthy state`, `ScheduledBackup` (`immediate: true`) fired
+immediately and succeeded — `ObjectStore` status shows a populated
+`firstRecoverabilityPoint`/`lastSuccessfulBackupTime` on the first try,
+and the Garage bucket shows 12 objects (~6.7 MiB) archived.
 
 ### Step 7 detail (2026-07-24) — off-site backup sync, RESOLVED
 
