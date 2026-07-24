@@ -49,11 +49,15 @@ server:
       secretName: openbao-db-app
       secretKey: uri
 
-  # Chart ships this disabled by default; the httpGet handler works fine
-  # over our TLS listener (chart templates scheme: HTTPS automatically
-  # when global.tlsDisable is false).
+  # Chart ships this disabled by default, deliberately: confirmed live
+  # that enabling it crash-loops the pod while sealed/uninitialized
+  # (/v1/sys/health returns 501 pre-init, 503 while sealed — both read
+  # as failure by kubelet's httpGet probe). Sealed is a normal, expected,
+  # potentially long-lived state until the [H] unseal ceremony; a
+  # liveness probe that kills the container there provides no benefit
+  # (restarting doesn't unseal it) and only adds churn. Leave disabled.
   livenessProbe:
-    enabled: true
+    enabled: false
 
   # No local PVCs — CNPG/Postgres is the store.
   dataStorage:
