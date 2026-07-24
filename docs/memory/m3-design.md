@@ -28,8 +28,14 @@ so it may unblock IPv6 iSCSI on the cluster.
 - **A2**: Garage before OpenBao raft snapshots. Garage admin token via SOPS
   at bootstrap (same break-glass pattern as aws-account-creds).
 - **A3**: Static unseal keys (SOPS); auto-unseal deferred to M11.
-- **A4**: Secret migration scope: only `aws-account-creds` + one proof ESO
-  ExternalSecret. Talos machine secrets stay in SOPS.
+- ~~**A4**~~ CORRECTED 2026-07-24: originally scoped as `aws-account-creds`
+  (a static AWS bootstrap key) + one proof ESO ExternalSecret. The
+  `aws-account-creds` half never had a real source: the Roles Anywhere
+  trust-anchor bootstrap (M2 §4.4) was done interactively with the
+  user's AWS SAML SSO credentials, not a stored static IAM key — no
+  such secret was ever created, so there is nothing to migrate. Scope is
+  now just the one proof-of-concept ExternalSecret. Talos machine
+  secrets stay in SOPS. See [[m3-step-tracker]] step 6 pre-flight note.
 
 ## Open [H] decisions (needed before indicated steps)
 
@@ -59,7 +65,8 @@ so it may unblock IPv6 iSCSI on the cluster.
 3. Garage 3-node + bucket provisioning
 4. step-ca-db barman → Garage (retire dump CronJob)
 5. OpenBao HA raft + unseal ceremony [H]
-6. ESO ClusterSecretStore → OpenBao; migrate aws-account-creds
+6. ESO ClusterSecretStore → OpenBao; proof-of-concept ExternalSecret
+   (aws-account-creds migration dropped — see A4 correction)
 7. OpenBao raft snapshot CronJob → Garage + off-site [H: A6]
 8. keycloak-db CNPG [H: group names]
 9. Keycloak + exposure at id.rye.ninja [H: A5]
