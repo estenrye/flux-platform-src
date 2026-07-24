@@ -59,9 +59,12 @@ Recovery order — each layer must be verified before the next:
    `454b03bf485f2a70f84b6c290e3ff3eaaef30ef192822c5f69d8c593f7635add`
    (update if root legitimately rotates - see M0 inventory PKI section).
    TODO(M2): exact restore-vs-redeploy decision tree.
-7. **OpenBao**: TODO(M3) - unseal from SOPS key shares; raft restore from
-   Garage snapshot if needed. Until OpenBao is up, ESO across the fleet
-   cannot sync (workloads keep running on last-synced secrets).
+7. **OpenBao**: unseal ceremony per `openbao-unseal.md` (SOPS-encrypted
+   key shares; storage backend is CNPG/PostgreSQL, not Raft, so the
+   `openbao-db` Cluster must be healthy first and recovers via its own
+   barman-to-Garage path like `step-ca-db`, not a raft snapshot
+   restore). Until OpenBao is up, ESO across the fleet cannot sync
+   (workloads keep running on last-synced secrets).
 8. **Keycloak**: TODO(M3) - CNPG restore; verify OIDC discovery endpoint;
    Pinniped Supervisor follows.
 9. **Fleet reconciliation**: workload clusters reconnect automatically
