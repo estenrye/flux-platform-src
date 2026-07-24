@@ -1,0 +1,114 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: step-ca-db-snapshots-sync
+  namespace: step-ca
+  annotations:
+    ignore-check.kube-linter.io/unset-cpu-requirements: "Small, infrequent batch sync; resource envelope not needed."
+    ignore-check.kube-linter.io/unset-memory-requirements: "Small, infrequent batch sync; resource envelope not needed."
+    ignore-check.kube-linter.io/no-node-affinity: "Single-host homelab cluster; no zone or role topology to express affinity against."
+    ignore-check.kube-linter.io/no-liveness-probe: "Batch workload; liveness probes are not meaningful."
+    ignore-check.kube-linter.io/no-readiness-probe: "Batch workload; readiness probes are not meaningful."
+    ignore-check.kube-linter.io/no-read-only-root-fs: "rclone writes transient state under $HOME; readOnlyRootFilesystem is not supported."
+    ignore-check.kube-linter.io/env-value-from: "Credentials are SOPS-encrypted secrets applied at bootstrap; not present as static resources."
+    ignore-check.kube-linter.io/read-secret-from-env-var: "S3 credentials passed via env for rclone's connection-string remote syntax (no on-disk rclone.conf)."
+    ignore-check.kube-linter.io/default-service-account: "Job does not need API server access; automountServiceAccountToken disabled."
+    checkov.io/skip01: "CKV_K8S_10=Small, infrequent batch sync; resource requests not needed."
+    checkov.io/skip02: "CKV_K8S_11=Small, infrequent batch sync; resource limits not needed."
+    checkov.io/skip03: "CKV_K8S_12=Small, infrequent batch sync; memory requests not needed."
+    checkov.io/skip04: "CKV_K8S_13=Small, infrequent batch sync; memory limits not needed."
+    checkov.io/skip05: "CKV_K8S_22=rclone writes transient state; readOnlyRootFilesystem not supported."
+    checkov.io/skip06: "CKV_K8S_38=automountServiceAccountToken disabled; SA token is not mounted."
+    checkov.io/skip07: "CKV_K8S_35=S3 credentials passed via env for rclone's connection-string remote syntax (no on-disk rclone.conf)."
+spec:
+  # Same pattern as applications/openbao-snapshots-sync (M3 step 7); runs
+  # after the 03:00 UTC CNPG ScheduledBackup (see
+  # applications/step-ca-db/controlplane/resources) so each run mirrors a
+  # fresh backup, not yesterday's.
+  schedule: "0 4 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: step-ca-db-snapshots-sync
+        spec:
+          restartPolicy: OnFailure
+          automountServiceAccountToken: false
+          serviceAccountName: default
+          securityContext:
+            runAsUser: 65532
+            runAsGroup: 65532
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rclone
+              # rclone/rclone:1.68.2
+              image: "rclone/rclone@sha256:74c51b8817e5431bd6d7ed27cb2a50d8ee78d77f6807b72a41ef6f898845942b"
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                # Source: Garage's step-ca-db-barman bucket (the CNPG barman
+                # WAL/base-backup data) via a dedicated read-only key.
+                - name: GARAGE_ENDPOINT
+                  value: "http://garage.garage.svc.cluster.local:3900"
+                - name: GARAGE_BUCKET
+                  value: "step-ca-db-barman"
+                - name: GARAGE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: step-ca-db-snapshots-sync-credentials
+                      key: access-key-id
+                - name: GARAGE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: step-ca-db-snapshots-sync-credentials
+                      key: secret-access-key
+                - name: GARAGE_REGION
+                  valueFrom:
+                    secretKeyRef:
+                      name: step-ca-db-snapshots-sync-credentials
+                      key: region
+                # Destination: Cloudflare R2, off-site (same pattern as A6).
+                - name: R2_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudflare-r2-step-ca-db-snapshots
+                      key: endpoint
+                - name: R2_BUCKET
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudflare-r2-step-ca-db-snapshots
+                      key: bucket
+                - name: R2_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudflare-r2-step-ca-db-snapshots
+                      key: access-key-id
+                - name: R2_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudflare-r2-step-ca-db-snapshots
+                      key: secret-access-key
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  # rclone's connection-string syntax uses ':' and ',' as
+                  # delimiters -- endpoint values contain both (scheme and
+                  # port), so they must be double-quoted or the parser
+                  # mis-splits them (see applications/openbao-snapshots-sync).
+                  rclone sync \
+                    ":s3,provider=Other,env_auth=false,access_key_id=${GARAGE_ACCESS_KEY_ID},secret_access_key=${GARAGE_SECRET_ACCESS_KEY},endpoint=\"${GARAGE_ENDPOINT}\",region=${GARAGE_REGION},force_path_style=true:${GARAGE_BUCKET}" \
+                    ":s3,provider=Cloudflare,env_auth=false,access_key_id=${R2_ACCESS_KEY_ID},secret_access_key=${R2_SECRET_ACCESS_KEY},endpoint=\"${R2_ENDPOINT}\":${R2_BUCKET}" \
+                    --checksum --stats-one-line -v

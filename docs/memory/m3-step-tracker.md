@@ -76,6 +76,38 @@ ever-growing pile.
   root-token handling). Flux will create the real Secret from the
   committed SOPS file on merge.
 
+### Step 7 extended to step-ca-db (2026-07-24) — same pattern, second bucket
+
+At the user's request, replicated the exact same off-site-sync pattern for
+`step-ca-db`: new `applications/step-ca-db-snapshots-sync` app, new R2
+bucket `step-ca-db-snapshots`, new dedicated read-only Garage key on
+`step-ca-db-barman`. Two things worth remembering:
+
+- **`step-ca-db` (the CNPG cluster) runs in the `step-ca` namespace, not
+  `step-ca-db`** — same pattern as `openbao-db` running in `openbao`, not
+  `openbao-db`. Got this wrong on the first pass (namespace-not-found on
+  apply); the app-name-vs-namespace split is the rule to check first next
+  time, not assume symmetry from the resource name.
+- **R2 bucket + scoped token were created programmatically**, not via
+  dashboard — the user pointed me at an account-admin-scoped Cloudflare API
+  token (`op://psqynbegdx52mzknfzo55zmlwi/nfpyakcyihmxgg5uh7sp23agam/credential`,
+  outside the `controlplane` 1Password vault) after I initially assumed
+  dashboard access was required (mirroring how A6's original openbao bucket
+  was provisioned). See [[cloudflare-r2-token-derivation]] for the
+  Access-Key-ID/Secret-Access-Key derivation formula this required (got it
+  wrong once, verified the fix live before trusting it).
+- R2 side verified via direct `aws s3 ls`/`cp`/`rm` round-trip *before*
+  encrypting (proves the credential works, scoped correctly to just this
+  bucket). The in-cluster CronJob dry-run (`kubectl create job
+  --from=cronjob/...`, same as the openbao verification) was **not**
+  completed for this bucket — the local 1Password CLI session expired
+  mid-task before a temporary live Secret could be built, and re-deriving
+  a fresh token to work around it was judged unnecessary token churn given
+  the CronJob logic is an unmodified copy of the already-proven openbao
+  job and the credential was already independently verified. If this ever
+  needs re-confirming: `kubectl create job -n step-ca
+  step-ca-db-snapshots-sync-test --from=cronjob/step-ca-db-snapshots-sync`.
+
 ### Step 4 detail (2026-07-23) — RESOLVED
 
 - WAL archiving wired and base backups now actually run: PR #98 wired
