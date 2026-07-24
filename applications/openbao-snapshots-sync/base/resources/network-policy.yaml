@@ -1,0 +1,37 @@
+# M3 step 7: off-site backup sync (Garage openbao-db-barman -> Cloudflare
+# R2 openbao-snapshots). CronJob pods only, no ingress needed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openbao-snapshots-sync
+  namespace: openbao
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "CronJob creates Job pods dynamically; the podSelector label is valid but no pod exists in the static rendered manifest."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: openbao-snapshots-sync
+  policyTypes:
+    - Egress
+  egress:
+    # Garage S3 API (in-cluster). Calico evaluates post-DNAT: target the
+    # pod port (3900) directly.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: garage
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: garage
+      ports:
+        - protocol: TCP
+          port: 3900
+    # Cloudflare R2 (off-site, external HTTPS endpoint).
+    - ports:
+        - protocol: TCP
+          port: 443
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

@@ -50,6 +50,11 @@ resources:
   # above is still a prerequisite for other apps, not for this one.
   - ../../applications/openbao-db/controlplane
   - ../../applications/openbao/base
+  # M3 step 7: off-site backup. OpenBao no longer produces raft snapshots
+  # (step 5 pivoted to CNPG/Postgres) — this mirrors the real backup data,
+  # Garage's openbao-db-barman bucket, to Cloudflare R2 instead. See
+  # docs/memory/m3-step-tracker.md.
+  - ../../applications/openbao-snapshots-sync/base
   # M2 step 6 crossplane install (2026-07-20): four ordered Flux
   # Kustomizations (crossplane-core -> crossplane-providers ->
   # crossplane-xrds -> crossplane-resources,
@@ -100,6 +105,9 @@ resources:
   - secrets/step-ca-db-barman-credentials.sops.yaml
   # Garage S3 access key for openbao-db barman WAL archiving (M3 step 5).
   - secrets/openbao-db-barman-credentials.sops.yaml
+  # Garage S3 access key (read-only) for openbao-snapshots-sync's off-site
+  # mirror to Cloudflare R2 (M3 step 7).
+  - secrets/openbao-snapshots-sync-credentials.sops.yaml
 
 patches:
   - path: patches/envoy-proxy.ipfamily.yaml

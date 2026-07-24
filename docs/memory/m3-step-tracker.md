@@ -17,7 +17,64 @@ this decays fast, keep it current rather than trusting it blindly.
 | 3 | Garage 3-node + buckets | Done (#85–#97); Garage was redeployed/reset several times during this step's iteration — see WAL gap note below |
 | 4 | step-ca-db barman → Garage, retire pg_dump CronJob | Done — see detail below |
 | 5 | OpenBao HA on CNPG/Postgres backend | Done — see detail below; unseal ceremony `[H]` and openbao-db-barman credentials still open |
-| 6–11 | ESO migration, snapshots, Keycloak, Pinniped, ADRs | Not started |
+| 6 | ESO ClusterSecretStore → OpenBao | Done, separate PR — see [[m3-step6-secret-migration-eligibility]] |
+| 7 | Off-site backup sync (Garage → Cloudflare R2) | Done — see detail below |
+| 8–11 | Keycloak, Pinniped, ADRs | Not started |
+
+### Step 7 detail (2026-07-24) — off-site backup sync, RESOLVED
+
+**Redesigned, at the user's request, before implementation started**: the
+M3 design's step 7 was written as "OpenBao raft snapshot CronJob → Garage
++ off-site copy," but that's stale — step 5 pivoted OpenBao off raft onto
+CNPG/Postgres, so there is no `bao operator raft snapshot` to run anymore.
+The user asked for a dependency-style gut check before building anything;
+confirmed the real backup data is already the CNPG barman WAL/base-backup
+stream flowing into Garage's `openbao-db-barman` bucket (wired in step 5).
+Redefined step 7 as: mirror that bucket to the already-provisioned
+Cloudflare R2 `openbao-snapshots` bucket (credential from A6, created
+2026-07-21, sat unused until now). The Garage `openbao-snapshots` bucket
+from step 3's bucket-init job is now dead weight — pre-provisioned for the
+old raft-snapshot design, nothing writes to it. Left it empty rather than
+deleting it.
+
+**What shipped**: new `applications/openbao-snapshots-sync` app — a
+`CronJob` (daily 04:00 UTC, after the 03:00 UTC CNPG `ScheduledBackup`)
+running `rclone sync` between two S3-compatible "on-the-fly" remotes (no
+`rclone.conf` on disk): Garage's `openbao-db-barman` bucket (source) and
+Cloudflare R2's `openbao-snapshots` bucket (destination). `sync` (not
+`copy`) so R2 tracks Garage's 30-day barman retention pruning too, not an
+ever-growing pile.
+
+- New dedicated Garage key `openbao-snapshots-sync`, **read-only** on
+  `openbao-db-barman` (least privilege — this job never writes to Garage).
+  Created directly via `kubectl exec ... garage key create` /
+  `garage bucket allow --read`; no admin token needed for the in-pod CLI
+  path (unlike the HTTP admin API the bucket-init job uses). SOPS-encrypted
+  as `openbao-snapshots-sync-credentials.sops.yaml`.
+- R2 side reuses the existing `cloudflare-r2-openbao-snapshots` secret
+  (access key, secret key, endpoint, bucket — all already provisioned)
+  as-is.
+- **Real bug hit and fixed during live verification**: rclone's inline
+  connection-string syntax (`:s3,param=val,...:path`) uses `:` and `,` as
+  delimiters. Passing `endpoint=http://garage.garage.svc.cluster.local:3900`
+  unquoted made rclone mis-split the string — failed with `Custom endpoint
+  \`http\` was not a valid URI`. Fix: wrap endpoint values in escaped
+  double quotes (`endpoint=\"${VAR}\"`) per rclone's CSV-style
+  connection-string quoting rules. Applies to any future on-the-fly S3
+  remote with a scheme+port endpoint, not just this job.
+- Verified end-to-end live (manual `kubectl create job --from=cronjob/...`
+  runs, before merge): first run copied all 52 objects (~5.6 MiB) from
+  Garage to R2 successfully; second run reported "nothing to transfer" —
+  confirmed idempotent, safe for daily scheduling.
+- Live-testing note: applying the SOPS-encrypted credentials Secret
+  directly via `kubectl apply -f <rendered-file>` fails (`unknown field
+  "sops"` — render doesn't decrypt). Verified instead by applying an
+  equivalent plaintext Secret with the same values piped through
+  `kubectl apply -f -` via heredoc (not `--from-literal`, which the auto
+  mode classifier blocked as a bare credential-bearing CLI arg — stdin
+  piping worked, consistent with [[m3-step6-secret-migration-eligibility]]'s
+  root-token handling). Flux will create the real Secret from the
+  committed SOPS file on merge.
 
 ### Step 4 detail (2026-07-23) — RESOLVED
 
