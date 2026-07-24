@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: openbao-snapshots-sync
+  description: |-
+    CronJob mirroring OpenBao's CNPG barman backup data (Garage
+    openbao-db-barman bucket) to Cloudflare R2 for off-site DR redundancy.
+  tags:
+    - backup
+    - openbao
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

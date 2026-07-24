@@ -2,10 +2,15 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 # controlplane overlay: bucket init job runs after StatefulSet deploys.
-# The job assigns node layout (3 zones × 45 GiB) and creates the 4 buckets.
-# Access keys for consuming services (barman, openbao) are created per step:
+# The job assigns node layout (3 zones × 45 GiB) and creates the buckets.
+# Access keys for consuming services are created per step:
 #   Step 4: kubectl exec -n garage garage-0 -- garage key create barman-step-ca-db
-#   Step 7: kubectl exec -n garage garage-0 -- garage key create openbao-snapshots
+#   Step 7: kubectl exec -n garage garage-0 -- garage key create openbao-snapshots-sync
+# (M3 step 7, 2026-07-24: dropped the standalone `openbao-snapshots` bucket
+# from the init list -- it was pre-provisioned for the original raft-snapshot
+# design, superseded when step 5 pivoted OpenBao to CNPG/Postgres. The real
+# off-site sync source is openbao-db-barman; see
+# applications/openbao-snapshots-sync.)
 
 resources:
   - ../base
