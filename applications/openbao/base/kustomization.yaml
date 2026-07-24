@@ -7,7 +7,9 @@ resources:
   - resources/namespace.yaml
   - resources/network-policy.yaml
   - resources/test-pod-network-policy.yaml
-  - resources/spiffe-csi-rbac.yaml
+  - resources/certificate.yaml
+  - resources/certificate-request-policy.yaml
+  - resources/certificate-request-policy-rbac.yaml
 
 helmCharts:
   - name: openbao
