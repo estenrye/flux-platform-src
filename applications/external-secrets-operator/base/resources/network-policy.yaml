@@ -33,3 +33,15 @@ spec:
           port: 53
         - protocol: UDP
           port: 53
+    # M3 step 6: OpenBao-backed ClusterSecretStore (kubernetes auth login +
+    # KV reads for the crossplane-system ExternalSecrets).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openbao
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: openbao
+      ports:
+        - protocol: TCP
+          port: 8200

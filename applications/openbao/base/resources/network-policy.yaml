@@ -1,6 +1,3 @@
-# Ingress on 8200 is scoped to the openbao namespace itself for now —
-# no consumer exists yet. Step 6 (ESO ClusterSecretStore) adds an ingress
-# rule from the external-secrets-operator namespace.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -28,6 +25,15 @@ spec:
         - podSelector:
             matchLabels:
               helm.sh/hook: test
+      ports:
+        - protocol: TCP
+          port: 8200
+    # M3 step 6: ESO reads the crossplane-system ExternalSecrets (KV read +
+    # kubernetes auth login) from this namespace.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: external-secrets-operator
       ports:
         - protocol: TCP
           port: 8200
