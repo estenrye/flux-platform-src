@@ -23,7 +23,11 @@ find "${WORKING_DIR}/${RELATIVE_PATH}" -name "kustomization.yaml" -exec dirname 
   echo "Rendering '${WORKING_DIR}/${RELATIVE_PATH}/${directory}' ..."
   mkdir -p "${RENDER_DIR}/${TARGET_REPO_NAME}"/${RELATIVE_PATH}/${directory}
   pushd "${WORKING_DIR}/${RELATIVE_PATH}/${directory}" > /dev/null || exit 1
-  kustomize build --enable-helm . > "${RENDER_DIR}/${TARGET_REPO_NAME}/${RELATIVE_PATH}/${directory}/rendered.yaml"
+  # --helm-kube-version: kustomize's built-in helm invocation defaults to
+  # an old Capabilities.KubeVersion (pre-1.30) unless told otherwise, which
+  # trips charts with a kubeVersion gate (e.g. openbao-helm requires
+  # >=1.30.0-0). Pin to controlplane's actual server version.
+  kustomize build --enable-helm --helm-kube-version 1.36.2 . > "${RENDER_DIR}/${TARGET_REPO_NAME}/${RELATIVE_PATH}/${directory}/rendered.yaml"
   cp catalog.yaml "${RENDER_DIR}/${TARGET_REPO_NAME}/${RELATIVE_PATH}/${directory}/catalog.yaml"
   pushd "${RENDER_DIR}/${TARGET_REPO_NAME}/${RELATIVE_PATH}/${directory}" > /dev/null || exit 1
   popd > /dev/null || exit 1

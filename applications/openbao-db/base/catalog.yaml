@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: openbao-db
+  description: |-
+    Highly available PostgreSQL cluster for OpenBao's storage backend,
+    managed by the CloudNativePG operator.
+  tags:
+    - database
+    - postgresql
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

@@ -1,0 +1,64 @@
+# Ingress on 8200 is scoped to the openbao namespace itself for now —
+# no consumer exists yet. Step 6 (ESO ClusterSecretStore) adds an ingress
+# rule from the external-secrets-operator namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openbao
+  namespace: openbao
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: openbao
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: openbao
+      ports:
+        - protocol: TCP
+          port: 8200
+        - protocol: TCP
+          port: 8201
+    # Helm test hook (openbao-server-test) polls `bao status`.
+    - from:
+        - podSelector:
+            matchLabels:
+              helm.sh/hook: test
+      ports:
+        - protocol: TCP
+          port: 8200
+  egress:
+    # HA leader-election coordination + request forwarding between pods.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: openbao
+      ports:
+        - protocol: TCP
+          port: 8200
+        - protocol: TCP
+          port: 8201
+    # CNPG openbao-db storage backend.
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: openbao-db
+      ports:
+        - protocol: TCP
+          port: 5432
+    # apiserver — service_registration "kubernetes" patches this pod's own
+    # labels to reflect active/standby status. Calico evaluates egress
+    # post-DNAT (docs/memory/calico-networkpolicy-dnat.md); Talos serves
+    # 6443.
+    - ports:
+        - protocol: TCP
+          port: 6443
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

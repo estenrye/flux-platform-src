@@ -3,10 +3,10 @@ kind: Component
 metadata:
   name: openbao
   description: |-
-    OpenBao HA raft secret store (M3 step 5). Namespace stub deployed early
-    to allow R2 snapshot credentials (cloudflare-r2-openbao-snapshots) to land
-    before the full deployment. TLS from cert-manager; SOPS-encrypted unseal
-    keys; ESO ClusterSecretStore consumer.
+    OpenBao HA secret store (M3 step 5), backed by CNPG/PostgreSQL
+    (applications/openbao-db) rather than integrated Raft storage. TLS via
+    the SPIFFE CSI driver; SOPS-encrypted unseal keys; ESO
+    ClusterSecretStore consumer (step 6).
   tags:
     - secrets
     - platform

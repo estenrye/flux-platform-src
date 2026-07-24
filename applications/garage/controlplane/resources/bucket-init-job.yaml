@@ -135,7 +135,7 @@ spec:
           fi
 
           # Create buckets (409 = already exists, not an error).
-          for BUCKET in step-ca-db-barman openbao-snapshots lgtm jwks; do
+          for BUCKET in step-ca-db-barman openbao-db-barman openbao-snapshots lgtm jwks; do
             echo "Creating bucket ${BUCKET}..."
             HTTP_CODE=$(curl -s -X POST \
               -H "Authorization: Bearer ${GARAGE_ADMIN_TOKEN}" \
@@ -157,6 +157,8 @@ spec:
           echo "Access keys for consuming services:"
           echo "  Step 4 (barman): kubectl exec -n garage garage-0 -- /garage key create barman-step-ca-db"
           echo "                   kubectl exec -n garage garage-0 -- /garage bucket allow --read --write --owner step-ca-db-barman --key <key-id>"
+          echo "  Step 5 (openbao-db barman): kubectl exec -n garage garage-0 -- /garage key create barman-openbao-db"
+          echo "                    kubectl exec -n garage garage-0 -- /garage bucket allow --read --write --owner openbao-db-barman --key <key-id>"
           echo "  Step 7 (openbao): kubectl exec -n garage garage-0 -- /garage key create openbao-snapshots"
           echo "                    kubectl exec -n garage garage-0 -- /garage bucket allow --read --write --owner openbao-snapshots --key <key-id>"
       volumes:

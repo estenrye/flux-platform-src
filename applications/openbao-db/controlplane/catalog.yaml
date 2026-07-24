@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: openbao-db-controlplane
+  description: |-
+    CNPG PostgreSQL cluster for OpenBao on the controlplane cluster,
+    with barman continuous WAL archiving + base backups to Garage via
+    the shared cnpg-barman-plugin (M3 step 5).
+  tags:
+    - database
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
