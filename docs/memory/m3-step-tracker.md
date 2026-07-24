@@ -98,15 +98,20 @@ bucket `step-ca-db-snapshots`, new dedicated read-only Garage key on
   wrong once, verified the fix live before trusting it).
 - R2 side verified via direct `aws s3 ls`/`cp`/`rm` round-trip *before*
   encrypting (proves the credential works, scoped correctly to just this
-  bucket). The in-cluster CronJob dry-run (`kubectl create job
-  --from=cronjob/...`, same as the openbao verification) was **not**
-  completed for this bucket — the local 1Password CLI session expired
-  mid-task before a temporary live Secret could be built, and re-deriving
-  a fresh token to work around it was judged unnecessary token churn given
-  the CronJob logic is an unmodified copy of the already-proven openbao
-  job and the credential was already independently verified. If this ever
-  needs re-confirming: `kubectl create job -n step-ca
-  step-ca-db-snapshots-sync-test --from=cronjob/step-ca-db-snapshots-sync`.
+  bucket).
+- **In-cluster CronJob dry-run completed 2026-07-24** (deferred earlier in
+  the same session when 1Password locked out mid-task, then finished once
+  it came back): minted a throwaway R2 token scoped identically to the
+  committed one, applied it as a temporary live `cloudflare-r2-
+  step-ca-db-snapshots` Secret in `step-ca`, ran `kubectl create job -n
+  step-ca step-ca-db-snapshots-sync-test --from=cronjob/
+  step-ca-db-snapshots-sync`. First run copied all WAL segments + 5 base
+  backups (~21 MiB) from Garage to R2; second run reported "nothing to
+  transfer" — confirmed idempotent. Temp token revoked after. The live
+  Secret in-cluster now holds that revoked temp credential's values until
+  Flux applies the real one from the committed SOPS file post-merge — not
+  a problem, just don't be surprised if `cloudflare-r2-step-ca-db-snapshots`
+  looks "wrong" in-cluster before this PR merges.
 
 ### Step 4 detail (2026-07-23) — RESOLVED
 
