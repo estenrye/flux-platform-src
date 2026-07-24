@@ -68,28 +68,22 @@ server:
   auditStorage:
     enabled: false
 
-  # SPIFFE CSI ephemeral volume: automatically issued AND automatically
-  # approved by the dedicated cert-manager-csi-driver-spiffe-approver
-  # (separate from the generic cert-manager-approver-policy system) —
-  # no Certificate/CertificateRequestPolicy/RBAC needed. Chains to
-  # csi-driver-spiffe-ca, already trusted platform-wide via the
-  # trust-manager Bundle.
+  # TLS: a real cert-manager Certificate (resources/certificate.yaml),
+  # NOT the SPIFFE CSI ephemeral volume. Confirmed live: this cluster's
+  # csi-driver-spiffe-approver issues SPIFFE-CSI certs with a SPIFFE URI
+  # SAN *only* — no DNS names are ever included, regardless of the
+  # csi.cert-manager.io/dns-names annotation (that mechanism is for
+  # SPIFFE-aware peer verification, not standard hostname-based TLS,
+  # which is what the bao CLI / any Go http client does). A static
+  # Certificate issued by the same csi-driver-spiffe-ca ClusterIssuer
+  # (still no new CA to distribute — already trusted platform-wide via
+  # the trust-manager Bundle) with explicit dnsNames is the right tool.
   volumes:
-    - name: spiffe
-      csi:
-        driver: spiffe.csi.cert-manager.io
-        readOnly: true
+    - name: server-tls
+      secret:
+        secretName: openbao-server-tls
 
   volumeMounts:
-    - name: spiffe
+    - name: server-tls
       mountPath: /openbao/tls
       readOnly: true
-
-  # Both long (FQDN) and short forms are needed: BAO_CLUSTER_ADDR
-  # (pod-to-pod HA coordination) and VAULT_ADDR (helm test hook, and
-  # anything using the chart's own conventions) use the short
-  # <name>.<namespace>.svc / <pod>.openbao-internal forms, not the FQDN.
-  # Confirmed live: a cert covering only the FQDN form fails TLS
-  # hostname verification against openbao.openbao.svc.
-  annotations:
-    csi.cert-manager.io/dns-names: "openbao.openbao.svc.cluster.local,openbao.openbao.svc,${POD_NAME}.openbao-internal.openbao.svc.cluster.local,${POD_NAME}.openbao-internal"
