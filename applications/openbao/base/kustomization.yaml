@@ -7,6 +7,7 @@ resources:
   - resources/namespace.yaml
   - resources/network-policy.yaml
   - resources/test-pod-network-policy.yaml
+  - resources/spiffe-csi-rbac.yaml
 
 helmCharts:
   - name: openbao
@@ -126,6 +127,9 @@ patches:
       - op: add
         path: /spec/automountServiceAccountToken
         value: false
+      - op: add
+        path: /spec/serviceAccountName
+        value: openbao
       - op: add
         path: /spec/securityContext
         value:
