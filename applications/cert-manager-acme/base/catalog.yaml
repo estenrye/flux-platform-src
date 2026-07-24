@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cert-manager-acme
+  description: |-
+    Let's Encrypt ACME DNS-01 ClusterIssuers (staging + prod) via the
+    Cloudflare solver, for browser-facing OIDC endpoints (Keycloak,
+    Pinniped) that can't use step-ca's self-signed chain.
+  tags:
+    - pki
+    - tls
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

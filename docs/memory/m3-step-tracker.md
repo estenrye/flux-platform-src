@@ -1,6 +1,6 @@
 ---
 name: m3-step-tracker
-description: Live tracker of M3's 11 execution steps — steps 1-8 fully done (unseal ceremony, ESO→OpenBao, Garage→R2 off-site sync x2, keycloak-db CNPG); step 9a (cert-manager-acme) not started
+description: Live tracker of M3's 11 execution steps — steps 1-9a fully done (unseal ceremony, ESO→OpenBao, Garage→R2 off-site sync x2, keycloak-db CNPG, cert-manager-acme); step 9b (Keycloak) not started
 metadata:
   type: project
 ---
@@ -20,7 +20,48 @@ this decays fast, keep it current rather than trusting it blindly.
 | 6 | ESO ClusterSecretStore → OpenBao | Done — see [[m3-step6-secret-migration-eligibility]] |
 | 7 | Off-site backup sync (Garage → Cloudflare R2) | Done — see detail below |
 | 8 | `keycloak-db` CNPG cluster | Done — see detail below |
-| 9–11 | Keycloak, Pinniped, ADRs | Not started |
+| 9a | `cert-manager-acme`: letsencrypt-staging/prod ClusterIssuers | Done — see detail below |
+| 9b–11 | Keycloak, Pinniped, ADRs | Not started |
+
+### Step 9a detail (2026-07-24) — cert-manager-acme, RESOLVED
+
+New `applications/cert-manager-acme/base` app: `letsencrypt-staging` +
+`letsencrypt-prod` `ClusterIssuer`s (ACME DNS-01, Cloudflare solver), one
+shared `CertificateRequestPolicy` (`letsencrypt-policy`, glob-matched via
+`selector.issuerRef.name: "letsencrypt-*"`, `allowed.dnsNames.values:
+["*.rye.ninja"]`) + RBAC `use` grant for the `cert-manager` ServiceAccount
+— same shape as the existing `csi-driver-spiffe-ca-policy` pattern.
+No new NetworkPolicy needed: the upstream cert-manager Helm chart's own
+`networkPolicy.enabled: true` already opens unrestricted-destination
+egress on 80/443/53/6443 for the controller pod, which covers both the
+ACME API and the Cloudflare API calls DNS-01 needs.
+
+**Cloudflare token sourced from OpenBao, not 1Password** (the design doc's
+original assumption) — same 1Password item (`cloudflare-api-token`) as
+crossplane's `cloudflare-creds`, but via a dedicated
+`openbao-cert-manager` `ClusterSecretStore` / `eso-cert-manager` k8s-auth
+role / `cert-manager-secrets-read` policy, kept separate from step 6's
+`crossplane-secrets-read` for least-privilege scoping even though the same
+ESO ServiceAccount authenticates for both (same reasoning as the
+dedicated Garage keys minted per bucket this session). Confirmed clean of
+circularity first: the `letsencrypt-*` issuers are entirely separate from
+the `csi-driver-spiffe-ca` issuer OpenBao's own Certificate uses, so
+nothing on OpenBao's boot chain touches this. Config script:
+`.bin/configure-openbao-cert-manager-secrets.sh`.
+
+Verified end-to-end live before merge, not just component-by-component:
+issued a real `Certificate` (`acme-dns01-smoke-test.rye.ninja`) via
+`letsencrypt-staging` — full DNS-01 round trip (Cloudflare TXT record,
+propagation, Let's Encrypt validation) succeeded in ~90s, decoded cert
+confirmed correct subject/SAN/issuer. Both `ClusterIssuer`s show
+`ACMEAccountRegistered`/`Ready: True`. Test `Certificate`/Secret deleted
+after.
+
+**ACME account email**: used `esten.rye@ryezone.com` (no existing
+precedent in the repo for a registration email) — this is where Let's
+Encrypt sends expiry/problem notifications. Not silently reversible: an
+email change re-registers a *new* ACME account rather than updating the
+existing one.
 
 ### Step 8 detail (2026-07-24) — keycloak-db CNPG cluster, RESOLVED
 
