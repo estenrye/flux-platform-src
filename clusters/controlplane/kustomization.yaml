@@ -21,9 +21,6 @@ resources:
   # M3 step 3: Garage 3-node S3 cluster (50 GiB iSCSI per node). Layout and
   # bucket provisioning handled by the bucket-init job in the controlplane overlay.
   - ../../applications/garage/controlplane
-  # M3 step 5 stub: openbao namespace only — full HA raft deployment comes in
-  # step 5. Stub deployed early so the R2 snapshot secret (below) can land.
-  - ../../applications/openbao/base
   # M3 step 1: democratic-csi deployed alongside truenas-csi as shadow classes.
   # truenas-csi remains until smoke test confirms democratic-csi-nfs-pg works
   # for CNPG uid 26 without the nfs-pg-owner CronJob (M3 step 2 cutover).
@@ -44,6 +41,13 @@ resources:
   - ../../applications/cert-manager-trust-manager/controlplane
   - ../../applications/cert-manager-spiffe-issuer/controlplane
   - ../../applications/cert-manager-spiffe-csi-driver/controlplane
+  # M3 step 5: OpenBao HA on a CNPG/PostgreSQL backend (not integrated
+  # Raft — see docs/memory/m3-step-tracker.md). openbao-db must come
+  # first (CNPG cluster + barman plugin wiring, same pattern as
+  # step-ca-db); openbao's own SPIFFE-CSI TLS volume needs
+  # cert-manager-spiffe-csi-driver, already present above.
+  - ../../applications/openbao-db/controlplane
+  - ../../applications/openbao/base
   # M2 step 6 crossplane install (2026-07-20): four ordered Flux
   # Kustomizations (crossplane-core -> crossplane-providers ->
   # crossplane-xrds -> crossplane-resources,

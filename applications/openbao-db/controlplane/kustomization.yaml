@@ -1,0 +1,35 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# controlplane variant: CNPG cluster with barman continuous WAL archiving
+# + base backups to Garage via the shared cnpg-barman-plugin (M3 step 5).
+
+resources:
+  - ../base
+  - resources/apiserver-egress-network-policy.yaml
+  - resources/barman-network-policy.yaml
+  - resources/scheduled-backup.yaml
+  - resources/barman-objectstore.yaml
+
+patches:
+  # democratic-csi-nfs-pg: fsGroupPolicy: File handles CNPG uid 26 ownership
+  # at mount time. imageName pin: prevents the postgres image from
+  # floating with the operator's compiled-in default; matches step-ca-db.
+  - target:
+      kind: Cluster
+      name: openbao-db
+      namespace: openbao
+    patch: |-
+      - op: add
+        path: /spec/storage/storageClass
+        value: democratic-csi-nfs-pg
+      - op: add
+        path: /spec/imageName
+        value: ghcr.io/cloudnative-pg/postgresql:18.3@sha256:5e30290fba3d990b08a9caea6ddb49c661ad8246cbb2688adad7e6cc78df6c3f
+      - op: add
+        path: /spec/plugins
+        value:
+          - name: barman-cloud.cloudnative-pg.io
+            isWALArchiver: true
+            parameters:
+              barmanObjectName: openbao-db-barman

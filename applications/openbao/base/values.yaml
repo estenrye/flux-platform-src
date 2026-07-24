@@ -1,0 +1,85 @@
+global:
+  enabled: true
+  tlsDisable: false
+
+injector:
+  enabled: false
+
+server:
+  enabled: true
+
+  image:
+    registry: quay.io
+    repository: openbao/openbao
+    tag: "2.6.1"
+
+  updateStrategyType: "OnDelete"
+  configAnnotation: true
+
+  # M3 step 5: PostgreSQL (CNPG-backed) storage instead of integrated Raft.
+  # OpenBao's HA-over-Postgres coordinates leader election via a dedicated
+  # lock table (openbao_ha_locks) — no raft peer discovery needed, every
+  # pod points at the same CNPG primary. connection_url is intentionally
+  # NOT in this HCL: OpenBao reads it from BAO_PG_CONNECTION_URL (below),
+  # sourced from CNPG's auto-generated app Secret. No credentials land in
+  # a rendered manifest.
+  ha:
+    enabled: true
+    replicas: 3
+    raft:
+      enabled: false
+    config: |
+      ui = true
+
+      listener "tcp" {
+        address       = "[::]:8200"
+        cluster_address = "[::]:8201"
+        tls_cert_file = "/openbao/tls/tls.crt"
+        tls_key_file  = "/openbao/tls/tls.key"
+      }
+
+      storage "postgresql" {
+        ha_enabled = "true"
+      }
+
+      service_registration "kubernetes" {}
+
+  extraSecretEnvironmentVars:
+    - envName: BAO_PG_CONNECTION_URL
+      secretName: openbao-db-app
+      secretKey: uri
+
+  # Chart ships this disabled by default; the httpGet handler works fine
+  # over our TLS listener (chart templates scheme: HTTPS automatically
+  # when global.tlsDisable is false).
+  livenessProbe:
+    enabled: true
+
+  # No local PVCs — CNPG/Postgres is the store.
+  dataStorage:
+    enabled: false
+
+  # Audit device gets enabled post-unseal via `bao audit enable file
+  # file_path=stdout` (the [H] unseal-ceremony step), not a manifest.
+  auditStorage:
+    enabled: false
+
+  # SPIFFE CSI ephemeral volume: automatically issued AND automatically
+  # approved by the dedicated cert-manager-csi-driver-spiffe-approver
+  # (separate from the generic cert-manager-approver-policy system) —
+  # no Certificate/CertificateRequestPolicy/RBAC needed. Chains to
+  # csi-driver-spiffe-ca, already trusted platform-wide via the
+  # trust-manager Bundle.
+  volumes:
+    - name: spiffe
+      csi:
+        driver: spiffe.csi.cert-manager.io
+        readOnly: true
+
+  volumeMounts:
+    - name: spiffe
+      mountPath: /openbao/tls
+      readOnly: true
+
+  annotations:
+    csi.cert-manager.io/dns-names: "openbao.openbao.svc.cluster.local,${POD_NAME}.openbao-internal.openbao.svc.cluster.local"
