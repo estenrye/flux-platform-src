@@ -98,6 +98,8 @@ resources:
   - secrets/garage-admin.sops.yaml
   # Garage S3 access key for step-ca-db barman WAL archiving (M3 step 4).
   - secrets/step-ca-db-barman-credentials.sops.yaml
+  # Garage S3 access key for openbao-db barman WAL archiving (M3 step 5).
+  - secrets/openbao-db-barman-credentials.sops.yaml
 
 patches:
   - path: patches/envoy-proxy.ipfamily.yaml
