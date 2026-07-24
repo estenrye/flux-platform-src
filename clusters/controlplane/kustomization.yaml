@@ -58,6 +58,11 @@ resources:
   # Same pattern, applied to step-ca-db: mirrors Garage's step-ca-db-barman
   # bucket off-site to its own dedicated Cloudflare R2 bucket.
   - ../../applications/step-ca-db-snapshots-sync/base
+  # M3 step 8: keycloak-db CNPG cluster, same pattern as step-ca-db/
+  # openbao-db (barman to Garage via the shared cnpg-barman-plugin). Owns
+  # creation of the `keycloak` namespace — the future Keycloak app (step
+  # 9b) will just reuse it, same as step-ca/openbao-db's split.
+  - ../../applications/keycloak-db/controlplane
   # M2 step 6 crossplane install (2026-07-20): four ordered Flux
   # Kustomizations (crossplane-core -> crossplane-providers ->
   # crossplane-xrds -> crossplane-resources,
@@ -120,6 +125,8 @@ resources:
   # off-site mirror (same pattern as step 7, applied to step-ca-db).
   - secrets/cloudflare-r2-step-ca-db-snapshots.sops.yaml
   - secrets/step-ca-db-snapshots-sync-credentials.sops.yaml
+  # Garage S3 access key for keycloak-db barman WAL archiving (M3 step 8).
+  - secrets/keycloak-db-barman-credentials.sops.yaml
 
 patches:
   - path: patches/envoy-proxy.ipfamily.yaml

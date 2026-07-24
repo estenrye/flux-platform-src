@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: keycloak-db-backup
+  namespace: keycloak
+spec:
+  # Staggered from step-ca-db (03:00) and openbao-db (03:30).
+  schedule: "0 15 3 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: keycloak-db
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+  target: primary
+  immediate: true

@@ -1,0 +1,46 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak-db
+  namespace: keycloak
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "CNPG creates PostgreSQL pods dynamically; the cnpg.io/cluster label is valid but pods do not exist in the static rendered manifest."
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "CNPG creates PostgreSQL pods dynamically; the cnpg.io/cluster label is valid but pods do not exist in the static rendered manifest."
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: keycloak-db
+  policyTypes:
+    - Ingress
+  ingress:
+    # M3 step 9b: Keycloak server pods connecting to Postgres. Label is a
+    # placeholder matching the common Keycloak Helm chart convention
+    # (app.kubernetes.io/name: keycloak) -- verify/adjust once that chart
+    # is actually vendored, same as openbao-db's equivalent rule.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: keycloak
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: keycloak
+      ports:
+        - protocol: TCP
+          port: 5432
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cloudnative-pg
+      ports:
+        - protocol: TCP
+          port: 8000
+    - from:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: keycloak-db
+      ports:
+        - protocol: TCP
+          port: 5432
