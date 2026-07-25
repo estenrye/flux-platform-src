@@ -47,3 +47,41 @@ The on-prem substrate is:
   fallback if the official driver disappoints.
 - A second on-prem cluster reuses everything with a new dataset subtree
   and its own API key.
+
+## Amendment 2026-07-25 (democratic-csi replaces truenas-csi for iSCSI; M3 A1)
+
+The official TrueNAS CSI driver decision above is **superseded for iSCSI**.
+Full design: [2026-07-21-m3-identity-secrets-design.md](../superpowers/specs/2026-07-21-m3-identity-secrets-design.md) §A1.
+
+- **truenas-csi iSCSI never became usable.** kubernetes-csi/csi-lib-iscsi#94
+  (IPv6 portal mis-parse) stayed open and unfixed on master; truenas-csi
+  pins a pre-fix version with no workaround that doesn't require upstream
+  action. This cluster is IPv6-only (ADR-23), so iSCSI stayed blocked for
+  the driver's entire tenure here.
+- **The replacement, democratic-csi, has its own known-broken feature**:
+  `datasetPermissions*` silently coalesces `setperm` calls under concurrent
+  PVC creation on this TrueNAS version (SCALE 25.10.x), leaving some
+  datasets `root:root 0755` while the API reports success
+  (democratic-csi#564). **Do not use `datasetPermissions*`.** The
+  workaround, confirmed by the issue's author running the same environment:
+  `csiDriver.fsGroupPolicy: File` with no `datasetPermissions*` — kubelet
+  applies `fsGroup` per-pod at mount time, and CNPG already sets
+  `fsGroup: 26` natively, so Postgres volumes work with no driver-side
+  chown at all. This retired the `nfs-pg-owner` CronJob bridge that
+  previously plugged this exact gap.
+- **democratic-csi iSCSI uses a different code path** (native Node.js, not
+  `csi-lib-iscsi`) and was the actual motivation for the swap — it's the
+  only route to iSCSI on this substrate. Confirmed working post-cutover:
+  `democratic-csi-iscsi` backs Garage's 3-node StatefulSet (`data`/`meta`
+  PVCs per replica).
+- **Result**: `democratic-csi-nfs` is now the default StorageClass;
+  `democratic-csi-nfs-pg` (CNPG workloads) and `democratic-csi-iscsi`
+  (Garage) round out the set. The original `truenas-iscsi`/`truenas-nfs`/
+  `truenas-nfs-pg` StorageClasses are left in place, unused, rather than
+  deleted outright — TrueNAS itself is unaffected (still the ADR's storage
+  substrate; only the CSI driver in front of it changed for these three
+  classes), and removing dormant StorageClasses is a separate, low-risk
+  cleanup that doesn't need to block this amendment.
+- **Chart/image**: `democratic-csi` Helm chart `0.15.1`, driver image
+  digest-pinned to a `next` tag (no versioned tag exists for the driver
+  itself, per upstream's own release practice at the time).

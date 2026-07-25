@@ -1,6 +1,6 @@
 ---
 name: m3-step-tracker
-description: Live tracker of M3's 11 execution steps — steps 1-10 fully done including the [H] verification (Pinniped login confirmed end-to-end, required a Talos anonymous-auth fix); step 11 (ADRs/runbooks) not started
+description: M3 is fully complete (all 11 steps) as of 2026-07-25 — democratic-csi/Garage/OpenBao/Keycloak/Pinniped live, ADR-21 amended, ADR-25/26 written, 4 runbooks in docs/runbooks/
 metadata:
   type: project
 ---
@@ -23,7 +23,7 @@ this decays fast, keep it current rather than trusting it blindly.
 | 9a | `cert-manager-acme`: letsencrypt-staging/prod ClusterIssuers | Done — see detail below |
 | 9b | Keycloak: realm `ryezone-labs` at `https://id.rye.ninja` | Done — see detail below |
 | 10 | Pinniped Supervisor + Concierge, OIDC federation, RBAC | Done 2026-07-25 — see detail below |
-| 11 | ADRs, runbooks | Not started |
+| 11 | ADRs, runbooks | Done 2026-07-25 — ADR-21 amended, ADR-25/26 written; openbao-restore/keycloak-realm-restore/garage-node-replacement runbooks written (openbao-unseal already existed). **M3 complete.** |
 
 ### Step 10 detail (2026-07-25) — Pinniped Supervisor + Concierge, RESOLVED
 
