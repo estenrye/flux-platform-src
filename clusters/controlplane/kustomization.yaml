@@ -152,6 +152,10 @@ resources:
   # Keycloak local admin bootstrap credential (M3 step 9b); break-glass
   # copy also stored in OpenBao at secret/platform/keycloak/local-admin.
   - secrets/keycloak-admin-credentials.sops.yaml
+  # M3 step 10 [H] verification: temporary password for the first real
+  # user (esten), in the k8s-admin group -- Keycloak forces a reset on
+  # first login.
+  - secrets/keycloak-user-esten-credentials.sops.yaml
   # M3 step 10: Pinniped Supervisor's OIDC client secret against Keycloak
   # -- same generated value, encrypted twice (once per namespace that
   # needs it).

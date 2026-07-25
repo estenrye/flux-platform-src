@@ -48,6 +48,24 @@ data:
               access.token.claim: "true"
               userinfo.token.claim: "true"
 
+    # M3 step 10 [H] verification: first real user, in k8s-admin so the
+    # login can be checked end-to-end against Pinniped's ClusterRoleBinding
+    # (cluster-admin). Temporary password -- Keycloak forces a reset on
+    # first login, same as any real onboarding flow.
+    users:
+      - username: esten
+        email: esten.rye@ryezone.com
+        firstName: Esten
+        lastName: Rye
+        enabled: true
+        emailVerified: true
+        groups:
+          - k8s-admin
+        credentials:
+          - type: password
+            value: "$(env:ESTEN_TEMP_PASSWORD)"
+            temporary: true
+
     # M3 step 10: Pinniped Supervisor's upstream OIDC client. Redirect URI
     # is the Supervisor's fixed callback path convention
     # (https://<issuer-host>/callback). defaultClientScopes enumerated
