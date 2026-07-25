@@ -1,0 +1,25 @@
+# A5: Keycloak terminates TLS at Envoy Gateway (unlike step-ca's TLS
+# Passthrough) since browser-facing OIDC needs a publicly-trusted cert,
+# not step-ca's self-signed chain. gatewayClassName: merged-eg shares the
+# same underlying Envoy proxy fleet/external address as step-ca's own
+# Gateway object -- each app owns its own Gateway, Envoy Gateway merges
+# their listeners.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: keycloak
+  namespace: keycloak
+spec:
+  gatewayClassName: merged-eg
+  listeners:
+    - name: https
+      hostname: id.rye.ninja
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: id-rye-ninja-tls
+      allowedRoutes:
+        namespaces:
+          from: Same

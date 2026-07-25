@@ -1,0 +1,62 @@
+# Replaces the chart's own default NetworkPolicy (networkPolicy.enabled:
+# false in values.yaml), which is unrestricted-egress / any-source-ingress
+# -- too permissive for this cluster's default-deny model. Applies to both
+# the Keycloak StatefulSet pods and the keycloak-config-cli Job pod (both
+# carry app.kubernetes.io/name: keycloak, differing only in the
+# `component` label), which conveniently covers the config-cli -> Keycloak
+# admin-API call with one rule pair.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak
+  namespace: keycloak
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "CNPG creates PostgreSQL pods dynamically; the cnpg.io/cluster label is valid but pods do not exist in the static rendered manifest."
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "keycloak-db (applications/keycloak-db) lives in a sibling Kustomization; not visible when this app renders in isolation, but present in the combined cluster render."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Envoy Gateway (id.rye.ninja HTTPS-terminate listener) forwarding to
+    # the Keycloak Service.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+      ports:
+        - protocol: TCP
+          port: 8080
+    # keycloak-config-cli (same namespace) calling the admin REST API;
+    # also covers StatefulSet peer-to-peer if replicaCount is ever raised
+    # above 1.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: keycloak-db
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

@@ -1,0 +1,89 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: keycloak
+
+resources:
+  - resources/network-policy.yaml
+  - resources/gateway.yaml
+  - resources/certificate.yaml
+  - resources/http-route.yaml
+
+helmCharts:
+  - name: keycloak
+    repo: oci://registry-1.docker.io/bitnamicharts
+    version: 25.2.0
+    releaseName: keycloak
+    namespace: keycloak
+    includeCRDs: false
+    valuesFile: values.yaml
+
+patches:
+  - target:
+      kind: StatefulSet
+      name: keycloak
+    patch: |-
+      - op: add
+        path: /spec/template/spec/automountServiceAccountToken
+        value: false
+      - op: add
+        path: /metadata/annotations
+        value: {}
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip01
+        value: "CKV_K8S_40=UID 1001 is the Bitnami image's fixed non-root user; not independently configurable."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1default-service-account
+        value: "Keycloak makes no Kubernetes API calls (cache.stack: jdbc-ping, not KUBE_PING); automountServiceAccountToken is set to false."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+        value: "Single-host homelab cluster; no zone or role topology to express affinity against."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
+        value: "Single replica for M3's initial rollout (jgroups/ispn HA clustering deferred to a later milestone); replicaCount: 1 is the chart's own default."
+      - op: add
+        path: /spec/template/spec/restartPolicy
+        value: Always
+
+  - target:
+      kind: Job
+      name: keycloak-keycloak-config-cli
+    patch: |-
+      - op: add
+        path: /spec/template/spec/automountServiceAccountToken
+        value: false
+      - op: add
+        path: /metadata/annotations
+        value: {}
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip01
+        value: "CKV_K8S_40=UID 1001 is the Bitnami image's fixed non-root user; not independently configurable."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip02
+        value: "CKV_K8S_35=KEYCLOAK_PASSWORD as an env var is keycloak-config-cli's documented configuration mechanism (github.com/adorsys/keycloak-config-cli); no file-based alternative exists upstream."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1read-secret-from-env-var
+        value: "KEYCLOAK_PASSWORD as an env var is keycloak-config-cli's documented configuration mechanism; no file-based alternative exists upstream."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+        value: "Single-host homelab cluster; no zone or role topology to express affinity against."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-liveness-probe
+        value: "One-shot realm-reconciliation Job (chart's post-install/post-upgrade hook, applied as a plain Job -- see values.yaml); liveness probes are not meaningful for batch workloads."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-readiness-probe
+        value: "One-shot realm-reconciliation Job; readiness probes are not meaningful for batch workloads."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1restart-policy
+        value: "restartPolicy: Never plus backoffLimit: 1 (chart default) is deliberate for this one-shot import Job -- retried at the Job level, not the container level."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1env-value-from
+        value: "keycloak-admin-credentials is a SOPS-encrypted secret applied at bootstrap; not present as a static resource in this application-level render (see clusters/controlplane/secrets)."
+
+  - target:
+      kind: PodDisruptionBudget
+      name: keycloak
+    patch: |-
+      - op: add
+        path: /spec/unhealthyPodEvictionPolicy
+        value: AlwaysAllow

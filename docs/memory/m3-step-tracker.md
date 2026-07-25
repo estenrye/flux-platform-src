@@ -1,6 +1,6 @@
 ---
 name: m3-step-tracker
-description: Live tracker of M3's 11 execution steps — steps 1-9a fully done (unseal ceremony, ESO→OpenBao, Garage→R2 off-site sync x2, keycloak-db CNPG, cert-manager-acme); step 9b (Keycloak) not started
+description: Live tracker of M3's 11 execution steps — steps 1-9b fully done (unseal ceremony, ESO→OpenBao, Garage→R2 off-site sync x2, keycloak-db CNPG, cert-manager-acme, Keycloak live at id.rye.ninja); step 10 (Pinniped) not started
 metadata:
   type: project
 ---
@@ -21,7 +21,110 @@ this decays fast, keep it current rather than trusting it blindly.
 | 7 | Off-site backup sync (Garage → Cloudflare R2) | Done — see detail below |
 | 8 | `keycloak-db` CNPG cluster | Done — see detail below |
 | 9a | `cert-manager-acme`: letsencrypt-staging/prod ClusterIssuers | Done — see detail below |
-| 9b–11 | Keycloak, Pinniped, ADRs | Not started |
+| 9b | Keycloak: realm `ryezone-labs` at `https://id.rye.ninja` | Done — see detail below |
+| 10–11 | Pinniped, ADRs | Not started |
+
+### Step 9b detail (2026-07-25) — Keycloak, RESOLVED
+
+**Deployment tooling, at the user's explicit choice** (asked directly
+rather than assumed, given the size of this step): official Bitnami Helm
+chart for the server + its bundled `keycloakConfigCli` integration
+(adorsys/keycloak-config-cli) for realm/group reconciliation, over the
+Keycloak Operator's `KeycloakRealmImport` (a one-shot Job that doesn't
+prune removed settings on reconcile — weaker fit for "declarative config
+re-applies cleanly"). Keycloak itself has no official standalone Helm
+chart (only the Operator) — Bitnami's is the closest thing, and
+conveniently ships keycloak-config-cli as a first-class values-driven
+integration already.
+
+**Real, non-obvious finding: Bitnami retired its free `docker.io/bitnami/*`
+image tags** (moved behind a paid subscription, some time in 2025) — the
+chart's own default image refs (`bitnami/keycloak:26.3.3-debian-12-r0`,
+`bitnami/keycloak-config-cli:6.4.0-debian-12-r11`) don't exist on Docker
+Hub anymore (`bitnami/keycloak` has zero tags). `bitnamilegacy/*` is the
+frozen free mirror at the exact versions each chart version was built
+against — used that instead, digest-pinned to the same tags the chart
+templates expect (verified the tags exist there with `curl
+registry.hub.docker.com/v2/repositories/bitnamilegacy/...` before
+committing to it). No patches land on `bitnamilegacy` going forward, so
+this is a fixed, aging pin — worth knowing before reaching for *any*
+other Bitnami chart in this repo; the same problem will recur.
+
+**Architecture, per A5**: TLS terminates at Envoy Gateway (`mode:
+Terminate`), not inside Keycloak — `tls.enabled: false`, `production:
+true`, `proxyHeaders: "xforwarded"`. `KC_HOSTNAME` is derived from
+`ingress.hostname` regardless of whether `ingress.enabled` is true (the
+chart's own `configmap-env-vars.yaml` templates it unconditionally) — set
+`ingress.hostname: id.rye.ninja` / `ingress.enabled: false` since this
+cluster uses Gateway API HTTPRoute, not a Kubernetes `Ingress`.
+`replicaCount: 1` (chart default, kept deliberately for M3's initial
+rollout — jgroups/ispn HA clustering deferred to a later milestone, kept
+the NetworkPolicy simpler by not needing inter-replica port 7800).
+
+**New `keycloak` Gateway object, not a shared one**: `gatewayClassName:
+merged-eg` is Envoy Gateway's "merged gateways" feature — every app
+creates its *own* `Gateway`, and Envoy Gateway merges all of them onto
+one shared Envoy proxy fleet/external address. Confirmed live: `keycloak`
+and `step-ca`'s Gateways both resolved to the identical address
+(`2607:3640:1064:27f::9280`). The `letsencrypt-policy`
+`CertificateRequestPolicy` from step 9a already covered `id.rye.ninja`
+(`*.rye.ninja` glob) — no new approver-policy grant needed.
+
+**Real bug hit and fixed during live verification**: after wiring the
+Gateway/HTTPRoute/Certificate, `https://id.rye.ninja` returned `503`
+(cert was correct — real prod Let's Encrypt cert, right subject/dates —
+but no working backend). Root cause: `applications/envoy-gateway`'s own
+`envoy-proxy-allow` NetworkPolicy needed port 8080 added to its
+unrestricted-destination egress list (same pattern as the existing
+443/9000/9001 entries for step-ca) — I'd edited the *source* file for
+this earlier in the session but never re-applied it live, so the running
+cluster was still on the old policy. Lesson: a NetworkPolicy edit to a
+*shared* app (not the new app being built) is easy to forget to actually
+push live, since `make render`/lint only validate the manifest, not
+cluster state — always check `kubectl get networkpolicy` against what
+was intended when touching a shared policy mid-session, don't just trust
+that the source edit "counts."
+
+**Local admin credential**: 32-char random password, generated and piped
+directly into `sops -e` + `kubectl apply` (live Secret) + OpenBao
+(`secret/platform/keycloak/local-admin`, `bao kv put`) all within one
+shell scope — never displayed, never written to a file. **Repeated the
+"deleted the plaintext before finishing all three uses" mistake from
+earlier in this session once already** (see [[m3-step-tracker]]'s
+step-ca-db-snapshots-sync section) before catching it partway through —
+this time caught it before losing anything, redid the whole
+generate→encrypt→apply→break-glass sequence as a single atomic block.
+**Establish this as the standing pattern for any future secret needing
+multiple destinations: generate once, consume everywhere, in one shell
+scope — never split "encrypt" and "use" across separate commands when
+the value can't be recovered after SOPS-encrypting it.**
+
+Verified end-to-end live before merge:
+- Keycloak pod `Running`/`Ready`, started cleanly in `production` mode
+  with no internal TLS (`Profile prod activated`, `Listening on:
+  http://0.0.0.0:8080`)
+- `keycloak-config-cli` Job succeeded: realm `ryezone-labs` + all 5 A7
+  groups created, `keycloak-admin` group confirmed holding the
+  `realm-management` client's `realm-admin` composite role (queried via
+  the admin REST API, not just "the Job exited 0")
+- Re-ran the config-cli Job (delete + recreate, same "re-run by deleting
+  the job" pattern as `garage-bucket-init`) — idempotent, no duplicate
+  groups, second run ~4x faster (1.46s vs 5.9s) confirming it diffed
+  cleanly against existing state
+- `https://id.rye.ninja/admin/master/console/` → `200`, real title
+  "Keycloak Administration Console"
+- `https://id.rye.ninja/realms/ryezone-labs/.well-known/openid-configuration`
+  → `200`, `issuer: https://id.rye.ninja/realms/ryezone-labs` (confirms
+  `hostnameStrict`/`proxyHeaders` correctly derive the public issuer URL
+  — this exact value is what step 10's Pinniped OIDC client will need)
+
+**Deferred to step 10, deliberately**: a `groups` client scope +
+group-membership protocol mapper (so group membership shows up as an
+OIDC claim) was *not* added in this step. `defaultDefaultClientScopes`
+semantics in a realm-import context are a known sharp edge (unclear
+whether specifying it replaces vs. adds to the built-in scope list) —
+safer to wire this once there's a real client (Pinniped) to test the
+actual claim flow against, rather than guess now.
 
 ### Step 9a detail (2026-07-24) — cert-manager-acme, RESOLVED
 
