@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: id-rye-ninja
+  namespace: keycloak
+spec:
+  secretName: id-rye-ninja-tls
+  dnsNames:
+    - id.rye.ninja
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer

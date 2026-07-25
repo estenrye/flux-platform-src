@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: keycloak
+  description: |-
+    Keycloak identity provider (codecentric/keycloakx chart, upstream
+    quay.io/keycloak/keycloak image + hand-rolled keycloak-config-cli
+    Job), backed by keycloak-db (CNPG). Realm ryezone-labs, exposed at
+    id.rye.ninja via Envoy Gateway HTTPS-terminate + Let's Encrypt.
+  tags:
+    - identity
+    - oidc
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

@@ -1,0 +1,82 @@
+fullnameOverride: keycloak
+nameOverride: keycloak
+replicas: 1
+
+# codecentric/keycloakx, not Bitnami's chart: this chart is a thin wrapper
+# around the genuine upstream `quay.io/keycloak/keycloak` image directly
+# (no repackaging), per the user's explicit request after Bitnami retired
+# its own free image tags (docker.io/bitnami/keycloak now has zero tags --
+# moved behind a paid subscription). Digest-pinned per repo convention.
+image:
+  repository: quay.io/keycloak/keycloak
+  tag: "26.6.4"
+  digest: sha256:0aae0de7fca85525f727d3354df17896092de8bb26ae4c12d89c77e5df8cbce4
+
+serviceAccount:
+  automountServiceAccountToken: false
+
+# Unlike Bitnami's chart (whose entrypoint script defaulted to starting
+# the server), the upstream image's own ENTRYPOINT is bare `kc.sh` with
+# no default command -- omitting this makes the container just print
+# help text and exit healthy-looking-but-not-actually-serving (confirmed
+# live: `kubectl logs` showed the CLI help page, not a startup log).
+args:
+  - start
+
+# TLS terminates at Envoy Gateway (A5) -- Keycloak runs plain HTTP
+# in-cluster and trusts proxy headers for its externally-visible hostname/
+# scheme, same as any standard reverse-proxied deployment.
+proxy:
+  enabled: true
+  mode: xforwarded
+
+http:
+  # Chart defaults to "/auth" for backwards compat with older Keycloak
+  # versions; root path matches the Gateway/HTTPRoute wiring below.
+  relativePath: "/"
+
+database:
+  vendor: postgres
+  hostname: keycloak-db-rw.keycloak.svc.cluster.local
+  port: 5432
+  database: keycloak
+  username: keycloak
+  existingSecret: keycloak-db-app
+  existingSecretKey: password
+
+extraEnv: |
+  - name: KC_HOSTNAME
+    value: https://id.rye.ninja
+  - name: KC_BOOTSTRAP_ADMIN_USERNAME
+    value: admin
+  - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-admin-credentials
+        key: password
+
+# Not using the chart's own Ingress (this cluster uses Gateway API
+# HTTPRoute, not Ingress) -- generates the HTTPRoute for the existing
+# `keycloak` Gateway (resources/gateway.yaml) directly, targeting its
+# https listener (TLS-terminate, A5).
+httpRoute:
+  enabled: true
+  servicePort: 80
+  parentRefs:
+    - name: keycloak
+      sectionName: https
+  hostnames:
+    - id.rye.ninja
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2
+    memory: 1Gi

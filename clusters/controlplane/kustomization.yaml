@@ -68,6 +68,11 @@ resources:
   # creation of the `keycloak` namespace — the future Keycloak app (step
   # 9b) will just reuse it, same as step-ca/openbao-db's split.
   - ../../applications/keycloak-db/controlplane
+  # M3 step 9b: Keycloak itself (Bitnami chart + keycloak-config-cli),
+  # exposed at id.rye.ninja via Envoy Gateway HTTPS-terminate (A5) +
+  # letsencrypt-prod (step 9a). Reuses the `keycloak` namespace keycloak-db
+  # already created.
+  - ../../applications/keycloak/base
   # M2 step 6 crossplane install (2026-07-20): four ordered Flux
   # Kustomizations (crossplane-core -> crossplane-providers ->
   # crossplane-xrds -> crossplane-resources,
@@ -136,6 +141,9 @@ resources:
   - secrets/step-ca-db-snapshots-sync-credentials.sops.yaml
   # Garage S3 access key for keycloak-db barman WAL archiving (M3 step 8).
   - secrets/keycloak-db-barman-credentials.sops.yaml
+  # Keycloak local admin bootstrap credential (M3 step 9b); break-glass
+  # copy also stored in OpenBao at secret/platform/keycloak/local-admin.
+  - secrets/keycloak-admin-credentials.sops.yaml
 
 patches:
   - path: patches/envoy-proxy.ipfamily.yaml

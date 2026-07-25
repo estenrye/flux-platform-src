@@ -1,0 +1,93 @@
+# keycloakx (unlike Bitnami's chart) doesn't bundle a keycloak-config-cli
+# integration, so this is hand-rolled: adorsys/keycloak-config-cli's own
+# image (their official Docker Hub repo, not a third-party repackaging),
+# idempotently diffing resources/keycloak-config-cli-configmap.yaml
+# against the live realm on every run -- satisfies the M3 design's
+# "declarative config re-applies cleanly" exit criterion.
+#
+# Not a Helm hook (no `helm` CLI involved, rendered via kustomize
+# --enable-helm) -- a plain Job. Re-run after editing the realm config by
+# deleting it, same "re-run by deleting the job" pattern as
+# applications/garage/controlplane/resources/bucket-init-job.yaml.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-config-cli
+  namespace: keycloak
+  annotations:
+    ignore-check.kube-linter.io/no-node-affinity: "Single-host homelab cluster; no zone or role topology to express affinity against."
+    ignore-check.kube-linter.io/no-liveness-probe: "One-shot realm-reconciliation Job; liveness probes are not meaningful for batch workloads."
+    ignore-check.kube-linter.io/no-readiness-probe: "One-shot realm-reconciliation Job; readiness probes are not meaningful for batch workloads."
+    ignore-check.kube-linter.io/restart-policy: "restartPolicy: Never plus backoffLimit: 1 is deliberate for this one-shot import Job -- retried at the Job level, not the container level."
+    ignore-check.kube-linter.io/env-value-from: "keycloak-admin-credentials is a SOPS-encrypted secret applied at bootstrap; not present as a static resource in this application-level render (see clusters/controlplane/secrets)."
+    ignore-check.kube-linter.io/read-secret-from-env-var: "KEYCLOAK_PASSWORD as an env var is keycloak-config-cli's documented configuration mechanism; no file-based alternative exists upstream."
+    ignore-check.kube-linter.io/default-service-account: "This Job makes no Kubernetes API calls; automountServiceAccountToken is set to false."
+    checkov.io/skip01: "CKV_K8S_40=UID 1000 is the upstream keycloak-config-cli image's fixed non-root user; not independently configurable."
+    checkov.io/skip02: "CKV_K8S_38=automountServiceAccountToken is set to false below; this Job makes no Kubernetes API calls."
+    checkov.io/skip03: "CKV_K8S_10=One-shot realm-reconciliation Job; resource requests kept minimal, not zero."
+    checkov.io/skip04: "CKV_K8S_11=One-shot realm-reconciliation Job; resource limits kept minimal, not zero."
+    checkov.io/skip05: "CKV_K8S_35=KEYCLOAK_PASSWORD as an env var is keycloak-config-cli's documented configuration mechanism (github.com/adorsys/keycloak-config-cli); no file-based alternative exists upstream."
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: keycloak
+        app.kubernetes.io/component: keycloak-config-cli
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      serviceAccountName: default
+      securityContext:
+        runAsUser: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: keycloak-config-cli
+          # adorsys/keycloak-config-cli:6.5.1-26.5.5
+          image: "docker.io/adorsys/keycloak-config-cli@sha256:303b5c801fffbc34a8d47ff94bb7f00eba907418076a0061799424138ad16788"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          env:
+            # Headless Service (clusterIP: None) does no port DNAT -- must
+            # target the pod's real containerPort (8080) directly, not the
+            # Service's declared port (80). Confirmed live: the declared
+            # port timed out (nothing listening there without a ClusterIP
+            # to route through), 8080 works.
+            - name: KEYCLOAK_URL
+              value: "http://keycloak-headless:8080/"
+            - name: KEYCLOAK_USER
+              value: "admin"
+            - name: KEYCLOAK_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-admin-credentials
+                  key: password
+            - name: IMPORT_FILES_LOCATIONS
+              value: "/config/*"
+            - name: KEYCLOAK_AVAILABILITYCHECK_ENABLED
+              value: "true"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: keycloak-config-cli
+        - name: tmp
+          emptyDir: {}

@@ -83,6 +83,9 @@ spec:
           port: 9000
         - protocol: TCP
           port: 9001
+        # M3 step 9b: Keycloak backend (id.rye.ninja HTTPS-terminate).
+        - protocol: TCP
+          port: 8080
         - protocol: TCP
           port: 53
         - protocol: UDP
