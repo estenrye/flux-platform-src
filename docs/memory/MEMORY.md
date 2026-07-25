@@ -27,7 +27,7 @@
 - [M3 Design](m3-design.md) — democratic-csi swap, Garage, OpenBao, Keycloak, Pinniped; three open [H] decisions (exposure path, off-site backup, realm groups)
 - [M2 Step 12 Go Decision](m2-step12-go-decision.md) — Esten decided GO 2026-07-21, soak curtailed from planned 7 days to <1 day; step 13 decommission now unblocked
 - [M2 Step 13 Decommission Tracker](m2-step13-decommission.md) — live tracker of 7 decommission items; item 1 done 2026-07-21; controlplane's Flux reconciles from the rendered repo, not flux-platform-src directly
-- [M3 Step Tracker](m3-step-tracker.md) — live tracker of M3's 11 steps; steps 1-10 done, Pinniped live at sso.rye.ninja; DNAT/RBAC/Talos kube-cert-agent lessons, Flux-reverts-unmerged-live-edits
+- [M3 Step Tracker](m3-step-tracker.md) — live tracker of M3's 11 steps; steps 1-10 fully done incl. [H] login verification; Talos needs anonymous-auth=true for Pinniped TokenCredentialRequest to work at all
 - [M3 Step 6 Secret Migration Eligibility](m3-step6-secret-migration-eligibility.md) — never migrate a secret on OpenBao's own dependency chain to ESO+OpenBao; Crossplane's github-token/cloudflare-creds confirmed clean candidates
 - [Cloudflare R2 Token Derivation](cloudflare-r2-token-derivation.md) — how to turn a generic Cloudflare API Token into S3 access-key-id/secret-access-key for R2 (access key = token id as-is, secret key = SHA256(value))
 - [Urgency is the User's Call](feedback-urgency-is-users-call.md) — don't unilaterally label a finding "not urgent"; surface it and let the user decide priority
