@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: pinniped-concierge
+  description: |-
+    Pinniped Concierge: aggregated API server validating tokens issued by
+    the Supervisor (JWTAuthenticator against sso.rye.ninja), serving
+    TokenCredentialRequest for kubectl. RBAC: A7's k8s-admin/k8s-viewer
+    Keycloak groups bound to cluster-admin/view ClusterRoles.
+  tags:
+    - identity
+    - oidc
+    - rbac
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

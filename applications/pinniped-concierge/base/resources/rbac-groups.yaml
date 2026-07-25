@@ -1,0 +1,33 @@
+# A7 group model: Concierge issues client certs carrying O=<group> for
+# each group in the Supervisor-issued token's `groups` claim (the
+# Supervisor's OIDCIdentityProvider maps Keycloak's group-membership
+# claim to this standardized name -- see
+# applications/pinniped-supervisor/base/resources/oidc-identity-provider.yaml).
+# Standard Kubernetes RBAC then just needs Group subjects matching the
+# bare Keycloak group names (full.path: false on the groups client scope
+# mapper strips the leading "/").
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pinniped-k8s-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: Group
+    name: k8s-admin
+    apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pinniped-k8s-viewer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: Group
+    name: k8s-viewer
+    apiGroup: rbac.authorization.k8s.io

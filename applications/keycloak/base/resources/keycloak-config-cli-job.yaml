@@ -15,18 +15,18 @@ metadata:
   name: keycloak-config-cli
   namespace: keycloak
   annotations:
-    ignore-check.kube-linter.io/no-node-affinity: "Single-host homelab cluster; no zone or role topology to express affinity against."
+    ignore-check.kube-linter.io/no-node-affinity: "This cluster's nodes carry no zone/rack topology labels to express affinity against; a one-shot Job has no meaningful spread requirement regardless."
     ignore-check.kube-linter.io/no-liveness-probe: "One-shot realm-reconciliation Job; liveness probes are not meaningful for batch workloads."
     ignore-check.kube-linter.io/no-readiness-probe: "One-shot realm-reconciliation Job; readiness probes are not meaningful for batch workloads."
     ignore-check.kube-linter.io/restart-policy: "restartPolicy: Never plus backoffLimit: 1 is deliberate for this one-shot import Job -- retried at the Job level, not the container level."
-    ignore-check.kube-linter.io/env-value-from: "keycloak-admin-credentials is a SOPS-encrypted secret applied at bootstrap; not present as a static resource in this application-level render (see clusters/controlplane/secrets)."
-    ignore-check.kube-linter.io/read-secret-from-env-var: "KEYCLOAK_PASSWORD as an env var is keycloak-config-cli's documented configuration mechanism; no file-based alternative exists upstream."
+    ignore-check.kube-linter.io/env-value-from: "keycloak-admin-credentials and pinniped-keycloak-client-secret are SOPS-encrypted secrets applied at bootstrap; not present as static resources in this application-level render (see clusters/controlplane/secrets)."
+    ignore-check.kube-linter.io/read-secret-from-env-var: "KEYCLOAK_PASSWORD and PINNIPED_CLIENT_SECRET as env vars are keycloak-config-cli's documented configuration/variable-substitution mechanism; no file-based alternative exists upstream."
     ignore-check.kube-linter.io/default-service-account: "This Job makes no Kubernetes API calls; automountServiceAccountToken is set to false."
     checkov.io/skip01: "CKV_K8S_40=UID 1000 is the upstream keycloak-config-cli image's fixed non-root user; not independently configurable."
     checkov.io/skip02: "CKV_K8S_38=automountServiceAccountToken is set to false below; this Job makes no Kubernetes API calls."
     checkov.io/skip03: "CKV_K8S_10=One-shot realm-reconciliation Job; resource requests kept minimal, not zero."
     checkov.io/skip04: "CKV_K8S_11=One-shot realm-reconciliation Job; resource limits kept minimal, not zero."
-    checkov.io/skip05: "CKV_K8S_35=KEYCLOAK_PASSWORD as an env var is keycloak-config-cli's documented configuration mechanism (github.com/adorsys/keycloak-config-cli); no file-based alternative exists upstream."
+    checkov.io/skip05: "CKV_K8S_35=KEYCLOAK_PASSWORD and PINNIPED_CLIENT_SECRET as env vars are keycloak-config-cli's documented configuration/variable-substitution mechanism (github.com/adorsys/keycloak-config-cli); no file-based alternative exists upstream."
 spec:
   backoffLimit: 1
   ttlSecondsAfterFinished: 600
@@ -73,6 +73,16 @@ spec:
               value: "/config/*"
             - name: KEYCLOAK_AVAILABILITYCHECK_ENABLED
               value: "true"
+            # M3 step 10: $(env:PINNIPED_CLIENT_SECRET) in the realm YAML
+            # keeps the pinniped-supervisor client's secret out of the
+            # plain ConfigMap.
+            - name: IMPORT_VARSUBSTITUTION_ENABLED
+              value: "true"
+            - name: PINNIPED_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: pinniped-keycloak-client-secret
+                  key: client-secret
           volumeMounts:
             - name: config
               mountPath: /config

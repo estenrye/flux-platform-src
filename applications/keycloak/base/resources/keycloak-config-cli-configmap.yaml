@@ -14,10 +14,7 @@ data:
     # this realm's admin console. openbao-admin/openbao-operator exist
     # here as groups only -- the OpenBao-side OIDC auth method binding
     # policies to these groups is not in M3's scope (no step references
-    # it explicitly). Groups-as-OIDC-claims wiring (a client scope with
-    # a group-membership mapper) is deferred to step 10, where it can
-    # actually be tested against a real client (Pinniped) instead of
-    # guessing at defaultDefaultClientScopes semantics blind.
+    # it explicitly).
     groups:
       - name: k8s-admin
       - name: k8s-viewer
@@ -27,3 +24,51 @@ data:
             - realm-admin
       - name: openbao-admin
       - name: openbao-operator
+
+    # M3 step 10: groups-as-OIDC-claims, assigned directly to the
+    # pinniped-supervisor client below rather than realm-wide
+    # defaultDefaultClientScopes (deliberately avoided in step 9b --
+    # unclear replace-vs-add semantics there; per-client assignment has
+    # no such ambiguity). full.path: false so the claim value is the bare
+    # group name ("k8s-admin"), matching the RBAC Group subjects in
+    # applications/pinniped-concierge.
+    clientScopes:
+      - name: groups
+        protocol: openid-connect
+        attributes:
+          include.in.token.scope: "true"
+        protocolMappers:
+          - name: groups
+            protocol: openid-connect
+            protocolMapper: oidc-group-membership-mapper
+            config:
+              claim.name: groups
+              full.path: "false"
+              id.token.claim: "true"
+              access.token.claim: "true"
+              userinfo.token.claim: "true"
+
+    # M3 step 10: Pinniped Supervisor's upstream OIDC client. Redirect URI
+    # is the Supervisor's fixed callback path convention
+    # (https://<issuer-host>/callback). defaultClientScopes enumerated
+    # explicitly (queried live from this realm's own "account" client
+    # rather than assumed) plus "groups".
+    clients:
+      - clientId: pinniped-supervisor
+        name: "Pinniped Supervisor"
+        enabled: true
+        clientAuthenticatorType: client-secret
+        secret: "$(env:PINNIPED_CLIENT_SECRET)"
+        redirectUris:
+          - "https://sso.rye.ninja/callback"
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: false
+        publicClient: false
+        defaultClientScopes:
+          - web-origins
+          - acr
+          - profile
+          - roles
+          - basic
+          - email
+          - groups

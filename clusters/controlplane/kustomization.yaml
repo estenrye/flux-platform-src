@@ -68,11 +68,19 @@ resources:
   # creation of the `keycloak` namespace — the future Keycloak app (step
   # 9b) will just reuse it, same as step-ca/openbao-db's split.
   - ../../applications/keycloak-db/controlplane
-  # M3 step 9b: Keycloak itself (Bitnami chart + keycloak-config-cli),
-  # exposed at id.rye.ninja via Envoy Gateway HTTPS-terminate (A5) +
+  # M3 step 9b: Keycloak itself (codecentric/keycloakx chart, upstream
+  # quay.io/keycloak/keycloak image + hand-rolled keycloak-config-cli
+  # Job), exposed at id.rye.ninja via Envoy Gateway HTTPS-terminate (A5) +
   # letsencrypt-prod (step 9a). Reuses the `keycloak` namespace keycloak-db
   # already created.
   - ../../applications/keycloak/base
+  # M3 step 10: Pinniped Supervisor + Concierge. Supervisor terminates its
+  # own TLS (deviates from A5's literal wording -- see
+  # applications/pinniped-supervisor/base/resources/gateway.yaml for why);
+  # Concierge is entirely in-cluster (aggregated API server), no public
+  # exposure.
+  - ../../applications/pinniped-supervisor/base
+  - ../../applications/pinniped-concierge/base
   # M2 step 6 crossplane install (2026-07-20): four ordered Flux
   # Kustomizations (crossplane-core -> crossplane-providers ->
   # crossplane-xrds -> crossplane-resources,
@@ -144,6 +152,11 @@ resources:
   # Keycloak local admin bootstrap credential (M3 step 9b); break-glass
   # copy also stored in OpenBao at secret/platform/keycloak/local-admin.
   - secrets/keycloak-admin-credentials.sops.yaml
+  # M3 step 10: Pinniped Supervisor's OIDC client secret against Keycloak
+  # -- same generated value, encrypted twice (once per namespace that
+  # needs it).
+  - secrets/pinniped-supervisor-keycloak-client-secret.sops.yaml
+  - secrets/pinniped-supervisor-oidc-client.sops.yaml
 
 patches:
   - path: patches/envoy-proxy.ipfamily.yaml

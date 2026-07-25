@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: pinniped-supervisor
+  description: |-
+    Pinniped Supervisor: federates Keycloak's ryezone-labs realm as an
+    OIDC identity provider for the cluster, issuing tokens the Concierge
+    validates. Exposed at sso.rye.ninja via TLS passthrough (Supervisor
+    owns its own Let's Encrypt cert -- it has no plain-HTTP listener).
+  tags:
+    - identity
+    - oidc
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

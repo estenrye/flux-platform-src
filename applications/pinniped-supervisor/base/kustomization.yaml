@@ -1,0 +1,52 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Pinniped has no Helm chart, only pre-rendered manifests attached to
+# GitHub releases (moved from vmware-tanzu/pinniped to vmware/pinniped
+# post-Broadcom reorg -- verify that redirect is still current if this
+# version is ever bumped). Image is already digest-pinned in the
+# upstream manifest itself.
+resources:
+  - https://github.com/vmware/pinniped/releases/download/v0.47.0/install-pinniped-supervisor.yaml
+  - resources/service-https.yaml
+  - resources/certificate.yaml
+  - resources/gateway.yaml
+  - resources/tls-route.yaml
+  - resources/federation-domain.yaml
+  - resources/oidc-identity-provider.yaml
+  - resources/network-policy.yaml
+
+patches:
+  - target:
+      kind: Deployment
+      name: pinniped-supervisor
+    patch: |-
+      - op: add
+        path: /spec/strategy
+        value:
+          type: RollingUpdate
+      - op: add
+        path: /spec/template/spec/restartPolicy
+        value: Always
+      - op: add
+        path: /metadata/annotations
+        value: {}
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip01
+        value: "CKV_K8S_38=Supervisor watches its own FederationDomain/OIDCIdentityProvider CRs via the K8s API; its ServiceAccount token is required (RBAC already scoped narrowly by the upstream manifest)."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+        value: "This cluster's nodes carry no zone/rack topology labels to express affinity against; the upstream manifest already sets its own preferred (soft) pod anti-affinity for spread."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
+        value: "Upstream manifest's own default (replicas: 2); not independently tuned for this step."
+
+  - target:
+      kind: RoleBinding
+      name: pinniped-supervisor
+      namespace: pinniped-supervisor
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          ignore-check.kube-linter.io/access-to-secrets: "Upstream RBAC: the Supervisor manages Secrets it owns (OIDC client credentials, session/signing keys) as part of its core function; not independently narrowable."

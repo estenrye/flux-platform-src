@@ -1,0 +1,13 @@
+# Cluster-scoped (JWTAuthenticator has no namespace). Validates ID
+# tokens issued by the Supervisor's own FederationDomain -- issuer must
+# match applications/pinniped-supervisor's FederationDomain.spec.issuer
+# exactly. No tls.certificateAuthorityData: sso.rye.ninja uses a real
+# Let's Encrypt cert, publicly trusted by the Concierge pod's default CA
+# bundle.
+apiVersion: authentication.concierge.pinniped.dev/v1alpha1
+kind: JWTAuthenticator
+metadata:
+  name: ryezone-labs
+spec:
+  issuer: https://sso.rye.ninja
+  audience: controlplane-rye-ninja

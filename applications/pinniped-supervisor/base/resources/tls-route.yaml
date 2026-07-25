@@ -1,0 +1,14 @@
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TLSRoute
+metadata:
+  name: pinniped-supervisor
+  namespace: pinniped-supervisor
+spec:
+  parentRefs:
+    - name: pinniped-supervisor
+      namespace: pinniped-supervisor
+      sectionName: https-passthrough
+  rules:
+    - backendRefs:
+        - name: pinniped-supervisor-https
+          port: 443

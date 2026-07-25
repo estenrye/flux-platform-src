@@ -86,6 +86,11 @@ spec:
         # M3 step 9b: Keycloak backend (id.rye.ninja HTTPS-terminate).
         - protocol: TCP
           port: 8080
+        # M3 step 10: Pinniped Supervisor backend (sso.rye.ninja
+        # TLS-passthrough -- still the pod's real port, not the Service's
+        # declared 443, since Calico evaluates egress post-DNAT).
+        - protocol: TCP
+          port: 8443
         - protocol: TCP
           port: 53
         - protocol: UDP

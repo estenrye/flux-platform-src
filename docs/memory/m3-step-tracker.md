@@ -1,6 +1,6 @@
 ---
 name: m3-step-tracker
-description: Live tracker of M3's 11 execution steps — steps 1-9b fully done (unseal ceremony, ESO→OpenBao, Garage→R2 off-site sync x2, keycloak-db CNPG, cert-manager-acme, Keycloak live at id.rye.ninja); step 10 (Pinniped) not started
+description: Live tracker of M3's 11 execution steps — steps 1-10 fully done (unseal ceremony, ESO→OpenBao, Garage→R2 off-site sync x2, keycloak-db CNPG, cert-manager-acme, Keycloak live at id.rye.ninja, Pinniped Supervisor+Concierge live at sso.rye.ninja); step 11 (ADRs/runbooks) not started
 metadata:
   type: project
 ---
@@ -22,7 +22,47 @@ this decays fast, keep it current rather than trusting it blindly.
 | 8 | `keycloak-db` CNPG cluster | Done — see detail below |
 | 9a | `cert-manager-acme`: letsencrypt-staging/prod ClusterIssuers | Done — see detail below |
 | 9b | Keycloak: realm `ryezone-labs` at `https://id.rye.ninja` | Done — see detail below |
-| 10–11 | Pinniped, ADRs | Not started |
+| 10 | Pinniped Supervisor + Concierge, OIDC federation, RBAC | Done 2026-07-25 — see detail below |
+| 11 | ADRs, runbooks | Not started |
+
+### Step 10 detail (2026-07-25) — Pinniped Supervisor + Concierge, RESOLVED
+
+Deployed via raw upstream release manifests (no Helm chart exists) at
+`applications/pinniped-supervisor/base` and
+`applications/pinniped-concierge/base`, `v0.47.0`. Supervisor federates
+Keycloak (`OIDCIdentityProvider` against `id.rye.ninja`) and issues its
+own tokens at `https://sso.rye.ninja` (`FederationDomain`); Concierge
+validates those tokens (`JWTAuthenticator`) and exposes
+`TokenCredentialRequest` for `kubectl`. RBAC: `k8s-admin`/`k8s-viewer`
+Keycloak groups bound to `cluster-admin`/`view` via `ClusterRoleBinding`
+`Group` subjects, relying on a new `groups` client scope
+(`oidc-group-membership-mapper`, `full.path: false`) assigned directly
+to the `pinniped-supervisor` client.
+
+**Deliberate deviation from [[m3-design]] A5's literal wording**: the
+Supervisor terminates its own TLS (Passthrough, same mechanism as
+step-ca's Gateway) rather than terminating at Envoy Gateway like
+Keycloak. Reason: the Supervisor has no plain-HTTP listener mode at
+all, and upstream's own docs warn against terminating TLS in front of
+it without re-encrypting to the backend. See
+`applications/pinniped-supervisor/base/resources/gateway.yaml`.
+
+**Every one of the following was found live, one at a time, each
+symptom masking the next** — the full stack looked "deployed" after the
+first `kubectl apply` pass but nothing actually worked end-to-end until
+all of these landed:
+
+1. **Rendered manifests split across subdirectories that a namespace-scoped `kubectl apply -f <dir>/pinniped-*/` misses entirely.** The upstream install manifests contain resources destined for `kube-system` (an extra Role/RoleBinding pair for `extension-apiserver-authentication-reader` + a `kube-system-pod-read` Role) and `kube-public` (a Role/RoleBinding granting `list`/`watch` on all ConfigMaps there) alongside three cluster-scoped `APIService` objects and a `CredentialIssuer`. `.render/.../resources/kube-system/`, `.../kube-public/`, and the top-level `apiregistration.k8s.io_v1_apiservice_*.yaml` / `config.concierge.pinniped.dev_v1alpha1_credentialissuer_*.yaml` files are separate from the per-app subdirectories — applying only `pinniped-supervisor/` and `pinniped-concierge/` silently skips all of them. **When applying a multi-namespace rendered app by hand (bypassing Flux), diff the full file list against what got applied — don't assume the per-app subdirectory is the complete set.**
+2. **Both `pinniped-supervisor`'s and `pinniped-concierge`'s NetworkPolicy egress rules were missing the Talos apiserver port (6443)** — both are themselves aggregated-API-server registrants (they watch their own CRs and manage `APIService`/`Secret` objects), same requirement as any other apiserver client. See [[calico-networkpolicy-dnat]].
+3. **`sso.rye.ninja`/`id.rye.ninja` resolve to this same cluster's own `envoy-merged-eg` LoadBalancer Service** (not a genuinely external destination like cert-manager's ACME/Cloudflare egress), so kube-proxy/Calico DNAT rewrites the destination before egress ever leaves the source pod's veth — egress must allow the post-DNAT containerPort **10443** (`envoy-merged-eg` Service: `443 -> targetPort 10443`), not the dialed port 443. Symptom was a bare TCP connect timeout (not a TLS-layer failure) from every namespace tested, including ones with no NetworkPolicy relevance at all — the tell was that a **direct pod-to-pod connection to the envoy-proxy pod's own IP:10443** also timed out, which only makes sense as a NetworkPolicy block, not a routing/hairpin problem. Fixed in both `pinniped-supervisor`'s and `pinniped-concierge`'s own `network-policy.yaml` (each reaches the other's namespace's public hostname). See [[calico-networkpolicy-dnat]].
+4. **`envoy-gateway-system`'s own `envoy-proxy-allow` NetworkPolicy egress never had port 8443 (Supervisor's containerPort) added**, despite the source file already containing the fix with a comment describing it — the edit existed in the repo from before this session's context compaction but was never actually `kubectl apply`'d live. This produced a TLS ClientHello that got sent but never answered (hung, not reset) — Envoy's own egress to the passthrough backend was blocked, so nothing was listening to complete the handshake from Envoy's side even though the Supervisor itself was healthy and Ready. **Lesson repeated from step 9b: a source-file fix is not a live fix. After resuming from a compacted context, re-diff "what the source says should be applied" against "what's actually live" before trusting any file's own claim that something was already done.**
+5. **Concierge's `kube-cert-agent-controller` hard-depends on `kube-public/cluster-info` existing, sequentially, before it even inspects the `kube-cert-agent` pod it deploys — and Talos never creates this ConfigMap** (it's a kubeadm-only bootstrap artifact; Talos's control plane is real and visible via `kubectl get pods -n kube-system -l k8s-app=kube-controller-manager`, but nothing populates `kube-public/cluster-info`). The `CredentialIssuer` sat on `CouldNotGetClusterInfo` indefinitely with the `kube-cert-agent` Deployment/pod already healthy — deploying the agent pod is necessary but not sufficient. Fixed with a new idempotent bootstrap script, `.bin/bootstrap-pinniped-cluster-info.sh`, that reads the live cluster's own CA + apiserver address from `kubectl config view --raw` and writes the standard kubeadm-format `cluster-info` ConfigMap (bare kubeconfig, CA + server only, no user/context — matches what a kubeadm cluster ships natively). Deliberately **not** committed as a static kustomize resource: the CA is per-cluster and would go stale across a Talos rebuild, same reasoning as this repo's other cluster-bootstrap-only scripts (`.bin/bootstrap-cluster-sops-key.sh`, `.bin/configure-openbao-*-secrets.sh`). **This is a standing Talos gap, not specific to this cluster's config — any Concierge deploy on any Talos (or other non-kubeadm) cluster needs this same fix.**
+
+None of these were guessed — each was isolated with a targeted debug pod (`kubectl run --rm -i --restart=Never --labels=<matching the relevant NetworkPolicy's podSelector>`) and a specific test (raw IP vs. hostname/SNI, direct pod IP vs. Service vs. external hostname, `curl -v` for TLS-handshake-level detail) to separate "connects but hangs" from "never connects" from "connects then resets," since each has a different root cause in this codebase's established DNAT/RBAC/leader-election failure modes.
+
+Also confirmed (not a bug, just a technique worth keeping): Keycloak's `keycloak-config-cli` Job needed re-running after this step's realm-config edits (new `groups` client scope + `pinniped-supervisor` client with `IMPORT_VARSUBSTITUTION_ENABLED` pulling `PINNIPED_CLIENT_SECRET` from a Secret) — Jobs are immutable, so this means `kubectl delete job` + re-apply, not `kubectl apply` in place, same pattern as `applications/garage/controlplane/resources/bucket-init-job.yaml`.
+
+**Not yet done**: the `[H]` step — a human running `pinniped get kubeconfig` against `https://sso.rye.ninja` and confirming `kubectl get pods -n kube-system` works end-to-end through a real browser login — cannot be performed by the assistant and is handed off explicitly.
 
 ### Step 9b detail (2026-07-25) — Keycloak, RESOLVED
 
