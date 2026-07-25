@@ -1,8 +1,7 @@
-# Replaces the chart's own default NetworkPolicy (networkPolicy.enabled:
-# false in values.yaml), which is unrestricted-egress / any-source-ingress
-# -- too permissive for this cluster's default-deny model. Applies to both
-# the Keycloak StatefulSet pods and the keycloak-config-cli Job pod (both
-# carry app.kubernetes.io/name: keycloak, differing only in the
+# codecentric/keycloakx ships no NetworkPolicy of its own -- this is
+# hand-written for this cluster's default-deny model. Applies to both the
+# Keycloak StatefulSet pods and the hand-rolled keycloak-config-cli Job
+# pod (both carry app.kubernetes.io/name: keycloak, differing only in the
 # `component` label), which conveniently covers the config-cli -> Keycloak
 # admin-API call with one rule pair.
 apiVersion: networking.k8s.io/v1

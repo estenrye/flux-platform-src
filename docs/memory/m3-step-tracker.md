@@ -26,40 +26,46 @@ this decays fast, keep it current rather than trusting it blindly.
 
 ### Step 9b detail (2026-07-25) — Keycloak, RESOLVED
 
-**Deployment tooling, at the user's explicit choice** (asked directly
-rather than assumed, given the size of this step): official Bitnami Helm
-chart for the server + its bundled `keycloakConfigCli` integration
-(adorsys/keycloak-config-cli) for realm/group reconciliation, over the
-Keycloak Operator's `KeycloakRealmImport` (a one-shot Job that doesn't
-prune removed settings on reconcile — weaker fit for "declarative config
-re-applies cleanly"). Keycloak itself has no official standalone Helm
-chart (only the Operator) — Bitnami's is the closest thing, and
-conveniently ships keycloak-config-cli as a first-class values-driven
-integration already.
+**Deployment tooling pivoted mid-step, at the user's explicit request**:
+started on Bitnami's Helm chart (their closest thing to an "official"
+chart, and it conveniently bundles `keycloakConfigCli` as a first-class
+values-driven integration). Shipped, deployed, fully verified live —
+then the user asked to switch to the *upstream* image instead. Swapping
+just `image.repository` on Bitnami's chart would have broken outright:
+its StatefulSet template hardcodes Bitnami-specific paths
+(`/opt/bitnami/keycloak/...`), a Bitnami entrypoint script, and a
+`prepare-write-dirs` init container assuming Bitnami's filesystem layout
+— none of which exist in `quay.io/keycloak/keycloak`. Re-platformed onto
+`codecentric/keycloakx` (a thin wrapper chart built specifically for the
+genuine upstream image, no repackaging) + a hand-rolled
+`keycloak-config-cli` Job (this chart doesn't bundle one).
 
 **Real, non-obvious finding: Bitnami retired its free `docker.io/bitnami/*`
-image tags** (moved behind a paid subscription, some time in 2025) — the
-chart's own default image refs (`bitnami/keycloak:26.3.3-debian-12-r0`,
-`bitnami/keycloak-config-cli:6.4.0-debian-12-r11`) don't exist on Docker
-Hub anymore (`bitnami/keycloak` has zero tags). `bitnamilegacy/*` is the
-frozen free mirror at the exact versions each chart version was built
-against — used that instead, digest-pinned to the same tags the chart
-templates expect (verified the tags exist there with `curl
-registry.hub.docker.com/v2/repositories/bitnamilegacy/...` before
-committing to it). No patches land on `bitnamilegacy` going forward, so
-this is a fixed, aging pin — worth knowing before reaching for *any*
-other Bitnami chart in this repo; the same problem will recur.
+image tags** (moved behind a paid subscription, some time in 2025) —
+`docker.io/bitnami/keycloak` has zero tags now. Worth knowing before
+reaching for *any* Bitnami chart in this repo again — the same problem
+will recur. Wasn't the reason for the pivot (the user asked for upstream
+regardless), but is what would have blocked staying on Bitnami's chart
+long-term anyway.
+
+**Real image findings, verified before committing to either**:
+`adorsys/keycloak-config-cli` (the project's own Docker Hub repo, not a
+Bitnami repackaging) is actively maintained — tags follow
+`<cli-version>-<keycloak-version>` (e.g. `6.5.1-26.5.5`), confirmed via
+`curl registry.hub.docker.com/v2/repositories/adorsys/keycloak-config-cli/tags/`
+before picking one close to this chart's Keycloak version.
 
 **Architecture, per A5**: TLS terminates at Envoy Gateway (`mode:
-Terminate`), not inside Keycloak — `tls.enabled: false`, `production:
-true`, `proxyHeaders: "xforwarded"`. `KC_HOSTNAME` is derived from
-`ingress.hostname` regardless of whether `ingress.enabled` is true (the
-chart's own `configmap-env-vars.yaml` templates it unconditionally) — set
-`ingress.hostname: id.rye.ninja` / `ingress.enabled: false` since this
-cluster uses Gateway API HTTPRoute, not a Kubernetes `Ingress`.
-`replicaCount: 1` (chart default, kept deliberately for M3's initial
-rollout — jgroups/ispn HA clustering deferred to a later milestone, kept
-the NetworkPolicy simpler by not needing inter-replica port 7800).
+Terminate`), not inside Keycloak — `proxy.mode: xforwarded`, no
+`tls:`/internal-cert config needed with keycloakx (it has no
+`production`-mode TLS-required gate the way Bitnami's chart did).
+`replicas: 1` (chart default, kept deliberately for M3's initial rollout
+— jgroups/ispn HA clustering deferred to a later milestone).
+`codecentric/keycloakx` ships **native Gateway API `httpRoute` support**
+— `httpRoute.enabled: true` with `parentRefs` pointed at the existing
+`keycloak` Gateway's `https` listener generates the HTTPRoute directly
+from chart values; no hand-written HTTPRoute resource needed (unlike the
+Bitnami attempt, which required one).
 
 **New `keycloak` Gateway object, not a shared one**: `gatewayClassName:
 merged-eg` is Envoy Gateway's "merged gateways" feature — every app
@@ -70,53 +76,83 @@ and `step-ca`'s Gateways both resolved to the identical address
 `CertificateRequestPolicy` from step 9a already covered `id.rye.ninja`
 (`*.rye.ninja` glob) — no new approver-policy grant needed.
 
-**Real bug hit and fixed during live verification**: after wiring the
-Gateway/HTTPRoute/Certificate, `https://id.rye.ninja` returned `503`
-(cert was correct — real prod Let's Encrypt cert, right subject/dates —
-but no working backend). Root cause: `applications/envoy-gateway`'s own
-`envoy-proxy-allow` NetworkPolicy needed port 8080 added to its
-unrestricted-destination egress list (same pattern as the existing
-443/9000/9001 entries for step-ca) — I'd edited the *source* file for
-this earlier in the session but never re-applied it live, so the running
-cluster was still on the old policy. Lesson: a NetworkPolicy edit to a
-*shared* app (not the new app being built) is easy to forget to actually
-push live, since `make render`/lint only validate the manifest, not
-cluster state — always check `kubectl get networkpolicy` against what
-was intended when touching a shared policy mid-session, don't just trust
-that the source edit "counts."
+**Three real bugs hit and fixed during live verification** (all specific
+to the keycloakx re-platform, not present in the earlier Bitnami pass):
+
+1. **Container printed CLI help and exited instead of starting.** Bitnami's
+   entrypoint script defaults to starting the server; the bare upstream
+   image's `ENTRYPOINT` is just `kc.sh` with no default command — with
+   `command`/`args` both empty (keycloakx's own default), the container
+   runs `kc.sh` alone, which prints usage and exits. Fix: `args: [start]`
+   explicitly. Confirmed via `kubectl logs` showing the literal `kc.sh`
+   help text before the fix, and a clean startup log after.
+2. **`keycloak-config-cli` hung waiting on `http://keycloak-headless/`**
+   for the full 120s timeout, every time, despite `keycloak-0` being
+   `Ready`. Root cause: a headless Service (`clusterIP: None`) does **no
+   port DNAT** — DNS resolves straight to the pod IP, but nothing
+   remaps the Service's declared `port: 80` to the pod's actual
+   `containerPort: 8080`; clients must target the real container port
+   directly. Confirmed by testing `curl` against the pod IP:8080 directly
+   (worked instantly) vs. the same pod IP via the *headless service
+   name* on the declared port 80 (hung until timeout) vs. explicit port
+   8080 on the headless service name (worked). Fixed by pointing
+   `KEYCLOAK_URL` at `http://keycloak-headless:8080/`. **This was also
+   silently true in the Bitnami pass** — its own config-cli Job used
+   `http://keycloak-headless:8080/` (explicit port) from the start,
+   which is why it never hit this; I didn't understand *why* that port
+   was explicit until debugging this from scratch.
+3. **`https://id.rye.ninja` 503'd again after the re-platform**, same
+   symptom as the Bitnami pass's fixed bug (`envoy-proxy-allow`
+   NetworkPolicy missing port 8080). Investigated assuming I'd
+   regressed it — instead discovered the **real root cause of the
+   original bug too**: Flux is actively reconciling this cluster from
+   `main` on its normal interval, and since PR #126 (which carries this
+   exact NetworkPolicy fix) was still open/unmerged, Flux's own
+   reconcile silently reverted my earlier manual `kubectl apply` back to
+   the committed (broken) state. It wasn't "I forgot to push the fix
+   live" (the step 9b Bitnami-era note's original conclusion) — it's
+   that *any* live edit to a Flux-managed resource is inherently
+   temporary until the underlying source is merged, no matter how
+   carefully it was applied. **General lesson**: when verifying a fix to
+   a resource Flux manages, on a cluster where Flux is actively
+   reconciling from an unmerged branch, expect it to get silently
+   reverted on Flux's next sync — re-apply immediately before each
+   verification attempt, and get the source change merged promptly
+   rather than assuming a manual apply "sticks."
 
 **Local admin credential**: 32-char random password, generated and piped
 directly into `sops -e` + `kubectl apply` (live Secret) + OpenBao
 (`secret/platform/keycloak/local-admin`, `bao kv put`) all within one
 shell scope — never displayed, never written to a file. **Repeated the
 "deleted the plaintext before finishing all three uses" mistake from
-earlier in this session once already** (see [[m3-step-tracker]]'s
-step-ca-db-snapshots-sync section) before catching it partway through —
-this time caught it before losing anything, redid the whole
-generate→encrypt→apply→break-glass sequence as a single atomic block.
-**Establish this as the standing pattern for any future secret needing
-multiple destinations: generate once, consume everywhere, in one shell
-scope — never split "encrypt" and "use" across separate commands when
-the value can't be recovered after SOPS-encrypting it.**
+earlier in this session once already** (see the step-ca-db-snapshots-sync
+section above) before catching it partway through — this time caught it
+before losing anything, redid the whole generate→encrypt→apply→break-glass
+sequence as a single atomic block. **Standing pattern for any future
+secret needing multiple destinations: generate once, consume everywhere,
+in one shell scope — never split "encrypt" and "use" across separate
+commands when the value can't be recovered after SOPS-encrypting it.**
+The DB and realm data live in `keycloak-db` (unaffected by the server
+chart swap) — confirmed the whole re-platform preserved the existing
+`ryezone-labs` realm and all 5 groups untouched (Keycloak's own startup
+log showed it auto-migrating the realm's stored schema version across
+the image bump, not recreating anything).
 
-Verified end-to-end live before merge:
-- Keycloak pod `Running`/`Ready`, started cleanly in `production` mode
-  with no internal TLS (`Profile prod activated`, `Listening on:
-  http://0.0.0.0:8080`)
-- `keycloak-config-cli` Job succeeded: realm `ryezone-labs` + all 5 A7
-  groups created, `keycloak-admin` group confirmed holding the
-  `realm-management` client's `realm-admin` composite role (queried via
-  the admin REST API, not just "the Job exited 0")
-- Re-ran the config-cli Job (delete + recreate, same "re-run by deleting
-  the job" pattern as `garage-bucket-init`) — idempotent, no duplicate
-  groups, second run ~4x faster (1.46s vs 5.9s) confirming it diffed
-  cleanly against existing state
+Verified end-to-end live before merge (full re-verification after the
+keycloakx pivot, not just carried over from the Bitnami pass):
+- Keycloak pod `Running`/`Ready` on the upstream image, `args: [start]`
+  confirmed actually starting the server (not printing help)
+- `keycloak-config-cli` Job succeeded against `keycloak-headless:8080`;
+  realm `ryezone-labs` + all 5 A7 groups confirmed present via the admin
+  REST API (identical group IDs to the pre-pivot check — proves the DB
+  data survived the chart swap, not just "a realm exists")
+- Re-ran the config-cli Job (delete + recreate) — succeeded again cleanly
 - `https://id.rye.ninja/admin/master/console/` → `200`, real title
   "Keycloak Administration Console"
 - `https://id.rye.ninja/realms/ryezone-labs/.well-known/openid-configuration`
   → `200`, `issuer: https://id.rye.ninja/realms/ryezone-labs` (confirms
-  `hostnameStrict`/`proxyHeaders` correctly derive the public issuer URL
-  — this exact value is what step 10's Pinniped OIDC client will need)
+  `proxy.mode: xforwarded` correctly derives the public issuer URL — this
+  exact value is what step 10's Pinniped OIDC client will need)
 
 **Deferred to step 10, deliberately**: a `groups` client scope +
 group-membership protocol mapper (so group membership shows up as an

@@ -7,12 +7,13 @@ resources:
   - resources/network-policy.yaml
   - resources/gateway.yaml
   - resources/certificate.yaml
-  - resources/http-route.yaml
+  - resources/keycloak-config-cli-configmap.yaml
+  - resources/keycloak-config-cli-job.yaml
 
 helmCharts:
-  - name: keycloak
-    repo: oci://registry-1.docker.io/bitnamicharts
-    version: 25.2.0
+  - name: keycloakx
+    repo: https://codecentric.github.io/helm-charts
+    version: 7.2.2
     releaseName: keycloak
     namespace: keycloak
     includeCRDs: false
@@ -27,63 +28,43 @@ patches:
         path: /spec/template/spec/automountServiceAccountToken
         value: false
       - op: add
+        path: /spec/template/spec/containers/0/securityContext/allowPrivilegeEscalation
+        value: false
+      - op: add
+        path: /spec/template/spec/containers/0/securityContext/capabilities
+        value:
+          drop: ["ALL"]
+      - op: add
+        path: /spec/template/spec/containers/0/securityContext/seccompProfile
+        value:
+          type: RuntimeDefault
+      - op: add
         path: /metadata/annotations
         value: {}
       - op: add
         path: /metadata/annotations/checkov.io~1skip01
-        value: "CKV_K8S_40=UID 1001 is the Bitnami image's fixed non-root user; not independently configurable."
+        value: "CKV_K8S_40=UID 1000 is the upstream keycloak image's fixed non-root user; not independently configurable."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip02
+        value: "CKV_K8S_22=upstream keycloak image writes transient state (RSA key cache, Quarkus/JVM tmp) at runtime; readOnlyRootFilesystem not verified safe without the kind of prepare-write-dirs init container Bitnami's chart used, and codecentric/keycloakx itself doesn't set it by default either."
+      - op: add
+        path: /metadata/annotations/checkov.io~1skip03
+        value: "CKV_K8S_35=KC_DB_PASSWORD/KC_BOOTSTRAP_ADMIN_PASSWORD as env vars are upstream Keycloak's documented configuration mechanism; this chart has no file-based alternative."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1no-read-only-root-fs
+        value: "upstream keycloak image writes transient state at runtime; readOnlyRootFilesystem not verified safe (see checkov skip02)."
+      - op: add
+        path: /metadata/annotations/ignore-check.kube-linter.io~1read-secret-from-env-var
+        value: "KC_DB_PASSWORD/KC_BOOTSTRAP_ADMIN_PASSWORD as env vars are upstream Keycloak's documented configuration mechanism; no file-based alternative in this chart."
       - op: add
         path: /metadata/annotations/ignore-check.kube-linter.io~1default-service-account
-        value: "Keycloak makes no Kubernetes API calls (cache.stack: jdbc-ping, not KUBE_PING); automountServiceAccountToken is set to false."
+        value: "Keycloak makes no Kubernetes API calls (cache.stack default, not KUBE_PING); automountServiceAccountToken is set to false at both the ServiceAccount and pod level."
       - op: add
         path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
         value: "Single-host homelab cluster; no zone or role topology to express affinity against."
       - op: add
         path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
-        value: "Single replica for M3's initial rollout (jgroups/ispn HA clustering deferred to a later milestone); replicaCount: 1 is the chart's own default."
-      - op: add
-        path: /spec/template/spec/restartPolicy
-        value: Always
-
-  - target:
-      kind: Job
-      name: keycloak-keycloak-config-cli
-    patch: |-
-      - op: add
-        path: /spec/template/spec/automountServiceAccountToken
-        value: false
-      - op: add
-        path: /metadata/annotations
-        value: {}
-      - op: add
-        path: /metadata/annotations/checkov.io~1skip01
-        value: "CKV_K8S_40=UID 1001 is the Bitnami image's fixed non-root user; not independently configurable."
-      - op: add
-        path: /metadata/annotations/checkov.io~1skip02
-        value: "CKV_K8S_35=KEYCLOAK_PASSWORD as an env var is keycloak-config-cli's documented configuration mechanism (github.com/adorsys/keycloak-config-cli); no file-based alternative exists upstream."
-      - op: add
-        path: /metadata/annotations/ignore-check.kube-linter.io~1read-secret-from-env-var
-        value: "KEYCLOAK_PASSWORD as an env var is keycloak-config-cli's documented configuration mechanism; no file-based alternative exists upstream."
-      - op: add
-        path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
-        value: "Single-host homelab cluster; no zone or role topology to express affinity against."
-      - op: add
-        path: /metadata/annotations/ignore-check.kube-linter.io~1no-liveness-probe
-        value: "One-shot realm-reconciliation Job (chart's post-install/post-upgrade hook, applied as a plain Job -- see values.yaml); liveness probes are not meaningful for batch workloads."
-      - op: add
-        path: /metadata/annotations/ignore-check.kube-linter.io~1no-readiness-probe
-        value: "One-shot realm-reconciliation Job; readiness probes are not meaningful for batch workloads."
-      - op: add
-        path: /metadata/annotations/ignore-check.kube-linter.io~1restart-policy
-        value: "restartPolicy: Never plus backoffLimit: 1 (chart default) is deliberate for this one-shot import Job -- retried at the Job level, not the container level."
+        value: "Single replica for M3's initial rollout (jgroups/ispn HA clustering deferred to a later milestone); replicas: 1 is the chart's own default."
       - op: add
         path: /metadata/annotations/ignore-check.kube-linter.io~1env-value-from
-        value: "keycloak-admin-credentials is a SOPS-encrypted secret applied at bootstrap; not present as a static resource in this application-level render (see clusters/controlplane/secrets)."
-
-  - target:
-      kind: PodDisruptionBudget
-      name: keycloak
-    patch: |-
-      - op: add
-        path: /spec/unhealthyPodEvictionPolicy
-        value: AlwaysAllow
+        value: "keycloak-db-app (CNPG auto-generated) and keycloak-admin-credentials (SOPS-encrypted, applied at bootstrap) are not present as static resources in this render (see clusters/controlplane/secrets)."

@@ -1,101 +1,82 @@
 fullnameOverride: keycloak
+nameOverride: keycloak
+replicas: 1
 
-# Bitnami retired the free `docker.io/bitnami/*` tags this chart's
-# defaults point at (moved behind a paid subscription, mid-2025) --
-# `docker.io/bitnami/keycloak` now has zero tags. `bitnamilegacy/*` is
-# the frozen free mirror at the exact versions this chart (25.2.0) was
-# built against; no newer patches land there, but it's the only free path
-# that matches what the chart's templates expect. Digest-pinned per repo
-# convention.
+# codecentric/keycloakx, not Bitnami's chart: this chart is a thin wrapper
+# around the genuine upstream `quay.io/keycloak/keycloak` image directly
+# (no repackaging), per the user's explicit request after Bitnami retired
+# its own free image tags (docker.io/bitnami/keycloak now has zero tags --
+# moved behind a paid subscription). Digest-pinned per repo convention.
 image:
-  registry: docker.io
-  repository: bitnamilegacy/keycloak
-  tag: 26.3.3-debian-12-r0
-  digest: sha256:c1d791ca7bc906f82bb82cc2c2c0ef72c85eeca560413fd86e9cf6c9d6dc5ff6
+  repository: quay.io/keycloak/keycloak
+  tag: "26.6.4"
+  digest: sha256:0aae0de7fca85525f727d3354df17896092de8bb26ae4c12d89c77e5df8cbce4
 
-# M3 step 9b design decision (per the user's explicit choice): official
-# Bitnami Helm chart for the server + its bundled keycloak-config-cli
-# integration for realm/group reconciliation -- adorsys/keycloak-config-cli
-# idempotently diffs this file's `keycloakConfigCli.configuration` against
-# the live realm on every run, directly satisfying the M3 design's
-# "declarative config re-applies cleanly" exit criterion (unlike the
-# Keycloak Operator's KeycloakRealmImport, which is a one-shot Job that
-# doesn't prune removed settings).
+serviceAccount:
+  automountServiceAccountToken: false
 
-auth:
-  adminUser: admin
-  existingSecret: keycloak-admin-credentials
-  passwordSecretKey: password
+# Unlike Bitnami's chart (whose entrypoint script defaulted to starting
+# the server), the upstream image's own ENTRYPOINT is bare `kc.sh` with
+# no default command -- omitting this makes the container just print
+# help text and exit healthy-looking-but-not-actually-serving (confirmed
+# live: `kubectl logs` showed the CLI help page, not a startup log).
+args:
+  - start
 
 # TLS terminates at Envoy Gateway (A5) -- Keycloak runs plain HTTP
 # in-cluster and trusts proxy headers for its externally-visible hostname/
 # scheme, same as any standard reverse-proxied deployment.
-production: true
-proxyHeaders: "xforwarded"
-hostnameStrict: true
-tls:
-  enabled: false
-httpEnabled: true
+proxy:
+  enabled: true
+  mode: xforwarded
+
+http:
+  # Chart defaults to "/auth" for backwards compat with older Keycloak
+  # versions; root path matches the Gateway/HTTPRoute wiring below.
+  relativePath: "/"
+
+database:
+  vendor: postgres
+  hostname: keycloak-db-rw.keycloak.svc.cluster.local
+  port: 5432
+  database: keycloak
+  username: keycloak
+  existingSecret: keycloak-db-app
+  existingSecretKey: password
+
+extraEnv: |
+  - name: KC_HOSTNAME
+    value: https://id.rye.ninja
+  - name: KC_BOOTSTRAP_ADMIN_USERNAME
+    value: admin
+  - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: keycloak-admin-credentials
+        key: password
 
 # Not using the chart's own Ingress (this cluster uses Gateway API
-# HTTPRoute, not Ingress) -- but KC_HOSTNAME is derived from
-# ingress.hostname regardless of ingress.enabled, so it still needs
-# setting here.
-ingress:
-  enabled: false
-  hostname: id.rye.ninja
-
-# Chart's default NetworkPolicy is unrestricted-egress / any-source
-# ingress -- too permissive for this cluster's default-deny model.
-# Replaced with an explicit one in resources/network-policy.yaml.
-networkPolicy:
-  enabled: false
-
-postgresql:
-  enabled: false
-externalDatabase:
-  host: keycloak-db-rw.keycloak.svc.cluster.local
-  port: 5432
-  user: keycloak
-  database: keycloak
-  existingSecret: keycloak-db-app
-  existingSecretPasswordKey: password
-
-keycloakConfigCli:
+# HTTPRoute, not Ingress) -- generates the HTTPRoute for the existing
+# `keycloak` Gateway (resources/gateway.yaml) directly, targeting its
+# https listener (TLS-terminate, A5).
+httpRoute:
   enabled: true
-  image:
-    registry: docker.io
-    repository: bitnamilegacy/keycloak-config-cli
-    tag: 6.4.0-debian-12-r11
-    digest: sha256:fb4e5f8df832974878b57ea58581c31f6c077c6eafdf6033f2bad9ee2b550723
-  # Rendered via kustomize --enable-helm, not the `helm` CLI itself, so the
-  # post-install/post-upgrade hook annotations this Job carries are inert
-  # (Flux applies it as a plain Job). Re-run after editing the realm config
-  # below by deleting it -- same "re-run by deleting the job" pattern as
-  # applications/garage/controlplane/resources/bucket-init-job.yaml.
-  cleanupAfterFinished:
-    enabled: true
-  configuration:
-    ryezone-labs.yaml: |
-      realm: ryezone-labs
-      enabled: true
-      displayName: "RyeZone Labs"
+  servicePort: 80
+  parentRefs:
+    - name: keycloak
+      sectionName: https
+  hostnames:
+    - id.rye.ninja
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/"
 
-      # M3 step 9b / A7 group model. `keycloak-admin` gets the built-in
-      # realm-management client's realm-admin composite role, granting
-      # this realm's admin console. openbao-admin/openbao-operator exist
-      # here as groups only -- the OpenBao-side OIDC auth method binding
-      # policies to these groups is not in M3's scope (no step references
-      # it explicitly). Groups-as-OIDC-claims wiring (a client scope with
-      # a group-membership mapper) is deferred to step 10, where it can
-      # actually be tested against a real client (Pinniped) instead of
-      # guessing at defaultDefaultClientScopes semantics blind.
-      groups:
-        - name: k8s-admin
-        - name: k8s-viewer
-        - name: keycloak-admin
-          clientRoles:
-            realm-management:
-              - realm-admin
-        - name: openbao-admin
-        - name: openbao-operator
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2
+    memory: 1Gi
