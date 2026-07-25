@@ -1,0 +1,49 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pinniped-supervisor
+  namespace: pinniped-supervisor
+spec:
+  podSelector:
+    matchLabels:
+      app: pinniped-supervisor
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Envoy Gateway (sso.rye.ninja TLS-passthrough listener) forwarding
+    # to the Supervisor's own HTTPS port.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+      ports:
+        - protocol: TCP
+          port: 8443
+  egress:
+    # apiserver targetPort — Calico evaluates egress post-DNAT
+    # (docs/memory/calico-networkpolicy-dnat.md). Talos serves 6443. The
+    # Supervisor is itself an aggregated-API-server registrant: it watches
+    # its own FederationDomain/OIDCIdentityProvider CRs and manages its
+    # APIService objects, same as Concierge's egress needs.
+    - ports:
+        - protocol: TCP
+          port: 6443
+    # OIDCIdentityProvider.spec.issuer is the *public* id.rye.ninja
+    # hostname (must match the issuer claim baked into Keycloak's
+    # tokens) -- the Supervisor reaches it the same way any external
+    # client would, back out through Envoy Gateway's public listener.
+    # Unlike cert-manager's ACME/Cloudflare egress (a genuinely external
+    # destination), this hostname resolves to the *same cluster's* own
+    # envoy-merged-eg LoadBalancer Service, so kube-proxy/Calico DNAT
+    # rewrites the destination before it ever leaves this pod's veth --
+    # egress is evaluated against the post-DNAT containerPort 10443
+    # (envoy-merged-eg Service: 443 -> targetPort 10443), not the
+    # dialed port 443 (docs/memory/calico-networkpolicy-dnat.md).
+    - ports:
+        - protocol: TCP
+          port: 10443
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

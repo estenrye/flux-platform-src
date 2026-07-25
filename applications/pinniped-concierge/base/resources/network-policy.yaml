@@ -1,0 +1,43 @@
+# Concierge is an aggregated API server: the main kube-apiserver proxies
+# TokenCredentialRequest calls to it directly (not through Envoy Gateway),
+# and on Talos the apiserver's own outbound connections don't necessarily
+# present as normal pod-CIDR traffic Calico can pin to a namespaceSelector
+# -- left ingress on the aggregation port open to any source, same
+# precedent as Garage's "S3 API: open to all namespaces" rule (auth
+# happens at the application layer regardless of network source).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pinniped-concierge
+  namespace: pinniped-concierge
+spec:
+  podSelector:
+    matchLabels:
+      app: pinniped-concierge
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 10250
+  egress:
+    # apiserver targetPort — Calico evaluates egress post-DNAT
+    # (docs/memory/calico-networkpolicy-dnat.md). Talos serves 6443.
+    - ports:
+        - protocol: TCP
+          port: 6443
+    # JWTAuthenticator.spec.issuer is the public sso.rye.ninja hostname
+    # (JWKS/discovery fetch) -- same as the Supervisor's own egress to
+    # id.rye.ninja, back out through Envoy Gateway's public listener.
+    # That hostname resolves to this same cluster's own envoy-merged-eg
+    # LoadBalancer Service, so egress is evaluated post-DNAT against
+    # containerPort 10443 (Service: 443 -> targetPort 10443), not the
+    # dialed port 443 (docs/memory/calico-networkpolicy-dnat.md).
+    - ports:
+        - protocol: TCP
+          port: 10443
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

@@ -1,0 +1,15 @@
+apiVersion: config.supervisor.pinniped.dev/v1alpha1
+kind: FederationDomain
+metadata:
+  name: ryezone-labs
+  namespace: pinniped-supervisor
+spec:
+  issuer: https://sso.rye.ninja
+  tls:
+    secretName: sso-rye-ninja-tls
+  identityProviders:
+    - displayName: "RyeZone Labs Keycloak"
+      objectRef:
+        apiGroup: idp.supervisor.pinniped.dev
+        kind: OIDCIdentityProvider
+        name: keycloak-ryezone-labs

@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: sso-rye-ninja
+  namespace: pinniped-supervisor
+spec:
+  secretName: sso-rye-ninja-tls
+  dnsNames:
+    - sso.rye.ninja
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer

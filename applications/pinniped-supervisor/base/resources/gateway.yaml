@@ -1,0 +1,28 @@
+# Deviation from A5's literal wording ("Pinniped terminate TLS at Envoy
+# Gateway", grouped with Keycloak): the Supervisor has no plain-HTTP
+# listener mode -- it only ever serves HTTPS, using a cert configured via
+# FederationDomain.spec.tls.secretName. Pinniped's own docs explicitly
+# warn against terminating TLS in front of it without re-encrypting to
+# the backend ("the OIDC protocol['s]...secret OIDC tokens would be
+# transmitted across the network without encryption" over plain HTTP).
+# TLS Passthrough (same mechanism as step-ca's Gateway) lets the
+# Supervisor own its TLS end-to-end using its own Let's Encrypt cert,
+# matching upstream's own recommended pattern with zero added complexity
+# (no BackendTLSPolicy needed for backend re-encryption).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: pinniped-supervisor
+  namespace: pinniped-supervisor
+spec:
+  gatewayClassName: merged-eg
+  listeners:
+    - name: https-passthrough
+      hostname: sso.rye.ninja
+      port: 443
+      protocol: TLS
+      tls:
+        mode: Passthrough
+      allowedRoutes:
+        namespaces:
+          from: Same

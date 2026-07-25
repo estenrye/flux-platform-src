@@ -1,0 +1,19 @@
+# Upstream install manifest deliberately ships no externally-facing
+# Service (many possible ingress strategies -- see the "Configure the
+# Supervisor as an OIDC issuer" how-to). Its own `pinniped-supervisor-api`
+# Service (port 443 -> targetPort 10250) is explicitly NOT for this
+# purpose (that's the internal aggregation API). This Service exposes the
+# actual OIDC/HTTPS listener (containerPort 8443) for the TLSRoute below.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pinniped-supervisor-https
+  namespace: pinniped-supervisor
+spec:
+  type: ClusterIP
+  selector:
+    app: pinniped-supervisor
+  ports:
+    - protocol: TCP
+      port: 443
+      targetPort: 8443

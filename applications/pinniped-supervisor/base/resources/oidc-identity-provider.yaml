@@ -1,0 +1,20 @@
+# Client credentials Secret (pinniped-supervisor-oidc-client) is
+# SOPS-encrypted -- see clusters/controlplane/secrets. Its clientID/
+# clientSecret must match the pinniped-supervisor client declared in
+# applications/keycloak's realm config exactly (same generated secret
+# value, encrypted twice -- see docs/memory/m3-step-tracker.md).
+apiVersion: idp.supervisor.pinniped.dev/v1alpha1
+kind: OIDCIdentityProvider
+metadata:
+  name: keycloak-ryezone-labs
+  namespace: pinniped-supervisor
+spec:
+  issuer: https://id.rye.ninja/realms/ryezone-labs
+  authorizationConfig:
+    additionalScopes: ["groups", "email", "profile"]
+    allowPasswordGrant: false
+  claims:
+    username: email
+    groups: groups
+  client:
+    secretName: pinniped-supervisor-oidc-client
