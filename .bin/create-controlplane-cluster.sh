@@ -151,6 +151,18 @@ cluster:
   etcd:
     advertisedSubnets:
       - ${INFRA_SUBNET}
+  apiServer:
+    # M3 step 10: Talos disables anonymous auth by default (unlike vanilla
+    # kubeadm). Pinniped's TokenCredentialRequest flow is deliberately
+    # designed to be called with zero prior credentials -- the JWT rides in
+    # the request body precisely so the call itself doesn't need apiserver
+    # authentication first. Re-enabling this only activates two pre-existing,
+    # already-reviewed system:unauthenticated RBAC bindings (Pinniped's own
+    # pre-authn-apis ClusterRole, and the stock system:public-info-viewer
+    # present on any vanilla cluster) -- nothing new is granted. See
+    # docs/memory/m3-step-tracker.md's step 10 section.
+    extraArgs:
+      anonymous-auth: "true"
 EOF
 
 talosctl gen config controlplane "https://[${APISERVER_VIP}]:6443" \
