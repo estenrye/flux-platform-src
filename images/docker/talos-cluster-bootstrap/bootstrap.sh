@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+# M4 step 2: Talos-bootstrap Job entrypoint. Runs in-cluster (on
+# `controlplane`, created by the `cluster-talos-kvm` Composition, M4 step 3)
+# once provider-terraform has created the target cluster's VMs. Ports
+# .bin/create-controlplane-cluster.sh's imperative half (schematic ID,
+# machine secrets, machine-config render, apply-config in maintenance mode,
+# etcd bootstrap, kubeconfig fetch) for unattended, per-claim execution:
+#
+#   - No YAML files (network.yaml/versions.yaml/hosts.yaml) -- every input
+#     is an env var, templated by the composition from the claim + the
+#     provider-terraform Workspace's `nodes` output.
+#   - Machine secrets go to OpenBao (kv-v2), not SOPS -- there's no
+#     workstation age key to decrypt with here.
+#   - Kubeconfig/talosconfig become K8s Secrets on controlplane (the
+#     composition's "connection secret" contract, spec 5.2 item 3), not
+#     local files.
+#   - VM creation itself (original script's step 5, `tofu apply`) is NOT
+#     here -- that already happened via provider-terraform before this Job
+#     runs. See docs/superpowers/specs/2026-07-26-m4-cluster-lifecycle-design.md.
+#
+# Idempotent: safe to re-run (same guarantee the original script makes).
+set -euo pipefail
+
+for var in CLUSTER_NAME TALOS_VERSION KUBERNETES_VERSION SCHEMATIC_JSON \
+  APISERVER_VIP ADDITIONAL_SANS INFRA_SUBNET NAT64_ULA NAT64_PREFIX \
+  POD_CIDR SVC_CIDR GUA_PREFIX NODES_JSON KUBECONFIG_SECRET_NAME \
+  KUBECONFIG_SECRET_NAMESPACE TALOSCONFIG_SECRET_NAME TALOSCONFIG_SECRET_NAMESPACE \
+  OPENBAO_ADDR OPENBAO_CACERT OPENBAO_KV_MOUNT OPENBAO_KV_PATH OPENBAO_K8S_AUTH_ROLE; do
+  [ -n "${!var:-}" ] || { echo "ERROR: required env var ${var} is not set" >&2; exit 1; }
+done
+TALOS_INSTALL_DISK="${TALOS_INSTALL_DISK:-/dev/vda}"
+WORK_DIR="$(mktemp -d)"
+trap 'rm -rf "${WORK_DIR}"' EXIT
+
+echo "==> Checking NAT64 path to the image factory ..."
+if ! curl -fsS --max-time 10 -o /dev/null https://factory.talos.dev/ 2>/dev/null; then
+  echo "ERROR: cannot reach factory.talos.dev via NAT64 (${NAT64_ULA})" >&2
+  exit 1
+fi
+echo "OK."
+
+echo "==> Authenticating to OpenBao (kubernetes auth, role ${OPENBAO_K8S_AUTH_ROLE}) ..."
+export BAO_ADDR="${OPENBAO_ADDR}"
+export BAO_CACERT="${OPENBAO_CACERT}"
+SA_JWT="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+BAO_TOKEN="$(bao write -field=token auth/kubernetes/login role="${OPENBAO_K8S_AUTH_ROLE}" jwt="${SA_JWT}")"
+export BAO_TOKEN
+echo "OK."
+
+echo "==> Computing image factory schematic ID ..."
+SCHEMATIC_ID="$(echo "${SCHEMATIC_JSON}" | curl -fsS -X POST --data-binary @- https://factory.talos.dev/schematics | jq -r '.id')"
+echo "schematic: ${SCHEMATIC_ID}"
+
+echo "==> Talos machine secrets (OpenBao) ..."
+SECRETS_PLAIN="${WORK_DIR}/secrets.yaml"
+if bao kv get -mount="${OPENBAO_KV_MOUNT}" -field=secrets.yaml "${OPENBAO_KV_PATH}" >"${SECRETS_PLAIN}" 2>/dev/null; then
+  echo "Existing machine secrets found in OpenBao."
+else
+  echo "Generating new machine secrets (first run) ..."
+  talosctl gen secrets -o "${SECRETS_PLAIN}"
+  bao kv put -mount="${OPENBAO_KV_MOUNT}" "${OPENBAO_KV_PATH}" "secrets.yaml=@${SECRETS_PLAIN}" >/dev/null
+  echo "Machine secrets written to OpenBao: ${OPENBAO_KV_MOUNT}/${OPENBAO_KV_PATH}"
+fi
+
+echo "==> Rendering machine configs ..."
+cat >"${WORK_DIR}/patch-all.yaml" <<EOF
+machine:
+  install:
+    disk: ${TALOS_INSTALL_DISK}
+    image: factory.talos.dev/installer/${SCHEMATIC_ID}:${TALOS_VERSION}
+  network:
+    nameservers:
+      - ${NAT64_ULA}
+  time:
+    servers:
+      - time.cloudflare.com
+  kubelet:
+    nodeIP:
+      validSubnets:
+        - ${INFRA_SUBNET}
+    extraMounts:
+      - destination: /etc/iscsi
+        type: bind
+        source: /etc/iscsi
+        options: [bind, rshared, rw]
+cluster:
+  network:
+    cni:
+      name: none
+    podSubnets:
+      - ${POD_CIDR}
+    serviceSubnets:
+      - ${SVC_CIDR}
+EOF
+
+cat >"${WORK_DIR}/patch-cp.yaml" <<EOF
+cluster:
+  etcd:
+    advertisedSubnets:
+      - ${INFRA_SUBNET}
+  apiServer:
+    # Same reasoning as controlplane (M3 step 10, docs/memory/m3-step-tracker.md):
+    # Pinniped's TokenCredentialRequest flow needs anonymous-auth open.
+    extraArgs:
+      anonymous-auth: "true"
+EOF
+
+talosctl gen config "${CLUSTER_NAME}" "https://[${APISERVER_VIP}]:6443" \
+  --with-secrets "${SECRETS_PLAIN}" \
+  --talos-version "${TALOS_VERSION}" \
+  --kubernetes-version "${KUBERNETES_VERSION}" \
+  --additional-sans "${ADDITIONAL_SANS}" \
+  --config-patch "@${WORK_DIR}/patch-all.yaml" \
+  --config-patch-control-plane "@${WORK_DIR}/patch-cp.yaml" \
+  --output-dir "${WORK_DIR}" \
+  --force
+
+for f in "${WORK_DIR}/controlplane.yaml" "${WORK_DIR}/worker.yaml"; do
+  yq ea -i 'select(.kind != "HostnameConfig")' "${f}"
+done
+
+node_names=()
+node_addrs=()
+node_macs=()
+render_node() {
+  local name="$1" ula="$2" role="$3" mac="$4" base vip_block=""
+  base="${WORK_DIR}/controlplane.yaml"
+  [ "${role}" = "worker" ] && base="${WORK_DIR}/worker.yaml"
+  if [ "${role}" = "controlplane" ]; then
+    vip_block="
+        vip:
+          ip: ${APISERVER_VIP}"
+  fi
+  cat >"${WORK_DIR}/patch-${name}.yaml" <<EOF
+machine:
+  network:
+    hostname: ${name}
+    interfaces:
+      - deviceSelector:
+          physical: true
+        dhcp: false
+        addresses:
+          - ${ula}/64
+        routes:
+          - network: ${NAT64_PREFIX}
+            gateway: ${NAT64_ULA}${vip_block}
+EOF
+  talosctl machineconfig patch "${base}" \
+    --patch "@${WORK_DIR}/patch-${name}.yaml" \
+    -o "${WORK_DIR}/${name}.yaml"
+  node_names+=("${name}")
+  node_addrs+=("${ula}")
+  node_macs+=("${mac}")
+}
+
+while IFS=$'\t' read -r name role ula mac; do
+  render_node "${name}" "${ula}" "${role}" "${mac}"
+done < <(echo "${NODES_JSON}" | jq -r 'to_entries[] | [.key, .value.role, .value.ula, .value.mac] | @tsv')
+echo "machine configs rendered for: ${node_names[*]}"
+
+echo "==> Applying configs in maintenance mode ..."
+# Same deterministic EUI-64 SLAAC derivation as create-controlplane-cluster.sh,
+# sourced from each node's MAC (already known from the Terraform module's
+# `nodes` output) instead of re-deriving it from the ULA.
+maintenance_addr() {
+  local mac="$1" octet
+  octet="${mac##*:}"
+  echo "${GUA_PREFIX}:5054:ff:feb3:a1${octet}"
+}
+
+for i in "${!node_names[@]}"; do
+  name="${node_names[$i]}"; ula="${node_addrs[$i]}"; mac="${node_macs[$i]}"
+  if talosctl --talosconfig "${WORK_DIR}/talosconfig" -n "${ula}" -e "${ula}" version >/dev/null 2>&1; then
+    echo "${name}: already configured at ${ula} — skipping"
+    continue
+  fi
+  addr="$(maintenance_addr "${mac}")"
+  echo "${name}: waiting for maintenance mode at ${addr} ..."
+  for attempt in $(seq 1 60); do
+    if talosctl apply-config --insecure --nodes "${addr}" --file "${WORK_DIR}/${name}.yaml" 2>/dev/null; then
+      echo "${name}: config applied — installing to disk"
+      break
+    fi
+    if talosctl --talosconfig "${WORK_DIR}/talosconfig" apply-config \
+        --nodes "${addr}" --endpoints "${addr}" --file "${WORK_DIR}/${name}.yaml" 2>/dev/null; then
+      echo "${name}: corrected config applied over TLS at ${addr}"
+      break
+    fi
+    [ "${attempt}" -eq 60 ] && { echo "ERROR: ${name} never reachable at ${addr}" >&2; exit 1; }
+    sleep 10
+  done
+done
+
+echo "==> Bootstrap + kubeconfig ..."
+CP_ADDRS="$(echo "${NODES_JSON}" | jq -r '[to_entries[] | select(.value.role == "controlplane") | .value.ula] | join(",")')"
+FIRST_CP="$(echo "${NODES_JSON}" | jq -r '[to_entries[] | select(.value.role == "controlplane")][0].value.ula')"
+
+talosctl --talosconfig "${WORK_DIR}/talosconfig" config endpoint ${CP_ADDRS//,/ }
+
+echo "Waiting for Talos API on ${FIRST_CP} (install + reboot takes a few minutes) ..."
+for attempt in $(seq 1 90); do
+  talosctl --talosconfig "${WORK_DIR}/talosconfig" -n "${FIRST_CP}" version >/dev/null 2>&1 && break
+  [ "${attempt}" -eq 90 ] && { echo "ERROR: Talos API never came up on ${FIRST_CP}" >&2; exit 1; }
+  sleep 10
+done
+
+BOOT_ARGS=(-n "${FIRST_CP}" -e "${FIRST_CP}" bootstrap)
+if [ -n "${RECOVER_FROM:-}" ]; then
+  [ -f "${RECOVER_FROM}" ] || { echo "ERROR: RECOVER_FROM snapshot not found: ${RECOVER_FROM}" >&2; exit 1; }
+  echo "Recovering etcd from snapshot: ${RECOVER_FROM}"
+  BOOT_ARGS+=(--recover-from="${RECOVER_FROM}")
+else
+  echo "Bootstrapping etcd ..."
+fi
+for attempt in $(seq 1 30); do
+  BOOT_OUT=$(talosctl --talosconfig "${WORK_DIR}/talosconfig" "${BOOT_ARGS[@]}" 2>&1) && { echo "etcd ${RECOVER_FROM:+recovery }bootstrap issued"; break; }
+  if echo "${BOOT_OUT}" | grep -qiE "AlreadyExists|etcd data directory is not empty"; then
+    echo "etcd already bootstrapped"
+    break
+  fi
+  [ "${attempt}" -eq 30 ] && { echo "ERROR: bootstrap never succeeded: ${BOOT_OUT}" >&2; exit 1; }
+  sleep 10
+done
+
+KUBECONFIG_OUT="${WORK_DIR}/kubeconfig"
+echo "Fetching kubeconfig (via apiserver VIP) ..."
+for attempt in $(seq 1 60); do
+  if talosctl --talosconfig "${WORK_DIR}/talosconfig" -n "${FIRST_CP}" kubeconfig "${KUBECONFIG_OUT}" --force >/dev/null 2>&1; then
+    break
+  fi
+  [ "${attempt}" -eq 60 ] && { echo "ERROR: could not fetch kubeconfig" >&2; exit 1; }
+  sleep 10
+done
+
+echo "==> Writing connection secrets to controlplane ..."
+kubectl create secret generic "${KUBECONFIG_SECRET_NAME}" \
+  --namespace "${KUBECONFIG_SECRET_NAMESPACE}" \
+  --from-file=kubeconfig="${KUBECONFIG_OUT}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic "${TALOSCONFIG_SECRET_NAME}" \
+  --namespace "${TALOSCONFIG_SECRET_NAMESPACE}" \
+  --from-file=talosconfig="${WORK_DIR}/talosconfig" \
+  --dry-run=client -o yaml | kubectl apply -f -
+echo "OK: ${KUBECONFIG_SECRET_NAMESPACE}/${KUBECONFIG_SECRET_NAME}, ${TALOSCONFIG_SECRET_NAMESPACE}/${TALOSCONFIG_SECRET_NAME}"
+
+echo "==> etcd status:"
+talosctl --talosconfig "${WORK_DIR}/talosconfig" -n "${CP_ADDRS}" etcd status || true
+
+echo
+echo "Cluster bootstrapped. Expected state: all Talos services healthy, nodes NotReady (CNI=none) until the baseline layer (M4 step 4) lands."

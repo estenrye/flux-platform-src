@@ -1,0 +1,61 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: provider-terraform-allow-egress
+  namespace: crossplane-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This policy addresses a pod that is dynamically created by the provider and cannot be referenced by a static analysis of the NetworkPolicy."
+spec:
+  podSelector:
+    matchLabels:
+      pkg.crossplane.io/provider: provider-terraform
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # libvirt over SSH to the KVM host inventory (currently one host --
+    # providers/kvm/hosts.yaml / network.yaml kvm_host.ula). Direct
+    # pod-to-external-host, not a Service, so no post-DNAT targetPort
+    # concern (docs/memory/calico-networkpolicy-dnat.md) -- destination
+    # port is the real dialed port.
+    - to:
+        - ipBlock:
+            cidr: fd97:45c2:b3a1:100::2000/128
+      ports:
+        - protocol: TCP
+          port: 22
+    # Terraform provider registry (releases for dmacvicar/libvirt) and any
+    # git-sourced Workspace module -- external, not expressible as a
+    # namespaceSelector. Same bare-443 pattern used by provider-kubernetes/
+    # provider-aws-route53 for their own external reachability.
+    - ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: provider-terraform-allow-ingress
+  namespace: crossplane-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This policy addresses a pod that is dynamically created by the provider and cannot be referenced by a static analysis of the NetworkPolicy."
+spec:
+  podSelector:
+    matchLabels:
+      pkg.crossplane.io/provider: provider-terraform
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: webhook
+          protocol: TCP
+        - port: metrics
+          protocol: TCP

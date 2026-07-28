@@ -1,0 +1,45 @@
+# Shared by every Workspace that doesn't override providerConfigRef.
+#
+# KNOWN LIMITATION (single-host fleet, docs/memory/m4-design.md D1): the
+# libvirt provider's `uri` below is hardcoded to the one KVM host that
+# exists today. Every Workspace using this ProviderConfig therefore
+# provisions onto that same host, regardless of claim. When a second host
+# is added, this needs to become host-aware per-Workspace (either multiple
+# ProviderConfigs, one per host, selected per claim, or moving host
+# selection into the module itself) -- not solved in M4 step 1.
+#
+# Credential file (`kvm-ssh-key`): the `automation-user` SSH private key
+# used interactively via ssh-agent from a workstation today has no
+# unattended equivalent -- this is a *new* dedicated key, minted by
+# .bin/bootstrap-provider-terraform-kvm-key.sh (M4 step 1) and stored in
+# OpenBao, synced here via ESO (see
+# clusters/controlplane/resources/eso.cluster-secret-store.openbao-provider-terraform.yaml
+# and eso.external-secret.provider-terraform-kvm-ssh-key.yaml). Two
+# follow-ups noted in the design doc (D4), not resolved here: whether
+# provider-terraform writes this file at a mode SSH's client will accept
+# (0600), and `no_verify=1` skipping the SSH host-key check.
+#
+# NO `terraform { backend "kubernetes" {...} }` block here, deliberately.
+# `configuration` is static HCL shared by every Workspace using this
+# ProviderConfig (every cluster, until we have a reason to split), so a
+# single hardcoded `secret_suffix` here would make every Workspace's state
+# collide on the same Kubernetes Secret name. Each cluster's own Workspace
+# (M4 step 3, one per claim) must declare its own backend block with a
+# secret_suffix derived from the claim (e.g. the cluster name) inside its
+# own module content instead.
+apiVersion: tf.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  credentials:
+    - filename: kvm-ssh-key
+      source: Secret
+      secretRef:
+        namespace: crossplane-system
+        name: provider-terraform-kvm-ssh-key
+        key: id_ed25519
+  configuration: |
+    provider "libvirt" {
+      uri = "qemu+ssh://automation-user@mf-ms-a2-01.usmnblm01.rye.ninja/system?keyfile=kvm-ssh-key&no_verify=1"
+    }

@@ -1,0 +1,13 @@
+# Scoped to what the Terraform `kubernetes` state backend actually needs
+# (create/read/update its own state Secret, one per Workspace, in this
+# namespace) -- not cluster-admin. See docs/memory/m4-design.md D4 for why
+# this backend is required at all (state is not persisted automatically).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: provider-terraform-state-backend
+  namespace: crossplane-system
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

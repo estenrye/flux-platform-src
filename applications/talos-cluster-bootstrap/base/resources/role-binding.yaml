@@ -1,0 +1,16 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: talos-cluster-bootstrap
+  namespace: crossplane-system
+  annotations:
+    ignore-check.kube-linter.io/access-to-secrets: "The bootstrap Job writes one kubeconfig/talosconfig Secret per claimed cluster (M4 step 3); names aren't known in advance to scope via resourceNames, same reasoning as provider-terraform-state-backend."
+    checkov.io/skip1: "CKV2_K8S_5=Same reason as the kube-linter annotation above -- future claimed clusters' Secret names can't be enumerated ahead of time."
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: talos-cluster-bootstrap
+subjects:
+  - kind: ServiceAccount
+    name: talos-cluster-bootstrap
+    namespace: crossplane-system

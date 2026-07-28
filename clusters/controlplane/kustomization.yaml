@@ -118,6 +118,11 @@ resources:
   # above — see docs/memory/m3-step6-secret-migration-eligibility.md.
   - resources/eso.cluster-secret-store.openbao-cert-manager.yaml
   - resources/eso.external-secret.cloudflare-api-token.yaml
+  # M4 step 1: provider-terraform's KVM SSH key, same per-consumer
+  # ClusterSecretStore pattern as cert-manager above. Policy/role/kv data
+  # configured by .bin/bootstrap-provider-terraform-kvm-key.sh.
+  - resources/eso.cluster-secret-store.openbao-provider-terraform.yaml
+  - resources/eso.external-secret.provider-terraform-kvm-ssh-key.yaml
   # Public DNS (M2 §4.5): publishes ca.rye.ninja's AAAA into the
   # Cloudflare-hosted rye.ninja zone. Separate from
   # eso.external-secret.cloudflare.yaml above, which feeds Crossplane's

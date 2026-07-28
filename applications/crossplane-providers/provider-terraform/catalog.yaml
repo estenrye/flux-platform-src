@@ -1,0 +1,32 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-provider-terraform
+  description: |-
+    This component installs the Crossplane Terraform provider, which lets a
+    Composition run an existing Terraform/OpenTofu module as a managed
+    resource. Used starting M4 to provision Talos-on-KVM cluster VMs (the
+    talos-kvm substrate composition) by driving the dmacvicar/libvirt
+    provider through the generalized providers/kvm/modules/talos-cluster
+    module -- see docs/superpowers/specs/2026-07-26-m4-cluster-lifecycle-design.md.
+  tags:
+    - crossplane
+    - crossplane-provider
+    - terraform
+    - kvm
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://marketplace.upbound.io/providers/crossplane-contrib/provider-terraform
+      title: Crossplane provider for Terraform
+      icon: docs
+      type: documentation
+    - url: https://github.com/crossplane-contrib/provider-terraform
+      title: GitHub repository for the Crossplane provider for Terraform
+      icon: github
+      type: source
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

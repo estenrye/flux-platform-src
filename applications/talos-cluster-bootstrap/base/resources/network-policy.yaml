@@ -1,0 +1,77 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: talos-cluster-bootstrap-allow-egress
+  namespace: crossplane-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This policy addresses Job pods the cluster-talos-kvm Composition creates dynamically (M4 step 3, one per claim) and cannot be referenced by a static analysis of the NetworkPolicy -- no such Job exists until a KubernetesCluster claim is created."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: talos-cluster-bootstrap
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # controlplane's own apiserver, to write the kubeconfig/talosconfig
+    # connection Secrets -- Calico evaluates egress post-DNAT, Talos serves
+    # the apiserver on 6443 (docs/memory/calico-networkpolicy-dnat.md), same
+    # pattern as provider-kubernetes/provider-aws-route53.
+    - ports:
+        - protocol: TCP
+          port: 6443
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+      ports:
+        - protocol: TCP
+          port: 443
+    # OpenBao (machine secrets kv-v2 + kubernetes-auth login).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openbao
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: openbao
+      ports:
+        - protocol: TCP
+          port: 8200
+    # Talos image factory (schematic ID lookup, ISO — reached through the
+    # NAT64 appliance like every other external HTTPS egress in this repo).
+    - ports:
+        - protocol: TCP
+          port: 443
+    # talosctl -> the claimed cluster's own nodes (apid gRPC, port 50000).
+    # Destination addresses vary per claim (every future cluster's node
+    # ULAs/maintenance-mode GUAs), so this can't be scoped to a specific
+    # ipBlock the way provider-terraform's KVM-host SSH rule is -- it's
+    # inherently "any destination on this port," same class of rule as the
+    # bare-443 external-reachability rules elsewhere in this file.
+    - ports:
+        - protocol: TCP
+          port: 50000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: talos-cluster-bootstrap-allow-ingress
+  namespace: crossplane-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This policy addresses Job pods the cluster-talos-kvm Composition creates dynamically (M4 step 3, one per claim) and cannot be referenced by a static analysis of the NetworkPolicy -- no such Job exists until a KubernetesCluster claim is created."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: talos-cluster-bootstrap
+  policyTypes:
+    - Ingress
+  ingress: []

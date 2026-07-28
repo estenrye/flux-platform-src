@@ -1,0 +1,28 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: talos-cluster-bootstrap
+  description: |-
+    Talos-bootstrap tooling image for M4's claim-managed Talos-on-KVM
+    clusters — bundles talosctl, kubectl, bao, jq, and yq. Run as a
+    Kubernetes Job by the cluster-talos-kvm Composition (M4 step 3) after
+    provider-terraform creates a claim's VMs: generates/reads Talos machine
+    secrets from OpenBao, renders and applies machine configs, bootstraps
+    etcd, and writes kubeconfig/talosconfig as Secrets on controlplane. A
+    close port of .bin/create-controlplane-cluster.sh's imperative half,
+    parameterized for unattended execution instead of a workstation run.
+  tags:
+    - crossplane
+    - talos
+    - kvm
+    - platform
+    - infrastructure
+  links:
+    - url: https://www.talos.dev/latest/reference/cli/
+      title: talosctl reference
+      icon: docs
+      type: documentation
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

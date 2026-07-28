@@ -1,0 +1,13 @@
+# Scoped to what the bootstrap Job actually writes: one kubeconfig +
+# talosconfig Secret per claimed cluster (M4 step 3 names them
+# "<cluster-name>-kubeconfig"/"<cluster-name>-talosconfig"), names not
+# knowable in advance since future clusters aren't enumerable here.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: talos-cluster-bootstrap
+  namespace: crossplane-system
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "update", "patch"]
