@@ -1,6 +1,6 @@
 ---
 name: m4-step-tracker
-description: M4 step tracker — step 1 verified done 2026-07-28 (OpenBao kv round-trip confirmed by the user); step 2 (Talos-bootstrap Job image + script) shipped same day, not yet live-tested
+description: M4 step tracker — steps 1-2 merged to main 2026-07-29 (PR estenrye/flux-platform-src#131 + rendered PR estenrye/flux-platform-rendered-controlplane#117), pending Flux reconcile on controlplane
 metadata:
   type: project
 ---
@@ -8,12 +8,12 @@ metadata:
 Tracks [[m4-design]]'s 8-step execution order. Update as steps complete —
 this decays fast, keep it current rather than trusting it blindly.
 
-## Status as of 2026-07-28
+## Status as of 2026-07-29
 
 | # | Step | Status |
 |---|---|---|
-| 1 | provider-terraform install + generalized `talos-cluster` tofu module + `crossplane-kvm-hosts` EnvironmentConfig | **Done** — bootstrap script run by the user, OpenBao `kv get` on `provider-terraform/kvm-ssh-key` confirmed working |
-| 2 | Talos-bootstrap Job image + script (OpenBao for secrets) | Shipped; OpenBao policy/role live-configured 2026-07-28; ServiceAccount/Job/manifests still unmerged, no real cluster bootstrap attempted |
+| 1 | provider-terraform install + generalized `talos-cluster` tofu module + `crossplane-kvm-hosts` EnvironmentConfig | **Done, merged to main** — bootstrap script run by the user, OpenBao `kv get` on `provider-terraform/kvm-ssh-key` confirmed working; package reference corrected to `xpkg.upbound.io/upbound/provider-terraform:v1.1.6` |
+| 2 | Talos-bootstrap Job image + script (OpenBao for secrets) | **Shipped, merged to main**; OpenBao policy/role live-configured 2026-07-28; image built+pushed to GHCR via CI; no real cluster bootstrap attempted yet (no Job template — that's step 3) |
 | 3 | `XKubernetesCluster` XRD + `cluster-talos-kvm` Composition | Not started |
 | 4 | `clusters/observability/` baseline layer | Not started |
 | 5 | `observability` claim instance — first end-to-end provision | Not started |
@@ -179,3 +179,17 @@ that the whole chain works. That last link (the actual ServiceAccount +
 a real `bao write auth/kubernetes/login` from a pod using it) can't be
 checked until the `talos-cluster-bootstrap` app + `provider-terraform`
 merge and Flux applies them.
+
+### Merged to main — 2026-07-29
+
+Source PR `estenrye/flux-platform-src#131` and rendered PR
+`estenrye/flux-platform-rendered-controlplane#117` both merged at the
+user's explicit direction, after all CI checks (render, lint, checkov,
+trust-domain, the `talos-cluster-bootstrap` image build, and the
+rendered-repo push) were green. `controlplane`'s Flux will pick this up
+on its normal reconcile — first real live installation of
+`provider-terraform` and the `talos-cluster-bootstrap` identity on the
+fleet. Not yet independently verified post-merge (e.g. `kubectl get
+provider provider-terraform` showing `Healthy`, or a real `bao write
+auth/kubernetes/login` from that ServiceAccount succeeding) — worth
+checking before step 3 assumes either is actually working.
