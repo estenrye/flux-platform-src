@@ -32,6 +32,19 @@ spec:
       ports:
         - protocol: TCP
           port: 22
+    # controlplane's own apiserver -- provider-terraform's SafeStart
+    # precheck does an RBAC self-check against the apiserver on startup
+    # (CustomResourceDefinitions get/list/watch), independent of anything
+    # a Workspace does. Calico evaluates egress post-DNAT, Talos serves
+    # the apiserver on 6443 (docs/memory/calico-networkpolicy-dnat.md).
+    # REAL BUG, caught live 2026-07-29: this rule was missing from the
+    # initial M4 step 1 PR despite the comment below correctly describing
+    # the pattern -- the pod crash-looped with a bare TCP dial timeout to
+    # kubernetes.default.svc:443 until this was added. Same pattern as
+    # provider-kubernetes/provider-aws-route53.
+    - ports:
+        - protocol: TCP
+          port: 6443
     # Terraform provider registry (releases for dmacvicar/libvirt) and any
     # git-sourced Workspace module -- external, not expressible as a
     # namespaceSelector. Same bare-443 pattern used by provider-kubernetes/
