@@ -1,0 +1,16 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: provider-terraform-state-backend
+  namespace: crossplane-system
+  annotations:
+    ignore-check.kube-linter.io/access-to-secrets: "The Terraform kubernetes state backend creates one Secret per Workspace, named by a caller-chosen secret_suffix at reconcile time -- resourceNames can't enumerate them in advance the way step-ca-cert-reader (a single fixed secret) does."
+    checkov.io/skip1: "CKV2_K8S_5=Same reason as the kube-linter annotation above: each M4 Workspace (one per claimed cluster, M4 step 3) picks its own secret_suffix for the Terraform kubernetes state backend, so the state Secret names aren't knowable in advance to scope via resourceNames."
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: provider-terraform-state-backend
+subjects:
+  - kind: ServiceAccount
+    name: provider-terraform
+    namespace: crossplane-system

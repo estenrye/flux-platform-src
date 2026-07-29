@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - resources/provider.yaml
+  - resources/network-policy.yaml
+  - resources/provider-runtime-config.yaml
+  - resources/role.yaml
+  - resources/role-binding.yaml
+  # provider-config.yaml deliberately not included here — it's applied by
+  # the crossplane-resources Flux Kustomization instead, gated on this
+  # provider being Healthy (docs/memory/crossplane-bootstrap-phasing.md).

@@ -1,0 +1,21 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: talos-cluster-bootstrap
+  description: |-
+    ServiceAccount/RBAC/NetworkPolicy identity for the M4 Talos-bootstrap
+    Job. Pre-provisioned on controlplane (fixed name, so OpenBao's
+    kubernetes-auth role can be configured ahead of any claim existing)
+    the same way provider-terraform's own identity is. The Job itself is
+    created by the cluster-talos-kvm Composition (M4 step 3) using the
+    talos-cluster-bootstrap image (images/docker/talos-cluster-bootstrap).
+  tags:
+    - crossplane
+    - talos
+    - kvm
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

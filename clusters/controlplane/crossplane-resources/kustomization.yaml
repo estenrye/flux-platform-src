@@ -8,5 +8,8 @@ resources:
   - ../../../applications/crossplane-providers/provider-github/provider-config
   - ../../../applications/crossplane-providers/provider-kubernetes/provider-config
   - ../../../applications/crossplane-providers/family-cloudflare/provider-config
+  # M4 step 1.
+  - ../../../applications/crossplane-providers/provider-terraform/provider-config
   - crossplane.environment-config.yaml
+  - crossplane.environment-config.kvm-hosts.yaml
   - delegated-hosted-zone-aws.controlplane-rye-ninja.yaml

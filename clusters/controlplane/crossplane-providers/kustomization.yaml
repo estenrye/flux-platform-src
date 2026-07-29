@@ -11,6 +11,15 @@ resources:
   - ../../../applications/crossplane-providers/provider-cloudflare-zone
   - ../../../applications/crossplane-providers/provider-github
   - ../../../applications/crossplane-providers/provider-kubernetes
+  # M4 step 1: drives the dmacvicar/libvirt provider for talos-kvm cluster
+  # VM provisioning — see docs/superpowers/specs/
+  # 2026-07-26-m4-cluster-lifecycle-design.md.
+  - ../../../applications/crossplane-providers/provider-terraform
+  # M4 step 2: fixed ServiceAccount/RBAC/NetworkPolicy identity for the
+  # Talos-bootstrap Job the cluster-talos-kvm Composition creates (step 3).
+  # Not itself a Crossplane provider, but needs crossplane-system to exist
+  # first, same ordering requirement as everything else in this file.
+  - ../../../applications/talos-cluster-bootstrap/base
   - ../../../applications/crossplane-functions/function-environment-configs
   - ../../../applications/crossplane-functions/function-go-templating
   - ../../../applications/crossplane-functions/function-auto-ready

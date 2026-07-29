@@ -1,0 +1,26 @@
+# M4 step 1: KVM host inventory shared across every claim-managed
+# talos-kvm cluster, so the fleet's host list lives in one place instead of
+# each cluster's Workspace hardcoding it. Same shape as
+# providers/kvm/hosts.yaml (that file stays the source of truth for the
+# script-bootstrapped `controlplane` cluster; this EnvironmentConfig is the
+# analogous source for anything provisioned via the `cluster-talos-kvm`
+# Composition, M4 step 3, which resolves this into
+# providers/kvm/modules/talos-cluster's `hosts` variable).
+#
+# Only one host today (docs/memory/m4-design.md D1) — list-shaped so a
+# second host slots in without redesign, same precedent as hosts.yaml
+# itself.
+apiVersion: apiextensions.crossplane.io/v1beta1
+kind: EnvironmentConfig
+metadata:
+  name: platform-kvm-hosts
+data:
+  hosts:
+    - name: mf-ms-a2-01
+      fqdn: mf-ms-a2-01.usmnblm01.rye.ninja
+      libvirtUri: qemu+ssh://automation-user@mf-ms-a2-01.usmnblm01.rye.ninja/system
+      bridge: br0
+      # Pre-existing libvirt storage pool (type zfs) for VM system-disk
+      # zvols, created by providers/kvm/scripts/prep-kvm-host.sh — shared
+      # by every cluster's VMs on this host, not per-cluster.
+      vmPool: vms

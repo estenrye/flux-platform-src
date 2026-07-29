@@ -1,0 +1,21 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-provider-terraform-config
+  description: |-
+    ProviderConfig for the Crossplane Terraform provider, split into its
+    own directory so it can be applied by the crossplane-resources Flux
+    Kustomization once the provider itself is Healthy (docs/memory/
+    crossplane-bootstrap-phasing.md). Supplies the libvirt provider block,
+    the KVM SSH credential, and the Terraform state backend every Workspace
+    using this ProviderConfig inherits.
+  tags:
+    - crossplane
+    - crossplane-provider
+    - terraform
+    - kvm
+spec:
+  type: operator
+  lifecycle: production
+  owner: platform-engineering
+  subcomponentOf: crossplane-provider-terraform

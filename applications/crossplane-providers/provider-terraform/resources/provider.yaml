@@ -1,0 +1,16 @@
+# Corrected 2026-07-29 at the user's direction: the xpkg.crossplane.io/
+# crossplane-contrib path guessed in M4 step 1 was never confirmed to
+# resolve (that registry returned 401 UNAUTHORIZED when probed
+# unauthenticated). xpkg.upbound.io/upbound/provider-terraform:v1.1.6 is
+# the correct, verified package -- confirmed reachable at
+# https://marketplace.upbound.io/providers/upbound/provider-terraform/v1.1.6
+# (200). See docs/memory/m4-design.md D4.
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-terraform
+spec:
+  package: xpkg.upbound.io/upbound/provider-terraform:v1.1.6
+  runtimeConfigRef:
+    name: provider-terraform
+    kind: DeploymentRuntimeConfig

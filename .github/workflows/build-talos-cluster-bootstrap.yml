@@ -1,0 +1,36 @@
+name: Build Image estenrye/talos-cluster-bootstrap
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'images/docker/talos-cluster-bootstrap/**'
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'images/docker/talos-cluster-bootstrap/**'
+
+jobs:
+  call-workflow:
+    uses: estenrye/.github/.github/workflows/docker-multiarch-slsa-releaser.yml@main
+    permissions:
+      contents: read # for checking out the repository.
+      actions: read # for detecting the Github Actions environment.
+      id-token: write # for creating OIDC tokens for signing.
+      packages: write # for uploading attestations.
+    with:
+      push: true
+      image_name: talos-cluster-bootstrap
+      context: images/docker/talos-cluster-bootstrap
+      provenance_generation: false
+      private_repository: true
+      # Pre-existing bug in the shared reusable workflow: its `tag` input
+      # defaults to github.ref_name, which on a pull_request event is
+      # "<PR_NUMBER>/merge" -- the slash makes it an invalid Docker tag
+      # ("invalid reference format"). crossplane-extra-bin-init's own
+      # PR-triggered builds have hit this same failure (its two Renovate
+      # PR runs both failed identically) -- not something new here, just
+      # not worked around there. Scoped fix: an explicit, always-valid tag.
+      tag: ${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref_name }}
+    secrets:
+      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
