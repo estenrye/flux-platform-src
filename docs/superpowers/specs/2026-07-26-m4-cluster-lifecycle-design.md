@@ -145,14 +145,17 @@ silently break Step 3's Workspace:
   module (§7) must not use any HCL feature newer than 1.5.7, narrower than
   the `>= 1.8.0` OpenTofu the workstation-run `providers/kvm/controlplane`
   module requires today.
-- **Package reference unverified**: pinning
-  `xpkg.crossplane.io/crossplane-contrib/provider-terraform:v1.1.1` (latest
-  GitHub release, matching this repo's registry-host convention for every
-  other `crossplane-contrib/*` package already installed) — but the
-  registry endpoint returned `401 UNAUTHORIZED` rather than a listable tag
-  set when probed unauthenticated, so this exact path/tag combination is
-  **not yet confirmed to resolve**. Verify with `crossplane xpkg` or a live
-  `kubectl describe provider` before treating step 1 as mergeable.
+- **Package reference — CORRECTED 2026-07-29**: the original guess,
+  `xpkg.crossplane.io/crossplane-contrib/provider-terraform:v1.1.1`
+  (matching this repo's registry-host convention for every other
+  `crossplane-contrib/*` package), was never confirmed to resolve — that
+  registry returned `401 UNAUTHORIZED` rather than a listable tag set when
+  probed unauthenticated. Corrected at the user's direction to
+  `xpkg.upbound.io/upbound/provider-terraform:v1.1.6` — confirmed live
+  (`https://marketplace.upbound.io/providers/upbound/provider-terraform/v1.1.6`
+  returns `200`). Note this is the `upbound` org/registry, not
+  `crossplane-contrib` — a deliberate exception to this repo's usual
+  registry-host convention, not an oversight.
 
 ## 3. Composition style (inherited convention, not a new decision)
 

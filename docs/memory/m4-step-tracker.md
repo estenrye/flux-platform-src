@@ -69,10 +69,16 @@ actually reconciles. Same annotation pattern already established by
 (`ignore-check.kube-linter.io/access-to-secrets` +
 `checkov.io/skip1: "CKV2_K8S_5=..."`, both on the `RoleBinding`).
 
-**Still genuinely unverified**: the `provider-terraform` package reference
-(`xpkg.crossplane.io/crossplane-contrib/provider-terraform:v1.1.1`) — the
-registry returned `401` unauthenticated, so tag existence wasn't confirmed
-the way M3 verified image tags directly. The `authorized_keys` entry on
+**RESOLVED 2026-07-29**: the `provider-terraform` package reference was
+corrected at the user's direction to
+`xpkg.upbound.io/upbound/provider-terraform:v1.1.6` (the original
+`xpkg.crossplane.io/crossplane-contrib/...:v1.1.1` guess was never
+confirmed to resolve — that registry returned `401` unauthenticated).
+Confirmed live: `https://marketplace.upbound.io/providers/upbound/provider-terraform/v1.1.6`
+returns `200`. Note the registry/org is `upbound`, not `crossplane-contrib`
+— a deliberate exception to this repo's usual registry-host convention.
+
+**Still genuinely unverified**: the `authorized_keys` entry on
 `mf-ms-a2-01` wasn't independently re-checked (only the OpenBao side was
 confirmed) — low risk, same script writes both atomically, but worth a
 glance before step 3 tries to actually use the key.
