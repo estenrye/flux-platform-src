@@ -1,6 +1,6 @@
 ---
 name: m4-step-tracker
-description: M4 step tracker — steps 1-2 merged to main 2026-07-29 (PR estenrye/flux-platform-src#131 + rendered PR estenrye/flux-platform-rendered-controlplane#117), pending Flux reconcile on controlplane
+description: M4 step tracker — steps 1-2 merged and live-verified (incl. a post-merge NetworkPolicy fix); step 3 (XRD + Composition, narrowed to core provisioning) shipped 2026-07-30, not yet applied live
 metadata:
   type: project
 ---
@@ -8,13 +8,13 @@ metadata:
 Tracks [[m4-design]]'s 8-step execution order. Update as steps complete —
 this decays fast, keep it current rather than trusting it blindly.
 
-## Status as of 2026-07-29
+## Status as of 2026-07-30
 
 | # | Step | Status |
 |---|---|---|
-| 1 | provider-terraform install + generalized `talos-cluster` tofu module + `crossplane-kvm-hosts` EnvironmentConfig | **Done, merged to main** — bootstrap script run by the user, OpenBao `kv get` on `provider-terraform/kvm-ssh-key` confirmed working; package reference corrected to `xpkg.upbound.io/upbound/provider-terraform:v1.1.6` |
-| 2 | Talos-bootstrap Job image + script (OpenBao for secrets) | **Shipped, merged to main**; OpenBao policy/role live-configured 2026-07-28; image built+pushed to GHCR via CI; no real cluster bootstrap attempted yet (no Job template — that's step 3) |
-| 3 | `XKubernetesCluster` XRD + `cluster-talos-kvm` Composition | Not started |
+| 1 | provider-terraform install + generalized `talos-cluster` tofu module + `crossplane-kvm-hosts` EnvironmentConfig | **Done, merged to main** — bootstrap script run by the user, OpenBao `kv get` on `provider-terraform/kvm-ssh-key` confirmed working; package reference corrected to `xpkg.upbound.io/upbound/provider-terraform:v1.1.6`; a live NetworkPolicy crash-loop bug found and fixed post-merge (PR #133) — `provider-terraform` confirmed `Running`/`Healthy=True` |
+| 2 | Talos-bootstrap Job image + script (OpenBao for secrets) | **Shipped, merged to main**; OpenBao policy/role live-configured; image built+pushed to GHCR via CI; no real cluster bootstrap attempted yet (no Job template existed until step 3) |
+| 3 | `XKubernetesCluster` XRD + `cluster-talos-kvm` Composition (core provisioning; Flux-push/GitHub-automation/JWKS-mirror split out to 3b/3c) | **Shipped 2026-07-30, not yet applied live** — `make render`/kube-linter/checkov/trust-domain all clean; embedded Terraform module independently validated; several Crossplane/provider API details used are unverified against a live reconcile (see detail below) |
 | 4 | `clusters/observability/` baseline layer | Not started |
 | 5 | `observability` claim instance — first end-to-end provision | Not started |
 | 6 | Chainsaw deletion/teardown test; Usage guards | Not started |
@@ -193,3 +193,149 @@ fleet. Not yet independently verified post-merge (e.g. `kubectl get
 provider provider-terraform` showing `Healthy`, or a real `bao write
 auth/kubernetes/login` from that ServiceAccount succeeding) — worth
 checking before step 3 assumes either is actually working.
+
+### Post-merge live verification found a real bug — RESOLVED 2026-07-29
+
+Checking the above turned up a genuine problem: `provider-terraform`'s pod
+was crash-looping (`0/1 Error`, 5+ restarts) — `kubectl logs` showed
+`SafeStart precheck failed: unable to perform RBAC check ... dial tcp
+[fd97:45c2:b3a1:2000::1]:443: i/o timeout` (the provider does an RBAC
+self-check against the apiserver on startup, independent of any
+Workspace). Root cause: the `provider-terraform` `NetworkPolicy` shipped
+in step 1 had a comment correctly describing the standard bare-port-6443
+apiserver egress rule (Calico evaluates post-DNAT, Talos serves the
+apiserver on 6443) but the rule itself was never actually written — only
+a separate external-443 rule existed. `talos-cluster-bootstrap`'s own
+NetworkPolicy had the correct rule; only `provider-terraform`'s was
+missing it. This is exactly the class of bug the design doc's own
+verification section exists to catch, and it was only caught because the
+user asked "proceed [to step 3]" and a live-state check was done first
+instead of assuming the merged PRs meant the pods actually worked.
+
+Fixed in `estenrye/flux-platform-src#133` + rendered
+`estenrye/flux-platform-rendered-controlplane#118`, merged same day.
+Verified end-to-end live: `flux-platform-rendered`'s `GitRepository`
+picked up the new revision (~90s after merge, 1m poll interval),
+`crossplane-providers` Kustomization applied it, and after a manual
+`kubectl delete pod` to force a restart with the new policy, the pod came
+up `1/1 Running`, `0` restarts, and `kubectl get providers.pkg.crossplane.io
+provider-terraform` shows `Healthy=True`/`Installed=True`.
+
+**Still not verified**: a real `bao write auth/kubernetes/login` from the
+`talos-cluster-bootstrap` ServiceAccount (no Job has run yet to exercise
+that path — the Job template itself is step 3).
+
+### Step 3 detail — shipped 2026-07-30, not yet applied live
+
+**Scope narrowed at the user's direction** before any code was written,
+same "narrow first" reasoning as steps 1-2 (confirmed via `AskUserQuestion`):
+this step gets a claim from nothing to a running, reachable Talos cluster
+with DNS/trust-domain registered and a kubeconfig Secret on `controlplane`.
+Pushing Flux onto the *new* cluster, GitHub rendered-repo/deploy-key
+automation, and the public JWKS/OIDC mirror are split out to steps 3b/3c —
+see [[m4-design]]'s execution-order section for the full breakdown and the
+ADR-14 automatability research behind it.
+
+**What shipped**: `applications/crossplane-resources/xkubernetescluster/`
+(XRD + `cluster-talos-kvm` Composition + catalog/kustomization/README/
+examples, mirroring `delegated-hosted-zone-aws`'s exact structure and
+Pipeline-mode Go-templating style); a `platform-kvm-network`
+`EnvironmentConfig` (hand-curated per-cluster network allocation, empty
+until step 5 populates a real `observability` entry); changes to
+`providers/kvm/modules/talos-cluster` (new `data.tf` computing the
+Talos-factory schematic ID internally instead of taking it as a
+caller-supplied input) and `images/docker/talos-cluster-bootstrap/
+bootstrap.sh` (takes the now-single-sourced `SCHEMATIC_ID` directly
+instead of recomputing it) — a real coordination gap found and fixed
+while *planning*, not discovered live: the VM-creation module and the
+bootstrap Job each independently computed a schematic ID that merely
+*happened* to agree because both hashed the same input; moving the
+computation into the module and threading its output through removes the
+duplication.
+
+**Independently validated, not just written and trusted**:
+- The embedded Terraform module text (the Composition's `Workspace` uses
+  `source: Inline` — see the "real risk avoided" note below — so the
+  actual HCL a reconcile would run is a literal string inside
+  `composition.yaml`, not a file `tofu` would normally lint). Extracted
+  it into a scratch directory (sibling `../talos-vm` copied alongside),
+  ran `tofu init`/`validate` (clean) and a real `tofu plan` against
+  `factory.talos.dev` with representative `tfvars` — produced the exact
+  same schematic ID, ISO URL, and node MAC/ULA output as the real
+  `providers/kvm/modules/talos-cluster` module's own equivalent test.
+  Caught and fixed two real HCL syntax bugs this way (see below) that
+  `make render`/kube-linter would never have caught, since kustomize
+  treats the whole embedded HCL as an opaque string.
+- **Real bugs caught by this validation, not by inspection**: six
+  `variable "x" { type = number, default = N }`-style declarations used
+  invalid single-line HCL block syntax (a block body's attributes must be
+  newline-separated, not comma-separated — comma-separated is only valid
+  inside an *object-constructor expression* like `{ source = "x", version
+  = "y" }` used as a value, which is a different grammar rule and is why
+  the adjacent `required_providers { libvirt = {...} }` block's inline
+  object syntax was fine while these weren't). `tofu init`/`validate`
+  failed with a specific, correct error pointing at each one; fixed by
+  splitting to multi-line blocks.
+- `make render` + `kube-linter` + `checkov` + `lint-trust-domain` all
+  clean across the whole repo, confirming the ~700-line `composition.yaml`
+  (a Go-template's source lives inside a YAML string field, so this only
+  validates the *outer* YAML structure, not the template's runtime
+  semantics — see below) parses and integrates correctly.
+
+**Real risk identified and deliberately avoided, not just noted**:
+`provider-terraform`'s `Workspace` supports `source: Remote` (git-sourced
+modules) or `source: Inline` (literal HCL text). `Remote` would let the
+Workspace reference `providers/kvm/modules/talos-cluster` directly from
+this repo instead of duplicating it — but `flux-platform-src` is private,
+so `Remote` needs its own git-clone credential wired into
+`provider-terraform`'s container, and exactly how/where `go-getter` picks
+that up for a private clone was unverified. Chose `Inline` (embed the
+module's current `.tf` content directly) to avoid stacking one more
+unproven dependency on top of everything else this step already
+introduces. **Accepted, documented tradeoff**: the embedded copy can
+drift from the real module if one is edited without the other — flagged
+both in `composition.yaml`'s own comments and in
+[[m4-design]]/the design doc, not silently accepted.
+
+**Known gap, not solved in this step, flagged prominently (not just in a
+code comment)**: the `Workspace` has no Terraform state backend
+configured anywhere — not in the embedded module, not in the shared
+`provider-terraform` `ProviderConfig` (which deliberately has none either,
+per step 1's D4 correction: a shared backend config would make every
+cluster's Workspace collide on one state Secret). Each Workspace needs
+its *own* uniquely-suffixed `terraform { backend "kubernetes" {...} } }`
+block, and there's currently no clean way to inject that per-Workspace
+without either (a) baking a `secret_suffix` templated from the cluster
+name directly into the embedded module text (straightforward, just not
+done yet), or (b) some other mechanism. **This means: as shipped, a real
+claim's Terraform state would not durably persist across a
+`provider-terraform` pod restart.** Needs to be fixed before step 5
+creates a real claim, not treated as a step-5 surprise.
+
+**Explicitly unverified against a live reconcile (no claim exists yet —
+that's step 5), each documented at its point of use**:
+- `provider-kubernetes`'s `Object` resource `apiVersion`
+  (`kubernetes.crossplane.io/v1alpha2`, inferred from
+  `crossplane-contrib/provider-kubernetes` source during research, not
+  observed live).
+- The exact field name for a CEL query under `readiness.policy:
+  DeriveFromCelQuery` (`celQuery`, inferred from the enum's own naming
+  convention).
+- `function-go-templating`'s Sprig function availability beyond `list`/
+  `default` (already confirmed in use by `delegated-hosted-zone-aws`) —
+  `dict`, `toJson`, `append`, `mul`, `quote` are assumed available (Sprig
+  is a large, standard, near-universally-bundled Go-template function
+  library, and `list`/`default` being present is reasonably strong
+  evidence the rest of Sprig is too) but not independently confirmed.
+- Whether `Workspace.spec.forProvider.varmap` accepts arbitrarily nested
+  JSON (lists of objects, maps) the way the `hosts`/`control_plane_node_ulas`
+  values here need — confirmed from the upstream README's description,
+  not from a live apply.
+
+**Not done in this step, deliberately**: no `KubernetesCluster`/
+`XKubernetesCluster` claim was created — no VM, no Job run, no live
+cluster. The XRD + Composition are themselves safe to apply live (they
+only register a CRD and a Composition; nothing reconciles until a claim
+exists) but weren't applied in this session — flagged for the user's
+go-ahead before merge, same diligence as every prior provider/CRD
+install in this milestone.

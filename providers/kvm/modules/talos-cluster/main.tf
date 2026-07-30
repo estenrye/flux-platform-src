@@ -28,7 +28,7 @@ resource "libvirt_pool" "images" {
 # VM boots disk-first with this ISO as fallback: an empty disk falls
 # through to maintenance mode, an installed disk boots Talos directly.
 resource "libvirt_volume" "talos_iso" {
-  name   = "talos-${var.talos_version}-${var.schematic_id}.iso"
+  name   = "talos-${var.talos_version}-${local.schematic_id}.iso"
   pool   = libvirt_pool.images.name
   source = local.iso_url
   format = "raw"

@@ -1,0 +1,30 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-xkubernetescluster
+  description: |-
+    XKubernetesCluster XRD + cluster-talos-kvm Composition -- the M4 fleet
+    abstraction. `kubectl apply` of one claim provisions a Talos-on-KVM
+    cluster: VMs via provider-terraform (the generalized
+    providers/kvm/modules/talos-cluster module), Talos bootstrap via a
+    composed Job (images/docker/talos-cluster-bootstrap), DNS delegation +
+    SPIFFE trust domain via a composed XDelegatedHostedZoneAWS claim, and a
+    kubeconfig/talosconfig connection secret on controlplane. Narrow scope
+    as of M4 step 3: does not yet push Flux onto the new cluster, register
+    a GitHub rendered repo, or expose a public JWKS/OIDC mirror -- see
+    docs/superpowers/specs/2026-07-26-m4-cluster-lifecycle-design.md.
+  tags:
+    - crossplane
+    - crossplane-resource
+    - talos
+    - kvm
+    - kubernetes
+  links:
+    - url: https://docs.crossplane.io/latest/concepts/compositions/
+      title: Crossplane Compositions
+      icon: docs
+      type: documentation
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

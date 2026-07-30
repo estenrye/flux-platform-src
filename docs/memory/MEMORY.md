@@ -33,4 +33,4 @@
 - [Urgency is the User's Call](feedback-urgency-is-users-call.md) — don't unilaterally label a finding "not urgent"; surface it and let the user decide priority
 - [M3 render-lint CI fix](m3-render-lint-ci-fix.md) — render-and-lint silently broken for all of M3 steps 1-4 (silent kustomize patch target-name mismatch); fixed in PR #100
 - [M4 Design](m4-design.md) — XKubernetesCluster XRD + talos-kvm composition; KVM capacity squeeze, Terraform-for-VMs + Job-for-bootstrap split, no separate claim kind
-- [M4 Step Tracker](m4-step-tracker.md) — step 1 done 2026-07-28 (verified live); step 2 (Talos-bootstrap Job image) shipped same day, not yet live-tested
+- [M4 Step Tracker](m4-step-tracker.md) — steps 1-2 merged and live-verified; step 3 (XRD + Composition, narrowed) shipped 2026-07-30, not yet applied live; state-backend gap flagged before step 5

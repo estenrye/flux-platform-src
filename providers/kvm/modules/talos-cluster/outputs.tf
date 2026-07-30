@@ -12,3 +12,8 @@ output "nodes" {
 output "talos_iso_url" {
   value = local.iso_url
 }
+
+output "schematic_id" {
+  description = "Computed once here (data.tf) -- the talos-cluster-bootstrap Job reads this instead of recomputing its own."
+  value       = local.schematic_id
+}
