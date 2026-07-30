@@ -3,7 +3,7 @@ locals {
   # variables.tf and docs/memory/m4-design.md D1.
   host = var.hosts[0]
 
-  iso_url = "https://factory.talos.dev/image/${var.schematic_id}/${var.talos_version}/metal-amd64.iso"
+  iso_url = "https://factory.talos.dev/image/${local.schematic_id}/${var.talos_version}/metal-amd64.iso"
 
   # MAC scheme "<mac_prefix>:<octet>" where <octet> is the ULA host part
   # (hex after "::") parsed as a byte -- same deterministic scheme as

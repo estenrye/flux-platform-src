@@ -1,0 +1,31 @@
+# M4 step 3: per-cluster network allocation for claim-managed talos-kvm
+# clusters, hand-curated like providers/kvm/network.yaml is for
+# `controlplane` -- no algorithmic derivation (docs/memory/m4-design.md).
+# `cluster-talos-kvm-composition` looks up `data.clusters["<claim name>"]`
+# and fails the claim with a readable ClaimConditions error if it's
+# missing, rather than guessing an allocation.
+#
+# Schema per cluster entry (documented here since there's no XRD-backed
+# schema for EnvironmentConfig data):
+#   apiserverVip:          ULA, e.g. "fd97:45c2:b3a1:200::10"
+#   infraSubnet:           ULA /64, e.g. "fd97:45c2:b3a1:200::/64"
+#   podCidr:                Calico pool /56, distinct from controlplane's
+#   serviceCidr:            kube service network /112, distinct from controlplane's
+#   bgpAsn:                 distinct from controlplane's 64513 -- this cluster's
+#                            own Calico BGP session with the gateway
+#   controlPlaneNodeUlas:   {"<name>": "<ULA>", ...} -- fully-qualified names,
+#                            e.g. "observability-cp-1" (matches
+#                            providers/kvm/network.yaml's convention, and
+#                            talos-cluster module's variable "hosts" doc)
+#   workerNodeUlas:         same shape, may be {}
+#
+# No entries populated yet -- M4 step 5 adds `observability` when that
+# claim is actually created. A NAT64 route (appliance ULA + translation
+# prefix) and BGP peering config on the UniFi gateway are also needed per
+# new subnet -- human prerequisites tracked at claim time, not here.
+apiVersion: apiextensions.crossplane.io/v1beta1
+kind: EnvironmentConfig
+metadata:
+  name: platform-kvm-network
+data:
+  clusters: {}

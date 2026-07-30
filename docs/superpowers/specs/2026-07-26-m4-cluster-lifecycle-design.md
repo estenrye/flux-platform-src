@@ -287,10 +287,32 @@ not needed for step 1's scaffolding.
    directly rather than inventing a new build/publish mechanism. See
    [[m4-step-tracker]] for the full detail, including two real bugs caught
    by actually building the image (not just reading the Dockerfile back).
-3. `XKubernetesCluster` XRD + `cluster-talos-kvm` Composition wiring 1–2
-   together, plus DNS delegation, connection secret, remote-cluster
-   `provider-kubernetes` `ProviderConfig`, Flux bootstrap push,
-   `service-account-issuer` + JWKS-mirror CronJob to Garage
+3. **Shipped 2026-07-29, narrowed and not yet live-tested** — originally
+   scoped as one step (XRD + Composition + DNS delegation + connection
+   secret + remote-cluster `provider-kubernetes` + Flux bootstrap push +
+   JWKS mirror). Split at the user's direction, same "narrow first"
+   reasoning as steps 1-2: **step 3** is core provisioning only —
+   `XKubernetesCluster` XRD + `cluster-talos-kvm` Composition, DNS
+   delegation (composes the existing `XDelegatedHostedZoneAWS` XRD as a
+   child resource), and the kubeconfig/talosconfig connection secret.
+   Deferred to separate follow-on steps:
+   - **3b** — Flux bootstrap push onto the *new* cluster. Needs a
+     genuinely new pattern (`provider-kubernetes` `ProviderConfig` with
+     `credentials.source: Secret`, pointed at a remote cluster — confirmed
+     via research to not exist anywhere in this repo yet) plus GitHub
+     rendered-repo/deploy-key automation (ADR-14 phases 3-4 — confirmed
+     mechanically automatable via the `provider-github` GitHub App
+     credential Crossplane already holds, including a real archived
+     precedent for a `DeployKey` resource,
+     `docs/migration/archive/crossplane/resources/github.deploykey.crossplane.yaml`
+     — not yet reintroduced live).
+   - **3c** — public JWKS/OIDC mirror (`service-account-issuer` +
+     mirror CronJob to Garage).
+   See [[m4-step-tracker]] for full step-3 detail, including real bugs
+   caught while planning (a schematic-ID coordination gap, fixed by moving
+   the computation into the Terraform module) and several items that
+   could not be verified against a live reconcile (no claim has been
+   created yet — that's step 5).
 4. `clusters/observability/` baseline layer
 5. `observability` `XKubernetesCluster` claim instance — first real
    end-to-end provision

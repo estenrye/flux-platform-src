@@ -12,4 +12,6 @@ resources:
   - ../../../applications/crossplane-providers/provider-terraform/provider-config
   - crossplane.environment-config.yaml
   - crossplane.environment-config.kvm-hosts.yaml
+  # M4 step 3.
+  - crossplane.environment-config.kvm-network.yaml
   - delegated-hosted-zone-aws.controlplane-rye-ninja.yaml

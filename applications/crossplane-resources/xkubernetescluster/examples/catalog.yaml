@@ -1,0 +1,24 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: xkubernetescluster-examples
+  description: |-
+    Example claim for the XKubernetesCluster / cluster-talos-kvm
+    Crossplane composition. Not wired into any live cluster's
+    kustomization tree -- documentation only. See ../README.md.
+  tags:
+    - crossplane
+    - crossplane-examples
+    - talos
+    - kvm
+    - examples
+    - documentation
+  links:
+    - url: ../README.md
+      title: xkubernetescluster documentation
+      icon: docs
+      type: documentation
+spec:
+  type: documentation
+  lifecycle: production
+  owner: platform-engineering

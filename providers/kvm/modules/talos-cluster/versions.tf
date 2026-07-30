@@ -12,5 +12,13 @@ terraform {
       # schema.
       version = "~> 0.8.0"
     }
+    # M4 step 3: computes the Talos factory schematic ID internally (see
+    # data.tf) instead of taking it as a caller-supplied input -- single
+    # source of truth shared with the talos-cluster-bootstrap Job, which
+    # reads this module's `schematic_id` output rather than recomputing it.
+    http = {
+      source  = "hashicorp/http"
+      version = "~> 3.4"
+    }
   }
 }

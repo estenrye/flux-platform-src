@@ -3,3 +3,5 @@ kind: Kustomization
 
 resources:
   - ../../../applications/crossplane-resources/delegated-hosted-zone-aws
+  # M4 step 3.
+  - ../../../applications/crossplane-resources/xkubernetescluster

@@ -1,0 +1,491 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: cluster-talos-kvm
+  labels:
+    substrate: talos-kvm
+spec:
+  compositeTypeRef:
+    apiVersion: platform.rye.ninja/v1alpha1
+    kind: XKubernetesCluster
+
+  mode: Pipeline
+  pipeline:
+  - step: environmentConfigs
+    functionRef:
+      name: function-environment-configs
+    input:
+      apiVersion: environmentconfigs.fn.crossplane.io/v1beta1
+      kind: Input
+      spec:
+        environmentConfigs:
+        - type: Reference
+          ref:
+            name: platform-kvm-hosts
+        - type: Reference
+          ref:
+            name: platform-kvm-network
+
+  - step: validate-network-allocation
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{ $name := .observed.composite.resource.metadata.name }}
+          {{ $environment := index .context "apiextensions.crossplane.io/environment" }}
+          {{ $networkConfig := "" }}
+          {{ if and $environment $environment.clusters }}
+            {{ $networkConfig = index $environment.clusters $name }}
+          {{ end }}
+          ---
+          apiVersion: meta.gotemplating.fn.crossplane.io/v1alpha1
+          kind: ClaimConditions
+          conditions:
+            - type: NetworkAllocationResolved
+              status: {{ if $networkConfig }}"True"{{ else }}"False"{{ end }}
+              reason: {{ if $networkConfig }}ResolvedNetworkAllocation{{ else }}MissingNetworkAllocation{{ end }}
+              message: {{ if $networkConfig }}"A network allocation was resolved for this claim."{{ else }}"No entry for this claim's name exists in the platform-kvm-network EnvironmentConfig's data.clusters map. Add one before this claim can provision (docs/superpowers/specs/2026-07-26-m4-cluster-lifecycle-design.md)."{{ end }}
+              target: CompositeAndClaim
+
+  - step: create-dns-delegation
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{ $name := .observed.composite.resource.metadata.name }}
+          {{ $namespace := .observed.composite.resource.metadata.namespace }}
+          {{ $subdomain := .observed.composite.resource.spec.subdomain }}
+          ---
+          apiVersion: dns.platform.rye.ninja/v1alpha1
+          kind: XDelegatedHostedZoneAWS
+          metadata:
+            name: {{ $name }}-rye-ninja
+            namespace: {{ $namespace }}
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: dns-delegation
+          spec:
+            subdomain: {{ $subdomain }}
+
+  - step: create-workspace
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{ $name := .observed.composite.resource.metadata.name }}
+          {{ $environment := index .context "apiextensions.crossplane.io/environment" }}
+          {{ $networkConfig := "" }}
+          {{ if and $environment $environment.clusters }}
+            {{ $networkConfig = index $environment.clusters $name }}
+          {{ end }}
+          {{ $talosVersion := .observed.composite.resource.spec.talosVersion | default "v1.13.5" }}
+          {{ $cp := .observed.composite.resource.spec.controlPlane }}
+          {{ $wk := .observed.composite.resource.spec.workers }}
+
+          {{ if and $networkConfig $environment.hosts }}
+          {{ $hostsList := list }}
+          {{ range $h := $environment.hosts }}
+            {{ $hostsList = append $hostsList (dict "name" $h.name "fqdn" $h.fqdn "libvirt_uri" $h.libvirtUri "bridge" $h.bridge "vm_pool" $h.vmPool) }}
+          {{ end }}
+
+          {{ $schematicCustomization := dict "customization" (dict "systemExtensions" (dict "officialExtensions" (list "siderolabs/qemu-guest-agent" "siderolabs/iscsi-tools"))) }}
+
+          {{ $varmap := dict
+               "cluster_name" $name
+               "schematic_customization_json" (toJson $schematicCustomization)
+               "talos_version" $talosVersion
+               "hosts" $hostsList
+               "control_plane_node_ulas" $networkConfig.controlPlaneNodeUlas
+               "worker_node_ulas" (default (dict) $networkConfig.workerNodeUlas)
+               "control_plane_vcpu" (default 4 $cp.vcpu)
+               "control_plane_memory_mb" (default 8192 $cp.memoryMb)
+               "control_plane_disk_size_bytes" (mul (default 100 $cp.diskSizeGb) 1073741824)
+               "worker_vcpu" (default 4 $wk.vcpu)
+               "worker_memory_mb" (default 16384 $wk.memoryMb)
+               "worker_disk_size_bytes" (mul (default 200 $wk.diskSizeGb) 1073741824)
+             }}
+          ---
+          apiVersion: tf.upbound.io/v1beta1
+          kind: Workspace
+          metadata:
+            name: {{ $name }}
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: workspace
+              crossplane.io/external-name: {{ $name }}
+          spec:
+            forProvider:
+              source: Inline
+              # Embedded, not git-sourced (source: Remote) -- flux-platform-src
+              # is a private repo and Remote would need its own git-clone
+              # credential wired into provider-terraform, an unproven
+              # dependency this step deliberately avoided (docs/memory/
+              # m4-design.md). KEEP IN SYNC BY HAND with
+              # providers/kvm/modules/talos-cluster/*.tf -- this is a known,
+              # accepted drift risk, not an oversight.
+              module: |
+                terraform {
+                  required_version = ">= 1.5.7"
+                  required_providers {
+                    libvirt = { source = "dmacvicar/libvirt", version = "~> 0.8.0" }
+                    http    = { source = "hashicorp/http", version = "~> 3.4" }
+                  }
+                }
+
+                variable "cluster_name" { type = string }
+                variable "schematic_customization_json" { type = string }
+                variable "talos_version" { type = string }
+                variable "hosts" {
+                  type = list(object({
+                    name        = string
+                    fqdn        = string
+                    libvirt_uri = string
+                    bridge      = string
+                    vm_pool     = string
+                  }))
+                }
+                variable "control_plane_node_ulas" { type = map(string) }
+                variable "worker_node_ulas" {
+                  type    = map(string)
+                  default = {}
+                }
+                variable "mac_prefix" {
+                  type    = string
+                  default = "52:54:00:b3:a1"
+                }
+                variable "reserved_mac_octets" {
+                  type    = list(number)
+                  default = [100]
+                }
+                variable "control_plane_vcpu" {
+                  type    = number
+                  default = 4
+                }
+                variable "control_plane_memory_mb" {
+                  type    = number
+                  default = 8192
+                }
+                variable "control_plane_disk_size_bytes" {
+                  type    = number
+                  default = 107374182400
+                }
+                variable "worker_vcpu" {
+                  type    = number
+                  default = 4
+                }
+                variable "worker_memory_mb" {
+                  type    = number
+                  default = 16384
+                }
+                variable "worker_disk_size_bytes" {
+                  type    = number
+                  default = 214748364800
+                }
+
+                data "http" "schematic" {
+                  url             = "https://factory.talos.dev/schematics"
+                  method          = "POST"
+                  request_headers = { Content-Type = "application/json" }
+                  request_body    = var.schematic_customization_json
+                }
+
+                locals {
+                  schematic_id = jsondecode(data.http.schematic.response_body).id
+                  host         = var.hosts[0]
+                  iso_url      = "https://factory.talos.dev/image/${local.schematic_id}/${var.talos_version}/metal-amd64.iso"
+                  node_ulas    = merge(var.control_plane_node_ulas, var.worker_node_ulas)
+                  node_mac_octet = { for name, ula in local.node_ulas :
+                    name => parseint(element(split("::", ula), 1), 16) }
+                  nodes = merge(
+                    {
+                      for name, ula in var.control_plane_node_ulas : name => {
+                        role            = "controlplane"
+                        ula             = ula
+                        mac             = format("%s:%02x", var.mac_prefix, local.node_mac_octet[name])
+                        vcpu            = var.control_plane_vcpu
+                        memory_mb       = var.control_plane_memory_mb
+                        disk_size_bytes = var.control_plane_disk_size_bytes
+                      }
+                    },
+                    {
+                      for name, ula in var.worker_node_ulas : name => {
+                        role            = "worker"
+                        ula             = ula
+                        mac             = format("%s:%02x", var.mac_prefix, local.node_mac_octet[name])
+                        vcpu            = var.worker_vcpu
+                        memory_mb       = var.worker_memory_mb
+                        disk_size_bytes = var.worker_disk_size_bytes
+                      }
+                    }
+                  )
+                }
+
+                check "node_mac_octets" {
+                  assert {
+                    condition = alltrue([
+                      for name, o in local.node_mac_octet :
+                      o >= 1 && o <= 255 && !contains(var.reserved_mac_octets, o)
+                    ])
+                    error_message = "Each node ULA host part must be a single byte 0x01-0xff and must not collide with reserved_mac_octets."
+                  }
+                  assert {
+                    condition     = length(values(local.node_mac_octet)) == length(distinct(values(local.node_mac_octet)))
+                    error_message = "Two node ULAs map to the same MAC last octet within this cluster's own node set."
+                  }
+                }
+
+                resource "libvirt_pool" "images" {
+                  name = "${var.cluster_name}-images"
+                  type = "dir"
+                  target {
+                    path = "/var/lib/libvirt/${var.cluster_name}-images"
+                  }
+                }
+
+                resource "libvirt_volume" "talos_iso" {
+                  name   = "talos-${var.talos_version}-${local.schematic_id}.iso"
+                  pool   = libvirt_pool.images.name
+                  source = local.iso_url
+                  format = "raw"
+                }
+
+                module "talos_node" {
+                  source   = "../talos-vm"
+                  for_each = local.nodes
+
+                  name            = each.key
+                  vcpu            = each.value.vcpu
+                  memory_mb       = each.value.memory_mb
+                  disk_size_bytes = each.value.disk_size_bytes
+                  pool            = local.host.vm_pool
+                  iso_path        = libvirt_volume.talos_iso.id
+                  bridge          = local.host.bridge
+                  mac             = each.value.mac
+                }
+
+                output "nodes" {
+                  value = { for name, n in local.nodes : name => { role = n.role, ula = n.ula, mac = n.mac } }
+                }
+                output "schematic_id" {
+                  value = local.schematic_id
+                }
+              varmap: {{ toJson $varmap }}
+              # NOTE: this Workspace's module has no `provider "libvirt" {}`
+              # block or terraform{backend} block by design -- both are
+              # injected by the shared provider-terraform ProviderConfig
+              # (applications/crossplane-providers/provider-terraform/
+              # provider-config/provider-config.yaml). That ProviderConfig
+              # deliberately has NO backend block either (docs/memory/
+              # m4-design.md D4 correction) -- every Workspace must declare
+              # its OWN uniquely-suffixed state backend or every cluster's
+              # state would collide on one Secret. Doing that here requires
+              # a second `module` fragment provider-terraform doesn't
+              # support merging separately from `module:` -- tracked as an
+              # open item for this Workspace to actually persist state
+              # durably; not solved in this step (see step tracker).
+          {{ end }}
+
+  - step: create-bootstrap-job
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{ $name := .observed.composite.resource.metadata.name }}
+          {{ $environment := index .context "apiextensions.crossplane.io/environment" }}
+          {{ $networkConfig := "" }}
+          {{ if and $environment $environment.clusters }}
+            {{ $networkConfig = index $environment.clusters $name }}
+          {{ end }}
+          {{ $talosVersion := .observed.composite.resource.spec.talosVersion | default "v1.13.5" }}
+          {{ $kubernetesVersion := .observed.composite.resource.spec.kubernetesVersion | default "1.36.2" }}
+
+          {{ $trustDomain := "" }}
+          {{ $nodesJson := "" }}
+          {{ $schematicId := "" }}
+          {{ if .observed.resources }}
+            {{ range $rname, $resource := .observed.resources }}
+              {{ if eq $resource.resource.kind "XDelegatedHostedZoneAWS" }}
+                {{ if $resource.resource.status.trustDomain }}
+                  {{ $trustDomain = $resource.resource.status.trustDomain }}
+                {{ end }}
+              {{ end }}
+              {{ if eq $resource.resource.kind "Workspace" }}
+                {{ if $resource.resource.status.atProvider.outputs }}
+                  {{ if $resource.resource.status.atProvider.outputs.nodes }}
+                    {{ $nodesJson = toJson $resource.resource.status.atProvider.outputs.nodes }}
+                  {{ end }}
+                  {{ if $resource.resource.status.atProvider.outputs.schematic_id }}
+                    {{ $schematicId = $resource.resource.status.atProvider.outputs.schematic_id }}
+                  {{ end }}
+                {{ end }}
+              {{ end }}
+            {{ end }}
+          {{ end }}
+
+          {{ if and $networkConfig $trustDomain $nodesJson $schematicId }}
+          ---
+          apiVersion: kubernetes.crossplane.io/v1alpha2
+          kind: Object
+          metadata:
+            name: {{ $name }}-bootstrap
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: bootstrap-job
+          spec:
+            providerConfigRef:
+              name: kubernetes-provider
+            # NOTE, unverified live (docs/memory/m4-step-tracker.md): the
+            # exact field name for the CEL query under DeriveFromCelQuery
+            # is inferred from provider-kubernetes's enum naming, not
+            # confirmed against a real reconcile yet.
+            readiness:
+              policy: DeriveFromCelQuery
+              celQuery: "object.status.conditions.exists(c, c.type == 'Complete' && c.status == 'True')"
+            forProvider:
+              manifest:
+                apiVersion: batch/v1
+                kind: Job
+                metadata:
+                  name: {{ $name }}-bootstrap
+                  namespace: crossplane-system
+                spec:
+                  backoffLimit: 2
+                  activeDeadlineSeconds: 3600
+                  template:
+                    metadata:
+                      labels:
+                        app.kubernetes.io/name: talos-cluster-bootstrap
+                    spec:
+                      serviceAccountName: talos-cluster-bootstrap
+                      restartPolicy: Never
+                      containers:
+                        - name: bootstrap
+                          image: ghcr.io/estenrye/talos-cluster-bootstrap:latest
+                          env:
+                            - name: CLUSTER_NAME
+                              value: {{ $name }}
+                            - name: TALOS_VERSION
+                              value: {{ $talosVersion }}
+                            - name: KUBERNETES_VERSION
+                              value: {{ $kubernetesVersion }}
+                            - name: SCHEMATIC_ID
+                              value: {{ $schematicId }}
+                            - name: APISERVER_VIP
+                              value: {{ $networkConfig.apiserverVip }}
+                            - name: ADDITIONAL_SANS
+                              value: "api.{{ $trustDomain }},{{ $networkConfig.apiserverVip }}"
+                            - name: INFRA_SUBNET
+                              value: {{ $networkConfig.infraSubnet }}
+                            - name: NAT64_ULA
+                              value: "fd97:45c2:b3a1:100::64"
+                            - name: NAT64_PREFIX
+                              value: "64:ff9b::/96"
+                            - name: POD_CIDR
+                              value: {{ $networkConfig.podCidr }}
+                            - name: SVC_CIDR
+                              value: {{ $networkConfig.serviceCidr }}
+                            - name: GUA_PREFIX
+                              value: "2607:3640:1064:270"
+                            - name: NODES_JSON
+                              value: {{ $nodesJson | quote }}
+                            - name: KUBECONFIG_SECRET_NAME
+                              value: "{{ $name }}-kubeconfig"
+                            - name: KUBECONFIG_SECRET_NAMESPACE
+                              value: "crossplane-system"
+                            - name: TALOSCONFIG_SECRET_NAME
+                              value: "{{ $name }}-talosconfig"
+                            - name: TALOSCONFIG_SECRET_NAMESPACE
+                              value: "crossplane-system"
+                            - name: OPENBAO_ADDR
+                              value: "https://openbao.openbao.svc:8200"
+                            - name: OPENBAO_CACERT
+                              value: "/var/run/secrets/openbao/ca.crt"
+                            - name: OPENBAO_KV_MOUNT
+                              value: "secret"
+                            - name: OPENBAO_KV_PATH
+                              value: "talos-clusters/{{ $name }}/machine-secrets"
+                            - name: OPENBAO_K8S_AUTH_ROLE
+                              value: "talos-cluster-bootstrap"
+                          volumeMounts:
+                            - name: openbao-ca
+                              mountPath: /var/run/secrets/openbao
+                              readOnly: true
+                      volumes:
+                        - name: openbao-ca
+                          configMap:
+                            name: ryezone-labs-intermediate-controlplane
+          {{ end }}
+
+  - step: status-update
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{ $trustDomain := "" }}
+          {{ $nameServers := list }}
+          {{ $kubeconfigReady := false }}
+          {{ $name := .observed.composite.resource.metadata.name }}
+          {{ if .observed.resources }}
+            {{ range $rname, $resource := .observed.resources }}
+              {{ if eq $resource.resource.kind "XDelegatedHostedZoneAWS" }}
+                {{ if $resource.resource.status.trustDomain }}
+                  {{ $trustDomain = $resource.resource.status.trustDomain }}
+                {{ end }}
+                {{ if $resource.resource.status.nameServers }}
+                  {{ $nameServers = $resource.resource.status.nameServers }}
+                {{ end }}
+              {{ end }}
+              {{ if and (eq $resource.resource.kind "Object") (eq $rname "bootstrap-job") }}
+                {{ range $cond := $resource.resource.status.conditions }}
+                  {{ if and (eq $cond.type "Ready") (eq $cond.status "True") }}
+                    {{ $kubeconfigReady = true }}
+                  {{ end }}
+                {{ end }}
+              {{ end }}
+            {{ end }}
+          {{ end }}
+          ---
+          apiVersion: platform.rye.ninja/v1alpha1
+          kind: XKubernetesCluster
+          status:
+            {{ if $trustDomain }}
+            trustDomain: {{ $trustDomain }}
+            {{ end }}
+            nameServers:
+            {{ range $nameServers }}
+            - {{ . }}
+            {{ end }}
+            {{ if $kubeconfigReady }}
+            kubeconfigSecretRef:
+              name: {{ $name }}-kubeconfig
+              namespace: crossplane-system
+            talosconfigSecretRef:
+              name: {{ $name }}-talosconfig
+              namespace: crossplane-system
+            phase: Ready
+            {{ else if $trustDomain }}
+            phase: Bootstrapping
+            {{ else }}
+            phase: PendingNetworkAllocation
+            {{ end }}
+
+  - step: auto-ready
+    functionRef:
+      name: function-auto-ready

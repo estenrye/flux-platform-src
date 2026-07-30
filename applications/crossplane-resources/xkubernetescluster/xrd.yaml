@@ -1,0 +1,97 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xkubernetesclusters.platform.rye.ninja
+spec:
+  group: platform.rye.ninja
+  names:
+    kind: XKubernetesCluster
+    plural: xkubernetesclusters
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              subdomain:
+                type: string
+                description: "Subdomain this cluster is delegated under <subdomain>.rye.ninja. Drives DNS delegation (a composed XDelegatedHostedZoneAWS claim) and the SPIFFE trust domain (ADR-16): trustDomain = <subdomain>.<resolved zone name>. Also the key this claim's network allocation is looked up under in the platform-kvm-network EnvironmentConfig -- must match an entry there or the claim fails validation."
+              controlPlane:
+                type: object
+                description: "Control-plane node pool. At least one node is required."
+                properties:
+                  count:
+                    type: integer
+                    minimum: 1
+                    default: 3
+                  vcpu:
+                    type: integer
+                    default: 4
+                  memoryMb:
+                    type: integer
+                    default: 8192
+                  diskSizeGb:
+                    type: integer
+                    default: 100
+                default: {}
+              workers:
+                type: object
+                description: "Worker node pool. count may be 0 -- Talos supports scheduling workloads on control-plane nodes (allowSchedulingOnControlPlanes) for small/dev clusters."
+                properties:
+                  count:
+                    type: integer
+                    minimum: 0
+                    default: 0
+                  vcpu:
+                    type: integer
+                    default: 4
+                  memoryMb:
+                    type: integer
+                    default: 16384
+                  diskSizeGb:
+                    type: integer
+                    default: 200
+                default: {}
+              talosVersion:
+                type: string
+                description: "Talos release, e.g. v1.13.5. Defaults to the fleet's current pin (see the Composition) when omitted -- override only for a deliberate per-cluster version skew (e.g. staged upgrade testing)."
+              kubernetesVersion:
+                type: string
+                description: "Kubernetes release, e.g. 1.36.2. Defaults to the fleet's current pin (see the Composition) when omitted."
+            required:
+            - subdomain
+          status:
+            type: object
+            properties:
+              trustDomain:
+                type: string
+                description: "This cluster's SPIFFE trust domain (ADR-16), read from the composed XDelegatedHostedZoneAWS claim's own status.trustDomain once it reconciles."
+              nameServers:
+                type: array
+                description: "Nameservers for the delegated zone, from the composed XDelegatedHostedZoneAWS claim's status."
+                items:
+                  type: string
+              kubeconfigSecretRef:
+                type: object
+                description: "Kubeconfig Secret on controlplane, written by the talos-cluster-bootstrap Job once it completes."
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+              talosconfigSecretRef:
+                type: object
+                description: "Talosconfig Secret on controlplane, written by the same Job."
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+              phase:
+                type: string
+                description: "Human-readable progress marker (e.g. PendingNetworkAllocation, ProvisioningVMs, Bootstrapping, Ready) -- coarser-grained than the underlying composed-resource conditions, meant for quick 'kubectl get' visibility."

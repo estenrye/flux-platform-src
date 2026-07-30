@@ -21,7 +21,7 @@
 # Idempotent: safe to re-run (same guarantee the original script makes).
 set -euo pipefail
 
-for var in CLUSTER_NAME TALOS_VERSION KUBERNETES_VERSION SCHEMATIC_JSON \
+for var in CLUSTER_NAME TALOS_VERSION KUBERNETES_VERSION SCHEMATIC_ID \
   APISERVER_VIP ADDITIONAL_SANS INFRA_SUBNET NAT64_ULA NAT64_PREFIX \
   POD_CIDR SVC_CIDR GUA_PREFIX NODES_JSON KUBECONFIG_SECRET_NAME \
   KUBECONFIG_SECRET_NAMESPACE TALOSCONFIG_SECRET_NAME TALOSCONFIG_SECRET_NAMESPACE \
@@ -47,9 +47,12 @@ BAO_TOKEN="$(bao write -field=token auth/kubernetes/login role="${OPENBAO_K8S_AU
 export BAO_TOKEN
 echo "OK."
 
-echo "==> Computing image factory schematic ID ..."
-SCHEMATIC_ID="$(echo "${SCHEMATIC_JSON}" | curl -fsS -X POST --data-binary @- https://factory.talos.dev/schematics | jq -r '.id')"
-echo "schematic: ${SCHEMATIC_ID}"
+echo "==> Using schematic: ${SCHEMATIC_ID}"
+# M4 step 3: computed once by the talos-cluster Terraform module's own
+# data.tf (same factory.talos.dev POST, moved upstream) and passed straight
+# through here as SCHEMATIC_ID -- this Job no longer recomputes it, so the
+# VM's installed image and this Job's machine-config `install.image` field
+# can never independently drift out of sync.
 
 echo "==> Talos machine secrets (OpenBao) ..."
 SECRETS_PLAIN="${WORK_DIR}/secrets.yaml"

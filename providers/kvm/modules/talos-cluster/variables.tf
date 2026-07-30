@@ -3,14 +3,16 @@ variable "cluster_name" {
   type        = string
 }
 
-variable "schematic_id" {
+variable "schematic_customization_json" {
   description = <<-EOT
-    Talos image factory schematic ID. Computed upstream of this module (a
-    POST to https://factory.talos.dev/schematics) -- for `controlplane` this
-    is `.bin/create-controlplane-cluster.sh`; for a claim-managed cluster
-    this is step 2's Talos-bootstrap Job or a composition step. Passed as a
-    var so the ID can never drift from whatever schematic definition
-    produced it.
+    Talos image factory schematic customization document (JSON), e.g.
+    '{"customization":{"systemExtensions":{"officialExtensions":[...]}}}' --
+    the same shape as providers/kvm/versions.yaml's `.talos.schematic` for
+    `controlplane`. This module computes the schematic ID itself (data.tf,
+    a POST to https://factory.talos.dev/schematics) instead of taking a
+    precomputed ID as an input -- M4 step 3 made this the single source of
+    truth; the talos-cluster-bootstrap Job reads this module's
+    `schematic_id` output instead of independently recomputing it.
   EOT
   type        = string
 }
