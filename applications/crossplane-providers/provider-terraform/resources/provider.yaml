@@ -13,12 +13,23 @@
 # instead -- extends the same upstream image with one Alpine package, a
 # much narrower addition than the git-clone-credential problem that ruled
 # out a custom image for source: Remote Workspaces (D4).
+#
+# CORRECTED AGAIN 2026-08-01, same day: this was first written as
+# `ghcr.io/estenrye/...`, which doesn't exist -- the shared
+# docker-multiarch-slsa-releaser.yml workflow's registry input defaults
+# to `docker.io`, and neither this image's nor talos-cluster-bootstrap's
+# build workflow ever overrode it, so both were pushed to Docker Hub the
+# whole time, not GHCR (confirmed via Docker Hub's public API: both exist
+# under docker.io/estenrye/*, `is_private: false`). Crossplane's package
+# pull failed with a GHCR auth error that looked like a private-image
+# problem but was actually just the wrong registry entirely -- caught by
+# checking Docker Hub directly, not by guessing GHCR URLs further.
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-terraform
 spec:
-  package: ghcr.io/estenrye/provider-terraform-libvirt:latest
+  package: docker.io/estenrye/provider-terraform-libvirt:latest
   runtimeConfigRef:
     name: provider-terraform
     kind: DeploymentRuntimeConfig

@@ -33,14 +33,29 @@ metadata:
   name: platform-kvm-network
 data:
   clusters:
+    # CORRECTED 2026-08-01 (M4 step 5, caught live): the original ::211/
+    # ::212/::213 suffixes are 3 hex digits (0x211 = 529 decimal) once fed
+    # through the MAC-octet derivation (parseint of the ULA host part,
+    # see providers/kvm/modules/talos-cluster/locals.tf) -- MUCH bigger
+    # than a single byte. Terraform's own `check` block validates this
+    # range but only *warns* on failure, it doesn't block the apply
+    # (unlike `precondition`/`postcondition`) -- the invalid MAC sailed
+    # through to a real libvirt XML error at domain-creation time instead
+    # of failing cleanly at plan time. Fixed to 2-hex-digit suffixes,
+    # mirroring controlplane's own convention (network.yaml: ::10 VIP,
+    # ::11-13 CP, ::21-23 workers) -- and deliberately DISJOINT from
+    # controlplane's actual octets (0x10-0x13, 0x21-0x23) and the NAT64
+    # appliance's 0x64, since both clusters' VMs currently share the same
+    # physical bridge (D1) and identical suffixes would produce identical,
+    # colliding MAC addresses despite living in different /64s.
     observability:
-      apiserverVip: "fd97:45c2:b3a1:200::210"
+      apiserverVip: "fd97:45c2:b3a1:200::30"
       infraSubnet: "fd97:45c2:b3a1:200::/64"
       podCidr: "fd97:45c2:b3a1:1200::/56"
       serviceCidr: "fd97:45c2:b3a1:2100::/112"
       bgpAsn: 64514
       controlPlaneNodeUlas:
-        observability-cp-1: "fd97:45c2:b3a1:200::211"
-        observability-cp-2: "fd97:45c2:b3a1:200::212"
-        observability-cp-3: "fd97:45c2:b3a1:200::213"
+        observability-cp-1: "fd97:45c2:b3a1:200::31"
+        observability-cp-2: "fd97:45c2:b3a1:200::32"
+        observability-cp-3: "fd97:45c2:b3a1:200::33"
       workerNodeUlas: {}
