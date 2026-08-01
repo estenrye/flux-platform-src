@@ -493,7 +493,14 @@ spec:
                       restartPolicy: Never
                       containers:
                         - name: bootstrap
-                          image: ghcr.io/estenrye/talos-cluster-bootstrap:latest
+                          # CORRECTED 2026-08-01 (M4 step 5, caught live):
+                          # was ghcr.io/estenrye/..., which doesn't exist --
+                          # the build workflow's registry defaults to
+                          # docker.io and neither this image's nor
+                          # provider-terraform-libvirt's build workflow
+                          # ever overrode it. See provider.yaml's matching
+                          # correction for the full story.
+                          image: docker.io/estenrye/talos-cluster-bootstrap:latest
                           env:
                             - name: CLUSTER_NAME
                               value: {{ $name }}
