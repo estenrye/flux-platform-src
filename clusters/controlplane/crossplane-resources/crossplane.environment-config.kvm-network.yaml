@@ -19,13 +19,28 @@
 #                            talos-cluster module's variable "hosts" doc)
 #   workerNodeUlas:         same shape, may be {}
 #
-# No entries populated yet -- M4 step 5 adds `observability` when that
-# claim is actually created. A NAT64 route (appliance ULA + translation
-# prefix) and BGP peering config on the UniFi gateway are also needed per
-# new subnet -- human prerequisites tracked at claim time, not here.
+# M4 step 5: `observability` populated 2026-08-01, next free block after
+# controlplane's fd97:45c2:b3a1:100::/64 / ASN 64513 in network.yaml.
+# Human prerequisite tracked separately (not GitOps-managed): a static
+# route / BGP peering update on the UniFi gateway for this new /64,
+# mirroring what controlplane's own bootstrap prerequisites document
+# (.bin/create-controlplane-cluster.sh's header) -- the apiserver VIP
+# itself is L2, not BGP-dependent, so VM creation and Talos bootstrap can
+# proceed regardless, but full external reachability needs this.
 apiVersion: apiextensions.crossplane.io/v1beta1
 kind: EnvironmentConfig
 metadata:
   name: platform-kvm-network
 data:
-  clusters: {}
+  clusters:
+    observability:
+      apiserverVip: "fd97:45c2:b3a1:200::210"
+      infraSubnet: "fd97:45c2:b3a1:200::/64"
+      podCidr: "fd97:45c2:b3a1:1200::/56"
+      serviceCidr: "fd97:45c2:b3a1:2100::/112"
+      bgpAsn: 64514
+      controlPlaneNodeUlas:
+        observability-cp-1: "fd97:45c2:b3a1:200::211"
+        observability-cp-2: "fd97:45c2:b3a1:200::212"
+        observability-cp-3: "fd97:45c2:b3a1:200::213"
+      workerNodeUlas: {}
