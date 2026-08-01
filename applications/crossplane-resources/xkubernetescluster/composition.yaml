@@ -554,6 +554,17 @@ spec:
                         - name: openbao-ca
                           configMap:
                             name: ryezone-labs-intermediate-controlplane
+                            # CORRECTED 2026-08-01 (M4 step 5, caught
+                            # live): the ConfigMap's actual key is
+                            # `intermediate.crt` (confirmed live via
+                            # `kubectl get configmap ... -o
+                            # jsonpath='{.data}'`), not `ca.crt` --
+                            # OPENBAO_CACERT expects the latter path.
+                            # Remap at mount time instead of renaming the
+                            # env var, so it stays a conventional name.
+                            items:
+                              - key: intermediate.crt
+                                path: ca.crt
           {{ end }}
 
   - step: status-update

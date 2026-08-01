@@ -37,6 +37,26 @@ spec:
       ports:
         - protocol: TCP
           port: 8200
+    # M4 step 5: the talos-cluster-bootstrap Job (crossplane-system) reads/
+    # writes Talos machine secrets directly via `bao` CLI + its own
+    # kubernetes-auth login, not through ESO -- needs its own ingress rule.
+    # Caught live: the Job's own egress policy was correct, but OpenBao's
+    # ingress side had never granted crossplane-system at all, regardless
+    # of egress correctness. Scoped to the specific pod label, not the
+    # whole (broad, shared) crossplane-system namespace, matching the
+    # helm-test-hook rule's precision above rather than the
+    # external-secrets-operator rule's namespace-wide one (that namespace
+    # is single-purpose; crossplane-system hosts many unrelated pods).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: crossplane-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: talos-cluster-bootstrap
+      ports:
+        - protocol: TCP
+          port: 8200
   egress:
     # HA leader-election coordination + request forwarding between pods.
     - to:
