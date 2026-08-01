@@ -60,6 +60,13 @@ if bao kv get -mount="${OPENBAO_KV_MOUNT}" -field=secrets.yaml "${OPENBAO_KV_PAT
   echo "Existing machine secrets found in OpenBao."
 else
   echo "Generating new machine secrets (first run) ..."
+  # CORRECTED 2026-08-01 (M4 step 5, caught live): the `>` redirection
+  # above creates/truncates SECRETS_PLAIN as a side effect even when
+  # `bao kv get` fails (e.g. the normal first-run "no value found" case)
+  # -- `talosctl gen secrets` then refuses to write to a path that
+  # already exists ("file ... already exists, use --force to
+  # overwrite"), even though it's empty. Remove the stray file first.
+  rm -f "${SECRETS_PLAIN}"
   talosctl gen secrets -o "${SECRETS_PLAIN}"
   bao kv put -mount="${OPENBAO_KV_MOUNT}" "${OPENBAO_KV_PATH}" "secrets.yaml=@${SECRETS_PLAIN}" >/dev/null
   echo "Machine secrets written to OpenBao: ${OPENBAO_KV_MOUNT}/${OPENBAO_KV_PATH}"
