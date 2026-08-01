@@ -140,6 +140,22 @@ spec:
                     libvirt = { source = "dmacvicar/libvirt", version = "~> 0.8.0" }
                     http    = { source = "hashicorp/http", version = "~> 3.4" }
                   }
+                  # Per-cluster state backend, templated with this claim's
+                  # own name -- fixes the gap flagged when this Composition
+                  # first shipped (docs/memory/m4-step-tracker.md step 3
+                  # detail): the shared provider-terraform ProviderConfig
+                  # deliberately carries no backend block (a single shared
+                  # secret_suffix would make every cluster's Workspace
+                  # collide on one state Secret, see D4), so each
+                  # Workspace's own embedded module must declare its own.
+                  # provider-terraform's existing crossplane-system
+                  # Role/RoleBinding (M4 step 1, no resourceNames) already
+                  # covers whatever Secret name this produces.
+                  backend "kubernetes" {
+                    secret_suffix     = "{{ $name }}"
+                    namespace         = "crossplane-system"
+                    in_cluster_config = true
+                  }
                 }
 
                 variable "cluster_name" { type = string }

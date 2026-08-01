@@ -1,6 +1,6 @@
 ---
 name: m4-step-tracker
-description: M4 step tracker — steps 1-2 merged and live-verified (incl. a post-merge NetworkPolicy fix); step 3 (XRD + Composition, narrowed to core provisioning) shipped 2026-07-30, not yet applied live
+description: M4 step tracker — steps 1-3 merged to main (XRD + Composition, narrowed to core provisioning); state-backend gap found and fixed same-day, 2026-07-31; step 5 (real claim) next
 metadata:
   type: project
 ---
@@ -8,13 +8,13 @@ metadata:
 Tracks [[m4-design]]'s 8-step execution order. Update as steps complete —
 this decays fast, keep it current rather than trusting it blindly.
 
-## Status as of 2026-07-30
+## Status as of 2026-07-31
 
 | # | Step | Status |
 |---|---|---|
 | 1 | provider-terraform install + generalized `talos-cluster` tofu module + `crossplane-kvm-hosts` EnvironmentConfig | **Done, merged to main** — bootstrap script run by the user, OpenBao `kv get` on `provider-terraform/kvm-ssh-key` confirmed working; package reference corrected to `xpkg.upbound.io/upbound/provider-terraform:v1.1.6`; a live NetworkPolicy crash-loop bug found and fixed post-merge (PR #133) — `provider-terraform` confirmed `Running`/`Healthy=True` |
 | 2 | Talos-bootstrap Job image + script (OpenBao for secrets) | **Shipped, merged to main**; OpenBao policy/role live-configured; image built+pushed to GHCR via CI; no real cluster bootstrap attempted yet (no Job template existed until step 3) |
-| 3 | `XKubernetesCluster` XRD + `cluster-talos-kvm` Composition (core provisioning; Flux-push/GitHub-automation/JWKS-mirror split out to 3b/3c) | **Shipped 2026-07-30, not yet applied live** — `make render`/kube-linter/checkov/trust-domain all clean; embedded Terraform module independently validated; several Crossplane/provider API details used are unverified against a live reconcile (see detail below) |
+| 3 | `XKubernetesCluster` XRD + `cluster-talos-kvm` Composition (core provisioning; Flux-push/GitHub-automation/JWKS-mirror split out to 3b/3c) | **Merged to main (PR #134)** — `make render`/kube-linter/checkov/trust-domain all clean; embedded Terraform module independently validated; per-cluster state backend gap found and fixed same day (below). Several Crossplane/provider API details used are still unverified against a live reconcile (see detail below) |
 | 4 | `clusters/observability/` baseline layer | Not started |
 | 5 | `observability` claim instance — first end-to-end provision | Not started |
 | 6 | Chainsaw deletion/teardown test; Usage guards | Not started |
@@ -297,20 +297,24 @@ drift from the real module if one is edited without the other — flagged
 both in `composition.yaml`'s own comments and in
 [[m4-design]]/the design doc, not silently accepted.
 
-**Known gap, not solved in this step, flagged prominently (not just in a
-code comment)**: the `Workspace` has no Terraform state backend
-configured anywhere — not in the embedded module, not in the shared
-`provider-terraform` `ProviderConfig` (which deliberately has none either,
-per step 1's D4 correction: a shared backend config would make every
-cluster's Workspace collide on one state Secret). Each Workspace needs
-its *own* uniquely-suffixed `terraform { backend "kubernetes" {...} } }`
-block, and there's currently no clean way to inject that per-Workspace
-without either (a) baking a `secret_suffix` templated from the cluster
-name directly into the embedded module text (straightforward, just not
-done yet), or (b) some other mechanism. **This means: as shipped, a real
-claim's Terraform state would not durably persist across a
-`provider-terraform` pod restart.** Needs to be fixed before step 5
-creates a real claim, not treated as a step-5 surprise.
+**Known gap — RESOLVED 2026-07-31, same day flagged**: the `Workspace` had
+no Terraform state backend configured anywhere — not in the embedded
+module, not in the shared `provider-terraform` `ProviderConfig` (which
+deliberately has none, per step 1's D4 correction: a shared backend
+config would make every cluster's Workspace collide on one state
+Secret). Fixed via option (a) from the original write-up: the embedded
+module's `terraform {}` block now also declares `backend "kubernetes" {
+secret_suffix = "{{ $name }}", namespace = "crossplane-system",
+in_cluster_config = true }`, templated per-claim by the same Go-template
+step that already has `$name` in scope. No new RBAC needed —
+`provider-terraform`'s existing `crossplane-system` `Role`/`RoleBinding`
+(step 1, no `resourceNames`) already covers whatever Secret name this
+produces. Re-validated the same way as the original embedded-module
+check: extracted into a scratch directory, `tofu init -backend=false` +
+`tofu validate` clean (confirms `-backend=false` correctly skips real
+backend initialization during offline validation, not just that the
+HCL parses). `make render`/kube-linter/checkov/trust-domain all
+re-confirmed clean after.
 
 **Explicitly unverified against a live reconcile (no claim exists yet —
 that's step 5), each documented at its point of use**:
