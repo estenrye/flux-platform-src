@@ -1,0 +1,25 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: provider-terraform-libvirt
+  description: |-
+    Custom provider-terraform image (extends xpkg.upbound.io/upbound/provider-terraform
+    unmodified, adding only the libxslt/xsltproc Alpine package). Needed
+    because dmacvicar/libvirt's `xml { xslt = ... }` domain-XML feature
+    (used by the cluster-talos-kvm Composition's embedded Terraform module
+    to set per-disk boot order and mark the Talos ISO read-only -- neither
+    expressible through the provider's native schema) shells out to the
+    external xsltproc binary, which the upstream image doesn't bundle.
+    Confirmed live, M4 step 5. A much narrower addition than a full custom
+    image built for git-clone credentials (rejected in M4 step 3, D4) --
+    this one just layers a single Alpine package on top.
+  tags:
+    - crossplane
+    - terraform
+    - kvm
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

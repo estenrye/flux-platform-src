@@ -4,7 +4,6 @@ metadata:
   name: observability
   namespace: crossplane-system
   labels:
-    rye.ninja/flux-src-repository: estenrye/flux-platform-src
     rye.ninja/component: xkubernetescluster
     rye.ninja/owner: platform-engineering
 spec:

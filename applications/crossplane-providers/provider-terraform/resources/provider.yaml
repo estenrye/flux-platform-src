@@ -5,12 +5,20 @@
 # the correct, verified package -- confirmed reachable at
 # https://marketplace.upbound.io/providers/upbound/provider-terraform/v1.1.6
 # (200). See docs/memory/m4-design.md D4.
+#
+# Corrected again 2026-08-01 (M4 step 5, caught live): the plain upstream
+# image lacks `xsltproc`, which dmacvicar/libvirt's `xml { xslt = ... }`
+# feature needs (confirmed live: "exec: \"xsltproc\": executable file not
+# found in $PATH"). Now pulling images/docker/provider-terraform-libvirt
+# instead -- extends the same upstream image with one Alpine package, a
+# much narrower addition than the git-clone-credential problem that ruled
+# out a custom image for source: Remote Workspaces (D4).
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
   name: provider-terraform
 spec:
-  package: xpkg.upbound.io/upbound/provider-terraform:v1.1.6
+  package: ghcr.io/estenrye/provider-terraform-libvirt:latest
   runtimeConfigRef:
     name: provider-terraform
     kind: DeploymentRuntimeConfig

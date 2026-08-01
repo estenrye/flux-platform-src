@@ -27,8 +27,25 @@
 # (M4 step 3, one per claim) must declare its own backend block with a
 # secret_suffix derived from the claim (e.g. the cluster name) inside its
 # own module content instead.
-apiVersion: tf.upbound.io/v1beta1
-kind: ProviderConfig
+#
+# CORRECTED 2026-08-01 (M4 step 5, caught live): `XKubernetesCluster` is a
+# namespaced XR (v2), and Crossplane v2 categorically forbids a namespaced
+# XR from composing a cluster-scoped resource -- confirmed against
+# crossplane/crossplane's own source
+# (internal/controller/apiextensions/composite/composition_functions.go,
+# errFmtNamespacedXRClusterResource), not an opt-out-able policy. The
+# plain `tf.upbound.io/v1beta1 Workspace`/`ProviderConfig` pair is
+# cluster-scoped only; `tf.m.upbound.io/v1beta1` is the namespace-aware
+# variant this provider also ships (confirmed live via `kubectl
+# api-resources`). A namespaced `Workspace` can still reference a
+# cluster-scoped `ClusterProviderConfig` (same group) via
+# `providerConfigRef.kind` -- same pattern `delegated-hosted-zone-aws`
+# already uses for its own `.m.upbound.io` managed resources. This
+# `ClusterProviderConfig` replaces what was a `tf.upbound.io/v1beta1
+# ProviderConfig` of the same name -- nothing else in this repo referenced
+# the old one.
+apiVersion: tf.m.upbound.io/v1beta1
+kind: ClusterProviderConfig
 metadata:
   name: default
 spec:
@@ -39,7 +56,19 @@ spec:
         namespace: crossplane-system
         name: provider-terraform-kvm-ssh-key
         key: id_ed25519
+  # CORRECTED 2026-08-01 (M4 step 5, caught live): the FQDN resolved to the
+  # wrong address entirely from inside this pod --
+  # `dial tcp [64:ff9b::a05:b001]:22: i/o timeout`, a NAT64-synthesized
+  # answer for some unrelated IPv4 (10.5.176.1), not the host's real ULA
+  # (fd97:45c2:b3a1:100::2000, per providers/kvm/hosts.yaml). Whatever
+  # resolves this hostname correctly on a workstation (likely a
+  # split-horizon/local override) isn't reachable from a cluster pod's
+  # DNS path. Fixed by connecting to the raw ULA literal, bypassing DNS
+  # entirely -- matches the NetworkPolicy's existing ipBlock scoping
+  # exactly (applications/crossplane-providers/provider-terraform/
+  # resources/network-policy.yaml), which was already IP-based, not
+  # hostname-based.
   configuration: |
     provider "libvirt" {
-      uri = "qemu+ssh://automation-user@mf-ms-a2-01.usmnblm01.rye.ninja/system?keyfile=kvm-ssh-key&no_verify=1"
+      uri = "qemu+ssh://automation-user@[fd97:45c2:b3a1:100::2000]/system?keyfile=kvm-ssh-key&no_verify=1"
     }

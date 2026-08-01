@@ -1,9 +1,22 @@
-# Check ./provider-in-cluster.yaml to see how to grant permissions to the Provider
-apiVersion: kubernetes.crossplane.io/v1alpha1
-kind: ProviderConfig
+# CORRECTED 2026-08-01 (M4 step 5, caught live): `XKubernetesCluster` is a
+# namespaced XR (v2), and Crossplane v2 categorically forbids a namespaced
+# XR from composing a cluster-scoped resource -- confirmed against
+# crossplane/crossplane's own source
+# (internal/controller/apiextensions/composite/composition_functions.go,
+# errFmtNamespacedXRClusterResource), not an opt-out-able policy. The
+# plain `kubernetes.crossplane.io/v1alpha2 Object` (and its
+# `kubernetes.crossplane.io/v1alpha1 ProviderConfig`) is cluster-scoped
+# only; `kubernetes.m.crossplane.io/v1alpha1` is the namespace-aware
+# variant this provider also ships (confirmed live via `kubectl
+# api-resources`). A namespaced `Object` can still reference a
+# cluster-scoped `ClusterProviderConfig` (same group) via
+# `providerConfigRef.kind`. This `ClusterProviderConfig` replaces what was
+# a `kubernetes.crossplane.io/v1alpha1 ProviderConfig` of the same name --
+# nothing else in this repo referenced the old one.
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: ClusterProviderConfig
 metadata:
   name: kubernetes-provider
-  namespace: crossplane-system
 spec:
   credentials:
     source: InjectedIdentity
