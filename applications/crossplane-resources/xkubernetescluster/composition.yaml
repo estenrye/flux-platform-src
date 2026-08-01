@@ -116,7 +116,7 @@ spec:
                "worker_disk_size_bytes" (mul (default 200 $wk.diskSizeGb) 1073741824)
              }}
           ---
-          apiVersion: tf.upbound.io/v1beta1
+          apiVersion: tf.m.upbound.io/v1beta1
           kind: Workspace
           metadata:
             name: {{ $name }}
@@ -124,18 +124,43 @@ spec:
               gotemplating.fn.crossplane.io/composition-resource-name: workspace
               crossplane.io/external-name: {{ $name }}
           spec:
+            # XKubernetesCluster is namespaced (v2); Crossplane forbids a
+            # namespaced XR from composing a cluster-scoped resource
+            # (crossplane/crossplane's composition_functions.go,
+            # errFmtNamespacedXRClusterResource -- caught live, M4 step 5).
+            # tf.m.upbound.io is provider-terraform's namespace-aware group;
+            # the referenced ClusterProviderConfig stays cluster-scoped.
+            providerConfigRef:
+              kind: ClusterProviderConfig
+              name: default
             forProvider:
               source: Inline
               # Embedded, not git-sourced (source: Remote) -- flux-platform-src
               # is a private repo and Remote would need its own git-clone
               # credential wired into provider-terraform, an unproven
               # dependency this step deliberately avoided (docs/memory/
-              # m4-design.md). KEEP IN SYNC BY HAND with
-              # providers/kvm/modules/talos-cluster/*.tf -- this is a known,
-              # accepted drift risk, not an oversight.
+              # m4-design.md). KEEP BEHAVIORALLY EQUIVALENT BY HAND with
+              # providers/kvm/modules/talos-cluster/*.tf -- known, accepted
+              # drift risk, not an oversight. NOT byte-identical: confirmed
+              # live (M4 step 5) that a `source: Inline` Workspace gets one
+              # isolated, generated working directory with no sibling
+              # module directories or files on disk, so the real module's
+              # `module "talos_node" { source = "../talos-vm" }` call and
+              # its `file("guest-agent-channel.xsl")` reference both had to
+              # be inlined directly (see the `libvirt_volume "node_system"`/
+              # `libvirt_domain "node"` resources and the
+              # `guest_agent_channel_xsl` local below) -- a real module
+              # reference or `file()` call would fail here even though it
+              # works fine for `providers/kvm/modules/talos-cluster` itself
+              # when driven by a real `tofu` checkout.
               module: |
                 terraform {
-                  required_version = ">= 1.5.7"
+                  # Confirmed live, M4 step 5: provider-terraform's embedded
+                  # Terraform binary is actually v1.5.5, not v1.5.7 as
+                  # documented at M4 step 1 (an unverified assumption from
+                  # upstream's README wording, never checked against the
+                  # real installed binary until now).
+                  required_version = ">= 1.5.5"
                   required_providers {
                     libvirt = { source = "dmacvicar/libvirt", version = "~> 0.8.0" }
                     http    = { source = "hashicorp/http", version = "~> 3.4" }
@@ -275,18 +300,89 @@ spec:
                   format = "raw"
                 }
 
-                module "talos_node" {
-                  source   = "../talos-vm"
-                  for_each = local.nodes
+                # Inlined from providers/kvm/modules/talos-vm (not called as
+                # `module { source = "../talos-vm" }`, deliberately): a
+                # `source: Inline` Workspace gets a single isolated,
+                # generated working directory with no sibling module
+                # directories on disk -- confirmed live, M4 step 5
+                # ("Unable to evaluate directory symlink: lstat ../talos-vm:
+                # no such file or directory"). Behaviorally equivalent to
+                # the real leaf module, including the guest-agent-channel.xsl
+                # content (inlined below as a string, since `file()` has the
+                # same no-sibling-files problem `../talos-vm` did).
+                locals {
+                  guest_agent_channel_xsl = <<-XSLT
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+                      <xsl:output omit-xml-declaration="yes" indent="yes"/>
+                      <xsl:template match="node()|@*">
+                        <xsl:copy>
+                          <xsl:apply-templates select="node()|@*"/>
+                        </xsl:copy>
+                      </xsl:template>
+                      <xsl:template match="/domain/devices/disk[contains(source/@file, '.iso') or contains(source/@volume, '.iso')]">
+                        <xsl:copy>
+                          <xsl:apply-templates select="node()|@*"/>
+                          <xsl:if test="not(readonly)">
+                            <readonly/>
+                          </xsl:if>
+                          <xsl:if test="not(boot)">
+                            <boot order="2"/>
+                          </xsl:if>
+                        </xsl:copy>
+                      </xsl:template>
+                      <xsl:template match="/domain/devices/disk[contains(source/@volume, '-system')]">
+                        <xsl:copy>
+                          <xsl:apply-templates select="node()|@*"/>
+                          <xsl:if test="not(boot)">
+                            <boot order="1"/>
+                          </xsl:if>
+                        </xsl:copy>
+                      </xsl:template>
+                    </xsl:stylesheet>
+                    XSLT
+                }
 
-                  name            = each.key
-                  vcpu            = each.value.vcpu
-                  memory_mb       = each.value.memory_mb
-                  disk_size_bytes = each.value.disk_size_bytes
-                  pool            = local.host.vm_pool
-                  iso_path        = libvirt_volume.talos_iso.id
-                  bridge          = local.host.bridge
-                  mac             = each.value.mac
+                resource "libvirt_volume" "node_system" {
+                  for_each = local.nodes
+                  name     = "${each.key}-system"
+                  pool     = local.host.vm_pool
+                  size     = each.value.disk_size_bytes
+                  format   = "raw"
+                }
+
+                resource "libvirt_domain" "node" {
+                  for_each  = local.nodes
+                  name      = each.key
+                  vcpu      = each.value.vcpu
+                  memory    = each.value.memory_mb
+                  autostart = true
+
+                  cpu {
+                    mode = "host-passthrough"
+                  }
+
+                  disk {
+                    volume_id = libvirt_volume.node_system[each.key].id
+                  }
+
+                  disk {
+                    file = libvirt_volume.talos_iso.id
+                  }
+
+                  network_interface {
+                    bridge = local.host.bridge
+                    mac    = each.value.mac
+                  }
+
+                  console {
+                    type        = "pty"
+                    target_port = "0"
+                  }
+
+                  xml {
+                    xslt = local.guest_agent_channel_xsl
+                  }
                 }
 
                 output "nodes" {
@@ -354,19 +450,27 @@ spec:
 
           {{ if and $networkConfig $trustDomain $nodesJson $schematicId }}
           ---
-          apiVersion: kubernetes.crossplane.io/v1alpha2
+          apiVersion: kubernetes.m.crossplane.io/v1alpha1
           kind: Object
           metadata:
             name: {{ $name }}-bootstrap
             annotations:
               gotemplating.fn.crossplane.io/composition-resource-name: bootstrap-job
           spec:
+            # XKubernetesCluster is namespaced (v2); the plain
+            # kubernetes.crossplane.io/v1alpha2 Object is cluster-scoped
+            # and a namespaced XR cannot compose it (caught live, M4 step
+            # 5 -- see the Workspace step's comment above for the full
+            # explanation). kubernetes.m.crossplane.io is
+            # provider-kubernetes's namespace-aware group; the referenced
+            # ClusterProviderConfig stays cluster-scoped.
             providerConfigRef:
+              kind: ClusterProviderConfig
               name: kubernetes-provider
-            # NOTE, unverified live (docs/memory/m4-step-tracker.md): the
-            # exact field name for the CEL query under DeriveFromCelQuery
-            # is inferred from provider-kubernetes's enum naming, not
-            # confirmed against a real reconcile yet.
+            # readiness.celQuery / policy: DeriveFromCelQuery confirmed
+            # live via `kubectl explain object.spec.readiness
+            # --api-version=kubernetes.m.crossplane.io/v1alpha1` and the
+            # CRD's own enum list -- no longer just inferred from naming.
             readiness:
               policy: DeriveFromCelQuery
               celQuery: "object.status.conditions.exists(c, c.type == 'Complete' && c.status == 'True')"
