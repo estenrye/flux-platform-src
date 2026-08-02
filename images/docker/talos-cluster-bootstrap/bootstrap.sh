@@ -209,8 +209,12 @@ talosctl --talosconfig "${WORK_DIR}/talosconfig" config endpoint ${CP_ADDRS//,/ 
 
 echo "Waiting for Talos API on ${FIRST_CP} (install + reboot takes a few minutes) ..."
 for attempt in $(seq 1 90); do
-  talosctl --talosconfig "${WORK_DIR}/talosconfig" -n "${FIRST_CP}" version >/dev/null 2>&1 && break
-  [ "${attempt}" -eq 90 ] && { echo "ERROR: Talos API never came up on ${FIRST_CP}" >&2; exit 1; }
+  VERSION_ERR=$(talosctl --talosconfig "${WORK_DIR}/talosconfig" -n "${FIRST_CP}" version 2>&1) && break
+  # Surface the real error on the last attempt instead of a bare "never
+  # came up" -- the original swallowed this entirely (>/dev/null 2>&1),
+  # which made a real M4 step 5 failure much harder to diagnose than it
+  # needed to be.
+  [ "${attempt}" -eq 90 ] && { echo "ERROR: Talos API never came up on ${FIRST_CP}. Last error:" >&2; echo "${VERSION_ERR}" >&2; exit 1; }
   sleep 10
 done
 
