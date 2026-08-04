@@ -593,8 +593,6 @@ spec:
                               value: {{ $networkConfig.podCidr }}
                             - name: SVC_CIDR
                               value: {{ $networkConfig.serviceCidr }}
-                            - name: GUA_PREFIX
-                              value: "2607:3640:1064:270"
                             - name: NODES_JSON
                               value: {{ $nodesJson | quote }}
                             - name: KUBECONFIG_SECRET_NAME
