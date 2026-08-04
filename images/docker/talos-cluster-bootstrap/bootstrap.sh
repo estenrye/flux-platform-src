@@ -23,7 +23,7 @@ set -euo pipefail
 
 for var in CLUSTER_NAME TALOS_VERSION KUBERNETES_VERSION SCHEMATIC_ID \
   APISERVER_VIP ADDITIONAL_SANS INFRA_SUBNET NAT64_ULA NAT64_PREFIX \
-  POD_CIDR SVC_CIDR GUA_PREFIX NODES_JSON KUBECONFIG_SECRET_NAME \
+  POD_CIDR SVC_CIDR NODES_JSON KUBECONFIG_SECRET_NAME \
   KUBECONFIG_SECRET_NAMESPACE TALOSCONFIG_SECRET_NAME TALOSCONFIG_SECRET_NAMESPACE \
   OPENBAO_ADDR OPENBAO_CACERT OPENBAO_KV_MOUNT OPENBAO_KV_PATH OPENBAO_K8S_AUTH_ROLE; do
   [ -n "${!var:-}" ] || { echo "ERROR: required env var ${var} is not set" >&2; exit 1; }
@@ -172,10 +172,25 @@ echo "==> Applying configs in maintenance mode ..."
 # Same deterministic EUI-64 SLAAC derivation as create-controlplane-cluster.sh,
 # sourced from each node's MAC (already known from the Terraform module's
 # `nodes` output) instead of re-deriving it from the ULA.
+#
+# CORRECTED 2026-08-05 (M4, caught live): this used to take a separate
+# GUA_PREFIX env var, hardcoded in the Composition to controlplane's own
+# VLAN 100 GUA prefix rather than derived per-cluster. That only "worked"
+# for observability by accident, while its VMs were still physically
+# misattached to br0/VLAN 100 (a since-fixed libvirt bridge bug -- see
+# dmacvicar-libvirt-bridge-inplace-update-bug memory). Once correctly on
+# its own dedicated, ULA-only VLAN (no GUA/PD at all -- see XNetworkSegment),
+# the node's real maintenance-mode SLAAC address is under INFRA_SUBNET's own
+# prefix instead, confirmed live via rdisc6 (Autonomous address conf: Yes
+# advertised for INFRA_SUBNET) and a direct ping to the predicted address.
+# INFRA_SUBNET is already correct and per-cluster (unlike the old
+# GUA_PREFIX), so derive from it instead of carrying a second, redundant
+# prefix value.
 maintenance_addr() {
-  local mac="$1" octet
+  local mac="$1" octet prefix
   octet="${mac##*:}"
-  echo "${GUA_PREFIX}:5054:ff:feb3:a1${octet}"
+  prefix="${INFRA_SUBNET%%::*}"
+  echo "${prefix}:5054:ff:feb3:a1${octet}"
 }
 
 for i in "${!node_names[@]}"; do
