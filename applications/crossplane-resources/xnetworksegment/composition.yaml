@@ -123,16 +123,68 @@ spec:
                   }
                 }
 
-                # UNVERIFIED against a live reconcile (flagged at point of
-                # use, matching docs/memory/m4-step-tracker.md's own
-                # discipline for inferred provider behavior). purpose
-                # "vlan-only" since these nodes are IPv6-only -- no DHCP/
-                # IPv4 needed here, unlike vlan100's kept-for-legacy
-                # ipv4_subnet (providers/kvm/network.yaml).
+                # CORRECTED 2026-08-04, caught live: purpose was
+                # "vlan-only" ("Third Party Gateway" in the UniFi UI) --
+                # confirmed via the live `ryezone-labs-ipv6` (VLAN 100)
+                # network's own stored config (`purpose: "corporate"`)
+                # that vlan-only means UniFi does ONLY L2 switching for
+                # that network, explicitly NOT L3 routing/RA, and expects
+                # an external device to be the gateway. Nothing else was
+                # positioned to fill that role, so ipv6_ra_enable below
+                # was silently a no-op -- no RA was ever sent on this
+                # VLAN. This matters beyond "more correct": Talos accepts
+                # Router Advertisements by default on a host interface
+                # (independent of the machine config's `dhcp: false`,
+                # which only disables DHCP address assignment, not RA
+                # processing -- images/docker/talos-cluster-bootstrap/
+                # bootstrap.sh's rendered machine config has no explicit
+                # `::/0` route at all, relying entirely on RA for a
+                # default route, same as controlplane's own nodes). With
+                # no RA being sent, the nodes had no default route and
+                # could not reply to anything outside their own /64 --
+                # the concrete cause of the bootstrap Job's connection
+                # timeouts, not just a config-hygiene issue.
+                #
+                # ipv6_interface_type stays "static" (not "pd" like
+                # vlan100) rather than replicating vlan100's exact
+                # structure (GUA via PD as the primary interface, ULA as
+                # a secondary "ipv6_aliases" entry) -- confirmed live that
+                # filipowm/unifi's Terraform provider exposes no
+                # alias-equivalent resource at all (checked every
+                # resource in its docs), so exact replication isn't
+                # achievable via Terraform. This network's whole purpose
+                # is ULA-based (infraSubnet, node ULAs, apiserverVip --
+                # nothing here uses GUA), and controlplane's own running
+                # nodes prove a cluster needs no GUA/direct v6 egress at
+                # all (same dhcp:false/ULA-only/NAT64-route-only pattern
+                # in .bin/create-controlplane-cluster.sh), so skipping PD
+                # for this segment is a deliberate scope choice, not a
+                # gap being silently accepted.
+                #
+                # CORRECTED 2026-08-04, caught live (2nd round): purpose
+                # "corporate" alone was necessary but not sufficient --
+                # the UniFi UI still showed this network's Router as
+                # "Third-party Gateway" after that fix, and no RA/dnsmasq
+                # process ever started for br200. Confirmed by comparing
+                # every network in the live UI: every one showing a real
+                # router (usmnblm01.rye.ninja) has an IPv4 `subnet`
+                # populated -- including vlan100/vlan101, which are
+                # otherwise unused for cluster IPv4 traffic (DHCP: None)
+                # -- and this was the only network with no IPv4 subnet at
+                # all. UniFi's network-ownership/routing model is
+                # IPv4-primary even for an IPv6-focused network: it
+                # apparently won't claim router ownership (or start RA)
+                # for a network with no IPv4 subnet object, regardless of
+                # `purpose`. Added one, matching vlan100/vlan101's own
+                # convention exactly (VLAN ID as the second octet, /16,
+                # DHCP disabled) -- unused by any real host, same as
+                # vlan100's ip_subnet.
                 resource "unifi_network" "segment" {
                   name                = "{{ $name }}"
-                  purpose             = "vlan-only"
+                  purpose             = "corporate"
                   vlan_id             = {{ $vlanId }}
+                  subnet              = "10.{{ $vlanId }}.0.1/16"
+                  dhcp_enabled        = false
                   ipv6_interface_type = "static"
                   ipv6_static_subnet  = "{{ $infraSubnet }}"
                   ipv6_ra_enable      = true
