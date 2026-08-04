@@ -34,25 +34,28 @@ spec:
               vlanId:
                 type: integer
                 minimum: 1
-                # CORRECTED 2026-08-05, caught in review: 802.1Q allows up
-                # to 4094, but this Composition's UniFi unifi_network
-                # resource derives an IPv4 subnet as
-                # "10.<vlanId>.0.1/16" (matching vlan100/vlan101's own
-                # hand-set convention -- UniFi won't claim router/RA
-                # ownership of a network with no IPv4 subnet at all,
-                # confirmed live) -- vlanId must fit in a single octet or
-                # that render produces invalid IPv4. Capped at 255 so an
-                # out-of-range claim fails immediately at admission time
-                # (a clear schema error) instead of partway through a
-                # Composition reconcile with a broken Terraform apply.
-                maximum: 255
-                description: "802.1Q VLAN ID for this segment's dedicated bridge on the KVM host -- see providers/kvm/ansible/roles/bridge for the reference playbook (the Composition embeds an inlined, kept-in-sync-by-hand copy for the same Go-template/Jinja2 {{ }} delimiter-collision reason talos-cluster's Terraform module is embedded rather than git-sourced). Capped at 255 (not the full 802.1Q 1-4094 range) -- the composed UniFi network's IPv4 subnet is derived as 10.<vlanId>.0.1/16, which requires vlanId to fit in a single octet."
+                maximum: 4094
+                description: "802.1Q VLAN ID for this segment's dedicated bridge on the KVM host -- see providers/kvm/ansible/roles/bridge for the reference playbook (the Composition embeds an inlined, kept-in-sync-by-hand copy for the same Go-template/Jinja2 {{ }} delimiter-collision reason talos-cluster's Terraform module is embedded rather than git-sourced)."
               infraSubnet:
                 type: string
                 description: "ULA /64 for this segment, e.g. \"fd97:45c2:b3a1:200::/64\". Single source of truth for this value -- a claiming XKubernetesCluster's own platform-kvm-network EnvironmentConfig entry has its own infraSubnet field too (used for the Talos bootstrap Job's env vars, which don't fetch this XR); keep the two in sync by hand until that's worth plumbing through extra-resources as well."
+              ipv4Subnet:
+                type: string
+                # ADDED 2026-08-05: an earlier version of this field
+                # derived an IPv4 subnet from vlanId ("10.<vlanId>.0.1/16")
+                # instead of taking one explicitly, which silently broke
+                # for any vlanId over 255 (doesn't fit an IPv4 octet) --
+                # caught in review before merging. Explicit and required
+                # instead of derived: the derivation coupled two unrelated
+                # decisions (802.1Q ID, IPv4 addressing) that don't have
+                # to move together, and this way a caller picks a subnet
+                # that's actually free rather than trusting a formula not
+                # to collide with something hand-configured elsewhere.
+                description: "IPv4 subnet + gateway for this segment, CIDR notation, e.g. \"10.200.0.1/16\" -- required even though this fleet's clusters are IPv6-only end to end (confirmed live: UniFi won't claim router/RA ownership of a network with no IPv4 subnet object at all, regardless of `purpose`; matches vlan100/vlan101's own convention of an unused-but-present IPv4 subnet, DHCP disabled). Pick something that doesn't collide with any other network in the UniFi UI's network list -- not validated against live UniFi state here."
             required:
             - vlanId
             - infraSubnet
+            - ipv4Subnet
           status:
             type: object
             properties:

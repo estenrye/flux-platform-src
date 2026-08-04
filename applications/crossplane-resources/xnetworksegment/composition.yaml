@@ -35,6 +35,7 @@ spec:
           {{ $name := .observed.composite.resource.metadata.name }}
           {{ $vlanId := .observed.composite.resource.spec.vlanId }}
           {{ $infraSubnet := .observed.composite.resource.spec.infraSubnet }}
+          {{ $ipv4Subnet := .observed.composite.resource.spec.ipv4Subnet }}
           {{ $environment := index .context "apiextensions.crossplane.io/environment" }}
           {{ $bridgeName := printf "br%d" (int $vlanId) }}
 
@@ -175,15 +176,23 @@ spec:
                 # IPv4-primary even for an IPv6-focused network: it
                 # apparently won't claim router ownership (or start RA)
                 # for a network with no IPv4 subnet object, regardless of
-                # `purpose`. Added one, matching vlan100/vlan101's own
-                # convention exactly (VLAN ID as the second octet, /16,
-                # DHCP disabled) -- unused by any real host, same as
-                # vlan100's ip_subnet.
+                # `purpose`.
+                #
+                # CORRECTED 2026-08-05, caught in review before merging:
+                # the IPv4 subnet was originally derived from vlanId as a
+                # "10.<vlanId>.0.1/16" string -- broke for any vlanId over
+                # 255 (doesn't fit an IPv4 octet), and coupled two
+                # decisions (802.1Q ID, IPv4 addressing) that don't have
+                # to move together. Now an explicit, caller-supplied XR
+                # spec field (xrd.yaml's ipv4Subnet) instead -- the caller
+                # picks something that doesn't collide with anything else
+                # in the UniFi network list, same as vlan100/vlan101's own
+                # hand-picked, unused, DHCP-disabled IPv4 subnets.
                 resource "unifi_network" "segment" {
                   name                = "{{ $name }}"
                   purpose             = "corporate"
                   vlan_id             = {{ $vlanId }}
-                  subnet              = "10.{{ $vlanId }}.0.1/16"
+                  subnet              = "{{ $ipv4Subnet }}"
                   dhcp_enabled        = false
                   ipv6_interface_type = "static"
                   ipv6_static_subnet  = "{{ $infraSubnet }}"
