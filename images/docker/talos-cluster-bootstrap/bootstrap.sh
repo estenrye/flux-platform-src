@@ -73,6 +73,27 @@ else
 fi
 
 echo "==> Rendering machine configs ..."
+# CORRECTED 2026-08-05, caught live (5th stacked bug blocking
+# observability's bootstrap, same root cause class as the NAT64-route
+# fix above): time.cloudflare.com has both real A and AAAA records, so
+# DNS resolution succeeds (confirmed live -- the node's resolver at
+# NAT64_ULA works fine cross-VLAN) but the NTP client is then left
+# trying to reach genuinely-unreachable global v4/v6 addresses -- this
+# VLAN has neither a real internet v4 stack nor a GUA/PD, by design
+# (XNetworkSegment, ULA-only). Talos's time.SyncController fails this
+# forever, and (per the same investigation as the NAT64 route bug)
+# never-synced time appears to gate cri/etcd from ever starting.
+# Fixed by pointing off-VLAN-100 nodes at a NAT64-synthesized literal
+# address instead of a hostname -- same "avoid the DNS64/NAT64 hostname
+# trap with a literal" pattern as provider-config.unifi.yaml's api_url.
+# 162.159.200.1 is one of time.cloudflare.com's own real IPv4 addresses
+# (confirmed via the DNS resolution that did succeed), so this is the
+# same NTP service, just addressed in a way this VLAN can actually
+# route to.
+TIME_SERVER="time.cloudflare.com"
+if [ "${NAT64_ULA%%::*}" != "${INFRA_SUBNET%%::*}" ]; then
+  TIME_SERVER="${NAT64_PREFIX%/*}a29f:c801"
+fi
 cat >"${WORK_DIR}/patch-all.yaml" <<EOF
 machine:
   install:
@@ -83,7 +104,7 @@ machine:
       - ${NAT64_ULA}
   time:
     servers:
-      - time.cloudflare.com
+      - ${TIME_SERVER}
   kubelet:
     nodeIP:
       validSubnets:
