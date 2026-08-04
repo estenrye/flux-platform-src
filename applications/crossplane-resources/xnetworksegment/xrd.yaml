@@ -34,8 +34,19 @@ spec:
               vlanId:
                 type: integer
                 minimum: 1
-                maximum: 4094
-                description: "802.1Q VLAN ID for this segment's dedicated bridge on the KVM host -- see providers/kvm/ansible/roles/bridge for the reference playbook (the Composition embeds an inlined, kept-in-sync-by-hand copy for the same Go-template/Jinja2 {{ }} delimiter-collision reason talos-cluster's Terraform module is embedded rather than git-sourced)."
+                # CORRECTED 2026-08-05, caught in review: 802.1Q allows up
+                # to 4094, but this Composition's UniFi unifi_network
+                # resource derives an IPv4 subnet as
+                # "10.<vlanId>.0.1/16" (matching vlan100/vlan101's own
+                # hand-set convention -- UniFi won't claim router/RA
+                # ownership of a network with no IPv4 subnet at all,
+                # confirmed live) -- vlanId must fit in a single octet or
+                # that render produces invalid IPv4. Capped at 255 so an
+                # out-of-range claim fails immediately at admission time
+                # (a clear schema error) instead of partway through a
+                # Composition reconcile with a broken Terraform apply.
+                maximum: 255
+                description: "802.1Q VLAN ID for this segment's dedicated bridge on the KVM host -- see providers/kvm/ansible/roles/bridge for the reference playbook (the Composition embeds an inlined, kept-in-sync-by-hand copy for the same Go-template/Jinja2 {{ }} delimiter-collision reason talos-cluster's Terraform module is embedded rather than git-sourced). Capped at 255 (not the full 802.1Q 1-4094 range) -- the composed UniFi network's IPv4 subnet is derived as 10.<vlanId>.0.1/16, which requires vlanId to fit in a single octet."
               infraSubnet:
                 type: string
                 description: "ULA /64 for this segment, e.g. \"fd97:45c2:b3a1:200::/64\". Single source of truth for this value -- a claiming XKubernetesCluster's own platform-kvm-network EnvironmentConfig entry has its own infraSubnet field too (used for the Talos bootstrap Job's env vars, which don't fetch this XR); keep the two in sync by hand until that's worth plumbing through extra-resources as well."
