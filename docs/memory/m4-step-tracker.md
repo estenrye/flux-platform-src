@@ -297,6 +297,22 @@ drift from the real module if one is edited without the other — flagged
 both in `composition.yaml`'s own comments and in
 [[m4-design]]/the design doc, not silently accepted.
 
+**CORRECTED 2026-08-03**: the premise above is wrong — confirmed live via
+`gh repo view estenrye/flux-platform-src` that `flux-platform-src` is
+**public** (`isPrivate: false`). A `Remote`-sourced Workspace would clone
+anonymously over HTTPS with no credential at all, so the git-clone-
+credential blocker this decision was based on doesn't exist. Surfaced during the `observability` bootstrap investigation while
+evaluating `provider-ansible` for a new, unrelated resource — not yet
+acted on for `talos-cluster` itself. **Reconsideration flagged, not yet
+done**:
+switching the existing `Workspace` from `Inline` to `Remote` now looks
+viable and would fix the embedded-copy drift risk at the root, but this
+Workspace is live and already provisioning real VMs (`controlplane` and
+`observability`) — changing `source` on an in-place Workspace risks
+Terraform treating it as a changed module and wanting to recreate
+resources. Needs a careful plan (state-diff dry run, maybe a throwaway
+Workspace first) before touching the real one, not a direct edit.
+
 **Known gap — RESOLVED 2026-07-31, same day flagged**: the `Workspace` had
 no Terraform state backend configured anywhere — not in the embedded
 module, not in the shared `provider-terraform` `ProviderConfig` (which

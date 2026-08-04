@@ -1,0 +1,19 @@
+# provider-ansible v0.8.0's controller manager unconditionally tries to
+# acquire a coordination.k8s.io Lease in a namespace named `upbound-system`
+# for its replica-sharding mechanism (internal/cmd/provider/main.go's
+# leaseNamespace flag defaults to this in the RELEASED v0.8.0 binary --
+# confirmed via `--help` against the actual running image; a newer
+# `--lease-namespace` override flag exists on the upstream `main` branch
+# but isn't in this release). Without this namespace, lease acquisition
+# fails forever (`namespaces "upbound-system" not found`) and blocks the
+# ENTIRE manager from starting -- not just leader election: no metrics
+# server, no webhook server, no reconcile loop at all, no logs, no status
+# writes on any AnsibleRun. Confirmed live 2026-08-04 after an extended
+# debugging session (empty logs + unlisted metrics port were the tell).
+# This namespace holds nothing but that one Lease object; safe to create
+# empty, unrelated to Upbound's own managed-control-plane convention this
+# name is borrowed from.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: upbound-system

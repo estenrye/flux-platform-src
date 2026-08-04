@@ -8,6 +8,8 @@ metadata:
     rye.ninja/owner: platform-engineering
 spec:
   subdomain: obs
+  vlanRef:
+    name: observability-vlan
   controlPlane:
     count: 3
     vcpu: 4

@@ -5,3 +5,8 @@ resources:
   - ../../../applications/crossplane-resources/delegated-hosted-zone-aws
   # M4 step 3.
   - ../../../applications/crossplane-resources/xkubernetescluster
+  # M4: per-cluster VLAN/bridge, referenced by XKubernetesCluster's
+  # vlanRef rather than composed directly (cluster-scoped XRD needed to
+  # compose ansible.crossplane.io's cluster-scoped AnsibleRun -- see
+  # xnetworksegment/xrd.yaml).
+  - ../../../applications/crossplane-resources/xnetworksegment

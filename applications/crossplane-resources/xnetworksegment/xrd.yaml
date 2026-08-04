@@ -1,0 +1,53 @@
+# Cluster-scoped, deliberately -- NOT namespaced like XKubernetesCluster.
+# Exists specifically so its Composition can compose ansible.crossplane.io's
+# AnsibleRun (hard cluster-scoped, no namespace-aware variant published --
+# confirmed via provider-ansible's apis/ directory, 2026-08-04) and
+# tf.m.upbound.io's Workspace, without hitting Crossplane's
+# errFmtNamespacedXRClusterResource rule ("if the XR is namespaced then the
+# composed resource must be too" -- confirmed against crossplane/
+# crossplane's own composition_functions.go). A namespaced XR (like
+# XKubernetesCluster) cannot compose either resource directly; a
+# Cluster-scoped one can compose resources at any scope. XKubernetesCluster
+# references this by name (spec.vlanRef.name) instead of composing it,
+# fetched via function-extra-resources -- see cluster-talos-kvm-composition.
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xnetworksegments.platform.rye.ninja
+spec:
+  scope: Cluster
+  group: platform.rye.ninja
+  names:
+    kind: XNetworkSegment
+    plural: xnetworksegments
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              vlanId:
+                type: integer
+                minimum: 1
+                maximum: 4094
+                description: "802.1Q VLAN ID for this segment's dedicated bridge on the KVM host -- see providers/kvm/ansible/roles/bridge for the reference playbook (the Composition embeds an inlined, kept-in-sync-by-hand copy for the same Go-template/Jinja2 {{ }} delimiter-collision reason talos-cluster's Terraform module is embedded rather than git-sourced)."
+              infraSubnet:
+                type: string
+                description: "ULA /64 for this segment, e.g. \"fd97:45c2:b3a1:200::/64\". Single source of truth for this value -- a claiming XKubernetesCluster's own platform-kvm-network EnvironmentConfig entry has its own infraSubnet field too (used for the Talos bootstrap Job's env vars, which don't fetch this XR); keep the two in sync by hand until that's worth plumbing through extra-resources as well."
+            required:
+            - vlanId
+            - infraSubnet
+          status:
+            type: object
+            properties:
+              bridgeName:
+                type: string
+                description: "Derived (br<vlanId>), surfaced here so referencing Compositions don't need to recompute it."
+              ready:
+                type: boolean
+                description: "True once both the bridge (AnsibleRun) and the UniFi VLAN (Workspace) report Ready. Set by this XRD's own Composition status-update step."

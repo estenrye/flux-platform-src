@@ -1,0 +1,25 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: xnetworksegment-examples
+  description: |-
+    Example claim for the XNetworkSegment / network-segment-kvm-unifi
+    Crossplane composition. Not wired into any live cluster's
+    kustomization tree -- documentation only, though it also carries
+    observability's real values, kept in sync by hand. See ./README.md.
+  tags:
+    - crossplane
+    - crossplane-examples
+    - kvm
+    - unifi
+    - examples
+    - documentation
+  links:
+    - url: ./README.md
+      title: xnetworksegment examples documentation
+      icon: docs
+      type: documentation
+spec:
+  type: documentation
+  lifecycle: production
+  owner: platform-engineering

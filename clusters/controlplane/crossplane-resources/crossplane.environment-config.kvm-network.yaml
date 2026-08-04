@@ -18,6 +18,16 @@
 #                            providers/kvm/network.yaml's convention, and
 #                            talos-cluster module's variable "hosts" doc)
 #   workerNodeUlas:         same shape, may be {}
+#   vlanId:                 802.1Q VLAN ID for this cluster's own dedicated
+#                            bridge (create-network-segment composition
+#                            step) -- distinct L2 segment from
+#                            controlplane's VLAN 100/br0, so this cluster's
+#                            infraSubnet is genuinely on-link there instead
+#                            of hairpin-routed through the gateway.
+#                            Convention: reuse the subnet's own nibble
+#                            (observability's infraSubnet is …:200::/64, so
+#                            vlanId is 200) so the mapping is legible
+#                            without cross-referencing.
 #
 # M4 step 5: `observability` populated 2026-08-01, next free block after
 # controlplane's fd97:45c2:b3a1:100::/64 / ASN 64513 in network.yaml.
@@ -27,6 +37,19 @@
 # (.bin/create-controlplane-cluster.sh's header) -- the apiserver VIP
 # itself is L2, not BGP-dependent, so VM creation and Talos bootstrap can
 # proceed regardless, but full external reachability needs this.
+#
+# SUPERSEDED 2026-08-04: the static-route approach above caused a real
+# outage, not just a documented gap -- both clusters' VMs sharing VLAN
+# 100's physical bridge (br0) meant the gateway had to hairpin-route
+# between them, which triggers ICMPv6 Redirects; `observability`'s replies
+# started bypassing the gateway asymmetrically while `controlplane`'s
+# requests kept routing through it every time, breaking the Talos API's
+# TLS handshake outright (confirmed via packet capture: TCP completes,
+# TLS never does). Fix in progress: `vlanId` below + the
+# create-network-segment composition step give `observability` its own
+# bridge instead. The static-route entry on the gateway becomes dead
+# config once that lands (not yet removed -- cleanup tracked with the
+# rest of this migration, docs/memory/m4-step-tracker.md).
 apiVersion: apiextensions.crossplane.io/v1beta1
 kind: EnvironmentConfig
 metadata:
@@ -54,6 +77,7 @@ data:
       podCidr: "fd97:45c2:b3a1:1200::/56"
       serviceCidr: "fd97:45c2:b3a1:2100::/112"
       bgpAsn: 64514
+      vlanId: 200
       controlPlaneNodeUlas:
         observability-cp-1: "fd97:45c2:b3a1:200::31"
         observability-cp-2: "fd97:45c2:b3a1:200::32"

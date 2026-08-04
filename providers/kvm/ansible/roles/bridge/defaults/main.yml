@@ -1,0 +1,10 @@
+# uplink_iface matches providers/kvm/hosts.yaml's own bond0 (2x X710
+# 10GbE, LACP 802.3ad layer2+3) -- the same physical uplink br0 (VLAN 100)
+# already rides on. A second KVM host (hosts.yaml is list-shaped for this)
+# would need its own uplink name; not parameterized per-host yet since
+# there's only one host today.
+uplink_iface: bond0
+
+# bridge_name is derived, not set directly by callers -- one source of
+# truth (vlan_id), same reasoning network.yaml uses for GUA-derived values.
+bridge_name: "br{{ vlan_id }}"

@@ -1,0 +1,66 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: provider-ansible-allow-egress
+  namespace: crossplane-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This policy addresses a pod that is dynamically created by the provider and cannot be referenced by a static analysis of the NetworkPolicy."
+spec:
+  podSelector:
+    matchLabels:
+      pkg.crossplane.io/provider: provider-ansible
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # SSH to the KVM host inventory -- same target and reasoning as
+    # provider-terraform's own egress rule (network-policy.yaml in that
+    # provider's directory): direct pod-to-external-host, not a Service.
+    - to:
+        - ipBlock:
+            cidr: fd97:45c2:b3a1:100::2000/128
+      ports:
+        - protocol: TCP
+          port: 22
+    # UNVERIFIED, included defensively: provider-terraform crash-looped
+    # on startup from a missing apiserver egress rule (a crossplane-runtime
+    # "SafeStart" RBAC self-check, not provider-terraform-specific logic --
+    # docs/memory/m4-step-tracker.md, PR #133). If provider-ansible shares
+    # that crossplane-runtime behavior this rule is needed too; if not,
+    # it's harmless. Confirm against a live pod once installed and remove
+    # this comment either way.
+    - ports:
+        - protocol: TCP
+          port: 6443
+    # Ansible Galaxy / any git-sourced role content (roles[].src).
+    - ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: provider-ansible-allow-ingress
+  namespace: crossplane-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This policy addresses a pod that is dynamically created by the provider and cannot be referenced by a static analysis of the NetworkPolicy."
+spec:
+  podSelector:
+    matchLabels:
+      pkg.crossplane.io/provider: provider-ansible
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: webhook
+          protocol: TCP
+        - port: metrics
+          protocol: TCP

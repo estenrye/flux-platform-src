@@ -10,6 +10,10 @@ resources:
   - ../../../applications/crossplane-providers/family-cloudflare/provider-config
   # M4 step 1.
   - ../../../applications/crossplane-providers/provider-terraform/provider-config
+  # M4: bridge-creation AnsibleRuns (cluster-talos-kvm-composition).
+  - ../../../applications/crossplane-providers/provider-ansible/provider-config
+  # M4: per-cluster VLAN Workspaces (cluster-talos-kvm-composition).
+  - provider-config.unifi.yaml
   - crossplane.environment-config.yaml
   - crossplane.environment-config.kvm-hosts.yaml
   # M4 step 3.

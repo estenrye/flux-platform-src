@@ -74,6 +74,37 @@ spec:
           spec:
             subdomain: {{ $subdomain }}
 
+  - step: fetch-network-segment
+    functionRef:
+      name: function-extra-resources
+    input:
+      apiVersion: extra-resources.fn.crossplane.io/v1beta1
+      kind: Input
+      spec:
+        extraResources:
+          - kind: XNetworkSegment
+            apiVersion: platform.rye.ninja/v1alpha1
+            into: XNetworkSegment
+            type: Selector
+            selector:
+              maxMatch: 1
+              minMatch: 0
+              matchLabels:
+                - key: platform.rye.ninja/network-segment-name
+                  type: FromCompositeFieldPath
+                  valueFromFieldPath: spec.vlanRef.name
+                  fromFieldPathPolicy: Optional
+            # UNVERIFIED edge case (function-extra-resources README's own
+            # compatibility notes don't cover this): a claim with no
+            # vlanRef set means valueFromFieldPath resolves to nothing and
+            # Optional drops that label matcher entirely -- with only one
+            # label matcher configured, an empty matchLabels list's actual
+            # match semantics (matches nothing vs. matches everything)
+            # aren't confirmed against a live reconcile yet. Only one
+            # XNetworkSegment exists today (observability's), so an
+            # overmatch would be low-impact even if it happens; re-check
+            # this before a second XNetworkSegment exists.
+
   - step: create-workspace
     functionRef:
       name: function-go-templating
@@ -92,11 +123,42 @@ spec:
           {{ $talosVersion := .observed.composite.resource.spec.talosVersion | default "v1.13.5" }}
           {{ $cp := .observed.composite.resource.spec.controlPlane }}
           {{ $wk := .observed.composite.resource.spec.workers }}
+          {{ $vlanRef := .observed.composite.resource.spec.vlanRef }}
 
-          {{ if and $networkConfig $environment.hosts }}
+          {{/* If this claim references an XNetworkSegment, its VM
+               Workspace must wait for that segment to actually be Ready
+               before creating VMs attached to a bridge that might not
+               exist yet -- and use that dedicated bridge instead of the
+               host's default. Fetched via function-extra-resources
+               (fetch-network-segment step above), not composed directly
+               -- see xnetworksegment/xrd.yaml for why. Mirrors how
+               create-bootstrap-job already waits on this Workspace's own
+               outputs below. */}}
+          {{ $networkSegmentReady := true }}
+          {{ $bridgeName := "" }}
+          {{ if $vlanRef }}
+            {{ $networkSegmentReady = false }}
+            {{ $extraResources := index .context "apiextensions.crossplane.io/extra-resources" }}
+            {{ if $extraResources }}
+              {{ $segments := index $extraResources "XNetworkSegment" }}
+              {{ if and $segments (gt (len $segments) 0) }}
+                {{ $segment := index $segments 0 }}
+                {{ if $segment.status.ready }}
+                  {{ $networkSegmentReady = true }}
+                  {{ $bridgeName = $segment.status.bridgeName }}
+                {{ end }}
+              {{ end }}
+            {{ end }}
+          {{ end }}
+
+          {{ if and $networkConfig $environment.hosts $networkSegmentReady }}
           {{ $hostsList := list }}
           {{ range $h := $environment.hosts }}
-            {{ $hostsList = append $hostsList (dict "name" $h.name "fqdn" $h.fqdn "libvirt_uri" $h.libvirtUri "bridge" $h.bridge "vm_pool" $h.vmPool) }}
+            {{ $bridge := $h.bridge }}
+            {{ if $bridgeName }}
+              {{ $bridge = $bridgeName }}
+            {{ end }}
+            {{ $hostsList = append $hostsList (dict "name" $h.name "fqdn" $h.fqdn "libvirt_uri" $h.libvirtUri "bridge" $bridge "vm_pool" $h.vmPool) }}
           {{ end }}
 
           {{ $schematicCustomization := dict "customization" (dict "systemExtensions" (dict "officialExtensions" (list "siderolabs/qemu-guest-agent" "siderolabs/iscsi-tools"))) }}
@@ -135,11 +197,18 @@ spec:
               name: default
             forProvider:
               source: Inline
-              # Embedded, not git-sourced (source: Remote) -- flux-platform-src
-              # is a private repo and Remote would need its own git-clone
-              # credential wired into provider-terraform, an unproven
-              # dependency this step deliberately avoided (docs/memory/
-              # m4-design.md). KEEP BEHAVIORALLY EQUIVALENT BY HAND with
+              # Embedded, not git-sourced (source: Remote) -- decided when
+              # flux-platform-src was believed to be a private repo, which
+              # would have made Remote need its own git-clone credential
+              # wired into provider-terraform, an unproven dependency this
+              # step deliberately avoided (docs/memory/m4-design.md).
+              # CORRECTED 2026-08-03: confirmed live (`gh repo view`) that
+              # the repo is actually public -- Remote wouldn't need a
+              # credential at all. Reconsideration flagged in
+              # docs/memory/m4-step-tracker.md; not yet switched over,
+              # since this Workspace already provisions live VMs and
+              # changing `source` in place needs a careful state-impact
+              # plan first, not a direct edit. KEEP BEHAVIORALLY EQUIVALENT BY HAND with
               # providers/kvm/modules/talos-cluster/*.tf -- known, accepted
               # drift risk, not an oversight. NOT byte-identical: confirmed
               # live (M4 step 5) that a `source: Inline` Workspace gets one
