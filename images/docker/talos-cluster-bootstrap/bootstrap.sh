@@ -133,13 +133,36 @@ node_names=()
 node_addrs=()
 node_macs=()
 render_node() {
-  local name="$1" ula="$2" role="$3" mac="$4" base vip_block=""
+  local name="$1" ula="$2" role="$3" mac="$4" base vip_block="" routes_block=""
   base="${WORK_DIR}/controlplane.yaml"
   [ "${role}" = "worker" ] && base="${WORK_DIR}/worker.yaml"
   if [ "${role}" = "controlplane" ]; then
     vip_block="
         vip:
           ip: ${APISERVER_VIP}"
+  fi
+  # CORRECTED 2026-08-05, caught live (4th stacked bug blocking
+  # observability's bootstrap): NAT64_ULA is nat64-01's fixed address on
+  # controlplane's own VLAN 100 -- there's only one nat64-01, it isn't
+  # per-cluster like INFRA_SUBNET/POD_CIDR. An explicit route to it is
+  # only installable when it's actually on-link for this node's own
+  # subnet; for any other cluster's VLAN, the gateway address isn't
+  # reachable via any route the node already has, and Talos's route
+  # config has no `onlink` escape hatch (confirmed against
+  # pkg/machinery/config/types/v1alpha1's Route struct) -- the kernel
+  # rejects the route outright ("no route to host"), and that failure
+  # loops forever, which blocks cri/kubelet/etcd from ever starting
+  # (confirmed live: `talosctl service` showed etcd not registered at
+  # all, not just stopped). Skip the explicit route off-VLAN-100 and let
+  # the existing default route (already required, RA-derived) carry
+  # NAT64-bound traffic to the gateway instead -- ordinary inter-VLAN
+  # forwarding, not new infrastructure, and doesn't touch controlplane's
+  # own already-working on-link path at all.
+  if [ "${NAT64_ULA%%::*}" = "${INFRA_SUBNET%%::*}" ]; then
+    routes_block="
+        routes:
+          - network: ${NAT64_PREFIX}
+            gateway: ${NAT64_ULA}"
   fi
   cat >"${WORK_DIR}/patch-${name}.yaml" <<EOF
 machine:
@@ -150,10 +173,7 @@ machine:
           physical: true
         dhcp: false
         addresses:
-          - ${ula}/64
-        routes:
-          - network: ${NAT64_PREFIX}
-            gateway: ${NAT64_ULA}${vip_block}
+          - ${ula}/64${vip_block}${routes_block}
 EOF
   talosctl machineconfig patch "${base}" \
     --patch "@${WORK_DIR}/patch-${name}.yaml" \
