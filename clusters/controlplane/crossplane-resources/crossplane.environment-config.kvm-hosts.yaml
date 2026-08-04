@@ -18,6 +18,15 @@ data:
   hosts:
     - name: mf-ms-a2-01
       fqdn: mf-ms-a2-01.usmnblm01.rye.ninja
+      # Added 2026-08-04 (M4, XNetworkSegment's bridge AnsibleRun): the
+      # fqdn above resolves via DNS64 to a NAT64-synthesized address that
+      # cluster pods can't route to ("Network unreachable") -- confirmed
+      # live, same class of bug already fixed for provider-terraform's own
+      # libvirt ProviderConfig (which hardcodes this same ULA rather than
+      # using a hostname, for the identical reason) and for the UniFi
+      # ClusterProviderConfig's api_url. Mirrors providers/kvm/hosts.yaml's
+      # own `ula` field for this host.
+      ula: fd97:45c2:b3a1:100::2000
       libvirtUri: qemu+ssh://automation-user@mf-ms-a2-01.usmnblm01.rye.ninja/system
       bridge: br0
       # Pre-existing libvirt storage pool (type zfs) for VM system-disk

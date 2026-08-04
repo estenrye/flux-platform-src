@@ -1,0 +1,82 @@
+# ClusterProviderConfig for the UniFi Terraform provider, used by
+# XNetworkSegment's per-segment VLAN Workspaces
+# (network-segment-kvm-unifi Composition's create-bridge-and-vlan step) --
+# kept separate from provider-terraform's existing `default`
+# ClusterProviderConfig because that one's
+# `configuration` HCL is shared verbatim by every Workspace referencing it
+# (the libvirt provider block), and injecting an unrelated `provider
+# "unifi" {}` block into every KVM Workspace too would be wrong even
+# though the underlying credential file mechanism is the same one used for
+# kvm-ssh-key.
+#
+# Registry choice: paultyng/terraform-provider-unifi (the provider this
+# design originally assumed) is archived (as of 2026-04-30) and points
+# users at three community forks. Using filipowm/unifi -- confirmed via
+# its own docs (docs/resources/network.md) to support IPv6-only networks
+# (`purpose` + `ipv6_interface_type` are the only fields this design
+# needs; `subnet` (IPv4) is optional, unlike the archived provider's docs
+# which weren't checked before this decision).
+#
+# Credential: a new, dedicated UniFi API key (not a reuse of
+# external-dns's existing credential, clusters/controlplane/resources/
+# external-dns.unifi-credentials.sops.yaml) -- both are equally
+# privileged (UniFi's integrations page, where API keys are
+# generated/managed, is Super-Admin-only; there's no narrower role to
+# scope a new one down to), but a separate credential keeps independent
+# revocation/rotation and a distinguishable per-consumer entry in UniFi's
+# own admin audit log. Minted and stored via
+# `.bin/bootstrap-provider-terraform-unifi-key.sh` 2026-08-04, synced by
+# clusters/controlplane/resources/
+# eso.external-secret.provider-terraform-unifi-api-key.yaml into the
+# provider-terraform-unifi-api-key Secret this ProviderConfig references
+# below -- CONFIRMED live: the Workspace got past reading this credential
+# file with no error (failed later, at the network layer -- see api_url).
+apiVersion: tf.m.upbound.io/v1beta1
+kind: ClusterProviderConfig
+metadata:
+  name: unifi
+spec:
+  credentials:
+    - filename: unifi-api-key
+      source: Secret
+      secretRef:
+        namespace: crossplane-system
+        name: provider-terraform-unifi-api-key
+        key: api-key
+  configuration: |
+    terraform {
+      required_providers {
+        unifi = { source = "filipowm/unifi", version = "~> 1.0" }
+      }
+    }
+
+    # CONFIRMED live 2026-08-04: provider-terraform's credentials[]
+    # mechanism materializes named files into the SAME working directory
+    # the injected `configuration` HCL runs in -- file("unifi-api-key")
+    # was read successfully (the Workspace failed later, at the network
+    # layer, not on this read).
+    provider "unifi" {
+      # trimspace(): CORRECTED 2026-08-04, caught live -- bare file()
+      # includes the trailing newline `bao kv put ... <<< "${VAR}"`
+      # appends (bash here-strings always add one), and Go's net/http
+      # rejects control characters in header values ("invalid header
+      # field value for \"X-Api-Key\"").
+      api_key = trimspace(file("unifi-api-key"))
+      # CORRECTED 2026-08-04, caught live: the hostname resolved via
+      # DNS64 to a NAT64-synthesized address the Workspace pod couldn't
+      # route to ("dial tcp [64:ff9b::a68:22fd]:443: connect: network is
+      # unreachable") -- the exact same class of bug already documented
+      # and fixed for the sibling KVM ProviderConfig (provider-terraform's
+      # own provider-config.yaml: "Whatever resolves this hostname
+      # correctly on a workstation isn't reachable from a cluster pod's
+      # DNS path. Fixed by connecting to the raw ULA literal, bypassing
+      # DNS entirely."). Same fix here: the gateway's VLAN-100 ULA
+      # (confirmed reachable all session via `ssh root@fd97:45c2:b3a1:100::1`,
+      # docs/memory/unifi-gateway-pd-discovery.md), not the hostname.
+      api_url = "https://[fd97:45c2:b3a1:100::1]"
+      # Matches the existing gateway's cert posture -- confirmed live
+      # (docs/memory/unifi-gateway-pd-discovery.md's root-shell access
+      # notes) that this is UniFi's own dataplane VM with no externally
+      # trusted cert configured.
+      allow_insecure = true
+    }

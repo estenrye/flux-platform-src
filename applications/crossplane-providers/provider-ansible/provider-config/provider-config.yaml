@@ -1,0 +1,29 @@
+# Reuses the SAME OpenBao-synced SSH key provider-terraform already has
+# (provider-terraform-kvm-ssh-key / clusters/controlplane/resources/
+# eso.external-secret.provider-terraform-kvm-ssh-key.yaml) -- same
+# automation-user, same host, no reason to mint a second credential for
+# the same access.
+#
+# UNVERIFIED, needs live confirmation: provider-ansible's credentials[]
+# mechanism is confirmed (via examples/provider/config.yaml upstream) to
+# materialize a named file into the AnsibleRun's working directory --
+# confirmed for the git-credentials use case, not specifically for
+# referencing an SSH private key from inventory content. The
+# `ansible_ssh_private_key_file=kvm-ssh-key` reference below follows
+# provider-terraform's own bare-filename convention (its `configuration`
+# HCL references `keyfile=kvm-ssh-key` the same way) but hasn't been
+# confirmed against a live provider-ansible reconcile. If the working
+# directory path differs, this inventory line will need adjusting once
+# tested (see the AnsibleRun step in composition.yaml).
+apiVersion: ansible.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  credentials:
+    - filename: kvm-ssh-key
+      source: Secret
+      secretRef:
+        namespace: crossplane-system
+        name: provider-terraform-kvm-ssh-key
+        key: id_ed25519

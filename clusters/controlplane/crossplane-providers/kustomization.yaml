@@ -15,6 +15,12 @@ resources:
   # VM provisioning — see docs/superpowers/specs/
   # 2026-07-26-m4-cluster-lifecycle-design.md.
   - ../../../applications/crossplane-providers/provider-terraform
+  # M4: drives Ansible role runs for KVM-host-level network prep (VLAN
+  # bridges) that no Terraform provider models declaratively — see the
+  # hairpin-routing investigation in docs/memory/m4-step-tracker.md for
+  # why talos-kvm clusters need their own bridge instead of sharing
+  # controlplane's br0.
+  - ../../../applications/crossplane-providers/provider-ansible
   # M4 step 2: fixed ServiceAccount/RBAC/NetworkPolicy identity for the
   # Talos-bootstrap Job the cluster-talos-kvm Composition creates (step 3).
   # Not itself a Crossplane provider, but needs crossplane-system to exist
@@ -23,3 +29,7 @@ resources:
   - ../../../applications/crossplane-functions/function-environment-configs
   - ../../../applications/crossplane-functions/function-go-templating
   - ../../../applications/crossplane-functions/function-auto-ready
+  # M4: lets cluster-talos-kvm-composition read an XNetworkSegment claim's
+  # status by reference (spec.vlanRef.name) instead of composing it
+  # directly — see xnetworksegment/xrd.yaml for why it can't be composed.
+  - ../../../applications/crossplane-functions/function-extra-resources

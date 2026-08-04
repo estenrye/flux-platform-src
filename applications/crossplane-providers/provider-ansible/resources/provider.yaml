@@ -1,0 +1,14 @@
+# Package coordinates confirmed live via the Upbound Marketplace listing
+# for crossplane-contrib/provider-ansible v0.8.0 (2026-08-04) -- same
+# xpkg.upbound.io registry convention already used for provider-terraform
+# (docs/memory/m4-step-tracker.md's own registry-guessing correction is
+# the reason this was verified up front instead of guessed).
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-ansible
+spec:
+  package: xpkg.upbound.io/crossplane-contrib/provider-ansible:v0.8.0
+  runtimeConfigRef:
+    name: provider-ansible
+    kind: DeploymentRuntimeConfig

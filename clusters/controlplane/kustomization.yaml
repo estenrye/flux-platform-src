@@ -123,6 +123,11 @@ resources:
   # configured by .bin/bootstrap-provider-terraform-kvm-key.sh.
   - resources/eso.cluster-secret-store.openbao-provider-terraform.yaml
   - resources/eso.external-secret.provider-terraform-kvm-ssh-key.yaml
+  # M4: UniFi API key for the `unifi` ClusterProviderConfig
+  # (XNetworkSegment's Workspace). Same openbao-provider-terraform store
+  # as the KVM SSH key above -- reuses its existing policy path. Minted
+  # by .bin/bootstrap-provider-terraform-unifi-key.sh.
+  - resources/eso.external-secret.provider-terraform-unifi-api-key.yaml
   # Public DNS (M2 §4.5): publishes ca.rye.ninja's AAAA into the
   # Cloudflare-hosted rye.ninja zone. Separate from
   # eso.external-secret.cloudflare.yaml above, which feeds Crossplane's

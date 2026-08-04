@@ -63,6 +63,15 @@ spec:
               kubernetesVersion:
                 type: string
                 description: "Kubernetes release, e.g. 1.36.2. Defaults to the fleet's current pin (see the Composition) when omitted."
+              vlanRef:
+                type: object
+                description: "Reference to an XNetworkSegment claim (cluster-scoped) giving this cluster its own VLAN-tagged bridge instead of sharing controlplane's VLAN 100/br0. Optional -- omit to use the KVM host's default bridge (providers/kvm/hosts.yaml), same behavior as before this field existed. Resolved via function-extra-resources against a platform.rye.ninja/network-segment-name label on the XNetworkSegment (not composed directly -- Crossplane forbids this namespaced XR from composing XNetworkSegment's cluster-scoped AnsibleRun; see xnetworksegment/xrd.yaml)."
+                properties:
+                  name:
+                    type: string
+                    description: "Name of the XNetworkSegment claim. Must also carry a matching platform.rye.ninja/network-segment-name label -- the Composition selects by label, not by this name directly (function-extra-resources' Reference-by-name type doesn't support field-path templating, only Selector/matchLabels does)."
+                required:
+                - name
             required:
             - subdomain
           status:

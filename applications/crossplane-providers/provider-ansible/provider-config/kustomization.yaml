@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Split from the parent provider-ansible directory so it can be referenced
+# as a directory (not a bare file) by clusters/controlplane/
+# crossplane-resources -- same reasoning as provider-terraform's own
+# provider-config/kustomization.yaml (docs/memory/crossplane-bootstrap-phasing.md).
+resources:
+  - ./provider-config.yaml

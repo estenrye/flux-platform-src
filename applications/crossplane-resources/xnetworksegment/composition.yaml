@@ -1,0 +1,181 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: network-segment-kvm-unifi
+  labels:
+    substrate: kvm-unifi
+spec:
+  compositeTypeRef:
+    apiVersion: platform.rye.ninja/v1alpha1
+    kind: XNetworkSegment
+
+  mode: Pipeline
+  pipeline:
+  - step: environmentConfigs
+    functionRef:
+      name: function-environment-configs
+    input:
+      apiVersion: environmentconfigs.fn.crossplane.io/v1beta1
+      kind: Input
+      spec:
+        environmentConfigs:
+        - type: Reference
+          ref:
+            name: platform-kvm-hosts
+
+  - step: create-bridge-and-vlan
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{ $name := .observed.composite.resource.metadata.name }}
+          {{ $vlanId := .observed.composite.resource.spec.vlanId }}
+          {{ $infraSubnet := .observed.composite.resource.spec.infraSubnet }}
+          {{ $environment := index .context "apiextensions.crossplane.io/environment" }}
+          {{ $bridgeName := printf "br%d" (int $vlanId) }}
+
+          {{ if $environment.hosts }}
+          {{ $host := index $environment.hosts 0 }}
+          ---
+          apiVersion: ansible.crossplane.io/v1alpha1
+          kind: AnsibleRun
+          metadata:
+            name: {{ $name }}-bridge
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: bridge
+          spec:
+            forProvider:
+              inventoryInline: |
+                {{ $host.fqdn }} ansible_host={{ $host.ula }} ansible_user=automation-user ansible_ssh_private_key_file=kvm-ssh-key ansible_ssh_common_args='-o StrictHostKeyChecking=accept-new'
+              # Deliberately not byte-identical to providers/kvm/ansible/
+              # roles/bridge/tasks/main.yml -- that role uses real Jinja2
+              # vars for standalone/reusable runs; here vlan_id/bridge_name
+              # are substituted by THIS Go template instead. Go's
+              # text/template and Jinja2 use the same double-brace marker
+              # for their own expressions (confirmed the hard way: an
+              # earlier version of THIS comment typed that marker out
+              # literally as an example and broke the template it was
+              # explaining -- "missing value for command" -- since Go
+              # tokenizes the raw string before any YAML-comment awareness
+              # exists). A Jinja2-parameterized playbook embedded verbatim
+              # here would hit the identical problem for real. Same
+              # accepted-drift tradeoff as talos-cluster's embedded
+              # Terraform module vs. the real one.
+              playbookInline: |
+                - hosts: all
+                  become: true
+                  tasks:
+                    - name: Write netplan config for {{ $bridgeName }}
+                      ansible.builtin.copy:
+                        dest: /etc/netplan/60-{{ $bridgeName }}.yaml
+                        mode: "0600"
+                        content: |
+                          network:
+                            version: 2
+                            vlans:
+                              bond0.{{ $vlanId }}:
+                                id: {{ $vlanId }}
+                                link: bond0
+                            bridges:
+                              {{ $bridgeName }}:
+                                interfaces: ["bond0.{{ $vlanId }}"]
+                      register: netplan_config
+                    - name: Apply netplan
+                      ansible.builtin.command:
+                        cmd: netplan apply
+                      when: netplan_config.changed
+                      changed_when: true
+            providerConfigRef:
+              name: default
+          ---
+          apiVersion: tf.m.upbound.io/v1beta1
+          kind: Workspace
+          metadata:
+            name: {{ $name }}-vlan
+            # tf.m.upbound.io's Workspace is namespaced (that's the whole
+            # point of the .m. group) -- XNetworkSegment itself is
+            # cluster-scoped (xrd.yaml's spec.scope: Cluster) so there's
+            # no namespace to implicitly inherit. Confirmed live 2026-08-04:
+            # omitting this produced "an empty namespace may not be set
+            # when a resource name is provided". crossplane-system matches
+            # where every other Workspace/ProviderConfig in this repo
+            # lives.
+            namespace: crossplane-system
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: vlan
+              crossplane.io/external-name: {{ $name }}-vlan
+          spec:
+            providerConfigRef:
+              kind: ClusterProviderConfig
+              name: unifi
+            forProvider:
+              source: Inline
+              module: |
+                terraform {
+                  backend "kubernetes" {
+                    secret_suffix     = "{{ $name }}-vlan"
+                    namespace         = "crossplane-system"
+                    in_cluster_config = true
+                  }
+                }
+
+                # UNVERIFIED against a live reconcile (flagged at point of
+                # use, matching docs/memory/m4-step-tracker.md's own
+                # discipline for inferred provider behavior). purpose
+                # "vlan-only" since these nodes are IPv6-only -- no DHCP/
+                # IPv4 needed here, unlike vlan100's kept-for-legacy
+                # ipv4_subnet (providers/kvm/network.yaml).
+                resource "unifi_network" "segment" {
+                  name                = "{{ $name }}"
+                  purpose             = "vlan-only"
+                  vlan_id             = {{ $vlanId }}
+                  ipv6_interface_type = "static"
+                  ipv6_static_subnet  = "{{ $infraSubnet }}"
+                  ipv6_ra_enable      = true
+                }
+          {{ end }}
+
+  - step: status-update
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{ $vlanId := .observed.composite.resource.spec.vlanId }}
+          {{ $bridgeReady := false }}
+          {{ $vlanReady := false }}
+          {{ if .observed.resources }}
+            {{ range $rname, $resource := .observed.resources }}
+              {{ if eq $rname "bridge" }}
+                {{ range $cond := $resource.resource.status.conditions }}
+                  {{ if and (eq $cond.type "Ready") (eq $cond.status "True") }}
+                    {{ $bridgeReady = true }}
+                  {{ end }}
+                {{ end }}
+              {{ end }}
+              {{ if eq $rname "vlan" }}
+                {{ range $cond := $resource.resource.status.conditions }}
+                  {{ if and (eq $cond.type "Ready") (eq $cond.status "True") }}
+                    {{ $vlanReady = true }}
+                  {{ end }}
+                {{ end }}
+              {{ end }}
+            {{ end }}
+          {{ end }}
+          ---
+          apiVersion: platform.rye.ninja/v1alpha1
+          kind: XNetworkSegment
+          status:
+            bridgeName: {{ printf "br%d" (int $vlanId) }}
+            ready: {{ and $bridgeReady $vlanReady }}
+
+  - step: auto-ready
+    functionRef:
+      name: function-auto-ready

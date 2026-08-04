@@ -1,0 +1,16 @@
+apiVersion: platform.rye.ninja/v1alpha1
+kind: XNetworkSegment
+metadata:
+  # Cluster-scoped (xrd.yaml's spec.scope: Cluster) -- no namespace field.
+  name: observability-vlan
+  labels:
+    rye.ninja/component: xnetworksegment
+    rye.ninja/owner: platform-engineering
+    # Matched by cluster-talos-kvm-composition's fetch-network-segment
+    # step (function-extra-resources Selector, since Reference-by-name
+    # doesn't support field-path templating) against the claiming
+    # XKubernetesCluster's spec.vlanRef.name.
+    platform.rye.ninja/network-segment-name: observability-vlan
+spec:
+  vlanId: 200
+  infraSubnet: "fd97:45c2:b3a1:200::/64"

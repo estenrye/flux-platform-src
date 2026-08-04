@@ -1,0 +1,32 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-provider-ansible
+  description: |-
+    Installs the Crossplane Ansible provider, which lets a Composition run
+    an Ansible role as a managed resource. Used starting M4 to create a
+    dedicated, VLAN-tagged bridge on the KVM host for talos-kvm clusters
+    that need L2 isolation from `controlplane`'s own VLAN 100 -- see the
+    hairpin-routing investigation in docs/memory/m4-step-tracker.md for
+    why a shared bridge broke ICMPv6 routing between clusters.
+  tags:
+    - crossplane
+    - crossplane-provider
+    - ansible
+    - kvm
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://marketplace.upbound.io/providers/crossplane-contrib/provider-ansible
+      title: Crossplane provider for Ansible
+      icon: docs
+      type: documentation
+    - url: https://github.com/crossplane-contrib/provider-ansible
+      title: GitHub repository for the Crossplane provider for Ansible
+      icon: github
+      type: source
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

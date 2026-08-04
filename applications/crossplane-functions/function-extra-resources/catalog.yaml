@@ -1,0 +1,38 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-function-extra-resources
+  description: |-
+    This component installs the Crossplane Extra Resources Function, which
+    fetches arbitrary cluster-scoped resources into the composition
+    pipeline context (by name or by label selector) for use by later
+    function steps, without composing/owning them.
+
+    Used starting M4 so XKubernetesCluster (namespaced) can read an
+    XNetworkSegment claim's status (cluster-scoped, referenced by
+    spec.vlanRef.name) instead of composing it directly -- Crossplane
+    forbids a namespaced XR from composing a cluster-scoped resource, and
+    XNetworkSegment exists specifically to compose ansible.crossplane.io's
+    AnsibleRun, which has no namespace-aware variant.
+  tags:
+    - crossplane
+    - crossplane-function
+    - extra-resources
+    - composition
+    - pipeline
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://github.com/crossplane-contrib/function-extra-resources
+      title: GitHub repository for the Extra Resources Function
+      icon: github
+      type: source
+    - url: https://marketplace.upbound.io/functions/crossplane-contrib/function-extra-resources
+      title: Extra Resources Function on Upbound Marketplace
+      icon: docs
+      type: documentation
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

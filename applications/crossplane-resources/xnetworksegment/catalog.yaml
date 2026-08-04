@@ -1,0 +1,30 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-xnetworksegment
+  description: |-
+    XNetworkSegment XRD + network-segment-kvm-unifi Composition. Gives a
+    talos-kvm cluster its own VLAN-tagged bridge (Ansible, on the KVM host)
+    and matching UniFi network/VLAN (Terraform), instead of sharing
+    controlplane's VLAN 100 bridge. Cluster-scoped (not namespaced) so its
+    Composition can compose ansible.crossplane.io's cluster-scoped
+    AnsibleRun -- XKubernetesCluster (namespaced) references a claim of
+    this kind by name (spec.vlanRef) rather than composing it directly.
+    Exists because sharing a physical bridge between clusters triggers
+    ICMPv6 Redirect hairpin routing that silently breaks the Talos API's
+    TLS handshake -- see docs/memory/m4-step-tracker.md.
+  tags:
+    - crossplane
+    - crossplane-resource
+    - kvm
+    - unifi
+    - networking
+  links:
+    - url: https://docs.crossplane.io/latest/composition/composite-resource-definitions/
+      title: Crossplane Composite Resource Definitions
+      icon: docs
+      type: documentation
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

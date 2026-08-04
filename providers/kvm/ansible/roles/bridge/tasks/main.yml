@@ -1,0 +1,43 @@
+---
+# Creates a VLAN-tagged bridge (br<vlan_id>) on top of uplink_iface,
+# mirroring br0's own native-VLAN-100 setup on the same physical bond
+# (providers/kvm/hosts.yaml). No `community.general.netplan` module exists
+# (verified before writing this -- an earlier sketch of this role assumed
+# one did); netplan's own idempotency comes from `copy`'s content-diffing,
+# not the module doing anything netplan-specific.
+
+- name: Assert vlan_id was supplied
+  ansible.builtin.assert:
+    that:
+      - vlan_id is defined
+      - vlan_id | int >= 1
+      - vlan_id | int <= 4094
+    fail_msg: "vlan_id must be set to a valid 802.1Q VLAN ID (1-4094) by the caller."
+
+- name: Write netplan config for {{ bridge_name }}
+  ansible.builtin.copy:
+    dest: "/etc/netplan/60-{{ bridge_name }}.yaml"
+    # 0600: matches netplan's own convention for generated configs (they
+    # often embed secrets for other renderer types); harmless here but
+    # avoids being the one file in /etc/netplan/ with different perms.
+    mode: "0600"
+    content: |
+      network:
+        version: 2
+        vlans:
+          {{ uplink_iface }}.{{ vlan_id }}:
+            id: {{ vlan_id }}
+            link: {{ uplink_iface }}
+        bridges:
+          {{ bridge_name }}:
+            interfaces: ["{{ uplink_iface }}.{{ vlan_id }}"]
+  register: netplan_config
+
+- name: Apply netplan
+  ansible.builtin.command:
+    cmd: netplan apply
+  when: netplan_config.changed
+  # netplan apply is not itself idempotent-aware (it always "succeeds"
+  # whether or not anything changed) -- gating on the file write being
+  # what actually changed is what makes this task's own idempotency real.
+  changed_when: true
