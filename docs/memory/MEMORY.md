@@ -34,3 +34,4 @@
 - [M3 render-lint CI fix](m3-render-lint-ci-fix.md) — render-and-lint silently broken for all of M3 steps 1-4 (silent kustomize patch target-name mismatch); fixed in PR #100
 - [M4 Design](m4-design.md) — XKubernetesCluster XRD + talos-kvm composition; KVM capacity squeeze, Terraform-for-VMs + Job-for-bootstrap split, no separate claim kind
 - [M4 Step Tracker](m4-step-tracker.md) — steps 1-3 merged (XRD + Composition, narrowed); state-backend gap found and fixed same-day; step 5 (real claim) next
+- [dmacvicar/libvirt Bridge In-Place Update Bug](dmacvicar-libvirt-bridge-inplace-update-bug.md) — network_interface.bridge change reports success but silently never applies; research task: Ansible vs. alternate libvirt provider
