@@ -1,6 +1,6 @@
 ---
 name: unifi-zone-firewall
-description: UniFi 10.x zone-based firewall on the home gateway — routed subnets (VIPs, NAT64) aren't bound to any zone, and WireGuard clients land in External not VPN
+description: UniFi 10.x zone-based firewall on the home gateway — routed subnets (VIPs, NAT64) aren't bound to any zone, WireGuard clients land in External not VPN, and new XNetworkSegment VLANs default into Internal not DMZ-Kubernetes
 metadata:
   type: project
 ---
@@ -83,6 +83,39 @@ Return traffic (`DMZ-Kubernetes → Internal`, `DMZ-Kubernetes → VPN`)
 appeared automatically as "Allow Return" zone-pair entries once the
 forward rules existed — no separate manual rule needed for that
 direction.
+
+## New XNetworkSegment VLANs default into `Internal`, not `DMZ-Kubernetes`
+
+Found live 2026-08-05 debugging `observability`'s bootstrap Job (M4):
+`unifi_network` resources created via [[dmacvicar-libvirt-bridge-inplace-update-bug]]'s
+sibling work, the `XNetworkSegment` XRD, aren't zone-aware by default —
+UniFi silently placed the new `observability-vlan` network in the
+default `Internal` zone, same as any other home network. `Internal`'s
+zone-pair policy doesn't permit new inbound connections from
+controlplane's own zone, so every packet from the bootstrap Job pod
+(running on `controlplane`) was silently dropped before ever reaching
+the gateway's `br200` interface — confirmed via a live tcpdump on
+`br200` showing **zero packets** arriving during a connection attempt,
+despite BGP routing and ICMP-from-the-same-segment both working
+correctly. This was the last of three stacked bugs blocking the same
+bootstrap Job (alongside a hardcoded `GUA_PREFIX` and a missing BGP
+route/prefix-list entry, both since fixed) — each one fully masked the
+next until fixed in order.
+
+Moving the network to `DMZ-Kubernetes` (the zone VLAN 100 already lives
+in, see above) fixed it immediately with no new Policy Table rules
+needed — zone-pair rules apply to every network in a zone, not
+per-network, so `DMZ-Kubernetes`'s existing `Internal → DMZ-Kubernetes`
+etc. rules already covered it.
+
+**Fixed at the source**: `filipowm/terraform-provider-unifi`'s
+`unifi_network` resource exposes `firewall_zone_id` directly (UniFi OS
+9.x+ with ZBF enabled), and a `unifi_firewall_zone` data source resolves
+a zone's ID by name. `xnetworksegment/composition.yaml`'s Terraform
+module now looks up `DMZ-Kubernetes` by name and sets
+`firewall_zone_id` on every `unifi_network` it creates, so this can't
+recur for a future `XNetworkSegment`-provisioned cluster the way it did
+here.
 
 ## Debugging tools used
 
