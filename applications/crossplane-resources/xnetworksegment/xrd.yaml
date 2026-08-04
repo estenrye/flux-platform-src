@@ -52,6 +52,24 @@ spec:
                 # that's actually free rather than trusting a formula not
                 # to collide with something hand-configured elsewhere.
                 description: "IPv4 subnet + gateway for this segment, CIDR notation, e.g. \"10.200.0.1/16\" -- required even though this fleet's clusters are IPv6-only end to end (confirmed live: UniFi won't claim router/RA ownership of a network with no IPv4 subnet object at all, regardless of `purpose`; matches vlan100/vlan101's own convention of an unused-but-present IPv4 subnet, DHCP disabled). Pick something that doesn't collide with any other network in the UniFi UI's network list -- not validated against live UniFi state here."
+              firewallZone:
+                type: string
+                default: "DMZ-Kubernetes"
+                # ADDED 2026-08-05, caught live (3rd stacked bug blocking
+                # observability's bootstrap Job, docs/memory/
+                # unifi-zone-firewall.md): a network created without an
+                # explicit firewall_zone_id lands in UniFi's default
+                # "Internal" zone, which doesn't permit new inbound
+                # connections from controlplane's own zone -- confirmed via
+                # a live tcpdump showing zero packets ever reaching the
+                # gateway's bridge interface. A caller-supplied field with
+                # a sensible default instead of a value hardcoded in the
+                # Composition, matching every other XR-configurable value
+                # here (vlanId, infraSubnet, ipv4Subnet) -- a future
+                # segment that legitimately needs a different zone (or a
+                # site with no DMZ-Kubernetes zone at all) can override it,
+                # rather than requiring a Composition edit.
+                description: "Name of the UniFi zone-based-firewall zone (Settings > Zones) this segment's network should be assigned to, resolved via a unifi_firewall_zone data source. Defaults to \"DMZ-Kubernetes\", the zone controlplane's own VLAN 100 lives in (docs/memory/unifi-zone-firewall.md) -- override only if this segment needs different zone-pair policy or the target site uses a different zone name."
             required:
             - vlanId
             - infraSubnet

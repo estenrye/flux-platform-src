@@ -36,6 +36,7 @@ spec:
           {{ $vlanId := .observed.composite.resource.spec.vlanId }}
           {{ $infraSubnet := .observed.composite.resource.spec.infraSubnet }}
           {{ $ipv4Subnet := .observed.composite.resource.spec.ipv4Subnet }}
+          {{ $firewallZone := .observed.composite.resource.spec.firewallZone }}
           {{ $environment := index .context "apiextensions.crossplane.io/environment" }}
           {{ $bridgeName := printf "br%d" (int $vlanId) }}
 
@@ -188,6 +189,27 @@ spec:
                 # picks something that doesn't collide with anything else
                 # in the UniFi network list, same as vlan100/vlan101's own
                 # hand-picked, unused, DHCP-disabled IPv4 subnets.
+                # CORRECTED 2026-08-05, caught live (3rd round): purpose,
+                # IPv4 subnet, and BGP route/prefix-list were all correct
+                # and the node was reachable via ICMP from the KVM host on
+                # the same segment, but a bootstrap Job pod (on
+                # `controlplane`, a different VLAN) still got zero TCP
+                # packets through -- confirmed via a live tcpdump on
+                # br200 that showed nothing arriving at all for a SYN sent
+                # from the pod. Root cause: this network was landing in
+                # UniFi's default "Internal" zone-based-firewall zone,
+                # which doesn't permit new inbound connections from
+                # controlplane's zone. The target zone comes from the XR's
+                # own spec.firewallZone (xrd.yaml, default
+                # "DMZ-Kubernetes") rather than a value hardcoded here --
+                # matches every other XR-configurable value in this
+                # Composition (vlanId, infraSubnet, ipv4Subnet), and lets
+                # a future segment or site override it without a
+                # Composition edit.
+                data "unifi_firewall_zone" "segment" {
+                  name = "{{ $firewallZone }}"
+                }
+
                 resource "unifi_network" "segment" {
                   name                = "{{ $name }}"
                   purpose             = "corporate"
@@ -197,6 +219,7 @@ spec:
                   ipv6_interface_type = "static"
                   ipv6_static_subnet  = "{{ $infraSubnet }}"
                   ipv6_ra_enable      = true
+                  firewall_zone_id    = data.unifi_firewall_zone.segment.id
                 }
           {{ end }}
 
