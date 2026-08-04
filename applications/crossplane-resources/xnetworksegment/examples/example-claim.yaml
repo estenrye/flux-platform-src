@@ -14,3 +14,4 @@ metadata:
 spec:
   vlanId: 200
   infraSubnet: "fd97:45c2:b3a1:200::/64"
+  ipv4Subnet: "10.200.0.1/16"

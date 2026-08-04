@@ -39,9 +39,23 @@ spec:
               infraSubnet:
                 type: string
                 description: "ULA /64 for this segment, e.g. \"fd97:45c2:b3a1:200::/64\". Single source of truth for this value -- a claiming XKubernetesCluster's own platform-kvm-network EnvironmentConfig entry has its own infraSubnet field too (used for the Talos bootstrap Job's env vars, which don't fetch this XR); keep the two in sync by hand until that's worth plumbing through extra-resources as well."
+              ipv4Subnet:
+                type: string
+                # ADDED 2026-08-05: an earlier version of this field
+                # derived an IPv4 subnet from vlanId ("10.<vlanId>.0.1/16")
+                # instead of taking one explicitly, which silently broke
+                # for any vlanId over 255 (doesn't fit an IPv4 octet) --
+                # caught in review before merging. Explicit and required
+                # instead of derived: the derivation coupled two unrelated
+                # decisions (802.1Q ID, IPv4 addressing) that don't have
+                # to move together, and this way a caller picks a subnet
+                # that's actually free rather than trusting a formula not
+                # to collide with something hand-configured elsewhere.
+                description: "IPv4 subnet + gateway for this segment, CIDR notation, e.g. \"10.200.0.1/16\" -- required even though this fleet's clusters are IPv6-only end to end (confirmed live: UniFi won't claim router/RA ownership of a network with no IPv4 subnet object at all, regardless of `purpose`; matches vlan100/vlan101's own convention of an unused-but-present IPv4 subnet, DHCP disabled). Pick something that doesn't collide with any other network in the UniFi UI's network list -- not validated against live UniFi state here."
             required:
             - vlanId
             - infraSubnet
+            - ipv4Subnet
           status:
             type: object
             properties:
