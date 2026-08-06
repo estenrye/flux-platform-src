@@ -156,15 +156,25 @@ spec:
             {{ end }}
           {{ end }}
 
-          {{ if $environment.hosts }}
-          {{ $host := index $environment.hosts 0 }}
+          {{ range $host := $environment.hosts }}
+          {{/* One AnsibleRun per host, not just the first -- addresses/
+               routes are per-host maps (spec.addresses/spec.routes keyed
+               by host.name) precisely because a shared VLAN needs each
+               host to carry its own unique address(es), not the same one
+               duplicated. index on a map with no entry for this host
+               returns nil, not an error -- that host's bridge/VLAN
+               sub-interface still gets created, just without static
+               addressing, matching this field's behavior before it
+               existed at all. */}}
+          {{ $hostAddresses := index $addresses $host.name }}
+          {{ $hostRoutes := index $routes $host.name }}
           ---
           apiVersion: ansible.crossplane.io/v1alpha1
           kind: AnsibleRun
           metadata:
-            name: {{ $name }}-bridge
+            name: {{ $name }}-bridge-{{ $host.name }}
             annotations:
-              gotemplating.fn.crossplane.io/composition-resource-name: bridge
+              gotemplating.fn.crossplane.io/composition-resource-name: bridge-{{ $host.name }}
           spec:
             forProvider:
               inventoryInline: |
@@ -223,7 +233,7 @@ spec:
                         fail_msg: "A bridge address is not within {{ $unifiNetworkRef.name }}'s infraSubnet {{ $unifiInfraSubnet }} -- see this task's per-item result for which address failed."
                         success_msg: "All bridge addresses fall within {{ $unifiInfraSubnet }}."
                       loop:
-                        {{ range $addr := $addresses }}
+                        {{ range $addr := $hostAddresses }}
                         - "{{ $addr }}"
                         {{ end }}
                     {{ end }}
@@ -245,15 +255,15 @@ spec:
                                 interfaces: ["{{ $uplinkIface }}"]
                                 dhcp4: {{ $dhcp4 }}
                                 dhcp6: {{ $dhcp6 }}
-                                {{ if $addresses }}
+                                {{ if $hostAddresses }}
                                 addresses:
-                                  {{ range $addr := $addresses }}
+                                  {{ range $addr := $hostAddresses }}
                                   - "{{ $addr }}"
                                   {{ end }}
                                 {{ end }}
-                                {{ if $routes }}
+                                {{ if $hostRoutes }}
                                 routes:
-                                  {{ range $route := $routes }}
+                                  {{ range $route := $hostRoutes }}
                                   - to: "{{ $route.to }}"
                                     {{ if $route.via }}via: "{{ $route.via }}"{{ end }}
                                     {{ if $route.scope }}scope: "{{ $route.scope }}"{{ end }}
@@ -285,18 +295,30 @@ spec:
             {{ $bridgeName = .observed.composite.resource.spec.bridgeName }}
           {{ end }}
           {{ $unifiNetworkRef := .observed.composite.resource.spec.unifiNetworkRef }}
-          {{ $bridgeReady := false }}
+          {{/* One AnsibleRun per host now (create-bridge's own range over
+               $environment.hosts), named "bridge-<host.name>" instead of
+               a single exact "bridge" -- ready means at least one such
+               resource exists AND every one of them reports Ready, not
+               just the first found. */}}
+          {{ $bridgeCount := 0 }}
+          {{ $allBridgesReady := true }}
           {{ if .observed.resources }}
             {{ range $rname, $resource := .observed.resources }}
-              {{ if eq $rname "bridge" }}
+              {{ if hasPrefix "bridge-" $rname }}
+                {{ $bridgeCount = add $bridgeCount 1 }}
+                {{ $thisBridgeReady := false }}
                 {{ range $cond := $resource.resource.status.conditions }}
                   {{ if and (eq $cond.type "Ready") (eq $cond.status "True") }}
-                    {{ $bridgeReady = true }}
+                    {{ $thisBridgeReady = true }}
                   {{ end }}
+                {{ end }}
+                {{ if not $thisBridgeReady }}
+                  {{ $allBridgesReady = false }}
                 {{ end }}
               {{ end }}
             {{ end }}
           {{ end }}
+          {{ $bridgeReady := and (gt $bridgeCount 0) $allBridgesReady }}
 
           {{/* Unlike "bridge" above, the UniFi network is no longer
                composed here -- it's fetched via extra-resources
