@@ -58,7 +58,14 @@ for raw_doc in raw_docs:
     objects.append({
         "apiVersion": "kubernetes.m.crossplane.io/v1alpha1",
         "kind": "Object",
-        "metadata": {"name": safe_name},
+        # kubernetes.m.crossplane.io/v1alpha1 Object is namespaced
+        # (confirmed live 2026-08-06: applying without one failed with
+        # "namespace not specified") -- crossplane-system, matching every
+        # other Object/ClusterProviderConfig-referencing resource in this
+        # repo. This is the Object's OWN namespace on controlplane, not the
+        # namespace of the wrapped remote resource (that's whatever the
+        # rendered manifest itself carries, untouched, in forProvider.manifest).
+        "metadata": {"name": safe_name, "namespace": "crossplane-system"},
         "spec": {
             "forProvider": {"manifest": doc},
             "providerConfigRef": {"kind": "ClusterProviderConfig", "name": provider_config_name},
