@@ -1,0 +1,192 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: unifi-network
+  labels:
+    substrate: unifi
+spec:
+  compositeTypeRef:
+    apiVersion: platform.rye.ninja/v1alpha1
+    kind: XUnifiNetwork
+
+  mode: Pipeline
+  pipeline:
+  - step: create-vlan
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{ $name := .observed.composite.resource.metadata.name }}
+          {{ $vlanId := .observed.composite.resource.spec.vlanId }}
+          {{ $infraSubnet := .observed.composite.resource.spec.infraSubnet }}
+          {{ $ipv4Subnet := .observed.composite.resource.spec.ipv4Subnet }}
+          {{ $firewallZone := .observed.composite.resource.spec.firewallZone }}
+          ---
+          apiVersion: tf.m.upbound.io/v1beta1
+          kind: Workspace
+          metadata:
+            name: {{ $name }}-vlan
+            # tf.m.upbound.io's Workspace is namespaced (that's the whole
+            # point of the .m. group) -- XUnifiNetwork itself is
+            # cluster-scoped (xrd.yaml's spec.scope: Cluster) so there's
+            # no namespace to implicitly inherit. Confirmed live 2026-08-04
+            # against this exact pattern in xnetworksegment's own
+            # Composition (this resource was split out of there
+            # 2026-08-06, behaviorally unchanged): omitting this produced
+            # "an empty namespace may not be set when a resource name is
+            # provided". crossplane-system matches where every other
+            # Workspace/ProviderConfig in this repo lives.
+            namespace: crossplane-system
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: vlan
+              crossplane.io/external-name: {{ $name }}-vlan
+          spec:
+            providerConfigRef:
+              kind: ClusterProviderConfig
+              name: unifi
+            forProvider:
+              source: Inline
+              module: |
+                terraform {
+                  backend "kubernetes" {
+                    secret_suffix     = "{{ $name }}-vlan"
+                    namespace         = "crossplane-system"
+                    in_cluster_config = true
+                  }
+                }
+
+                # CORRECTED 2026-08-04, caught live: purpose was
+                # "vlan-only" ("Third Party Gateway" in the UniFi UI) --
+                # confirmed via the live `ryezone-labs-ipv6` (VLAN 100)
+                # network's own stored config (`purpose: "corporate"`)
+                # that vlan-only means UniFi does ONLY L2 switching for
+                # that network, explicitly NOT L3 routing/RA, and expects
+                # an external device to be the gateway. Nothing else was
+                # positioned to fill that role, so ipv6_ra_enable below
+                # was silently a no-op -- no RA was ever sent on this
+                # VLAN. This matters beyond "more correct": Talos accepts
+                # Router Advertisements by default on a host interface
+                # (independent of the machine config's `dhcp: false`,
+                # which only disables DHCP address assignment, not RA
+                # processing -- images/docker/talos-cluster-bootstrap/
+                # bootstrap.sh's rendered machine config has no explicit
+                # `::/0` route at all, relying entirely on RA for a
+                # default route, same as controlplane's own nodes). With
+                # no RA being sent, the nodes had no default route and
+                # could not reply to anything outside their own /64 --
+                # the concrete cause of the bootstrap Job's connection
+                # timeouts, not just a config-hygiene issue.
+                #
+                # ipv6_interface_type stays "static" (not "pd" like
+                # vlan100) rather than replicating vlan100's exact
+                # structure (GUA via PD as the primary interface, ULA as
+                # a secondary "ipv6_aliases" entry) -- confirmed live that
+                # filipowm/unifi's Terraform provider exposes no
+                # alias-equivalent resource at all (checked every
+                # resource in its docs), so exact replication isn't
+                # achievable via Terraform. This network's whole purpose
+                # is ULA-based (infraSubnet, node ULAs, apiserverVip --
+                # nothing here uses GUA), and controlplane's own running
+                # nodes prove a cluster needs no GUA/direct v6 egress at
+                # all (same dhcp:false/ULA-only/NAT64-route-only pattern
+                # in .bin/create-controlplane-cluster.sh), so skipping PD
+                # for this segment is a deliberate scope choice, not a
+                # gap being silently accepted. (2026-08-06: a segment that
+                # genuinely needs real v6 egress instead reuses VLAN 100's
+                # already-live hybrid via XNetworkSegment's
+                # unifiNetworkRef being left unset, rather than this
+                # Composition trying to replicate that structure.)
+                #
+                # CORRECTED 2026-08-04, caught live (2nd round): purpose
+                # "corporate" alone was necessary but not sufficient --
+                # the UniFi UI still showed this network's Router as
+                # "Third-party Gateway" after that fix, and no RA/dnsmasq
+                # process ever started for br200. Confirmed by comparing
+                # every network in the live UI: every one showing a real
+                # router (usmnblm01.rye.ninja) has an IPv4 `subnet`
+                # populated -- including vlan100/vlan101, which are
+                # otherwise unused for cluster IPv4 traffic (DHCP: None)
+                # -- and this was the only network with no IPv4 subnet at
+                # all. UniFi's network-ownership/routing model is
+                # IPv4-primary even for an IPv6-focused network: it
+                # apparently won't claim router ownership (or start RA)
+                # for a network with no IPv4 subnet object, regardless of
+                # `purpose`.
+                #
+                # CORRECTED 2026-08-05, caught in review before merging:
+                # the IPv4 subnet was originally derived from vlanId as a
+                # "10.<vlanId>.0.1/16" string -- broke for any vlanId over
+                # 255 (doesn't fit an IPv4 octet), and coupled two
+                # decisions (802.1Q ID, IPv4 addressing) that don't have
+                # to move together. Now an explicit, caller-supplied XR
+                # spec field (xrd.yaml's ipv4Subnet) instead -- the caller
+                # picks something that doesn't collide with anything else
+                # in the UniFi network list, same as vlan100/vlan101's own
+                # hand-picked, unused, DHCP-disabled IPv4 subnets.
+                # CORRECTED 2026-08-05, caught live (3rd round): purpose,
+                # IPv4 subnet, and BGP route/prefix-list were all correct
+                # and the node was reachable via ICMP from the KVM host on
+                # the same segment, but a bootstrap Job pod (on
+                # `controlplane`, a different VLAN) still got zero TCP
+                # packets through -- confirmed via a live tcpdump on
+                # br200 that showed nothing arriving at all for a SYN sent
+                # from the pod. Root cause: this network was landing in
+                # UniFi's default "Internal" zone-based-firewall zone,
+                # which doesn't permit new inbound connections from
+                # controlplane's zone. The target zone comes from the XR's
+                # own spec.firewallZone (xrd.yaml, default
+                # "DMZ-Kubernetes") rather than a value hardcoded here --
+                # matches every other XR-configurable value in this
+                # Composition (vlanId, infraSubnet, ipv4Subnet), and lets
+                # a future segment or site override it without a
+                # Composition edit.
+                data "unifi_firewall_zone" "segment" {
+                  name = "{{ $firewallZone }}"
+                }
+
+                resource "unifi_network" "segment" {
+                  name                = "{{ $name }}"
+                  purpose             = "corporate"
+                  vlan_id             = {{ $vlanId }}
+                  subnet              = "{{ $ipv4Subnet }}"
+                  dhcp_enabled        = false
+                  ipv6_interface_type = "static"
+                  ipv6_static_subnet  = "{{ $infraSubnet }}"
+                  ipv6_ra_enable      = true
+                  firewall_zone_id    = data.unifi_firewall_zone.segment.id
+                }
+
+  - step: status-update
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{ $ready := false }}
+          {{ if .observed.resources }}
+            {{ range $rname, $resource := .observed.resources }}
+              {{ if eq $rname "vlan" }}
+                {{ range $cond := $resource.resource.status.conditions }}
+                  {{ if and (eq $cond.type "Ready") (eq $cond.status "True") }}
+                    {{ $ready = true }}
+                  {{ end }}
+                {{ end }}
+              {{ end }}
+            {{ end }}
+          {{ end }}
+          ---
+          apiVersion: platform.rye.ninja/v1alpha1
+          kind: XUnifiNetwork
+          status:
+            ready: {{ $ready }}
+
+  - step: auto-ready
+    functionRef:
+      name: function-auto-ready

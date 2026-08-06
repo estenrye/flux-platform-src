@@ -1,0 +1,24 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: xunifinetwork-examples
+  description: |-
+    Example claim for the XUnifiNetwork / unifi-network Crossplane
+    composition. Not wired into any live cluster's kustomization tree --
+    documentation only, though it also carries observability's real values,
+    kept in sync by hand. See ./README.md.
+  tags:
+    - crossplane
+    - crossplane-examples
+    - unifi
+    - examples
+    - documentation
+  links:
+    - url: ./README.md
+      title: xunifinetwork examples documentation
+      icon: docs
+      type: documentation
+spec:
+  type: documentation
+  lifecycle: production
+  owner: platform-engineering

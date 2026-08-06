@@ -71,15 +71,12 @@ data:
     # appliance's 0x64, since both clusters' VMs currently share the same
     # physical bridge (D1) and identical suffixes would produce identical,
     # colliding MAC addresses despite living in different /64s.
-    observability:
-      apiserverVip: "fd97:45c2:b3a1:200::30"
-      infraSubnet: "fd97:45c2:b3a1:200::/64"
-      podCidr: "fd97:45c2:b3a1:1200::/56"
-      serviceCidr: "fd97:45c2:b3a1:2100::/112"
-      bgpAsn: 64514
-      vlanId: 200
-      controlPlaneNodeUlas:
-        observability-cp-1: "fd97:45c2:b3a1:200::31"
-        observability-cp-2: "fd97:45c2:b3a1:200::32"
-        observability-cp-3: "fd97:45c2:b3a1:200::33"
-      workerNodeUlas: {}
+    # observability's entry (vlanId 200, fd97:45c2:b3a1:200::/64) removed
+    # 2026-08-06: the cluster and its dedicated VLAN 200 network were torn
+    # down (both the live XKubernetesCluster/XNetworkSegment claims and
+    # this allocation) ahead of the XNetworkSegment/XUnifiNetwork split
+    # (unifiNetworkRef) landing -- a future re-creation adds a fresh entry
+    # here, potentially reusing controlplane's own VLAN 100 instead of a
+    # dedicated VLAN (see docs/memory/m4-network-architecture-no-isolation-
+    # requirement.md for why a dedicated VLAN is no longer assumed
+    # necessary).

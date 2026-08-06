@@ -13,5 +13,9 @@ metadata:
     platform.rye.ninja/network-segment-name: observability-vlan
 spec:
   vlanId: 200
-  infraSubnet: "fd97:45c2:b3a1:200::/64"
-  ipv4Subnet: "10.200.0.1/16"
+  # References xunifinetwork/examples/example-claim.yaml, which creates the
+  # actual UniFi network/VLAN object -- omit this field entirely for a
+  # segment that reuses an already-existing network instead (see
+  # xrd.yaml's unifiNetworkRef description).
+  unifiNetworkRef:
+    name: observability-vlan

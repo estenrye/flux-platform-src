@@ -1,15 +1,24 @@
 # Cluster-scoped, deliberately -- NOT namespaced like XKubernetesCluster.
 # Exists specifically so its Composition can compose ansible.crossplane.io's
 # AnsibleRun (hard cluster-scoped, no namespace-aware variant published --
-# confirmed via provider-ansible's apis/ directory, 2026-08-04) and
-# tf.m.upbound.io's Workspace, without hitting Crossplane's
-# errFmtNamespacedXRClusterResource rule ("if the XR is namespaced then the
-# composed resource must be too" -- confirmed against crossplane/
-# crossplane's own composition_functions.go). A namespaced XR (like
-# XKubernetesCluster) cannot compose either resource directly; a
-# Cluster-scoped one can compose resources at any scope. XKubernetesCluster
-# references this by name (spec.vlanRef.name) instead of composing it,
-# fetched via function-extra-resources -- see cluster-talos-kvm-composition.
+# confirmed via provider-ansible's apis/ directory, 2026-08-04), without
+# hitting Crossplane's errFmtNamespacedXRClusterResource rule ("if the XR is
+# namespaced then the composed resource must be too" -- confirmed against
+# crossplane/crossplane's own composition_functions.go). A namespaced XR
+# (like XKubernetesCluster) cannot compose it directly; a Cluster-scoped one
+# can compose resources at any scope. XKubernetesCluster references this by
+# name (spec.vlanRef.name) instead of composing it, fetched via
+# function-extra-resources -- see cluster-talos-kvm-composition.
+#
+# Owns only the KVM-host bridge. The UniFi network/VLAN object used to be
+# composed here directly too, until split out (2026-08-06) into its own
+# XUnifiNetwork XRD, optionally referenced by spec.unifiNetworkRef -- same
+# reference-by-name-via-extra-resources pattern as XKubernetesCluster's own
+# vlanRef into this XRD. Splitting it out means: a segment reusing an
+# already-existing UniFi network (e.g. VLAN 100) references nothing at all,
+# and a future non-UniFi backend (e.g. a cloud VPC subnet) can exist as a
+# sibling XRD without this Composition needing to know its shape -- it only
+# ever reads a referenced backend's generic status.ready.
 apiVersion: apiextensions.crossplane.io/v2
 kind: CompositeResourceDefinition
 metadata:
@@ -36,44 +45,47 @@ spec:
                 minimum: 1
                 maximum: 4094
                 description: "802.1Q VLAN ID for this segment's dedicated bridge on the KVM host -- see providers/kvm/ansible/roles/bridge for the reference playbook (the Composition embeds an inlined, kept-in-sync-by-hand copy for the same Go-template/Jinja2 {{ }} delimiter-collision reason talos-cluster's Terraform module is embedded rather than git-sourced)."
-              infraSubnet:
-                type: string
-                description: "ULA /64 for this segment, e.g. \"fd97:45c2:b3a1:200::/64\". Single source of truth for this value -- a claiming XKubernetesCluster's own platform-kvm-network EnvironmentConfig entry has its own infraSubnet field too (used for the Talos bootstrap Job's env vars, which don't fetch this XR); keep the two in sync by hand until that's worth plumbing through extra-resources as well."
-              ipv4Subnet:
-                type: string
-                # ADDED 2026-08-05: an earlier version of this field
-                # derived an IPv4 subnet from vlanId ("10.<vlanId>.0.1/16")
-                # instead of taking one explicitly, which silently broke
-                # for any vlanId over 255 (doesn't fit an IPv4 octet) --
-                # caught in review before merging. Explicit and required
-                # instead of derived: the derivation coupled two unrelated
-                # decisions (802.1Q ID, IPv4 addressing) that don't have
-                # to move together, and this way a caller picks a subnet
-                # that's actually free rather than trusting a formula not
-                # to collide with something hand-configured elsewhere.
-                description: "IPv4 subnet + gateway for this segment, CIDR notation, e.g. \"10.200.0.1/16\" -- required even though this fleet's clusters are IPv6-only end to end (confirmed live: UniFi won't claim router/RA ownership of a network with no IPv4 subnet object at all, regardless of `purpose`; matches vlan100/vlan101's own convention of an unused-but-present IPv4 subnet, DHCP disabled). Pick something that doesn't collide with any other network in the UniFi UI's network list -- not validated against live UniFi state here."
-              firewallZone:
-                type: string
-                default: "DMZ-Kubernetes"
-                # ADDED 2026-08-05, caught live (3rd stacked bug blocking
-                # observability's bootstrap Job, docs/memory/
-                # unifi-zone-firewall.md): a network created without an
-                # explicit firewall_zone_id lands in UniFi's default
-                # "Internal" zone, which doesn't permit new inbound
-                # connections from controlplane's own zone -- confirmed via
-                # a live tcpdump showing zero packets ever reaching the
-                # gateway's bridge interface. A caller-supplied field with
-                # a sensible default instead of a value hardcoded in the
-                # Composition, matching every other XR-configurable value
-                # here (vlanId, infraSubnet, ipv4Subnet) -- a future
-                # segment that legitimately needs a different zone (or a
-                # site with no DMZ-Kubernetes zone at all) can override it,
-                # rather than requiring a Composition edit.
-                description: "Name of the UniFi zone-based-firewall zone (Settings > Zones) this segment's network should be assigned to, resolved via a unifi_firewall_zone data source. Defaults to \"DMZ-Kubernetes\", the zone controlplane's own VLAN 100 lives in (docs/memory/unifi-zone-firewall.md) -- override only if this segment needs different zone-pair policy or the target site uses a different zone name."
+              dhcp4:
+                type: boolean
+                default: false
+                description: "netplan dhcp4 setting for this segment's bridge interface (the KVM host's own address on the bridge, not the VMs attached to it -- those get their own addressing via Talos machine config, entirely independent of this field). Defaults to false, matching the bridge's behavior before this field existed (no addressing block at all)."
+              dhcp6:
+                type: boolean
+                default: false
+                description: "netplan dhcp6 setting for this segment's bridge interface. Same scope and default-false reasoning as dhcp4."
+              addresses:
+                type: array
+                items:
+                  type: string
+                default: []
+                description: "Static addresses (CIDR notation, e.g. \"10.200.0.5/16\" or \"fd97:45c2:b3a1:200::5/64\") for this segment's bridge interface on the KVM host itself. Maps directly to netplan's bridges.<name>.addresses. Empty by default, matching the bridge's behavior before this field existed."
+              routes:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    to:
+                      type: string
+                      description: "Destination CIDR, e.g. \"0.0.0.0/0\" or \"::/0\"."
+                    via:
+                      type: string
+                      description: "Gateway address for this route."
+                  required:
+                  - to
+                  - via
+                default: []
+                description: "Static routes for this segment's bridge interface on the KVM host. Maps directly to netplan's bridges.<name>.routes. Caution: a route whose destination is a subnet that's ALSO reachable on-link via this same bridge (a nested/off-link route layered on top of an already-connected bridge) has already caused a real ICMPv6-redirect hairpin outage in this fleet once -- see docs/memory/m4-step-tracker.md and commit 177da4d. Prefer RA or dhcp4/dhcp6 for anything this segment's own connected network already provides; reserve this for genuinely off-link destinations."
+              unifiNetworkRef:
+                type: object
+                description: "Reference to an XUnifiNetwork claim (cluster-scoped) giving this segment's VLAN a real UniFi network/VLAN object. Optional -- omit for a segment that reuses an already-existing, already-configured UniFi network instead, e.g. VLAN 100, hand-configured outside this repo with a GUA-via-PD + ULA hybrid structure that filipowm/unifi's Terraform provider can't express (see xunifinetwork/composition.yaml's ipv6_interface_type comment). When omitted, status.ready depends only on the bridge (AnsibleRun) -- the bridge step itself still always runs regardless, and is idempotent (netplan applies only on diff), so pointing a second segment at an already-bridged VLAN is a harmless no-op, not an error. Resolved via function-extra-resources against a platform.rye.ninja/unifi-network-name label on the XUnifiNetwork (not composed directly -- same reasoning as XKubernetesCluster's own vlanRef into this XRD). When set, this segment's own vlanId and addresses are cross-checked against the referenced XUnifiNetwork's vlanId and infraSubnet -- see composition.yaml's validate-unifi-network-match step and the UnifiNetworkMatch ClaimCondition it sets. This is XNetworkSegment's only source of subnet truth now that its own infraSubnet field is gone (removed 2026-08-06, unused by the bridge itself and redundant with XUnifiNetwork's copy once split out)."
+                properties:
+                  name:
+                    type: string
+                    description: "Name of the XUnifiNetwork claim. Must also carry a matching platform.rye.ninja/unifi-network-name label -- the Composition selects by label, not by this name directly (function-extra-resources' Reference-by-name type doesn't support field-path templating, only Selector/matchLabels does)."
+                required:
+                - name
             required:
             - vlanId
-            - infraSubnet
-            - ipv4Subnet
           status:
             type: object
             properties:
@@ -82,4 +94,4 @@ spec:
                 description: "Derived (br<vlanId>), surfaced here so referencing Compositions don't need to recompute it."
               ready:
                 type: boolean
-                description: "True once both the bridge (AnsibleRun) and the UniFi VLAN (Workspace) report Ready. Set by this XRD's own Composition status-update step."
+                description: "True once the bridge (AnsibleRun) reports Ready, and -- only if unifiNetworkRef is set -- the referenced XUnifiNetwork's own status.ready is also true. Set by this XRD's own Composition status-update step."

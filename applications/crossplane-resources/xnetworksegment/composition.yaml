@@ -23,7 +23,95 @@ spec:
           ref:
             name: platform-kvm-hosts
 
-  - step: create-bridge-and-vlan
+  - step: fetch-unifi-network
+    functionRef:
+      name: function-extra-resources
+    input:
+      apiVersion: extra-resources.fn.crossplane.io/v1beta1
+      kind: Input
+      spec:
+        extraResources:
+          - kind: XUnifiNetwork
+            apiVersion: platform.rye.ninja/v1alpha1
+            into: XUnifiNetwork
+            type: Selector
+            selector:
+              maxMatch: 1
+              minMatch: 0
+              matchLabels:
+                - key: platform.rye.ninja/unifi-network-name
+                  type: FromCompositeFieldPath
+                  valueFromFieldPath: spec.unifiNetworkRef.name
+                  fromFieldPathPolicy: Optional
+            # Same pattern, and same unverified edge case, as
+            # xkubernetescluster-composition's own fetch-network-segment
+            # step: a claim with no unifiNetworkRef set means
+            # valueFromFieldPath resolves to nothing and Optional drops
+            # that label matcher entirely -- with only one label matcher
+            # configured, an empty matchLabels list's actual match
+            # semantics (matches nothing vs. matches everything) aren't
+            # confirmed against a live reconcile yet. Only one
+            # XUnifiNetwork is expected to exist at first, so an
+            # overmatch would be low-impact even if it happens; re-check
+            # this before a second XUnifiNetwork exists.
+
+  - step: validate-unifi-network-match
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{ $vlanId := .observed.composite.resource.spec.vlanId }}
+          {{ $unifiNetworkRef := .observed.composite.resource.spec.unifiNetworkRef }}
+          {{ $networkFound := false }}
+          {{ $vlanIdMatches := true }}
+          {{ $problem := "" }}
+          {{ if $unifiNetworkRef }}
+            {{ $extraResources := index .context "apiextensions.crossplane.io/extra-resources" }}
+            {{ if $extraResources }}
+              {{ $networks := index $extraResources "XUnifiNetwork" }}
+              {{ if and $networks (gt (len $networks) 0) }}
+                {{ $networkFound = true }}
+                {{ $network := index $networks 0 }}
+                {{ if ne $vlanId $network.spec.vlanId }}
+                  {{ $vlanIdMatches = false }}
+                  {{ $problem = printf "vlanId %v does not match XUnifiNetwork %q's vlanId %v" $vlanId $unifiNetworkRef.name $network.spec.vlanId }}
+                {{ end }}
+              {{ end }}
+            {{ end }}
+          {{ end }}
+          {{ $ok := and $networkFound $vlanIdMatches }}
+
+          {{/* addresses vs. the referenced XUnifiNetwork's infraSubnet is
+               NOT checked here -- that needs real CIDR-subset math, which
+               isn't reliably expressible in this Go-template pipeline
+               (confirmed live 2026-08-06: ansible.utils.in_network /
+               in_any_network work correctly in provider-ansible's runtime,
+               so that check lives in create-bridge's playbook instead, as
+               a real ansible.builtin.assert -- see there). This step only
+               covers vlanId (plain integer equality, no CIDR math needed)
+               for fast, host-independent kubectl visibility before any
+               AnsibleRun even executes. */}}
+          {{ if $unifiNetworkRef }}
+          ---
+          apiVersion: meta.gotemplating.fn.crossplane.io/v1alpha1
+          kind: ClaimConditions
+          conditions:
+            - type: UnifiNetworkMatch
+              status: {{ if $ok }}"True"{{ else }}"False"{{ end }}
+              reason: {{ if $ok }}Matches{{ else if not $networkFound }}NetworkNotFound{{ else }}Mismatch{{ end }}
+              message: {{ if $ok }}"vlanId matches the referenced XUnifiNetwork."{{ else if not $networkFound }}{{ printf "%q" (printf "No XUnifiNetwork found matching unifiNetworkRef %q." $unifiNetworkRef.name) }}{{ else }}{{ printf "%q" $problem }}{{ end }}
+              target: CompositeAndClaim
+          {{ end }}
+          # This condition is informational only -- it does not currently
+          # gate bridge creation (create-bridge below runs regardless of a
+          # vlanId mismatch). Revisit if a real mismatch ever needs to
+          # block rather than just be visible via `kubectl describe`.
+
+  - step: create-bridge
     functionRef:
       name: function-go-templating
     input:
@@ -34,11 +122,30 @@ spec:
         template: |
           {{ $name := .observed.composite.resource.metadata.name }}
           {{ $vlanId := .observed.composite.resource.spec.vlanId }}
-          {{ $infraSubnet := .observed.composite.resource.spec.infraSubnet }}
-          {{ $ipv4Subnet := .observed.composite.resource.spec.ipv4Subnet }}
-          {{ $firewallZone := .observed.composite.resource.spec.firewallZone }}
+          {{ $dhcp4 := .observed.composite.resource.spec.dhcp4 }}
+          {{ $dhcp6 := .observed.composite.resource.spec.dhcp6 }}
+          {{ $addresses := .observed.composite.resource.spec.addresses }}
+          {{ $routes := .observed.composite.resource.spec.routes }}
+          {{ $unifiNetworkRef := .observed.composite.resource.spec.unifiNetworkRef }}
           {{ $environment := index .context "apiextensions.crossplane.io/environment" }}
           {{ $bridgeName := printf "br%d" (int $vlanId) }}
+
+          {{/* Resolved here (not just in validate-unifi-network-match)
+               because this is where it's actually enforced -- see the
+               "Assert bridge addresses" task below. Empty string when
+               unifiNetworkRef is unset or unresolved, which the task
+               itself is gated on (no infraSubnet to check against). */}}
+          {{ $unifiInfraSubnet := "" }}
+          {{ if $unifiNetworkRef }}
+            {{ $extraResources := index .context "apiextensions.crossplane.io/extra-resources" }}
+            {{ if $extraResources }}
+              {{ $networks := index $extraResources "XUnifiNetwork" }}
+              {{ if and $networks (gt (len $networks) 0) }}
+                {{ $network := index $networks 0 }}
+                {{ $unifiInfraSubnet = $network.spec.infraSubnet }}
+              {{ end }}
+            {{ end }}
+          {{ end }}
 
           {{ if $environment.hosts }}
           {{ $host := index $environment.hosts 0 }}
@@ -71,6 +178,46 @@ spec:
                 - hosts: all
                   become: true
                   tasks:
+                    {{ if $unifiInfraSubnet }}
+                    # Real CIDR-subset math (ansible.utils.in_any_network,
+                    # confirmed live 2026-08-06 to work in
+                    # provider-ansible's runtime -- ansible.utils 6.0.1 is
+                    # installed, and the test works correctly despite
+                    # netaddr not being importable from any Python
+                    # interpreter in the pod, so it must resolve via
+                    # stdlib ipaddress internally, not netaddr). Hard gate,
+                    # unlike validate-unifi-network-match's vlanId check --
+                    # a bad address fails this whole AnsibleRun rather than
+                    # just setting a ClaimCondition. fail_msg deliberately
+                    # doesn't interpolate the loop variable Ansible-side --
+                    # writing that literal marker here would collide with
+                    # THIS Go template's own delimiters the same way
+                    # inventoryInline's big comment above already explains
+                    # (confirmed the hard way there, then again writing
+                    # THIS comment: an earlier draft spelled that marker
+                    # out directly as an example and broke this template
+                    # too). The failing address is still visible in this
+                    # task's own per-item Ansible result.
+                    - name: Assert bridge addresses are within {{ $unifiNetworkRef.name }}'s infraSubnet
+                      ansible.builtin.assert:
+                        # ansible.utils.in_any_network wants a bare address,
+                        # not a CIDR-suffixed one -- confirmed live
+                        # 2026-08-06: "<addr>/64" is ansible.utils.in_any_network(...)
+                        # silently evaluates false even for a genuinely
+                        # in-subnet address (it's comparing the /64
+                        # *network* those host bits fall in, not the host
+                        # address itself, against the target). item here
+                        # is always "<addr>/<prefixlen>" (netplan's own
+                        # addresses: format, matching xrd.yaml's addresses
+                        # field) -- split off the prefix length first.
+                        that: "item.split('/')[0] is ansible.utils.in_any_network(['{{ $unifiInfraSubnet }}'])"
+                        fail_msg: "A bridge address is not within {{ $unifiNetworkRef.name }}'s infraSubnet {{ $unifiInfraSubnet }} -- see this task's per-item result for which address failed."
+                        success_msg: "All bridge addresses fall within {{ $unifiInfraSubnet }}."
+                      loop:
+                        {{ range $addr := $addresses }}
+                        - "{{ $addr }}"
+                        {{ end }}
+                    {{ end }}
                     - name: Write netplan config for {{ $bridgeName }}
                       ansible.builtin.copy:
                         dest: /etc/netplan/60-{{ $bridgeName }}.yaml
@@ -85,6 +232,21 @@ spec:
                             bridges:
                               {{ $bridgeName }}:
                                 interfaces: ["bond0.{{ $vlanId }}"]
+                                dhcp4: {{ $dhcp4 }}
+                                dhcp6: {{ $dhcp6 }}
+                                {{ if $addresses }}
+                                addresses:
+                                  {{ range $addr := $addresses }}
+                                  - "{{ $addr }}"
+                                  {{ end }}
+                                {{ end }}
+                                {{ if $routes }}
+                                routes:
+                                  {{ range $route := $routes }}
+                                  - to: "{{ $route.to }}"
+                                    via: "{{ $route.via }}"
+                                  {{ end }}
+                                {{ end }}
                       register: netplan_config
                     - name: Apply netplan
                       ansible.builtin.command:
@@ -93,134 +255,6 @@ spec:
                       changed_when: true
             providerConfigRef:
               name: default
-          ---
-          apiVersion: tf.m.upbound.io/v1beta1
-          kind: Workspace
-          metadata:
-            name: {{ $name }}-vlan
-            # tf.m.upbound.io's Workspace is namespaced (that's the whole
-            # point of the .m. group) -- XNetworkSegment itself is
-            # cluster-scoped (xrd.yaml's spec.scope: Cluster) so there's
-            # no namespace to implicitly inherit. Confirmed live 2026-08-04:
-            # omitting this produced "an empty namespace may not be set
-            # when a resource name is provided". crossplane-system matches
-            # where every other Workspace/ProviderConfig in this repo
-            # lives.
-            namespace: crossplane-system
-            annotations:
-              gotemplating.fn.crossplane.io/composition-resource-name: vlan
-              crossplane.io/external-name: {{ $name }}-vlan
-          spec:
-            providerConfigRef:
-              kind: ClusterProviderConfig
-              name: unifi
-            forProvider:
-              source: Inline
-              module: |
-                terraform {
-                  backend "kubernetes" {
-                    secret_suffix     = "{{ $name }}-vlan"
-                    namespace         = "crossplane-system"
-                    in_cluster_config = true
-                  }
-                }
-
-                # CORRECTED 2026-08-04, caught live: purpose was
-                # "vlan-only" ("Third Party Gateway" in the UniFi UI) --
-                # confirmed via the live `ryezone-labs-ipv6` (VLAN 100)
-                # network's own stored config (`purpose: "corporate"`)
-                # that vlan-only means UniFi does ONLY L2 switching for
-                # that network, explicitly NOT L3 routing/RA, and expects
-                # an external device to be the gateway. Nothing else was
-                # positioned to fill that role, so ipv6_ra_enable below
-                # was silently a no-op -- no RA was ever sent on this
-                # VLAN. This matters beyond "more correct": Talos accepts
-                # Router Advertisements by default on a host interface
-                # (independent of the machine config's `dhcp: false`,
-                # which only disables DHCP address assignment, not RA
-                # processing -- images/docker/talos-cluster-bootstrap/
-                # bootstrap.sh's rendered machine config has no explicit
-                # `::/0` route at all, relying entirely on RA for a
-                # default route, same as controlplane's own nodes). With
-                # no RA being sent, the nodes had no default route and
-                # could not reply to anything outside their own /64 --
-                # the concrete cause of the bootstrap Job's connection
-                # timeouts, not just a config-hygiene issue.
-                #
-                # ipv6_interface_type stays "static" (not "pd" like
-                # vlan100) rather than replicating vlan100's exact
-                # structure (GUA via PD as the primary interface, ULA as
-                # a secondary "ipv6_aliases" entry) -- confirmed live that
-                # filipowm/unifi's Terraform provider exposes no
-                # alias-equivalent resource at all (checked every
-                # resource in its docs), so exact replication isn't
-                # achievable via Terraform. This network's whole purpose
-                # is ULA-based (infraSubnet, node ULAs, apiserverVip --
-                # nothing here uses GUA), and controlplane's own running
-                # nodes prove a cluster needs no GUA/direct v6 egress at
-                # all (same dhcp:false/ULA-only/NAT64-route-only pattern
-                # in .bin/create-controlplane-cluster.sh), so skipping PD
-                # for this segment is a deliberate scope choice, not a
-                # gap being silently accepted.
-                #
-                # CORRECTED 2026-08-04, caught live (2nd round): purpose
-                # "corporate" alone was necessary but not sufficient --
-                # the UniFi UI still showed this network's Router as
-                # "Third-party Gateway" after that fix, and no RA/dnsmasq
-                # process ever started for br200. Confirmed by comparing
-                # every network in the live UI: every one showing a real
-                # router (usmnblm01.rye.ninja) has an IPv4 `subnet`
-                # populated -- including vlan100/vlan101, which are
-                # otherwise unused for cluster IPv4 traffic (DHCP: None)
-                # -- and this was the only network with no IPv4 subnet at
-                # all. UniFi's network-ownership/routing model is
-                # IPv4-primary even for an IPv6-focused network: it
-                # apparently won't claim router ownership (or start RA)
-                # for a network with no IPv4 subnet object, regardless of
-                # `purpose`.
-                #
-                # CORRECTED 2026-08-05, caught in review before merging:
-                # the IPv4 subnet was originally derived from vlanId as a
-                # "10.<vlanId>.0.1/16" string -- broke for any vlanId over
-                # 255 (doesn't fit an IPv4 octet), and coupled two
-                # decisions (802.1Q ID, IPv4 addressing) that don't have
-                # to move together. Now an explicit, caller-supplied XR
-                # spec field (xrd.yaml's ipv4Subnet) instead -- the caller
-                # picks something that doesn't collide with anything else
-                # in the UniFi network list, same as vlan100/vlan101's own
-                # hand-picked, unused, DHCP-disabled IPv4 subnets.
-                # CORRECTED 2026-08-05, caught live (3rd round): purpose,
-                # IPv4 subnet, and BGP route/prefix-list were all correct
-                # and the node was reachable via ICMP from the KVM host on
-                # the same segment, but a bootstrap Job pod (on
-                # `controlplane`, a different VLAN) still got zero TCP
-                # packets through -- confirmed via a live tcpdump on
-                # br200 that showed nothing arriving at all for a SYN sent
-                # from the pod. Root cause: this network was landing in
-                # UniFi's default "Internal" zone-based-firewall zone,
-                # which doesn't permit new inbound connections from
-                # controlplane's zone. The target zone comes from the XR's
-                # own spec.firewallZone (xrd.yaml, default
-                # "DMZ-Kubernetes") rather than a value hardcoded here --
-                # matches every other XR-configurable value in this
-                # Composition (vlanId, infraSubnet, ipv4Subnet), and lets
-                # a future segment or site override it without a
-                # Composition edit.
-                data "unifi_firewall_zone" "segment" {
-                  name = "{{ $firewallZone }}"
-                }
-
-                resource "unifi_network" "segment" {
-                  name                = "{{ $name }}"
-                  purpose             = "corporate"
-                  vlan_id             = {{ $vlanId }}
-                  subnet              = "{{ $ipv4Subnet }}"
-                  dhcp_enabled        = false
-                  ipv6_interface_type = "static"
-                  ipv6_static_subnet  = "{{ $infraSubnet }}"
-                  ipv6_ra_enable      = true
-                  firewall_zone_id    = data.unifi_firewall_zone.segment.id
-                }
           {{ end }}
 
   - step: status-update
@@ -233,8 +267,8 @@ spec:
       inline:
         template: |
           {{ $vlanId := .observed.composite.resource.spec.vlanId }}
+          {{ $unifiNetworkRef := .observed.composite.resource.spec.unifiNetworkRef }}
           {{ $bridgeReady := false }}
-          {{ $vlanReady := false }}
           {{ if .observed.resources }}
             {{ range $rname, $resource := .observed.resources }}
               {{ if eq $rname "bridge" }}
@@ -244,11 +278,26 @@ spec:
                   {{ end }}
                 {{ end }}
               {{ end }}
-              {{ if eq $rname "vlan" }}
-                {{ range $cond := $resource.resource.status.conditions }}
-                  {{ if and (eq $cond.type "Ready") (eq $cond.status "True") }}
-                    {{ $vlanReady = true }}
-                  {{ end }}
+            {{ end }}
+          {{ end }}
+
+          {{/* Unlike "bridge" above, the UniFi network is no longer
+               composed here -- it's fetched via extra-resources
+               (fetch-unifi-network step), same as
+               xkubernetescluster-composition's own read of this XRD's
+               own status.ready. A segment with no unifiNetworkRef set
+               is trivially network-ready; one that references an
+               XUnifiNetwork waits on that claim's own status.ready. */}}
+          {{ $unifiNetworkReady := true }}
+          {{ if $unifiNetworkRef }}
+            {{ $unifiNetworkReady = false }}
+            {{ $extraResources := index .context "apiextensions.crossplane.io/extra-resources" }}
+            {{ if $extraResources }}
+              {{ $networks := index $extraResources "XUnifiNetwork" }}
+              {{ if and $networks (gt (len $networks) 0) }}
+                {{ $network := index $networks 0 }}
+                {{ if $network.status.ready }}
+                  {{ $unifiNetworkReady = true }}
                 {{ end }}
               {{ end }}
             {{ end }}
@@ -258,7 +307,7 @@ spec:
           kind: XNetworkSegment
           status:
             bridgeName: {{ printf "br%d" (int $vlanId) }}
-            ready: {{ and $bridgeReady $vlanReady }}
+            ready: {{ and $bridgeReady $unifiNetworkReady }}
 
   - step: auto-ready
     functionRef:
