@@ -126,9 +126,18 @@ spec:
           {{ $dhcp6 := .observed.composite.resource.spec.dhcp6 }}
           {{ $addresses := .observed.composite.resource.spec.addresses }}
           {{ $routes := .observed.composite.resource.spec.routes }}
+          {{ $taggedVlan := .observed.composite.resource.spec.taggedVlan }}
+          {{ $bondInterface := .observed.composite.resource.spec.bondInterface }}
           {{ $unifiNetworkRef := .observed.composite.resource.spec.unifiNetworkRef }}
           {{ $environment := index .context "apiextensions.crossplane.io/environment" }}
           {{ $bridgeName := printf "br%d" (int $vlanId) }}
+          {{ if .observed.composite.resource.spec.bridgeName }}
+            {{ $bridgeName = .observed.composite.resource.spec.bridgeName }}
+          {{ end }}
+          {{ $uplinkIface := printf "%s.%d" $bondInterface (int $vlanId) }}
+          {{ if not $taggedVlan }}
+            {{ $uplinkIface = $bondInterface }}
+          {{ end }}
 
           {{/* Resolved here (not just in validate-unifi-network-match)
                because this is where it's actually enforced -- see the
@@ -225,13 +234,15 @@ spec:
                         content: |
                           network:
                             version: 2
+                            {{ if $taggedVlan }}
                             vlans:
-                              bond0.{{ $vlanId }}:
+                              {{ $uplinkIface }}:
                                 id: {{ $vlanId }}
-                                link: bond0
+                                link: {{ $bondInterface }}
+                            {{ end }}
                             bridges:
                               {{ $bridgeName }}:
-                                interfaces: ["bond0.{{ $vlanId }}"]
+                                interfaces: ["{{ $uplinkIface }}"]
                                 dhcp4: {{ $dhcp4 }}
                                 dhcp6: {{ $dhcp6 }}
                                 {{ if $addresses }}
@@ -244,7 +255,9 @@ spec:
                                 routes:
                                   {{ range $route := $routes }}
                                   - to: "{{ $route.to }}"
-                                    via: "{{ $route.via }}"
+                                    {{ if $route.via }}via: "{{ $route.via }}"{{ end }}
+                                    {{ if $route.scope }}scope: "{{ $route.scope }}"{{ end }}
+                                    {{ if $route.from }}from: "{{ $route.from }}"{{ end }}
                                   {{ end }}
                                 {{ end }}
                       register: netplan_config
@@ -267,6 +280,10 @@ spec:
       inline:
         template: |
           {{ $vlanId := .observed.composite.resource.spec.vlanId }}
+          {{ $bridgeName := printf "br%d" (int $vlanId) }}
+          {{ if .observed.composite.resource.spec.bridgeName }}
+            {{ $bridgeName = .observed.composite.resource.spec.bridgeName }}
+          {{ end }}
           {{ $unifiNetworkRef := .observed.composite.resource.spec.unifiNetworkRef }}
           {{ $bridgeReady := false }}
           {{ if .observed.resources }}
@@ -306,7 +323,7 @@ spec:
           apiVersion: platform.rye.ninja/v1alpha1
           kind: XNetworkSegment
           status:
-            bridgeName: {{ printf "br%d" (int $vlanId) }}
+            bridgeName: {{ $bridgeName }}
             ready: {{ and $bridgeReady $unifiNetworkReady }}
 
   - step: auto-ready
