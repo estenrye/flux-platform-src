@@ -65,32 +65,36 @@ spec:
                 default: false
                 description: "netplan dhcp6 setting for this segment's bridge interface. Same scope and default-false reasoning as dhcp4."
               addresses:
-                type: array
-                items:
-                  type: string
-                default: []
-                description: "Static addresses (CIDR notation, e.g. \"10.200.0.5/16\" or \"fd97:45c2:b3a1:200::5/64\") for this segment's bridge interface on the KVM host itself. Maps directly to netplan's bridges.<name>.addresses. Empty by default, matching the bridge's behavior before this field existed."
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+                default: {}
+                description: "Static addresses (CIDR notation, e.g. \"10.200.0.5/16\" or \"fd97:45c2:b3a1:200::5/64\") for this segment's bridge interface, keyed by KVM host name (platform-kvm-hosts' own host.name, e.g. \"mf-ms-a2-01\") -- each host on a shared VLAN needs its own unique address(es), so this Composition composes one bridge-configuring AnsibleRun per host listed in platform-kvm-hosts, applying that host's own entry here. A host with no entry still gets its bridge/VLAN sub-interface created, just with no static addressing (matching the bridge's behavior before this field existed). Maps directly to each host's own netplan bridges.<name>.addresses."
               routes:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    to:
-                      type: string
-                      description: "Destination CIDR, e.g. \"0.0.0.0/0\" or \"::/0\"."
-                    via:
-                      type: string
-                      description: "Gateway address for this route. Omit for a link-scope route (see scope below) that has no gateway -- e.g. a route reachable directly over the link rather than through a next hop."
-                    scope:
-                      type: string
-                      description: "netplan route scope, e.g. \"link\" -- for a route with no gateway (via), reachable directly over the interface. Rare outside policy-routing setups; added specifically for adopting controlplane's own existing br0 config, which has one (a link-scope route paired with `from` below, for source-address-based routing)."
-                    from:
-                      type: string
-                      description: "Source address to match for this route (policy routing) -- netplan's routes[].from. Optional; paired with scope for controlplane's existing br0 link-scope route."
-                  required:
-                  - to
-                default: []
-                description: "Static routes for this segment's bridge interface on the KVM host. Maps directly to netplan's bridges.<name>.routes. Caution: a route whose destination is a subnet that's ALSO reachable on-link via this same bridge (a nested/off-link route layered on top of an already-connected bridge) has already caused a real ICMPv6-redirect hairpin outage in this fleet once -- see docs/memory/m4-step-tracker.md and commit 177da4d. Prefer RA or dhcp4/dhcp6 for anything this segment's own connected network already provides; reserve this for genuinely off-link destinations."
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      to:
+                        type: string
+                        description: "Destination CIDR, e.g. \"0.0.0.0/0\" or \"::/0\"."
+                      via:
+                        type: string
+                        description: "Gateway address for this route. Omit for a link-scope route (see scope below) that has no gateway -- e.g. a route reachable directly over the link rather than through a next hop."
+                      scope:
+                        type: string
+                        description: "netplan route scope, e.g. \"link\" -- for a route with no gateway (via), reachable directly over the interface. Rare outside policy-routing setups; added specifically for adopting controlplane's own existing br0 config, which has one (a link-scope route paired with `from` below, for source-address-based routing)."
+                      from:
+                        type: string
+                        description: "Source address to match for this route (policy routing) -- netplan's routes[].from. Optional; paired with scope for controlplane's existing br0 link-scope route."
+                    required:
+                    - to
+                default: {}
+                description: "Static routes for this segment's bridge interface, keyed by KVM host name the same way addresses is -- not just for consistency: a route's from field (if set) is inherently host-specific (it names that host's own address), so even a route that's otherwise identical for every host (e.g. a shared gateway route) needs its own per-host entry here. Maps directly to each host's own netplan bridges.<name>.routes. Caution: a route whose destination is a subnet that's ALSO reachable on-link via this same bridge (a nested/off-link route layered on top of an already-connected bridge) has already caused a real ICMPv6-redirect hairpin outage in this fleet once -- see docs/memory/m4-step-tracker.md and commit 177da4d. Prefer RA or dhcp4/dhcp6 for anything this segment's own connected network already provides; reserve this for genuinely off-link destinations."
               unifiNetworkRef:
                 type: object
                 description: "Reference to an XUnifiNetwork claim (cluster-scoped) giving this segment's VLAN a real UniFi network/VLAN object. Optional -- omit for a segment that reuses an already-existing, already-configured UniFi network instead, e.g. VLAN 100, hand-configured outside this repo with a GUA-via-PD + ULA hybrid structure that filipowm/unifi's Terraform provider can't express (see xunifinetwork/composition.yaml's ipv6_interface_type comment). When omitted, status.ready depends only on the bridge (AnsibleRun) -- the bridge step itself still always runs regardless, and is idempotent (netplan applies only on diff), so pointing a second segment at an already-bridged VLAN is a harmless no-op, not an error. Resolved via function-extra-resources against a platform.rye.ninja/unifi-network-name label on the XUnifiNetwork (not composed directly -- same reasoning as XKubernetesCluster's own vlanRef into this XRD). When set, this segment's own vlanId and addresses are cross-checked against the referenced XUnifiNetwork's vlanId and infraSubnet -- see composition.yaml's validate-unifi-network-match step and the UnifiNetworkMatch ClaimCondition it sets. This is XNetworkSegment's only source of subnet truth now that its own infraSubnet field is gone (removed 2026-08-06, unused by the bridge itself and redundant with XUnifiNetwork's copy once split out)."

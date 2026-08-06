@@ -29,12 +29,19 @@ spec:
   bondInterface: bond0
   dhcp4: false
   dhcp6: true
+  # addresses/routes keyed by KVM host name (matches platform-kvm-hosts'
+  # own host.name) since 2026-08-06 -- a second host on this same VLAN
+  # gets its own entry here instead of sharing mf-ms-a2-01's address, and
+  # this Composition composes one bridge-configuring AnsibleRun per host
+  # in platform-kvm-hosts, not just the first.
   addresses:
-    - "fd97:45c2:b3a1:100::2000/64"
-    - "2607:3640:1064:270::2000/64"
+    mf-ms-a2-01:
+      - "fd97:45c2:b3a1:100::2000/64"
+      - "2607:3640:1064:270::2000/64"
   routes:
-    - to: "fd97:45c2:b3a1:100::/64"
-      via: "fd97:45c2:b3a1:100::1"
-    - to: "fd97:45c2:b3a1:100::1000/128"
-      scope: "link"
-      from: "fd97:45c2:b3a1:100::2000"
+    mf-ms-a2-01:
+      - to: "fd97:45c2:b3a1:100::/64"
+        via: "fd97:45c2:b3a1:100::1"
+      - to: "fd97:45c2:b3a1:100::1000/128"
+        scope: "link"
+        from: "fd97:45c2:b3a1:100::2000"

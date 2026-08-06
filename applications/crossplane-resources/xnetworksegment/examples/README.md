@@ -4,6 +4,8 @@
 
 This claim **adopts** controlplane's own pre-existing VLAN 100 bridge (`br0`) rather than creating a new one — no `unifiNetworkRef`, since VLAN 100's UniFi network already exists, hand-configured outside this repo. `bridgeName`/`taggedVlan`/`bondInterface` exist specifically to support this case; see their descriptions in `../xrd.yaml`. Note `br0` also carries the KVM host's own management/SSH traffic — before ever applying a change like this for real, verify it with a `netplan generate` dry-run against an isolated `--root-dir` first (no real state touched), the same way this claim's own initial rollout was verified.
 
+`addresses`/`routes` are keyed by KVM host name (`mf-ms-a2-01` here) — this Composition composes one bridge-configuring `AnsibleRun` per host listed in `platform-kvm-hosts`, not just the first, so a second host on the same VLAN gets its own entry (its own unique address) instead of sharing this one's.
+
 Applying a *new* (not adopted) segment for real requires, in order:
 
 1. `provider-ansible` and `function-extra-resources` `Healthy` on `controlplane`.
@@ -15,7 +17,7 @@ Applying a *new* (not adopted) segment for real requires, in order:
 ```sh
 kubectl get xnetworksegment vlan100
 kubectl describe xnetworksegment vlan100
-kubectl get ansiblerun vlan100-bridge
+kubectl get ansiblerun vlan100-bridge-mf-ms-a2-01  # one per host in platform-kvm-hosts, not just this name
 kubectl get xunifinetwork vlan100  # only if unifiNetworkRef is set -- it isn't for vlan100 itself
 ```
 
