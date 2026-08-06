@@ -10,3 +10,6 @@ resources:
   # compose ansible.crossplane.io's cluster-scoped AnsibleRun -- see
   # xnetworksegment/xrd.yaml).
   - ../../../applications/crossplane-resources/xnetworksegment
+  # M4: the UniFi network/VLAN object a segment optionally references
+  # (spec.unifiNetworkRef) -- split out of xnetworksegment 2026-08-06.
+  - ../../../applications/crossplane-resources/xunifinetwork

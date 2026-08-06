@@ -1,0 +1,17 @@
+apiVersion: platform.rye.ninja/v1alpha1
+kind: XUnifiNetwork
+metadata:
+  # Cluster-scoped (xrd.yaml's spec.scope: Cluster) -- no namespace field.
+  name: observability-vlan
+  labels:
+    rye.ninja/component: xunifinetwork
+    rye.ninja/owner: platform-engineering
+    # Matched by xnetworksegment-composition's fetch-unifi-network step
+    # (function-extra-resources Selector, since Reference-by-name doesn't
+    # support field-path templating) against the referencing
+    # XNetworkSegment's spec.unifiNetworkRef.name.
+    platform.rye.ninja/unifi-network-name: observability-vlan
+spec:
+  vlanId: 200
+  infraSubnet: "fd97:45c2:b3a1:200::/64"
+  ipv4Subnet: "10.200.0.1/16"

@@ -1,0 +1,57 @@
+# Cluster-scoped, same reasoning as xnetworksegment/xrd.yaml: its
+# Composition composes tf.m.upbound.io's Workspace directly, and Crossplane
+# forbids a namespaced XR from composing a cluster-scoped resource
+# (errFmtNamespacedXRClusterResource). Split out of XNetworkSegment
+# (2026-08-06) so a segment's KVM-host bridge and its UniFi network/VLAN
+# object have independent lifecycles -- a segment reusing an
+# already-existing UniFi network (e.g. VLAN 100, hand-configured outside
+# this repo) references no XUnifiNetwork at all, and a future non-UniFi
+# backend (e.g. a cloud VPC subnet) can exist as its own sibling XRD without
+# XNetworkSegment needing to know its shape -- XNetworkSegment only ever
+# reads a referenced backend's generic status.ready.
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xunifinetworks.platform.rye.ninja
+spec:
+  scope: Cluster
+  group: platform.rye.ninja
+  names:
+    kind: XUnifiNetwork
+    plural: xunifinetworks
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              vlanId:
+                type: integer
+                minimum: 1
+                maximum: 4094
+                description: "802.1Q VLAN ID for this UniFi network. Should match the vlanId of whichever XNetworkSegment(s) reference this claim by name -- kept in sync by hand, same as infraSubnet below (not plumbed through extra-resources; two independently-lived resources describing the same physical VLAN)."
+              infraSubnet:
+                type: string
+                description: "ULA /64 for this network, e.g. \"fd97:45c2:b3a1:200::/64\". Feeds unifi_network's ipv6_static_subnet. Should match the referencing XNetworkSegment's own infraSubnet field."
+              ipv4Subnet:
+                type: string
+                description: "IPv4 subnet + gateway for this network, CIDR notation, e.g. \"10.200.0.1/16\" -- required even though this fleet's clusters are IPv6-only end to end (confirmed live: UniFi won't claim router/RA ownership of a network with no IPv4 subnet object at all, regardless of `purpose`; matches vlan100/vlan101's own convention of an unused-but-present IPv4 subnet, DHCP disabled). Pick something that doesn't collide with any other network in the UniFi UI's network list -- not validated against live UniFi state here."
+              firewallZone:
+                type: string
+                default: "DMZ-Kubernetes"
+                description: "Name of the UniFi zone-based-firewall zone (Settings > Zones) this network should be assigned to, resolved via a unifi_firewall_zone data source. Defaults to \"DMZ-Kubernetes\", the zone controlplane's own VLAN 100 lives in (docs/memory/unifi-zone-firewall.md) -- override only if this network needs different zone-pair policy or the target site uses a different zone name."
+            required:
+            - vlanId
+            - infraSubnet
+            - ipv4Subnet
+          status:
+            type: object
+            properties:
+              ready:
+                type: boolean
+                description: "True once the composed unifi_network Workspace reports Ready. Set by this XRD's own Composition status-update step."

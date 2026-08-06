@@ -1,0 +1,30 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: crossplane-xunifinetwork
+  description: |-
+    XUnifiNetwork XRD + unifi-network Composition. Creates a UniFi
+    network/VLAN object (Terraform, filipowm/unifi) for a given vlanId --
+    nothing else. Split out of XNetworkSegment (2026-08-06) so the KVM-host
+    bridge (XNetworkSegment) and the UniFi network object have independent
+    lifecycles: a segment can optionally reference a claim of this kind by
+    name (spec.unifiNetworkRef) instead of always creating a new one, e.g.
+    to reuse an already-existing, already-configured network like VLAN 100.
+    Also lets a future non-UniFi backend (e.g. a cloud VPC subnet) exist as
+    a sibling XRD without XNetworkSegment needing to know its shape.
+    Cluster-scoped for the same reason XNetworkSegment is -- see
+    xnetworksegment/xrd.yaml.
+  tags:
+    - crossplane
+    - crossplane-resource
+    - unifi
+    - networking
+  links:
+    - url: https://docs.crossplane.io/latest/composition/composite-resource-definitions/
+      title: Crossplane Composite Resource Definitions
+      icon: docs
+      type: documentation
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
