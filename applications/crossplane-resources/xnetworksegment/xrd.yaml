@@ -44,7 +44,18 @@ spec:
                 type: integer
                 minimum: 1
                 maximum: 4094
-                description: "802.1Q VLAN ID for this segment's dedicated bridge on the KVM host -- see providers/kvm/ansible/roles/bridge for the reference playbook (the Composition embeds an inlined, kept-in-sync-by-hand copy for the same Go-template/Jinja2 {{ }} delimiter-collision reason talos-cluster's Terraform module is embedded rather than git-sourced)."
+                description: "802.1Q VLAN ID for this segment's dedicated bridge on the KVM host -- see providers/kvm/ansible/roles/bridge for the reference playbook (the Composition embeds an inlined, kept-in-sync-by-hand copy for the same Go-template/Jinja2 {{ }} delimiter-collision reason talos-cluster's Terraform module is embedded rather than git-sourced). Still required even when taggedVlan is false (adopting an existing native/untagged bridge) -- used for status.bridgeName's fallback derivation and general bookkeeping (e.g. platform-kvm-network's own vlanId convention), even though it no longer drives the actual interface name or tagging in that case."
+              bridgeName:
+                type: string
+                description: "Override the bridge interface's name instead of deriving it from vlanId (br<vlanId>). Needed for adopting a pre-existing bridge that doesn't follow that convention -- e.g. \"br0\" for controlplane's own VLAN 100 bridge on mf-ms-a2-01, which predates this XRD and bridges bond0 directly (see taggedVlan below). When set, status.bridgeName reports this value instead of the derived one, and the netplan file this Composition writes is /etc/netplan/60-<bridgeName>.yaml -- for br0 specifically, that's a second file alongside the host's existing /etc/netplan/50-cloud-init.yaml, which already declares br0 (netplan merges same-named devices across files, later filename winning per-key on conflicts -- verify this live, e.g. via `netplan generate`, before trusting it against a bridge carrying live SSH/management traffic)."
+              taggedVlan:
+                type: boolean
+                default: true
+                description: "Whether this segment's bridge is 802.1Q-tagged on the uplink. true (default) creates a <bondInterface>.<vlanId> VLAN sub-interface and bridges that -- the original, only behavior before this field existed. false bridges bondInterface directly, untagged -- for a VLAN that's the trunk's native/untagged VLAN, like VLAN 100's existing br0 on mf-ms-a2-01 (providers/kvm/hosts.yaml's own bond0 config has no VLAN tag for it). Only meaningful together with a bridgeName override in practice: an untagged bridge is virtually always a pre-existing, differently-named interface, not a new br<vlanId> one this Composition would otherwise create from scratch."
+              bondInterface:
+                type: string
+                default: "bond0"
+                description: "Name of the host's bonded uplink interface this segment's bridge (or VLAN sub-interface, if taggedVlan is true) attaches to. Defaults to \"bond0\", the only bond every host in this fleet has had until now (providers/kvm/hosts.yaml) -- override for a host with multiple bonds, e.g. a second bond dedicated to a different physical NIC pair or upstream switch."
               dhcp4:
                 type: boolean
                 default: false
@@ -69,10 +80,15 @@ spec:
                       description: "Destination CIDR, e.g. \"0.0.0.0/0\" or \"::/0\"."
                     via:
                       type: string
-                      description: "Gateway address for this route."
+                      description: "Gateway address for this route. Omit for a link-scope route (see scope below) that has no gateway -- e.g. a route reachable directly over the link rather than through a next hop."
+                    scope:
+                      type: string
+                      description: "netplan route scope, e.g. \"link\" -- for a route with no gateway (via), reachable directly over the interface. Rare outside policy-routing setups; added specifically for adopting controlplane's own existing br0 config, which has one (a link-scope route paired with `from` below, for source-address-based routing)."
+                    from:
+                      type: string
+                      description: "Source address to match for this route (policy routing) -- netplan's routes[].from. Optional; paired with scope for controlplane's existing br0 link-scope route."
                   required:
                   - to
-                  - via
                 default: []
                 description: "Static routes for this segment's bridge interface on the KVM host. Maps directly to netplan's bridges.<name>.routes. Caution: a route whose destination is a subnet that's ALSO reachable on-link via this same bridge (a nested/off-link route layered on top of an already-connected bridge) has already caused a real ICMPv6-redirect hairpin outage in this fleet once -- see docs/memory/m4-step-tracker.md and commit 177da4d. Prefer RA or dhcp4/dhcp6 for anything this segment's own connected network already provides; reserve this for genuinely off-link destinations."
               unifiNetworkRef:
@@ -91,7 +107,7 @@ spec:
             properties:
               bridgeName:
                 type: string
-                description: "Derived (br<vlanId>), surfaced here so referencing Compositions don't need to recompute it."
+                description: "spec.bridgeName if set, else derived (br<vlanId>) -- surfaced here so referencing Compositions don't need to recompute it."
               ready:
                 type: boolean
                 description: "True once the bridge (AnsibleRun) reports Ready, and -- only if unifiNetworkRef is set -- the referenced XUnifiNetwork's own status.ready is also true. Set by this XRD's own Composition status-update step."
