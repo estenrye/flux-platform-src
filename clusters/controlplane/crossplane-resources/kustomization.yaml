@@ -19,3 +19,10 @@ resources:
   # M4 step 3.
   - crossplane.environment-config.kvm-network.yaml
   - delegated-hosted-zone-aws.controlplane-rye-ninja.yaml
+  # M4 step 3b (CNI): remote-cluster manifest delivery -- observability has
+  # no Flux instance of its own yet, so Calico is applied via generated
+  # provider-kubernetes Objects instead (.bin/render/render-remote-objects.sh,
+  # applications/calico/observability). See docs/memory/
+  # remote-cluster-manifest-delivery.md.
+  - provider-config.kubernetes.observability.yaml
+  - generated/calico-observability-objects.yaml
