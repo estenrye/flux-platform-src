@@ -1,0 +1,26 @@
+# Values for the tigera-operator chart — IPv6-only Talos cluster.
+# Adapted from applications/calico/controlplane/values.yaml -- same pattern,
+# observability's own pod CIDR (platform-kvm-network's podCidr for this
+# cluster, clusters/controlplane/crossplane-resources/
+# crossplane.environment-config.kvm-network.yaml).
+installation:
+  enabled: true
+  calicoNetwork:
+    bgp: Enabled
+    # IPv6-only: no v4 ipPools and no nodeAddressAutodetectionV4 means the
+    # operator never enables IPv4 (Talos nodes carry no IPv4 addresses at all).
+    ipPools:
+      - name: pods-v6
+        cidr: fd97:45c2:b3a1:1200::/56 # platform-kvm-network's observability.podCidr
+        encapsulation: None # same L2 segment (shared VLAN 100); node-to-node mesh routes pods
+        natOutgoing: Enabled # pods are ULA — SNAT to node address for egress
+        blockSize: 122
+        nodeSelector: all()
+    # Pin the BGP source to each node's Kubernetes InternalIP -- same
+    # reasoning as controlplane's own values.yaml: VLAN 100's shared /64
+    # also holds each node's EUI-64 SLAAC address and controlplane's own
+    # apiserver VIP, so an unqualified cidrs match would be ambiguous.
+    nodeAddressAutodetectionV6:
+      kubernetes: NodeInternalIP
+apiServer:
+  enabled: true

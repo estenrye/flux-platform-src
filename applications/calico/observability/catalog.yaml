@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: calico-observability
+  description: |-
+    Calico CNI for the IPv6-only observability cluster: operator install
+    with internal node-to-node-mesh BGP (AS 64514) only -- no external
+    gateway peering or LoadBalancer IPAM yet. Rendered statically (kustomize
+    build, same mechanism as calico-controlplane) and applied to
+    observability's remote API server via generated provider-kubernetes
+    Objects, since observability has no Flux instance of its own.
+  tags:
+    - networking
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

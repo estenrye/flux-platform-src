@@ -38,3 +38,4 @@
 - [No Isolation Requirement Between Cluster VLANs](m4-network-architecture-no-isolation-requirement.md) — VLAN 200 exists to fix the ICMPv6 hairpin bug, not isolation; sharing VLAN 100 is a valid default
 - [Don't Inflate Tradeoff Costs](feedback-dont-inflate-tradeoff-costs.md) — ground downside framing in the user's stated constraints, not assumed best-practice concerns
 - [provider-ansible Delete Cleanup Broken](provider-ansible-delete-cleanup-broken.md) — deletionPolicy:Delete + runPolicy:ObserveAndDelete never fires on v0.8.0, confirmed live; tracked at upstream issue #362
+- [Remote-Cluster Manifest Delivery](remote-cluster-manifest-delivery.md) — no Flux on new clusters yet; kustomize build + generated provider-kubernetes Objects, not provider-helm

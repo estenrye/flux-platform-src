@@ -1,0 +1,59 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Calico for the IPv6-only `observability` cluster: operator install +
+# internal node-to-node-mesh BGP (no external gateway peering or
+# LoadBalancer IPAM yet -- see resources/bgp-configuration.yaml). Talos is
+# installed with CNI "none"; this is what makes nodes Ready.
+#
+# Not wired into any cluster's Flux kustomization tree directly -- this
+# renders to a static, offline manifest set (same `kustomize build`
+# mechanism `make render-manifests` already uses for
+# applications/calico/controlplane), which a generator script then wraps as
+# individual provider-kubernetes Objects targeting observability's remote
+# API server (controlplane has no Flux instance running on observability
+# itself to apply these directly -- docs/memory/xkubernetescluster-remote-
+# calico-generation.md).
+
+helmCharts:
+  - name: tigera-operator
+    repo: https://docs.tigera.io/calico/charts
+    version: v3.32.1
+    releaseName: calico
+    namespace: tigera-operator
+    includeCRDs: true
+    valuesFile: values.yaml
+
+resources:
+  - resources/namespace.yaml
+  - resources/bgp-configuration.yaml
+  - resources/ippool-pods.yaml
+
+patches:
+  # Same reasoning as controlplane's own kustomization.yaml: the chart's
+  # pre-delete helm hook renders as a plain Job under kustomize, which would
+  # run unconditionally (not just on uninstall) once wrapped as a normal
+  # Object.
+  - patch: |-
+      $patch: delete
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: tigera-operator-uninstall
+        namespace: tigera-operator
+  - target:
+      kind: Deployment
+      name: tigera-operator
+    path: patches/deployment.yaml
+  - target:
+      kind: ClusterRole
+      name: tigera-operator
+    path: patches/cluster-role.yaml
+  - target:
+      kind: ClusterRoleBinding
+      name: tigera-operator
+    path: patches/cluster-role.yaml
+
+images:
+  - name: quay.io/tigera/operator
+    digest: sha256:4f32a054d5da52731f5f633816ac29cd98ffe97f69903cc04ec5ac60c86e6a02

@@ -1,0 +1,16 @@
+apiVersion: crd.projectcalico.org/v1
+kind: IPPool
+metadata:
+  name: pods-v6
+spec:
+  # Declared explicitly rather than relying on the Installation spec -- same
+  # reasoning as controlplane's own resources/ippool-pods.yaml: the tigera
+  # operator skips creating pools from Installation when any IPPool already
+  # exists.
+  cidr: fd97:45c2:b3a1:1200::/56 # platform-kvm-network's observability.podCidr
+  blockSize: 122
+  natOutgoing: true # pods are ULA — SNAT to node address for external destinations
+  nodeSelector: all()
+  ipipMode: Never
+  vxlanMode: Never
+  allowedUses: ["Workload", "Tunnel"]

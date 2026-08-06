@@ -1,0 +1,19 @@
+# Remote-cluster variant of provider-kubernetes/provider-config/
+# provider-config.in-cluster.yaml -- that one uses InjectedIdentity
+# (targets controlplane, the cluster provider-kubernetes itself runs in);
+# this one targets observability's own API server via its kubeconfig
+# Secret (written by the bootstrap Job, applications/crossplane-resources/
+# xkubernetescluster/composition.yaml's create-bootstrap-job step).
+# Schema confirmed live 2026-08-06 via `kubectl explain
+# clusterproviderconfigs.kubernetes.m.crossplane.io.spec.credentials`.
+apiVersion: kubernetes.m.crossplane.io/v1alpha1
+kind: ClusterProviderConfig
+metadata:
+  name: observability
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: observability-kubeconfig
+      key: kubeconfig

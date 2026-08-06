@@ -1,0 +1,19 @@
+apiVersion: crd.projectcalico.org/v1
+kind: BGPConfiguration
+metadata:
+  name: default
+spec:
+  # platform-kvm-network's observability.bgpAsn -- distinct from
+  # controlplane's own 64513 and the gateway's 64512.
+  asNumber: 64514
+  # Full node-to-node mesh carries pod routes on the shared L2 segment
+  # (VLAN 100) -- this is internal Calico-to-Calico peering between
+  # observability's own nodes, independent of any external gateway BGP
+  # session. Needed for cross-node pod routing to work at all, given
+  # ipPools' encapsulation: None in values.yaml (no VXLAN/IPIP fallback).
+  nodeToNodeMeshEnabled: true
+  logSeverityScreen: Info
+  # No serviceLoadBalancerIPs / external gateway BGPPeer (unlike
+  # controlplane's own bgp-configuration.yaml + bgp-peer.yaml) -- deferred
+  # until observability actually has LoadBalancer-type Services needing
+  # VIPs advertised. Add both together when that's needed.
