@@ -1,0 +1,11 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: observability
+  annotations:
+    github.com/project-slug: estenrye/flux-platform-rendered-observability
+    rye.ninja/flux-source-repo: estenrye/flux-platform-src
+    rye.ninja/kubeconfig: /Users/esten/.kube/homelab/observability.yaml
+spec:
+  owner: group:platform-engineering
+  domain: platform
