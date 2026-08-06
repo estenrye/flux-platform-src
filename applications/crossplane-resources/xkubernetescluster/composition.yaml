@@ -673,10 +673,22 @@ spec:
             {{ if $trustDomain }}
             trustDomain: {{ $trustDomain }}
             {{ end }}
-            nameServers:
-            {{ range $nameServers }}
-            - {{ . }}
-            {{ end }}
+            # A range loop over an empty $nameServers renders zero lines,
+            # leaving a bare "nameServers:" key with no value -- valid YAML
+            # for null, but the XRD schema requires type: array (not
+            # nullable), so this failed status application outright on
+            # every new cluster's first few reconciles until the DNS
+            # delegation populated real nameservers (confirmed live
+            # 2026-08-06, observability's re-creation on vlan100: "cannot
+            # apply composite resource status: ... nameServers: Invalid
+            # value: \"null\""). toJson always renders a valid array
+            # literal, "[]" when empty, so there's no empty-list case to
+            # trip over. (Caught the hard way writing THIS comment too --
+            # an earlier draft spelled the range marker out literally as
+            # an example and broke this template exactly like
+            # create-bridge's own comment already warns about, in
+            # xnetworksegment/composition.yaml.)
+            nameServers: {{ toJson $nameServers }}
             {{ if $kubeconfigReady }}
             kubeconfigSecretRef:
               name: {{ $name }}-kubeconfig
