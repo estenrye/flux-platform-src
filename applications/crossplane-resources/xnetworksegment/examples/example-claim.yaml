@@ -2,20 +2,39 @@ apiVersion: platform.rye.ninja/v1alpha1
 kind: XNetworkSegment
 metadata:
   # Cluster-scoped (xrd.yaml's spec.scope: Cluster) -- no namespace field.
-  name: observability-vlan
+  name: vlan100
   labels:
     rye.ninja/component: xnetworksegment
     rye.ninja/owner: platform-engineering
     # Matched by cluster-talos-kvm-composition's fetch-network-segment
     # step (function-extra-resources Selector, since Reference-by-name
-    # doesn't support field-path templating) against the claiming
+    # doesn't support field-path templating) against a claiming
     # XKubernetesCluster's spec.vlanRef.name.
-    platform.rye.ninja/network-segment-name: observability-vlan
+    platform.rye.ninja/network-segment-name: vlan100
 spec:
-  vlanId: 200
-  # References xunifinetwork/examples/example-claim.yaml, which creates the
-  # actual UniFi network/VLAN object -- omit this field entirely for a
-  # segment that reuses an already-existing network instead (see
-  # xrd.yaml's unifiNetworkRef description).
-  unifiNetworkRef:
-    name: observability-vlan
+  # ADOPTED 2026-08-06 (Approach 1, docs/memory/
+  # m4-network-architecture-no-isolation-requirement.md): this is the real,
+  # live claim for controlplane's own VLAN 100 bridge, adopted rather than
+  # created from scratch -- bridgeName/taggedVlan/bondInterface exist
+  # specifically for this case (see their xrd.yaml descriptions). No
+  # unifiNetworkRef: VLAN 100's UniFi network already exists, hand-configured
+  # outside this repo (the whole reason Approach 1 was chosen over a
+  # dedicated per-cluster VLAN). Verified via a netplan-generate dry-run
+  # (isolated --root-dir, no real state touched) before ever applying this
+  # for real, since br0 is the same interface carrying this host's own
+  # management/SSH traffic.
+  vlanId: 100
+  bridgeName: br0
+  taggedVlan: false
+  bondInterface: bond0
+  dhcp4: false
+  dhcp6: true
+  addresses:
+    - "fd97:45c2:b3a1:100::2000/64"
+    - "2607:3640:1064:270::2000/64"
+  routes:
+    - to: "fd97:45c2:b3a1:100::/64"
+      via: "fd97:45c2:b3a1:100::1"
+    - to: "fd97:45c2:b3a1:100::1000/128"
+      scope: "link"
+      from: "fd97:45c2:b3a1:100::2000"
