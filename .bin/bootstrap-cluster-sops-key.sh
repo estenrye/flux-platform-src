@@ -231,10 +231,10 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-- ../../applications/priority-classes/v0.0.1
-- ../../applications/prometheus-operator-crds/v28.0.1
-- ../../applications/external-secrets-operator/v2.4.1
-- ../../applications/flux/v2.7.5
+- ../../applications/priority-classes
+- ../../applications/prometheus-operator-crds/base
+- ../../applications/external-secrets-operator/base
+- ../../applications/flux/base
 - resources/eso.service-account-secret.yaml
 - resources/eso.cluster-secret-store.yaml
 - resources/flux.ssh-key-generator.yaml
