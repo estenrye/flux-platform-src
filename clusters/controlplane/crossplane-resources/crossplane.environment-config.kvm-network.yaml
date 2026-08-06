@@ -18,16 +18,17 @@
 #                            providers/kvm/network.yaml's convention, and
 #                            talos-cluster module's variable "hosts" doc)
 #   workerNodeUlas:         same shape, may be {}
-#   vlanId:                 802.1Q VLAN ID for this cluster's own dedicated
-#                            bridge (create-network-segment composition
-#                            step) -- distinct L2 segment from
-#                            controlplane's VLAN 100/br0, so this cluster's
-#                            infraSubnet is genuinely on-link there instead
-#                            of hairpin-routed through the gateway.
-#                            Convention: reuse the subnet's own nibble
-#                            (observability's infraSubnet is …:200::/64, so
-#                            vlanId is 200) so the mapping is legible
-#                            without cross-referencing.
+#   vlanId:                 OPTIONAL, legacy -- only meaningful for a cluster
+#                            with its own dedicated VLAN/bridge (the original
+#                            M4 step 5 design). Never actually read by
+#                            cluster-talos-kvm-composition (confirmed live
+#                            2026-08-06) -- the bridge a cluster's VMs land on
+#                            comes from the claim's own spec.vlanRef, not
+#                            this EnvironmentConfig. Omit entirely for a
+#                            cluster sharing an existing segment (e.g.
+#                            observability on VLAN 100, Approach 1,
+#                            docs/memory/m4-network-architecture-no-
+#                            isolation-requirement.md).
 #
 # M4 step 5: `observability` populated 2026-08-01, next free block after
 # controlplane's fd97:45c2:b3a1:100::/64 / ASN 64513 in network.yaml.
@@ -71,12 +72,33 @@ data:
     # appliance's 0x64, since both clusters' VMs currently share the same
     # physical bridge (D1) and identical suffixes would produce identical,
     # colliding MAC addresses despite living in different /64s.
-    # observability's entry (vlanId 200, fd97:45c2:b3a1:200::/64) removed
-    # 2026-08-06: the cluster and its dedicated VLAN 200 network were torn
-    # down (both the live XKubernetesCluster/XNetworkSegment claims and
-    # this allocation) ahead of the XNetworkSegment/XUnifiNetwork split
-    # (unifiNetworkRef) landing -- a future re-creation adds a fresh entry
-    # here, potentially reusing controlplane's own VLAN 100 instead of a
-    # dedicated VLAN (see docs/memory/m4-network-architecture-no-isolation-
-    # requirement.md for why a dedicated VLAN is no longer assumed
-    # necessary).
+    # RE-ADDED 2026-08-06 (Approach 1, docs/memory/
+    # m4-network-architecture-no-isolation-requirement.md): observability
+    # now shares controlplane's own VLAN 100 / fd97:45c2:b3a1:100::/64
+    # instead of a dedicated VLAN -- infraSubnet is genuinely
+    # controlplane's own infra_subnet (providers/kvm/network.yaml), not a
+    # new block. apiserverVip/node octets (0x30/0x31-33) are disjoint from
+    # controlplane's own (0x10-13, 0x21-23) and NAT64's (0x64), same MAC-
+    # collision reasoning as the comment above -- both clusters' VMs
+    # genuinely share the same physical bridge (br0) now, not just
+    # incidentally during a bug. No vlanId field: unlike the old
+    # dedicated-VLAN entry, this cluster's bridge comes from
+    # spec.vlanRef (pointing at the live `vlan100` XNetworkSegment claim,
+    # applications/crossplane-resources/xnetworksegment/examples/
+    # example-claim.yaml), which cluster-talos-kvm-composition's
+    # create-workspace step actually reads -- confirmed live 2026-08-06
+    # that this EnvironmentConfig's own vlanId/bgpAsn fields are never
+    # consumed by the Composition at all, purely human documentation for
+    # the still-manual gateway BGP peering step (bgpAsn kept below for
+    # that reason).
+    observability:
+      apiserverVip: "fd97:45c2:b3a1:100::30"
+      infraSubnet: "fd97:45c2:b3a1:100::/64"
+      podCidr: "fd97:45c2:b3a1:1200::/56"
+      serviceCidr: "fd97:45c2:b3a1:2100::/112"
+      bgpAsn: 64514
+      controlPlaneNodeUlas:
+        observability-cp-1: "fd97:45c2:b3a1:100::31"
+        observability-cp-2: "fd97:45c2:b3a1:100::32"
+        observability-cp-3: "fd97:45c2:b3a1:100::33"
+      workerNodeUlas: {}
