@@ -4,6 +4,10 @@ clusters/controlplane/.sops.age-key
 # crossplane private age key: untracked (was committed since afe949f — rotate the
 # crossplane age key, its exposure is already in git history)
 clusters/crossplane/.sops.age-key
+# blanket rule for every other cluster's private age key (1Password holds
+# the recovery copy) — bootstrap-cluster-sops-key.sh writes this file but
+# doesn't itself gitignore it per-cluster, so this must stay generic
+clusters/*/.sops.age-key
 # tofu working files: state stays on the workstation, media cache is derived
 providers/kvm/.cache/
 providers/kvm/**/.terraform/

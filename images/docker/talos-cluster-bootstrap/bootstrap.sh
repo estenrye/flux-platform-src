@@ -94,6 +94,20 @@ TIME_SERVER="time.cloudflare.com"
 if [ "${NAT64_ULA%%::*}" != "${INFRA_SUBNET%%::*}" ]; then
   TIME_SERVER="${NAT64_PREFIX%/*}a29f:c801"
 fi
+
+# XRD's own doc comment (xrd.yaml: "Worker node pool. count may be 0 --
+# Talos supports scheduling workloads on control-plane nodes
+# (allowSchedulingOnControlPlanes) for small/dev clusters.") was never
+# actually wired up -- caught live bootstrapping observability (0 workers):
+# control-plane nodes keep their default NoSchedule taint, so nothing but
+# hostNetwork DaemonSets (Calico) can ever schedule. Only set this when
+# there are no worker nodes -- controlplane has real workers and keeps
+# control-plane/workload separation.
+ALLOW_SCHEDULING_ON_CP="false"
+if ! echo "${NODES_JSON}" | jq -e 'to_entries[] | select(.value.role == "worker")' >/dev/null 2>&1; then
+  ALLOW_SCHEDULING_ON_CP="true"
+fi
+
 cat >"${WORK_DIR}/patch-all.yaml" <<EOF
 machine:
   install:
@@ -115,6 +129,7 @@ machine:
         source: /etc/iscsi
         options: [bind, rshared, rw]
 cluster:
+  allowSchedulingOnControlPlanes: ${ALLOW_SCHEDULING_ON_CP}
   network:
     cni:
       name: none
