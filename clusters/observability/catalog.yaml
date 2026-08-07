@@ -6,6 +6,9 @@ metadata:
     github.com/project-slug: estenrye/flux-platform-rendered-observability
     rye.ninja/flux-source-repo: estenrye/flux-platform-src
     rye.ninja/kubeconfig: /Users/esten/.kube/homelab/observability.yaml
+  description: >-
+    Observability cluster — IPv6-only Talos Linux on home lab KVM, sharing
+    controlplane's VLAN 100 (M4).
 spec:
   owner: group:platform-engineering
   domain: platform
