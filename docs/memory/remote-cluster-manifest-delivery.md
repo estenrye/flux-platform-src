@@ -56,3 +56,13 @@ Flux of its own, follow the same three steps -- don't reach for
 gets a real Flux instance of its own, these generated Objects should be
 retired in favor of that cluster's own GitOps reconciliation, not left
 running in parallel.
+
+**Retired for `observability` 2026-08-07:** it now has its own Flux instance
+(see [[bootstrap-cluster-generic-chain]]), which reconciles
+`applications/calico/observability` directly -- the generated
+`provider-kubernetes` Objects and `ClusterProviderConfig/observability` were
+deleted. Turned out they'd never actually gone live: `crossplane-resources`'s
+Kustomization had been failing the whole time on the same missing-namespace
+bug the Objects generator had (fixed, then superseded before it mattered).
+This doc and `.bin/render/render-remote-objects.sh` remain the right pattern
+for the *next* Flux-less cluster.
