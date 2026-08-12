@@ -44,6 +44,7 @@ See `xrd.yaml` for the full OpenAPI schema and field-level docs. Summary:
 | `create-dns-delegation` | Composes an `XDelegatedHostedZoneAWS` XR (reused as-is) for `spec.subdomain`. |
 | `create-workspace` | Composes a `provider-terraform` `Workspace` (`source: Inline`) — creates the cluster's VMs. |
 | `create-bootstrap-job` | Composes a `provider-kubernetes` `Object` wrapping a `batch/v1 Job` (the `talos-cluster-bootstrap` image) — bootstraps Talos, writes the connection Secrets. |
+| `create-secret-usage-guards` (M4 step 6) | Composes two `protection.crossplane.io/v1beta1 Usage` resources, protecting the `{name}-kubeconfig`/`{name}-talosconfig` connection Secrets (not Crossplane-owned) from accidental deletion while this claim exists. See the comment above this step in `composition.yaml` for a live-verified Crossplane limitation this design works around. |
 | `status-update` | Writes `trustDomain`/`nameServers`/`kubeconfigSecretRef`/`talosconfigSecretRef`/`phase` back onto the XR, gated on upstream steps actually having resolved. |
 | `auto-ready` | Marks the XR `Ready` once composed resources report ready. |
 

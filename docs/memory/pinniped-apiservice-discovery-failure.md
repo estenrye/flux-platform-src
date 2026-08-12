@@ -39,3 +39,16 @@ live in chainsaw's default ephemeral namespace can set
 `spec.namespace.fastDelete: true` in their `.chainsaw.yaml` `Configuration`
 to skip waiting on that namespace's deletion outcome entirely (see
 `tests/xkubernetescluster-validation/.chainsaw.yaml`).
+
+**Also blocks plain resource-finalizer cleanup, not just Namespace
+termination**: while live-verifying the `Usage`/`ClusterUsage` API for M4
+step 6's Usage guards, two scratch resources got stuck `Terminating` the
+same way — `namespace/chainsaw-scratch-cluster-of` and
+`usage.protection.crossplane.io/chainsaw-scratch-ns-usage` (both in/under
+`crossplane-system` on `controlplane`) — their own finalizer-removal
+controllers appear to stall on the same discovery failure. Harmless orphans
+(the Usage never had any real protective effect — it was the scratch
+resource that proved cluster-scoped `of` targets aren't enforced, see
+[[m4-step-tracker]]), left in place rather than forced, since force-deleting
+finalized-but-stuck resources risks masking the real bug instead of fixing
+it. Clean up both once the underlying APIService issue is resolved.
