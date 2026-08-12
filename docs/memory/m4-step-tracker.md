@@ -1,6 +1,6 @@
 ---
 name: m4-step-tracker
-description: M4 step tracker — steps 1-3 merged to main (XRD + Composition, narrowed to core provisioning); state-backend gap found and fixed same-day, 2026-07-31; step 5 (real claim) next
+description: M4 step tracker — steps 1-5 and 3b merged to main; observability is a real, Flux-synced claimed cluster as of 2026-08-06; steps 6-8 (chainsaw teardown test, Backstage catalog wiring, fleet ADR) remain
 metadata:
   type: project
 ---
@@ -8,18 +8,29 @@ metadata:
 Tracks [[m4-design]]'s 8-step execution order. Update as steps complete —
 this decays fast, keep it current rather than trusting it blindly.
 
-## Status as of 2026-07-31
+## Status as of 2026-08-11
 
 | # | Step | Status |
 |---|---|---|
 | 1 | provider-terraform install + generalized `talos-cluster` tofu module + `crossplane-kvm-hosts` EnvironmentConfig | **Done, merged to main** — bootstrap script run by the user, OpenBao `kv get` on `provider-terraform/kvm-ssh-key` confirmed working; package reference corrected to `xpkg.upbound.io/upbound/provider-terraform:v1.1.6`; a live NetworkPolicy crash-loop bug found and fixed post-merge (PR #133) — `provider-terraform` confirmed `Running`/`Healthy=True` |
-| 2 | Talos-bootstrap Job image + script (OpenBao for secrets) | **Shipped, merged to main**; OpenBao policy/role live-configured; image built+pushed to GHCR via CI; no real cluster bootstrap attempted yet (no Job template existed until step 3) |
-| 3 | `XKubernetesCluster` XRD + `cluster-talos-kvm` Composition (core provisioning; Flux-push/GitHub-automation/JWKS-mirror split out to 3b/3c) | **Merged to main (PR #134)** — `make render`/kube-linter/checkov/trust-domain all clean; embedded Terraform module independently validated; per-cluster state backend gap found and fixed same day (below). Several Crossplane/provider API details used are still unverified against a live reconcile (see detail below) |
-| 4 | `clusters/observability/` baseline layer | Not started |
-| 5 | `observability` claim instance — first end-to-end provision | Not started |
-| 6 | Chainsaw deletion/teardown test; Usage guards | Not started |
-| 7 | Backstage `catalog.yaml` generation wiring (ADR-18) | Not started |
+| 2 | Talos-bootstrap Job image + script (OpenBao for secrets) | **Shipped, merged to main**; OpenBao policy/role live-configured; image built+pushed to GHCR via CI |
+| 3 | `XKubernetesCluster` XRD + `cluster-talos-kvm` Composition (core provisioning) | **Merged to main (PR #134, #135)** — per-cluster Terraform state-backend gap found and fixed same week |
+| 3b | Flux bootstrap push onto the new cluster | **Done, merged (PR #157)** — not via the originally-envisioned Crossplane-automated `provider-kubernetes` remote ProviderConfig; instead the existing generic `.bin/bootstrap-cluster-*.sh` chain (built for `controlplane`) was run end-to-end for the first time against `observability`, surfacing 3 real bugs — see [[bootstrap-cluster-generic-chain]]. The fully-automated composition-driven version from the original step-3 split is **not built**; still a manual (if scripted) step for every new cluster. Worth revisiting when step 8's ADR is written — this is the real remaining gap in ADR-14's "manual, can't be automated" consequence |
+| 3c | Public JWKS/OIDC mirror (`service-account-issuer` + Garage CronJob) | **Not started** — deferred at the same time as 3b, no commit found for it. Not required for `observability`'s current LGTM-facing role in M5, but flag if any future workload needs external OIDC federation to this cluster |
+| 4 | `clusters/observability/` baseline layer | **Done** — merged alongside steps 5 network fixes below; Calico, ESO, cert-manager+spiffe (own trust domain `obs.rye.ninja`... verify exact value before quoting), storage, etc. all live |
+| 5 | `observability` claim instance — first end-to-end provision | **Done** — real VMs (3 CP / 0 worker) provisioned via Terraform, Talos-bootstrapped, DNS-delegated; required its own dedicated VLAN 200 mid-step to fix an ICMPv6 hairpin-routing bug (PR #142), later reconsidered — see [[m4-network-architecture-no-isolation-requirement]] (VLAN 200 removed, observability moved onto shared VLAN 100, PR #148/#153). Also required a new `XUnifiNetwork`/`XNetworkSegment` split (PR #148) and several live bug fixes (PRs #136-#154: wrong image registry, invalid node ULA/MAC allocation, OpenBao CA ConfigMap key mismatch, `allowSchedulingOnControlPlanes` missing for 0-worker clusters, NAT64/NTP routing, nameServers status-patch crash on first reconcile) |
+| 6 | Chainsaw deletion/teardown test; Usage guards | **In progress** (2026-08-11) |
+| 7 | Backstage `catalog.yaml` generation wiring (ADR-18) | Not started — note `.bin/bootstrap-cluster-catalog.sh` already exists and scaffolds a minimal `clusters/<name>/catalog.yaml` (used for both `controlplane` and `observability`), but it's a manual/scripted step, not composition-driven; "wiring" likely means closing that gap, not starting from zero |
 | 8 | ADR: XKubernetesCluster fleet abstraction (amends ADR-14) | Not started |
+
+**Two real fleet-topology bugs found and fixed during steps 4-5, not
+scoped in the original design doc**: `provider-kubernetes`'s generated-Objects
+CNI-bridge approach for delivering Calico to a cluster with no Flux of its
+own yet (used briefly between steps 4 and 3b) turned out to have never
+actually gone live — `crossplane-resources`'s Kustomization was silently
+`Ready: False` the whole time on a missing-namespace bug (PR #156) — caught
+before assuming it worked, then the whole bridge was retired in favor of
+3b's real Flux instance (PR #158, see [[remote-cluster-manifest-delivery]]).
 
 ### Step 1 detail — DONE 2026-07-28
 
