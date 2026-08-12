@@ -1,0 +1,65 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: xkubernetescluster-validation
+spec:
+  description: >-
+    M4 step 6, Tier A: an XKubernetesCluster claim whose name has no
+    platform-kvm-network entry fails fast via validate-network-allocation's
+    ClaimConditions and never provisions a Workspace (VM) or a
+    talos-cluster-bootstrap Job -- proving create-workspace/create-bootstrap-job's
+    {{ if }} gates actually hold, not just that the composition doesn't error.
+    NOTE: create-dns-delegation is unconditional (composition.yaml) -- this
+    claim still creates a real, short-lived Route53 zone + Cloudflare NS
+    records. Accepted cost, see resources/claim.yaml and this suite's README.
+    Deep garbage-collection verification (confirming the real Route53 zone
+    is actually gone, no orphaned VM) is tests/xkubernetescluster-lifecycle's
+    job, not duplicated here -- this suite only proves the fail-fast path.
+  steps:
+    - name: apply-claim-missing-network-allocation
+      try:
+        - apply:
+            file: resources/claim.yaml
+
+    - name: assert-claim-conditions-surfaces-missing-allocation
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -eu
+              T=$(mktemp); trap 'rm -f "$T"' EXIT
+              kubectl get xkubernetesclusters.platform.rye.ninja chainsaw-validate-xkc \
+                -n crossplane-system -o json > "$T"
+              REASON=$(jq -r '[.status.conditions[]? | select(.type=="NetworkAllocationResolved")][0].reason // empty' "$T")
+              [ "$REASON" = "MissingNetworkAllocation" ] \
+                || { echo "FAIL: expected NetworkAllocationResolved/MissingNetworkAllocation, got '${REASON:-<none>}'"; cat "$T"; exit 1; }
+              echo "OK: ClaimConditions correctly surfaces MissingNetworkAllocation"
+
+    - name: assert-no-vm-or-bootstrap-job-ever-created
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              set -eu
+              WS=$(kubectl get workspaces.tf.m.upbound.io chainsaw-validate-xkc \
+                -n crossplane-system --ignore-not-found -o name)
+              [ -z "$WS" ] \
+                || { echo "FAIL: a Workspace was created despite missing network allocation: $WS"; exit 1; }
+              JOB=$(kubectl get objects.kubernetes.m.crossplane.io chainsaw-validate-xkc-bootstrap \
+                -n crossplane-system --ignore-not-found -o name)
+              [ -z "$JOB" ] \
+                || { echo "FAIL: a bootstrap Object was created despite missing network allocation: $JOB"; exit 1; }
+              echo "OK: no Workspace and no bootstrap Job -- create-workspace/create-bootstrap-job gates hold"
+
+    - name: delete-claim-and-confirm-removal
+      try:
+        - delete:
+            file: resources/claim.yaml
+        - script:
+            timeout: 60s
+            content: |
+              set -eu
+              kubectl get xkubernetesclusters.platform.rye.ninja chainsaw-validate-xkc \
+                -n crossplane-system --ignore-not-found -o name | grep -q . \
+                && { echo "FAIL: claim still present after delete"; exit 1; }
+              echo "OK: claim removed"

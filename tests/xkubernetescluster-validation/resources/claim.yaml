@@ -1,0 +1,18 @@
+# Deliberately-invalid XKubernetesCluster claim: "chainsaw-validate-xkc" has
+# no entry in the platform-kvm-network EnvironmentConfig
+# (clusters/controlplane/crossplane-resources/crossplane.environment-config.kvm-network.yaml)
+# and never will -- the whole point of this suite is proving the claim fails
+# fast and never provisions a VM or Talos bootstrap Job. NOTE:
+# create-dns-delegation (composition.yaml) is NOT gated on network-allocation
+# validation -- this claim still creates a real, short-lived Route53 zone +
+# Cloudflare NS records for chainsaw-validate-xkc.rye.ninja before the claim
+# is deleted at the end of this suite. Accepted, documented cost (README) --
+# cheap and near-instant, unlike tests/xkubernetescluster-lifecycle's real
+# VM/Talos provision.
+apiVersion: platform.rye.ninja/v1alpha1
+kind: XKubernetesCluster
+metadata:
+  name: chainsaw-validate-xkc
+  namespace: crossplane-system
+spec:
+  subdomain: chainsaw-validate-xkc
