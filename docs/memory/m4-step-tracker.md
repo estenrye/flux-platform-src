@@ -1,6 +1,6 @@
 ---
 name: m4-step-tracker
-description: M4 step tracker — steps 1-3 merged to main (XRD + Composition, narrowed to core provisioning); state-backend gap found and fixed same-day, 2026-07-31; step 5 (real claim) next
+description: M4 all 8 steps shipped as of 2026-08-11 (steps 6/7 as open PRs #159/#160 pending merge, step 8's ADR-27 as PR pending); Tier B's first live run still deliberately deferred
 metadata:
   type: project
 ---
@@ -8,18 +8,101 @@ metadata:
 Tracks [[m4-design]]'s 8-step execution order. Update as steps complete —
 this decays fast, keep it current rather than trusting it blindly.
 
-## Status as of 2026-07-31
+## Status as of 2026-08-11
 
 | # | Step | Status |
 |---|---|---|
 | 1 | provider-terraform install + generalized `talos-cluster` tofu module + `crossplane-kvm-hosts` EnvironmentConfig | **Done, merged to main** — bootstrap script run by the user, OpenBao `kv get` on `provider-terraform/kvm-ssh-key` confirmed working; package reference corrected to `xpkg.upbound.io/upbound/provider-terraform:v1.1.6`; a live NetworkPolicy crash-loop bug found and fixed post-merge (PR #133) — `provider-terraform` confirmed `Running`/`Healthy=True` |
-| 2 | Talos-bootstrap Job image + script (OpenBao for secrets) | **Shipped, merged to main**; OpenBao policy/role live-configured; image built+pushed to GHCR via CI; no real cluster bootstrap attempted yet (no Job template existed until step 3) |
-| 3 | `XKubernetesCluster` XRD + `cluster-talos-kvm` Composition (core provisioning; Flux-push/GitHub-automation/JWKS-mirror split out to 3b/3c) | **Merged to main (PR #134)** — `make render`/kube-linter/checkov/trust-domain all clean; embedded Terraform module independently validated; per-cluster state backend gap found and fixed same day (below). Several Crossplane/provider API details used are still unverified against a live reconcile (see detail below) |
-| 4 | `clusters/observability/` baseline layer | Not started |
-| 5 | `observability` claim instance — first end-to-end provision | Not started |
-| 6 | Chainsaw deletion/teardown test; Usage guards | Not started |
-| 7 | Backstage `catalog.yaml` generation wiring (ADR-18) | Not started |
-| 8 | ADR: XKubernetesCluster fleet abstraction (amends ADR-14) | Not started |
+| 2 | Talos-bootstrap Job image + script (OpenBao for secrets) | **Shipped, merged to main**; OpenBao policy/role live-configured; image built+pushed to GHCR via CI |
+| 3 | `XKubernetesCluster` XRD + `cluster-talos-kvm` Composition (core provisioning) | **Merged to main (PR #134, #135)** — per-cluster Terraform state-backend gap found and fixed same week |
+| 3b | Flux bootstrap push onto the new cluster | **Done, merged (PR #157)** — not via the originally-envisioned Crossplane-automated `provider-kubernetes` remote ProviderConfig; instead the existing generic `.bin/bootstrap-cluster-*.sh` chain (built for `controlplane`) was run end-to-end for the first time against `observability`, surfacing 3 real bugs — see [[bootstrap-cluster-generic-chain]]. The fully-automated composition-driven version from the original step-3 split is **not built**; still a manual (if scripted) step for every new cluster. Worth revisiting when step 8's ADR is written — this is the real remaining gap in ADR-14's "manual, can't be automated" consequence |
+| 3c | Public JWKS/OIDC mirror (`service-account-issuer` + Garage CronJob) | **Not started** — deferred at the same time as 3b, no commit found for it. Not required for `observability`'s current LGTM-facing role in M5, but flag if any future workload needs external OIDC federation to this cluster |
+| 4 | `clusters/observability/` baseline layer | **Done** — merged alongside steps 5 network fixes below; Calico, ESO, cert-manager+spiffe (own trust domain `obs.rye.ninja`... verify exact value before quoting), storage, etc. all live |
+| 5 | `observability` claim instance — first end-to-end provision | **Done** — real VMs (3 CP / 0 worker) provisioned via Terraform, Talos-bootstrapped, DNS-delegated; required its own dedicated VLAN 200 mid-step to fix an ICMPv6 hairpin-routing bug (PR #142), later reconsidered — see [[m4-network-architecture-no-isolation-requirement]] (VLAN 200 removed, observability moved onto shared VLAN 100, PR #148/#153). Also required a new `XUnifiNetwork`/`XNetworkSegment` split (PR #148) and several live bug fixes (PRs #136-#154: wrong image registry, invalid node ULA/MAC allocation, OpenBao CA ConfigMap key mismatch, `allowSchedulingOnControlPlanes` missing for 0-worker clusters, NAT64/NTP routing, nameServers status-patch crash on first reconcile) |
+| 6 | Chainsaw deletion/teardown test; Usage guards | **Shipped 2026-08-11, PR pending** — Tier A (validation-path suite) verified live and passing; Usage guards verified live against the real `observability` claim; Tier B (real end-to-end lifecycle suite) built but deliberately **not yet run live** (needs a `platform-kvm-network` fixture entry + separate go-ahead). See step 6 detail below |
+| 7 | Backstage `catalog.yaml` generation wiring (ADR-18) | **Done, PR #159** — fixed a real bug (`bootstrap-cluster-catalog.sh` hardcoded `owner: group:platform-engineering`, mismatching ADR-18's own convention) and enriched the script to pull `rye.ninja/trust-domain` from the claim's live status; fixed `observability`'s existing file to match; amended ADR-18 |
+| 8 | ADR: XKubernetesCluster fleet abstraction (amends ADR-14) | **Shipped 2026-08-11, PR pending** — [ADR-27](../adr/0027-xkubernetescluster-fleet-abstraction.md), plus an amendment section on ADR-14 itself. Written last, after steps 6/7's actual PRs existed, so it accurately reflects what shipped rather than what was planned |
+
+**M4 is functionally complete as of this update** — all 8 design-doc steps
+shipped (steps 6-8 as open PRs #159/#160/pending-ADR-27-PR, not yet merged;
+merge order recommended 7 → 6 → 8 to avoid tracker-file diff overlap, see
+step 6's PR description). The one deliberately-deferred piece is Tier B's
+first *live* run (real VM/DNS provisioning) — built and lint-clean, but
+execution needs a `platform-kvm-network` fixture entry plus a separate
+explicit go-ahead given its real cost. M5 (observability backbone) can
+proceed once 6/7/8 merge.
+
+**Two real fleet-topology bugs found and fixed during steps 4-5, not
+scoped in the original design doc**: `provider-kubernetes`'s generated-Objects
+CNI-bridge approach for delivering Calico to a cluster with no Flux of its
+own yet (used briefly between steps 4 and 3b) turned out to have never
+actually gone live — `crossplane-resources`'s Kustomization was silently
+`Ready: False` the whole time on a missing-namespace bug (PR #156) — caught
+before assuming it worked, then the whole bridge was retired in favor of
+3b's real Flux instance (PR #158, see [[remote-cluster-manifest-delivery]]).
+
+### Step 6 detail — shipped 2026-08-11
+
+**Tier A** (`tests/xkubernetescluster-validation/`): proves a claim with no
+`platform-kvm-network` entry fails fast via `validate-network-allocation`'s
+`ClaimConditions` and never provisions a `Workspace`/bootstrap `Job`. Ran
+live against `controlplane`, passed, confirmed full cleanup (claim,
+composed `XDelegatedHostedZoneAWS`, real Route53 zone + Cloudflare NS
+records all gone). **Real finding, not zero-cost as originally scoped**:
+`create-dns-delegation` in `composition.yaml` is unconditional — it composes
+a real DNS delegation on *every* claim, valid or not, since
+`validate-network-allocation` only writes advisory status, it doesn't gate
+later pipeline steps except `create-workspace`/`create-bootstrap-job`. User
+confirmed accepting the small, near-instant real cost rather than fixing the
+composition gap.
+
+**Usage guards**: pivoted from the plan's original target (protecting the
+shared `provider-terraform`/`provider-kubernetes` `ClusterProviderConfig`s)
+after live verification found a real Crossplane limitation —
+`protection.crossplane.io/v1beta1 Usage`'s deletion-blocking webhook
+(`nousages.protection.crossplane.io`) only enforces when **both** `of` and
+`by` are namespaced resources. A cluster-scoped `of` (confirmed with a
+scratch `Namespace`) is accepted by the API with no error but is silently
+unprotected. `ClusterUsage` (the cluster-scoped variant) doesn't fix this
+either — its `by.resourceRef` schema has no `namespace` field at all, so it
+can't reference a namespaced resource like a `Workspace` (strict-decoding
+error on apply). Pivoted to protecting the `{name}-kubeconfig`/
+`{name}-talosconfig` connection Secrets instead (both `of`/`by` namespaced,
+confirmed working) — these are written imperatively by the bootstrap Job,
+not Crossplane-owned, so nothing protected or garbage-collected them before
+this. Verified end-to-end against the real `observability` claim: both
+`Usage` resources compose `Ready`, and a real dry-run delete of
+`observability-kubeconfig` is genuinely denied.
+
+**New known gap surfaced by this work, documented not fixed**: because the
+connection Secrets were never Crossplane-owned, deleting the claim still
+does not clean them up — Usage guard or not. `replayDeletion` (a `Usage`
+field that would replay a blocked deletion once the `Usage` itself is
+removed) wasn't set, so this doesn't even partially help on intentional
+teardown. Tier B's suite asserts this explicitly and cleans the Secrets up
+itself rather than silently leaving them orphaned every run. A real fix
+(making the bootstrap Job's Secret writes Crossplane-composed/owned) would
+touch step 2/3's already-shipped, already-live bootstrap Job — out of scope
+for step 6, flagged for whoever next touches that Job.
+
+**Tier B** (`tests/xkubernetescluster-lifecycle/`): a real, minimal (1 CP
+node) end-to-end provision-then-delete suite, built and lint-clean but
+**deliberately not run live yet** — needs a one-time `platform-kvm-network`
+fixture entry (documented in the suite's own README, next free ULA/ASN
+block after `observability`'s) and separate explicit go-ahead given the real
+KVM/AWS/Cloudflare cost (~10-20 min per run). Also asserts the Usage guards
+deny deletion of *this* claim's own secrets (not just `observability`'s) and
+checks the real KVM host (via SSH, `virsh list`) for no orphaned domain.
+
+**Unrelated, pre-existing cluster issue found and documented while
+debugging chainsaw cleanup, not caused by this work**:
+`clientsecret.supervisor.pinniped.dev` APIService has been
+`FailedDiscoveryCheck` for 17+ days, stalling `Namespace`/`Usage`
+finalizer removal fleet-wide — see
+[[pinniped-apiservice-discovery-failure]]. Two harmless scratch objects from
+this session's live verification are stuck `Terminating` on `controlplane`
+as a result (`chainsaw-scratch-cluster-of` namespace,
+`chainsaw-scratch-ns-usage`) — clean up once that's fixed, not forced.
 
 ### Step 1 detail — DONE 2026-07-28
 

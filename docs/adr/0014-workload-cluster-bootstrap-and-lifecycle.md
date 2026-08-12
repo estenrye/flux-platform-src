@@ -156,10 +156,38 @@ In addition to the partial teardown steps, also:
 - Cluster lifecycle (provisioning and decommissioning) must be coordinated
   with the Crossplane control plane to avoid orphaned AWS resources.
 
+## Amendment 2026-08-11 (XKubernetesCluster automates provisioning; M4 step 8)
+
+The Consequences section's claim that bootstrap "cannot be fully automated
+yet" is **partially superseded**. Full design:
+[ADR-27: XKubernetesCluster Fleet Abstraction](0027-xkubernetescluster-fleet-abstraction.md).
+
+- **Phases 1, 5, and 6 above (provisioning, SPIFFE trust domain, control
+  plane registration/DNS delegation) are now automated** by one
+  `kubectl apply` of an `XKubernetesCluster` claim
+  (`applications/crossplane-resources/xkubernetescluster/`) — proven against
+  a second real cluster, `observability` (M4).
+- **Phases 2-4 (SOPS key delivery, rendered-repo bootstrap, deploy-key
+  creation — i.e. getting Flux itself running on the new cluster) remain
+  manual**, run via the same `.bin/bootstrap-cluster-*.sh` chain this ADR
+  already describes. The originally-envisioned fully-automated version (a
+  `provider-kubernetes` `ProviderConfig` with `credentials.source: Secret`
+  pointed at the new cluster, plus GitHub App deploy-key automation) was
+  never built — the existing scripted chain was used instead, now proven
+  end-to-end for a second cluster (see [[bootstrap-cluster-generic-chain]]
+  in `docs/memory/`). This is the honest remaining gap: bootstrap is
+  significantly less manual than when this ADR was written, not fully
+  automated.
+- The Decommissioning section's `.bin/teardown-cluster.sh` two-mode process
+  is unchanged by this amendment — `XKubernetesCluster` claim deletion
+  (garbage-collecting the VM/DNS-delegation side) is a separate concern from
+  that script's rendered-repo/GitHub-Environment/1Password cleanup.
+
 ## References
 
 - [ADR-2: Bootstrapping a Flux-Enabled Kubernetes Cluster](0002-managing-a-consistent-development-environment.md)
 - [ADR-3: Bootstrapping the Crossplane Controlplane Cluster](0003-bootstrapping-the-crossplane-controlplane-cluster.md)
 - [ADR-7: Crossplane Composition for ExternalDNS and CertManager IAM Roles Anywhere](0007-crossplane-composition-for-externaldns-and-certmanager-iam-roles-anywhere.md)
 - [ADR-16: SPIFFE Trust Domain Configuration per Cluster](0016-spiffe-trust-domain-configuration-per-cluster.md)
+- [ADR-27: XKubernetesCluster Fleet Abstraction](0027-xkubernetescluster-fleet-abstraction.md)
 - [FluxCD: Bootstrap](https://fluxcd.io/flux/installation/bootstrap/)
