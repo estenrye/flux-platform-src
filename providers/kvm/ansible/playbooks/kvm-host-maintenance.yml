@@ -1,0 +1,41 @@
+---
+# Reusable playbook for a controlled KVM host reboot (kernel updates,
+# hardware work, etc.): gracefully stops every guest domain on the host in
+# dependency order, waits for a clean shutdown, reboots the host, verifies
+# ZFS/libvirt came back healthy, then brings domains back up in reverse
+# order. Built from the live mf-ms-a2-01 maintenance run documented in
+# docs/runbooks/kvm-host-maintenance.md -- read that runbook first.
+#
+# Ad hoc only: run by hand from an operator's machine with SSH agent access
+# to automation-user. Not wired into provider-ansible/AnsibleRun or any
+# Crossplane reconciliation loop.
+#
+# Usage (from providers/kvm/ansible/, so ansible.cfg's roles_path/inventory
+# defaults apply):
+#   cd providers/kvm/ansible
+#   ansible-playbook playbooks/kvm-host-maintenance.yml --limit mf-ms-a2-01
+#
+# Tags: shutdown, reboot, verify, startup, openbao -- run a subset with
+# --tags if you want to pause and inspect between phases instead of one
+# continuous run (e.g. --tags shutdown to stop there, confirm state by
+# hand, then --tags reboot,verify,startup,openbao to finish).
+- name: KVM host maintenance (graceful domain shutdown, reboot, restart)
+  hosts: kvm_hosts
+  become: true
+  gather_facts: false
+  roles:
+    - kvm-host-maintenance
+
+# Separate play, same inventory hosts but connection: local: unsealing
+# OpenBao is a Kubernetes-API operation (kubectl/sops from the operator's
+# own machine), not something that happens on the KVM host itself over
+# SSH. Keyed off the same per-host inventory purely to reuse that host's
+# openbao_* config (kvm_maintenance_openbao_unseal_enabled defaults to
+# false -- see roles/openbao-unseal/defaults/main.yml -- so this is a
+# no-op on any host that doesn't carry the controlplane cluster).
+- name: Unseal OpenBao after the cluster restart
+  hosts: kvm_hosts
+  connection: local
+  gather_facts: false
+  roles:
+    - openbao-unseal

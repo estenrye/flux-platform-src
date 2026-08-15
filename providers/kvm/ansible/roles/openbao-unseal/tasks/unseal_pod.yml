@@ -1,0 +1,66 @@
+---
+# Included per ordinal with kvm_maintenance_openbao_ordinal set by the
+# caller's loop. StatefulSet is OrderedReady, so openbao-N doesn't exist
+# until openbao-(N-1) is Ready -- which itself doesn't happen until it's
+# unsealed. The wait below is therefore also the wait for the previous
+# pod's unseal to have taken effect.
+
+- name: "Wait for openbao-{{ kvm_maintenance_openbao_ordinal }} to exist"
+  ansible.builtin.command:
+    cmd: >-
+      kubectl --kubeconfig {{ kvm_maintenance_openbao_kubeconfig }}
+      get pod openbao-{{ kvm_maintenance_openbao_ordinal }} -n {{ kvm_maintenance_openbao_namespace }}
+  register: kvm_maintenance_openbao_pod_check
+  until: kvm_maintenance_openbao_pod_check.rc == 0
+  retries: "{{ kvm_maintenance_openbao_pod_wait_retries }}"
+  delay: "{{ kvm_maintenance_openbao_pod_wait_delay }}"
+  changed_when: false
+
+- name: "Check seal status of openbao-{{ kvm_maintenance_openbao_ordinal }}"
+  ansible.builtin.command:
+    cmd: >-
+      kubectl --kubeconfig {{ kvm_maintenance_openbao_kubeconfig }}
+      exec -n {{ kvm_maintenance_openbao_namespace }} openbao-{{ kvm_maintenance_openbao_ordinal }} -c openbao --
+      bao status -tls-skip-verify -format=json
+  register: kvm_maintenance_openbao_status
+  changed_when: false
+  # `bao status` exits non-zero (2) while sealed -- expected, not a failure.
+  # But the pod existing (previous task) only means it was scheduled, not
+  # that the openbao process is listening yet -- exec can hit connection
+  # refused for a few seconds after that, leaving stdout empty. Retry until
+  # a real API response comes back either way; don't treat a transient
+  # refused connection as "not sealed" (found live: silently skipped
+  # applying shares to openbao-2 this way, 2026-08-15).
+  failed_when: false
+  until: "'\"initialized\"' in kvm_maintenance_openbao_status.stdout"
+  retries: "{{ kvm_maintenance_openbao_pod_wait_retries }}"
+  delay: "{{ kvm_maintenance_openbao_pod_wait_delay }}"
+
+- name: "Apply unseal key shares to openbao-{{ kvm_maintenance_openbao_ordinal }}"
+  ansible.builtin.command:
+    cmd: >-
+      kubectl --kubeconfig {{ kvm_maintenance_openbao_kubeconfig }}
+      exec -n {{ kvm_maintenance_openbao_namespace }} openbao-{{ kvm_maintenance_openbao_ordinal }} -c openbao --
+      bao operator unseal -tls-skip-verify {{ item }}
+  loop: "{{ kvm_maintenance_openbao_shares }}"
+  when: "'\"sealed\": true' in kvm_maintenance_openbao_status.stdout"
+  changed_when: true
+  no_log: true
+
+- name: "Wait for openbao-{{ kvm_maintenance_openbao_ordinal }}'s container to report ready"
+  ansible.builtin.command:
+    # Single container per pod, so index [0] rather than a name filter --
+    # ansible.builtin.command tokenizes cmd via shlex (no real shell), which
+    # silently strips the embedded "..." quotes a [?(@.name=="openbao")]
+    # filter needs, breaking the jsonpath into something that returns
+    # nothing rather than erroring (found live: retries exhausted against
+    # an already-Ready pod, 2026-08-15).
+    cmd: >-
+      kubectl --kubeconfig {{ kvm_maintenance_openbao_kubeconfig }}
+      get pod openbao-{{ kvm_maintenance_openbao_ordinal }} -n {{ kvm_maintenance_openbao_namespace }}
+      -o jsonpath={.status.containerStatuses[0].ready}
+  register: kvm_maintenance_openbao_ready
+  until: kvm_maintenance_openbao_ready.stdout == "true"
+  retries: "{{ kvm_maintenance_openbao_pod_wait_retries }}"
+  delay: "{{ kvm_maintenance_openbao_pod_wait_delay }}"
+  changed_when: false

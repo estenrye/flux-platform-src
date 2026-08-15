@@ -1,0 +1,97 @@
+---
+# See docs/runbooks/openbao-unseal.md for the manual procedure this
+# encodes. Only ever unseals -- never runs `bao operator init`, which is a
+# one-time, operator-run ceremony (mints new key shares + root token) with
+# no business happening inside a routine reboot playbook. If this role
+# ever hits an uninitialized OpenBao, stop and run that ceremony by hand
+# first.
+
+- name: Wait for the controlplane API to accept requests
+  ansible.builtin.command:
+    cmd: "kubectl --kubeconfig {{ kvm_maintenance_openbao_kubeconfig }} get namespace {{ kvm_maintenance_openbao_namespace }}"
+  register: kvm_maintenance_openbao_api_check
+  until: kvm_maintenance_openbao_api_check.rc == 0
+  retries: "{{ kvm_maintenance_openbao_api_wait_retries }}"
+  delay: "{{ kvm_maintenance_openbao_api_wait_delay }}"
+  changed_when: false
+  when: kvm_maintenance_openbao_unseal_enabled
+  tags: [openbao]
+
+- name: Decrypt the unseal key shares
+  when: kvm_maintenance_openbao_unseal_enabled
+  tags: [openbao]
+  block:
+    # The age private key never touches disk in plaintext: op run resolves
+    # the op:// reference and injects it as SOPS_AGE_KEY into the sops
+    # subprocess's environment only, for the life of that one command.
+    # The .env file itself holds only the reference string, not the key --
+    # safe to have existed briefly on disk, safe even to commit.
+    - name: Create a scratch env-file for op run
+      ansible.builtin.tempfile:
+        state: file
+        suffix: .env
+      register: kvm_maintenance_openbao_envfile
+
+    - name: Write the age key's 1Password reference into it
+      ansible.builtin.copy:
+        dest: "{{ kvm_maintenance_openbao_envfile.path }}"
+        content: "SOPS_AGE_KEY={{ kvm_maintenance_openbao_age_key_ref }}\n"
+        mode: "0600"
+
+    - name: Run sops through op run (SOPS_AGE_KEY injected in-process only)
+      ansible.builtin.command:
+        cmd: >-
+          op run --no-masking --env-file={{ kvm_maintenance_openbao_envfile.path }}
+          -- sops -d --output-type json {{ kvm_maintenance_openbao_sops_file }}
+      register: kvm_maintenance_openbao_secret
+      changed_when: false
+      no_log: true
+  always:
+    - name: Remove the scratch env-file
+      ansible.builtin.file:
+        path: "{{ kvm_maintenance_openbao_envfile.path }}"
+        state: absent
+      when: kvm_maintenance_openbao_envfile.path is defined
+
+- name: Assert the secret decrypted and has enough shares for the configured threshold
+  ansible.builtin.assert:
+    that:
+      - kvm_maintenance_openbao_secret.rc == 0
+      - (kvm_maintenance_openbao_secret.stdout | from_json).stringData.unseal_keys_b64 | length >= kvm_maintenance_openbao_unseal_threshold | int
+    fail_msg: >-
+      Could not decrypt {{ kvm_maintenance_openbao_sops_file }} into at least
+      {{ kvm_maintenance_openbao_unseal_threshold }} unseal key shares --
+      check local age key access before proceeding.
+  no_log: true
+  when: kvm_maintenance_openbao_unseal_enabled
+  tags: [openbao]
+
+- name: Take the threshold-many shares needed to unseal
+  ansible.builtin.set_fact:
+    kvm_maintenance_openbao_shares: >-
+      {{ (kvm_maintenance_openbao_secret.stdout | from_json).stringData.unseal_keys_b64[:(kvm_maintenance_openbao_unseal_threshold | int)] }}
+  no_log: true
+  when: kvm_maintenance_openbao_unseal_enabled
+  tags: [openbao]
+
+- name: Unseal each openbao-N pod in order
+  ansible.builtin.include_tasks:
+    file: unseal_pod.yml
+    apply:
+      tags: [openbao]
+  loop: "{{ range(0, kvm_maintenance_openbao_replicas | int) | list }}"
+  loop_control:
+    loop_var: kvm_maintenance_openbao_ordinal
+  when: kvm_maintenance_openbao_unseal_enabled
+  tags: [openbao]
+
+- name: Verify HA formed (exactly one active, rest standby)
+  ansible.builtin.command:
+    cmd: >-
+      kubectl --kubeconfig {{ kvm_maintenance_openbao_kubeconfig }}
+      get pods -n {{ kvm_maintenance_openbao_namespace }} -l app.kubernetes.io/name=openbao -o jsonpath={.items[*].status.containerStatuses[0].ready}
+  register: kvm_maintenance_openbao_final_check
+  changed_when: false
+  failed_when: "'false' in kvm_maintenance_openbao_final_check.stdout.split()"
+  when: kvm_maintenance_openbao_unseal_enabled
+  tags: [openbao]

@@ -1,0 +1,27 @@
+---
+# Included per-domain with kvm_maintenance_domain set by the caller's loop.
+# Idempotent: a domain that's already shut off (e.g. controlplane-wk-1,
+# left off as a manual memory-pressure mitigation) is left alone rather
+# than erroring.
+
+- name: "Check current state of {{ kvm_maintenance_domain }}"
+  ansible.builtin.command:
+    cmd: "virsh domstate {{ kvm_maintenance_domain }}"
+  register: kvm_maintenance_domain_precheck
+  changed_when: false
+
+- name: "Gracefully shut down {{ kvm_maintenance_domain }}"
+  ansible.builtin.command:
+    cmd: "virsh shutdown {{ kvm_maintenance_domain }}"
+  when: "'running' in kvm_maintenance_domain_precheck.stdout"
+  changed_when: true
+
+- name: "Wait for {{ kvm_maintenance_domain }} to reach shut off"
+  ansible.builtin.command:
+    cmd: "virsh domstate {{ kvm_maintenance_domain }}"
+  register: kvm_maintenance_domain_wait
+  until: "'shut off' in kvm_maintenance_domain_wait.stdout"
+  retries: "{{ (kvm_maintenance_shutdown_timeout_seconds | int) // (kvm_maintenance_shutdown_poll_seconds | int) }}"
+  delay: "{{ kvm_maintenance_shutdown_poll_seconds }}"
+  when: "'running' in kvm_maintenance_domain_precheck.stdout"
+  changed_when: false

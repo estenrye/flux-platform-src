@@ -1,0 +1,33 @@
+# Desired domain fleet for this host, grouped by shutdown/startup order.
+# Empty by default -- real values live in inventory host_vars (see
+# providers/kvm/ansible/inventory/kvm-hosts.yml) so a second KVM host
+# (providers/kvm/hosts.yaml is list-shaped for this) can reuse this role
+# with its own fleet.
+#
+# Each list is the *desired running set*: shutdown tasks no-op on domains
+# already off, and startup brings every listed domain to "running" --
+# these are not just "what happened to be up when the playbook started".
+#
+# Order (shutdown runs top-to-bottom, startup runs bottom-to-top): legacy
+# -> observability -> controlplane workers -> controlplane control-plane
+# -> nat64. NAT64 is shut down last and started first since it's the
+# fleet's IPv4 egress path (docs/runbooks/control-plane-cold-start.md
+# step 4) -- nothing else needs it mid-shutdown, but controlplane's Flux
+# needs it back before it can reconcile anything on restart.
+kvm_maintenance_legacy_domains: []
+kvm_maintenance_observability_domains: []
+kvm_maintenance_worker_domains: []
+kvm_maintenance_controlplane_domains: []
+kvm_maintenance_nat64_domains: []
+
+kvm_maintenance_shutdown_timeout_seconds: 120
+kvm_maintenance_shutdown_poll_seconds: 5
+kvm_maintenance_reboot_timeout_seconds: 600
+kvm_maintenance_domain_settle_seconds: 10
+
+# Fires a synchronous etcd snapshot before touching any domain -- cheap
+# insurance on top of the every-6-hours timer (providers/kvm/scripts/
+# etcd-snapshot.timer). Only meaningful on hosts running the controlplane
+# cluster; harmless no-op elsewhere since the unit simply won't exist
+# (guarded by kvm_maintenance_etcd_snapshot_unit, not by cluster identity).
+kvm_maintenance_etcd_snapshot_unit: etcd-snapshot.service

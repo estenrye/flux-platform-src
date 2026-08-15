@@ -1,0 +1,180 @@
+---
+# See docs/runbooks/kvm-host-maintenance.md for the full procedure this
+# encodes, and providers/kvm/ansible/inventory/kvm-hosts.yml for the
+# per-host domain lists consumed here.
+
+# ── Pre-flight ────────────────────────────────────────────────────────────
+
+- name: Check whether the etcd-snapshot unit exists on this host
+  ansible.builtin.command:
+    cmd: "systemctl list-unit-files {{ kvm_maintenance_etcd_snapshot_unit }}"
+  register: kvm_maintenance_etcd_unit_check
+  changed_when: false
+  failed_when: false
+  tags: [shutdown]
+
+- name: Trigger a fresh etcd snapshot before shutting anything down
+  ansible.builtin.systemd:
+    name: "{{ kvm_maintenance_etcd_snapshot_unit }}"
+    state: started
+  when: kvm_maintenance_etcd_snapshot_unit in kvm_maintenance_etcd_unit_check.stdout
+  tags: [shutdown]
+
+- name: Wait for the etcd snapshot to finish
+  ansible.builtin.systemd:
+    name: "{{ kvm_maintenance_etcd_snapshot_unit }}"
+  register: kvm_maintenance_etcd_snapshot_status
+  until: >-
+    kvm_maintenance_etcd_snapshot_status.status.ActiveState == "inactive" and
+    kvm_maintenance_etcd_snapshot_status.status.Result == "success"
+  retries: 30
+  delay: 2
+  when: kvm_maintenance_etcd_snapshot_unit in kvm_maintenance_etcd_unit_check.stdout
+  tags: [shutdown]
+
+# ── Shutdown (dependency order: leaf/legacy first, egress path last) ───────
+
+- name: Shut down legacy/unmanaged domains
+  ansible.builtin.include_tasks:
+    file: shutdown_domain.yml
+    apply:
+      tags: [shutdown]
+  loop: "{{ kvm_maintenance_legacy_domains }}"
+  loop_control:
+    loop_var: kvm_maintenance_domain
+  tags: [shutdown]
+
+- name: Disable autostart on legacy/unmanaged domains
+  ansible.builtin.command:
+    cmd: "virsh autostart --disable {{ item }}"
+  loop: "{{ kvm_maintenance_legacy_domains }}"
+  changed_when: true
+  tags: [shutdown]
+
+- name: Shut down observability cluster domains
+  ansible.builtin.include_tasks:
+    file: shutdown_domain.yml
+    apply:
+      tags: [shutdown]
+  loop: "{{ kvm_maintenance_observability_domains }}"
+  loop_control:
+    loop_var: kvm_maintenance_domain
+  tags: [shutdown]
+
+- name: Shut down controlplane worker domains
+  ansible.builtin.include_tasks:
+    file: shutdown_domain.yml
+    apply:
+      tags: [shutdown]
+  loop: "{{ kvm_maintenance_worker_domains }}"
+  loop_control:
+    loop_var: kvm_maintenance_domain
+  tags: [shutdown]
+
+- name: Shut down controlplane control-plane domains
+  ansible.builtin.include_tasks:
+    file: shutdown_domain.yml
+    apply:
+      tags: [shutdown]
+  loop: "{{ kvm_maintenance_controlplane_domains }}"
+  loop_control:
+    loop_var: kvm_maintenance_domain
+  tags: [shutdown]
+
+- name: Shut down NAT64/DNS64 appliance domains
+  ansible.builtin.include_tasks:
+    file: shutdown_domain.yml
+    apply:
+      tags: [shutdown]
+  loop: "{{ kvm_maintenance_nat64_domains }}"
+  loop_control:
+    loop_var: kvm_maintenance_domain
+  tags: [shutdown]
+
+- name: Confirm every managed domain is shut off before rebooting
+  ansible.builtin.command:
+    cmd: "virsh domstate {{ item }}"
+  loop: >-
+    {{ kvm_maintenance_legacy_domains
+       + kvm_maintenance_observability_domains
+       + kvm_maintenance_worker_domains
+       + kvm_maintenance_controlplane_domains
+       + kvm_maintenance_nat64_domains }}
+  register: kvm_maintenance_preboot_check
+  changed_when: false
+  failed_when: "'shut off' not in kvm_maintenance_preboot_check.stdout"
+  tags: [shutdown]
+
+# ── Reboot ───────────────────────────────────────────────────────────────
+
+- name: Reboot the KVM host
+  ansible.builtin.reboot:
+    reboot_timeout: "{{ kvm_maintenance_reboot_timeout_seconds }}"
+    msg: "Rebooting via kvm-host-maintenance playbook"
+  tags: [reboot]
+
+# ── Post-reboot verification ────────────────────────────────────────────
+
+- name: Verify the ZFS vmpool imported and is ONLINE
+  ansible.builtin.command:
+    cmd: zpool status vmpool
+  register: kvm_maintenance_zpool_status
+  changed_when: false
+  failed_when: "'state: ONLINE' not in kvm_maintenance_zpool_status.stdout"
+  tags: [verify]
+
+- name: Verify libvirt storage pools are active
+  ansible.builtin.command:
+    cmd: virsh pool-list --all
+  register: kvm_maintenance_pool_list
+  changed_when: false
+  failed_when: >-
+    ('vms' not in kvm_maintenance_pool_list.stdout) or
+    ('appliances' not in kvm_maintenance_pool_list.stdout)
+  tags: [verify]
+
+# ── Startup (reverse of shutdown: egress path first, leaf clusters last) ───
+
+- name: Start NAT64/DNS64 appliance domains
+  ansible.builtin.include_tasks:
+    file: start_domain.yml
+    apply:
+      tags: [startup]
+  loop: "{{ kvm_maintenance_nat64_domains }}"
+  loop_control:
+    loop_var: kvm_maintenance_domain
+  tags: [startup]
+
+- name: Start controlplane control-plane domains
+  ansible.builtin.include_tasks:
+    file: start_domain.yml
+    apply:
+      tags: [startup]
+  loop: "{{ kvm_maintenance_controlplane_domains }}"
+  loop_control:
+    loop_var: kvm_maintenance_domain
+  tags: [startup]
+
+- name: Start controlplane worker domains
+  ansible.builtin.include_tasks:
+    file: start_domain.yml
+    apply:
+      tags: [startup]
+  loop: "{{ kvm_maintenance_worker_domains }}"
+  loop_control:
+    loop_var: kvm_maintenance_domain
+  tags: [startup]
+
+- name: Start observability cluster domains
+  ansible.builtin.include_tasks:
+    file: start_domain.yml
+    apply:
+      tags: [startup]
+  loop: "{{ kvm_maintenance_observability_domains }}"
+  loop_control:
+    loop_var: kvm_maintenance_domain
+  tags: [startup]
+
+# kvm_maintenance_legacy_domains are deliberately never restarted here --
+# autostart was disabled above; bring one back manually if it's ever
+# needed again.
