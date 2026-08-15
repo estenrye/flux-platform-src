@@ -1,0 +1,138 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: xkubernetescluster-lifecycle
+spec:
+  description: >-
+    M4 step 6, Tier B: a real, minimal-footprint XKubernetesCluster claim
+    provisions end-to-end (VM via Terraform, Talos bootstrap, DNS
+    delegation), then gets deleted -- proving every composed resource
+    (Workspace/VM, bootstrap Job, XDelegatedHostedZoneAWS + its real Route53
+    zone/Cloudflare NS records, Usage guards) garbage-collects with no
+    orphans. The same class of bug this fleet has already hit once
+    (docs/memory/provider-ansible-delete-cleanup-broken.md) -- exercised for
+    real, not assumed. MANUAL ONLY, real infra cost -- see README before
+    running.
+  steps:
+    - name: apply-claim
+      try:
+        - apply:
+            file: resources/claim.yaml
+
+    - name: wait-for-real-ready
+      try:
+        - script:
+            # Real VM boot + Talos bootstrap (schematic lookup, machine
+            # secrets, machine-config apply, etcd bootstrap, kubeconfig
+            # fetch) takes real wall-clock time -- generous timeout,
+            # matching the scale of create-controlplane-cluster.sh's own
+            # retry budgets, not this suite's other (K8s-API-only) timeouts.
+            timeout: 1200s
+            content: |
+              set -eu
+              for i in $(seq 1 120); do
+                PHASE=$(kubectl get xkubernetesclusters.platform.rye.ninja xkc-lifecycle-test \
+                  -n crossplane-system -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+                [ "$PHASE" = "Ready" ] && { echo "OK: phase=Ready after ${i} checks"; exit 0; }
+                echo "waiting: phase=${PHASE:-<none>} (check ${i}/120)"
+                sleep 10
+              done
+              echo "FAIL: claim never reached phase=Ready"
+              kubectl get xkubernetesclusters.platform.rye.ninja xkc-lifecycle-test -n crossplane-system -o yaml
+              exit 1
+
+    - name: assert-composed-resources-and-usage-guards
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -eu
+              WS=$(kubectl get workspaces.tf.m.upbound.io xkc-lifecycle-test -n crossplane-system \
+                -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+              [ "$WS" = "True" ] || { echo "FAIL: Workspace not Ready ($WS)"; exit 1; }
+
+              JOB=$(kubectl get objects.kubernetes.m.crossplane.io xkc-lifecycle-test-bootstrap -n crossplane-system \
+                -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+              [ "$JOB" = "True" ] || { echo "FAIL: bootstrap Object not Ready ($JOB)"; exit 1; }
+
+              for s in xkc-lifecycle-test-kubeconfig xkc-lifecycle-test-talosconfig; do
+                kubectl get secret "$s" -n crossplane-system >/dev/null \
+                  || { echo "FAIL: Secret $s missing"; exit 1; }
+              done
+
+              for u in xkc-lifecycle-test-kubeconfig-secret-protection xkc-lifecycle-test-talosconfig-secret-protection; do
+                READY=$(kubectl get usage.protection.crossplane.io "$u" -n crossplane-system \
+                  -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+                [ "$READY" = "True" ] || { echo "FAIL: Usage $u not Ready ($READY)"; exit 1; }
+              done
+              echo "OK: Workspace, bootstrap Job, both connection Secrets, and both Usage guards all present and Ready"
+
+        - script:
+            timeout: 30s
+            content: |
+              set -eu
+              # Confirms the Usage guards from M4 step 6's create-secret-usage-guards
+              # actually block deletion for THIS claim's own secrets, not just
+              # observability's (already confirmed separately, see
+              # docs/memory/m4-step-tracker.md).
+              OUT=$(kubectl delete secret xkc-lifecycle-test-kubeconfig -n crossplane-system --dry-run=server 2>&1 || true)
+              echo "$OUT" | grep -q "denied the request" \
+                || { echo "FAIL: expected the Usage guard to deny this delete, got: $OUT"; exit 1; }
+              echo "OK: Usage guard denies deletion of xkc-lifecycle-test-kubeconfig while the claim exists"
+
+    - name: delete-claim-and-confirm-full-teardown
+      try:
+        - delete:
+            file: resources/claim.yaml
+        - script:
+            # Deletion cascades through Workspace (real VM teardown -- can
+            # take a couple minutes) and the DNS delegation's real Route53
+            # zone -- longer timeout than a pure-K8s-object delete.
+            timeout: 300s
+            content: |
+              set -eu
+              for i in $(seq 1 30); do
+                LEFT=$(kubectl get xkubernetesclusters.platform.rye.ninja,workspaces.tf.m.upbound.io,objects.kubernetes.m.crossplane.io,xdelegatedhostedzoneaws.dns.platform.rye.ninja,usage.protection.crossplane.io \
+                  -n crossplane-system --ignore-not-found -o name 2>/dev/null | grep xkc-lifecycle-test || true)
+                [ -z "$LEFT" ] && { echo "OK: no composed resources remain"; exit 0; }
+                echo "waiting on teardown (check ${i}/30): $LEFT"
+                sleep 10
+              done
+              echo "FAIL: composed resources still present after delete"
+              kubectl get xkubernetesclusters.platform.rye.ninja,workspaces.tf.m.upbound.io,objects.kubernetes.m.crossplane.io,xdelegatedhostedzoneaws.dns.platform.rye.ninja,usage.protection.crossplane.io \
+                -n crossplane-system 2>/dev/null | grep xkc-lifecycle-test || true
+              exit 1
+
+        - script:
+            # KNOWN, PRE-EXISTING GAP (not introduced by the Usage guards):
+            # the connection Secrets are written imperatively by the
+            # bootstrap Job, not Crossplane-owned/composed -- nothing
+            # deletes them when the claim is deleted, Usage guard or not.
+            # Report their state explicitly (don't silently ignore) and
+            # clean them up as this suite's own responsibility, same as any
+            # other test fixture.
+            timeout: 30s
+            content: |
+              set -eu
+              for s in xkc-lifecycle-test-kubeconfig xkc-lifecycle-test-talosconfig; do
+                if kubectl get secret "$s" -n crossplane-system >/dev/null 2>&1; then
+                  echo "EXPECTED (documented gap, see README): $s survived claim deletion -- deleting it as suite cleanup"
+                  kubectl delete secret "$s" -n crossplane-system
+                else
+                  echo "NOTE: $s already gone (would mean the gap above is fixed -- update the README if so)"
+                fi
+              done
+
+    - name: confirm-no-orphaned-vm-on-kvm-host
+      try:
+        - script:
+            # Requires the operator's own SSH access to the KVM host
+            # (docs/runbooks/kvm-host-prep.md's established pattern) --
+            # not something this suite provisions.
+            timeout: 60s
+            content: |
+              set -eu
+              LEFT=$(ssh -o ConnectTimeout=10 automation-user@mf-ms-a2-01.usmnblm01.rye.ninja \
+                "virsh list --all --name | grep xkc-lifecycle-test || true; virsh pool-list --all 2>/dev/null | grep xkc-lifecycle-test || true")
+              [ -z "$LEFT" ] || { echo "FAIL: orphaned libvirt domain/pool found on the KVM host: $LEFT"; exit 1; }
+              echo "OK: no leftover libvirt domain or image pool for xkc-lifecycle-test on the KVM host"

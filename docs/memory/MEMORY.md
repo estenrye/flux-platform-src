@@ -33,10 +33,11 @@
 - [Urgency is the User's Call](feedback-urgency-is-users-call.md) — don't unilaterally label a finding "not urgent"; surface it and let the user decide priority
 - [M3 render-lint CI fix](m3-render-lint-ci-fix.md) — render-and-lint silently broken for all of M3 steps 1-4 (silent kustomize patch target-name mismatch); fixed in PR #100
 - [M4 Design](m4-design.md) — XKubernetesCluster XRD + talos-kvm composition; KVM capacity squeeze, Terraform-for-VMs + Job-for-bootstrap split, no separate claim kind
-- [M4 Step Tracker](m4-step-tracker.md) — all 8 steps shipped as of 2026-08-11 (steps 6-8 as pending PRs); Tier B's first live run still deferred
+- [M4 Step Tracker](m4-step-tracker.md) — all 8 steps shipped and merged as of 2026-08-15; Tier B's first live run still deferred
 - [dmacvicar/libvirt Bridge In-Place Update Bug](dmacvicar-libvirt-bridge-inplace-update-bug.md) — network_interface.bridge change reports success but silently never applies; research task: Ansible vs. alternate libvirt provider
 - [No Isolation Requirement Between Cluster VLANs](m4-network-architecture-no-isolation-requirement.md) — VLAN 200 exists to fix the ICMPv6 hairpin bug, not isolation; sharing VLAN 100 is a valid default
 - [Don't Inflate Tradeoff Costs](feedback-dont-inflate-tradeoff-costs.md) — ground downside framing in the user's stated constraints, not assumed best-practice concerns
 - [provider-ansible Delete Cleanup Broken](provider-ansible-delete-cleanup-broken.md) — deletionPolicy:Delete + runPolicy:ObserveAndDelete never fires on v0.8.0, confirmed live; tracked at upstream issue #362
 - [Remote-Cluster Manifest Delivery](remote-cluster-manifest-delivery.md) — kustomize build + generated provider-kubernetes Objects for any cluster with no Flux of its own yet; retired for observability 2026-08-07
 - [Bootstrap-Cluster Generic Chain](bootstrap-cluster-generic-chain.md) — how to give a new cluster its own real Flux instance via `.bin/bootstrap-cluster-*.sh`; 3 bugs the chain had never surfaced before observability
+- [Pinniped APIService Discovery Failure](pinniped-apiservice-discovery-failure.md) — clientsecret.supervisor.pinniped.dev APIService FailedDiscoveryCheck 17d+, stalls namespace-termination sweeps cluster-wide

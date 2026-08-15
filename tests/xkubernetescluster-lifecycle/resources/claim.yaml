@@ -1,0 +1,17 @@
+# Smallest reasonable footprint: 1 control-plane node, 0 workers, default
+# vcpu/memory sizing (see xrd.yaml defaults). Reuses controlplane's shared
+# VLAN 100 bridge (no vlanRef) -- same approach as observability, per
+# docs/memory/m4-network-architecture-no-isolation-requirement.md. Needs a
+# matching platform-kvm-network entry (see this suite's README) before
+# applying -- otherwise this fails validate-network-allocation exactly like
+# tests/xkubernetescluster-validation's claim does, on purpose, but this
+# suite's claim is meant to actually provision.
+apiVersion: platform.rye.ninja/v1alpha1
+kind: XKubernetesCluster
+metadata:
+  name: xkc-lifecycle-test
+  namespace: crossplane-system
+spec:
+  subdomain: xkc-lifecycle-test
+  controlPlane:
+    count: 1

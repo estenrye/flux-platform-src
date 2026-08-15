@@ -1,0 +1,24 @@
+apiVersion: chainsaw.kyverno.io/v1alpha2
+kind: Configuration
+metadata:
+  name: xkubernetescluster-validation
+spec:
+  # This suite's own resources all live in crossplane-system, not chainsaw's
+  # auto-created ephemeral test namespace (never used). That empty
+  # namespace's own deletion was observed live to hang past a 120s cleanup
+  # timeout on this cluster (unrelated to anything this suite creates) --
+  # fastDelete skips waiting on it instead of debugging cluster-wide
+  # namespace-deletion behavior that's out of this suite's scope.
+  namespace:
+    fastDelete: true
+  timeouts:
+    apply: 60s
+    assert: 60s
+    cleanup: 120s
+    # Longer than other suites' delete timeout: unlike a pure-K8s-object
+    # test, deleting this claim cascades into deleting a real AWS Route53
+    # zone + Cloudflare NS records (create-dns-delegation, unconditional --
+    # see chainsaw-test.yaml's description), a real cloud API round-trip.
+    delete: 180s
+    error: 60s
+    exec: 60s
