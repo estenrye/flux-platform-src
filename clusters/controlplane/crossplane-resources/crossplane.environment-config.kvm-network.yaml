@@ -102,3 +102,25 @@ data:
         observability-cp-2: "fd97:45c2:b3a1:100::32"
         observability-cp-3: "fd97:45c2:b3a1:100::33"
       workerNodeUlas: {}
+    # M4 step 6 (2026-08-15): fixture for tests/xkubernetescluster-lifecycle
+    # (Tier B) -- a real, minimal (1 CP node) end-to-end provision+teardown
+    # chainsaw suite, manual-only (see that suite's README for the real
+    # KVM/AWS/Cloudflare cost before running it). This entry alone doesn't
+    # provision anything -- nothing reads it until a claim named
+    # xkc-lifecycle-test actually exists. Reuses controlplane's shared VLAN
+    # 100 bridge (no vlanId), same approach as observability. Next free
+    # block after observability's 0x30-33: apiserverVip/node octets are
+    # disjoint from controlplane's (0x10-13, 0x21-23), NAT64's (0x64), and
+    # observability's (0x30-33) -- same MAC-collision reasoning as the
+    # comments above. podCidr/serviceCidr continue the existing
+    # 0x1200->0x1300 / 0x2100->0x2200 increment pattern; bgpAsn is next in
+    # sequence after observability's 64514.
+    xkc-lifecycle-test:
+      apiserverVip: "fd97:45c2:b3a1:100::40"
+      infraSubnet: "fd97:45c2:b3a1:100::/64"
+      podCidr: "fd97:45c2:b3a1:1300::/56"
+      serviceCidr: "fd97:45c2:b3a1:2200::/112"
+      bgpAsn: 64515
+      controlPlaneNodeUlas:
+        xkc-lifecycle-test-cp-1: "fd97:45c2:b3a1:100::41"
+      workerNodeUlas: {}
