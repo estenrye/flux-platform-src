@@ -1,6 +1,6 @@
 ---
 name: m4-step-tracker
-description: M4 step tracker — steps 1-5 and 3b merged to main; observability is a real, Flux-synced claimed cluster as of 2026-08-06; steps 6-8 (chainsaw teardown test, Backstage catalog wiring, fleet ADR) remain
+description: M4 all 8 steps shipped and merged as of 2026-08-15 (PRs #159/#160/#161); only Tier B's first live run remains deliberately deferred
 metadata:
   type: project
 ---
@@ -21,7 +21,16 @@ this decays fast, keep it current rather than trusting it blindly.
 | 5 | `observability` claim instance — first end-to-end provision | **Done** — real VMs (3 CP / 0 worker) provisioned via Terraform, Talos-bootstrapped, DNS-delegated; required its own dedicated VLAN 200 mid-step to fix an ICMPv6 hairpin-routing bug (PR #142), later reconsidered — see [[m4-network-architecture-no-isolation-requirement]] (VLAN 200 removed, observability moved onto shared VLAN 100, PR #148/#153). Also required a new `XUnifiNetwork`/`XNetworkSegment` split (PR #148) and several live bug fixes (PRs #136-#154: wrong image registry, invalid node ULA/MAC allocation, OpenBao CA ConfigMap key mismatch, `allowSchedulingOnControlPlanes` missing for 0-worker clusters, NAT64/NTP routing, nameServers status-patch crash on first reconcile) |
 | 6 | Chainsaw deletion/teardown test; Usage guards | **Shipped 2026-08-11, PR pending** — Tier A (validation-path suite) verified live and passing; Usage guards verified live against the real `observability` claim; Tier B (real end-to-end lifecycle suite) built but deliberately **not yet run live** (needs a `platform-kvm-network` fixture entry + separate go-ahead). See step 6 detail below |
 | 7 | Backstage `catalog.yaml` generation wiring (ADR-18) | **Done, PR #159** — fixed a real bug (`bootstrap-cluster-catalog.sh` hardcoded `owner: group:platform-engineering`, mismatching ADR-18's own convention) and enriched the script to pull `rye.ninja/trust-domain` from the claim's live status; fixed `observability`'s existing file to match; amended ADR-18 |
-| 8 | ADR: XKubernetesCluster fleet abstraction (amends ADR-14) | Not started |
+| 8 | ADR: XKubernetesCluster fleet abstraction (amends ADR-14) | **Done, PR #161** — [ADR-27](../adr/0027-xkubernetescluster-fleet-abstraction.md), plus an amendment section on ADR-14 itself. Written last, after steps 6/7's actual PRs existed, so it accurately reflects what shipped rather than what was planned |
+
+**M4 is functionally complete as of this update** — all 8 design-doc steps
+shipped (steps 6-8 as open PRs #159/#160/pending-ADR-27-PR, not yet merged;
+merge order recommended 7 → 6 → 8 to avoid tracker-file diff overlap, see
+step 6's PR description). The one deliberately-deferred piece is Tier B's
+first *live* run (real VM/DNS provisioning) — built and lint-clean, but
+execution needs a `platform-kvm-network` fixture entry plus a separate
+explicit go-ahead given its real cost. M5 (observability backbone) can
+proceed once 6/7/8 merge.
 
 **Two real fleet-topology bugs found and fixed during steps 4-5, not
 scoped in the original design doc**: `provider-kubernetes`'s generated-Objects
