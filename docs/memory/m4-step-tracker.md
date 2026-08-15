@@ -1,6 +1,6 @@
 ---
 name: m4-step-tracker
-description: M4 all 8 steps shipped and merged as of 2026-08-15 (PRs #159/#160/#161); only Tier B's first live run remains deliberately deferred
+description: M4 fully complete as of 2026-08-15 — all 8 steps shipped/merged and Tier B's first live run passed
 metadata:
   type: project
 ---
@@ -473,3 +473,12 @@ condition kept oscillating `WatchCircuitOpen`/`WatchCircuitClosed` over a
 following a Composition change adding 2 new composed resources per claim,
 not a correctness problem. Worth a glance if it's still flapping next time
 someone's looking at `observability`, but not investigated further here.
+
+### Tier B's first live run, 2026-08-15 — M4 fully closed
+
+See [[m4-step6-tier-b-first-live-run]] for full detail. First attempt
+blocked by an unrelated sealed-OpenBao incident (found, not caused, by
+this run); second attempt (after the user unsealed OpenBao) passed
+end-to-end in 154.90s, independently re-verified via `kubectl`. All 8 M4
+design-doc steps are now shipped, merged, and the one deliberately-deferred
+item is done — **M4 is fully complete**.
