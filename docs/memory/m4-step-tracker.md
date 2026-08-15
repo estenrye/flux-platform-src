@@ -433,3 +433,34 @@ only register a CRD and a Composition; nothing reconciles until a claim
 exists) but weren't applied in this session — flagged for the user's
 go-ahead before merge, same diligence as every prior provider/CRD
 install in this milestone.
+
+### Post-merge live verification, 2026-08-15 (PRs #159/#160/#161 merge sequence)
+
+Merged in the recommended order (7 → 6 → 8). Both rendered-repo PRs per
+source PR needed manual merge (auto-merge is off on rendered repos,
+[[rendered-repo-automerge-milestone]]) — not automatic, don't assume a
+source-repo merge alone reaches the clusters.
+
+**Real, but self-resolving, live behavior observed**: right after Flux
+picked up #160's Composition change and `observability`'s XR first composed
+the two new `Usage` resources, the XR's top-level `Ready` condition briefly
+read `False` ("Unready resources: kubeconfig-secret-usage,
+talosconfig-secret-usage") even though both `Usage` objects individually
+showed `Ready: True`. Initially looked like a real regression (hypothesis:
+`Usage` only ever exposes a `Ready` condition, never `Synced`, unlike every
+other composed resource in this pipeline) — but repeated checks over the
+next ~3-4 minutes showed `Ready: True` held stable throughout; the `False`
+reading was a one-time snapshot during the same transient window as a
+`WatchCircuitOpen`/`Responsive: False` condition (Crossplane's own
+watch-event circuit breaker, triggered by "too many watch events from
+Usage/observability-kubeconfig-secret-protection"). **No fix needed** — the
+"Unready resources" message was a stale/transient read, not a permanent
+duck-typing gap in `function-auto-ready`.
+
+**Not fully resolved, lower priority, non-blocking**: the `Responsive`
+condition kept oscillating `WatchCircuitOpen`/`WatchCircuitClosed` over a
+~200s observation window (not monotonically settling) — `Ready` stayed
+`True` throughout regardless, so this looks like normal watch-event noise
+following a Composition change adding 2 new composed resources per claim,
+not a correctness problem. Worth a glance if it's still flapping next time
+someone's looking at `observability`, but not investigated further here.
