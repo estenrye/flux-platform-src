@@ -1,0 +1,21 @@
+apiVersion: chainsaw.kyverno.io/v1alpha2
+kind: Configuration
+metadata:
+  name: xkubernetescluster-lifecycle
+spec:
+  # All resources live in crossplane-system; chainsaw's own ephemeral test
+  # namespace is never used -- see tests/xkubernetescluster-validation/.chainsaw.yaml's
+  # comment (same fastDelete workaround for the known, pre-existing Pinniped
+  # APIService discovery stall, docs/memory/pinniped-apiservice-discovery-failure.md).
+  namespace:
+    fastDelete: true
+  timeouts:
+    apply: 60s
+    # Real VM/Talos provisioning and teardown -- see chainsaw-test.yaml's own
+    # per-step timeouts for the specific budgets; these are the chainsaw-level
+    # ceilings around each operation type.
+    assert: 1200s
+    cleanup: 300s
+    delete: 300s
+    error: 60s
+    exec: 1200s

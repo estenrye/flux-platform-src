@@ -634,6 +634,99 @@ spec:
                                 path: ca.crt
           {{ end }}
 
+  # M4 step 6: the kubeconfig/talosconfig connection Secrets
+  # (create-bootstrap-job above) are written imperatively by the
+  # talos-cluster-bootstrap Job's own script (kubectl create secret |
+  # kubectl apply), not composed/owned by this pipeline -- Crossplane never
+  # automatically protects or garbage-collects them. Usage guards them from
+  # accidental deletion while this cluster's claim still exists.
+  #
+  # NOTE (live-verified 2026-08-11, not assumed): protection.crossplane.io
+  # Usage's deletion-blocking webhook (nousages.protection.crossplane.io)
+  # only actually enforces when BOTH `of` and `by` are namespaced resources
+  # -- confirmed live against a scratch ConfigMap pair. A cluster-scoped
+  # `of` (e.g. the shared provider-terraform/provider-kubernetes
+  # ClusterProviderConfigs -- the originally-considered guard target) is
+  # accepted by the API with no error but is silently NOT protected: the
+  # webhook never blocks the delete. `ClusterUsage` (the cluster-scoped
+  # variant) doesn't fix this either -- its `by.resourceRef` schema has no
+  # `namespace` field, so it can't reference a namespaced `by` resource like
+  # a Workspace at all (strict-decoding error on apply). This is why these
+  # Usage guards protect the Secrets (both `of`/`by` namespaced) instead --
+  # protecting the shared ClusterProviderConfigs isn't achievable with this
+  # Crossplane version. See docs/memory/m4-step-tracker.md.
+  - step: create-secret-usage-guards
+    functionRef:
+      name: function-go-templating
+    input:
+      apiVersion: gotemplating.fn.crossplane.io/v1beta1
+      kind: GoTemplate
+      source: Inline
+      inline:
+        template: |
+          {{ $name := .observed.composite.resource.metadata.name }}
+          {{ $namespace := .observed.composite.resource.metadata.namespace }}
+          {{ $kubeconfigReady := false }}
+          {{ if .observed.resources }}
+            {{ range $rname, $resource := .observed.resources }}
+              {{ if and (eq $resource.resource.kind "Object") (eq $rname "bootstrap-job") }}
+                {{ range $cond := $resource.resource.status.conditions }}
+                  {{ if and (eq $cond.type "Ready") (eq $cond.status "True") }}
+                    {{ $kubeconfigReady = true }}
+                  {{ end }}
+                {{ end }}
+              {{ end }}
+            {{ end }}
+          {{ end }}
+          {{ if $kubeconfigReady }}
+          ---
+          apiVersion: protection.crossplane.io/v1beta1
+          kind: Usage
+          metadata:
+            name: {{ $name }}-kubeconfig-secret-protection
+            namespace: {{ $namespace }}
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: kubeconfig-secret-usage
+          spec:
+            of:
+              apiVersion: v1
+              kind: Secret
+              resourceRef:
+                name: {{ $name }}-kubeconfig
+            by:
+              apiVersion: platform.rye.ninja/v1alpha1
+              kind: XKubernetesCluster
+              resourceRef:
+                name: {{ $name }}
+            reason: >-
+              Kubeconfig for the {{ $name }} cluster -- not Crossplane-owned
+              (written imperatively by the talos-cluster-bootstrap Job), so
+              never automatically protected or garbage-collected. Blocks
+              accidental deletion while this cluster's claim still exists.
+          ---
+          apiVersion: protection.crossplane.io/v1beta1
+          kind: Usage
+          metadata:
+            name: {{ $name }}-talosconfig-secret-protection
+            namespace: {{ $namespace }}
+            annotations:
+              gotemplating.fn.crossplane.io/composition-resource-name: talosconfig-secret-usage
+          spec:
+            of:
+              apiVersion: v1
+              kind: Secret
+              resourceRef:
+                name: {{ $name }}-talosconfig
+            by:
+              apiVersion: platform.rye.ninja/v1alpha1
+              kind: XKubernetesCluster
+              resourceRef:
+                name: {{ $name }}
+            reason: >-
+              Talosconfig for the {{ $name }} cluster -- same rationale as
+              the kubeconfig Secret Usage above.
+          {{ end }}
+
   - step: status-update
     functionRef:
       name: function-go-templating

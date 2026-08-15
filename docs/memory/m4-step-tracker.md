@@ -19,8 +19,8 @@ this decays fast, keep it current rather than trusting it blindly.
 | 3c | Public JWKS/OIDC mirror (`service-account-issuer` + Garage CronJob) | **Not started** — deferred at the same time as 3b, no commit found for it. Not required for `observability`'s current LGTM-facing role in M5, but flag if any future workload needs external OIDC federation to this cluster |
 | 4 | `clusters/observability/` baseline layer | **Done** — merged alongside steps 5 network fixes below; Calico, ESO, cert-manager+spiffe (own trust domain `obs.rye.ninja`... verify exact value before quoting), storage, etc. all live |
 | 5 | `observability` claim instance — first end-to-end provision | **Done** — real VMs (3 CP / 0 worker) provisioned via Terraform, Talos-bootstrapped, DNS-delegated; required its own dedicated VLAN 200 mid-step to fix an ICMPv6 hairpin-routing bug (PR #142), later reconsidered — see [[m4-network-architecture-no-isolation-requirement]] (VLAN 200 removed, observability moved onto shared VLAN 100, PR #148/#153). Also required a new `XUnifiNetwork`/`XNetworkSegment` split (PR #148) and several live bug fixes (PRs #136-#154: wrong image registry, invalid node ULA/MAC allocation, OpenBao CA ConfigMap key mismatch, `allowSchedulingOnControlPlanes` missing for 0-worker clusters, NAT64/NTP routing, nameServers status-patch crash on first reconcile) |
-| 6 | Chainsaw deletion/teardown test; Usage guards | **In progress** (2026-08-11) |
-| 7 | Backstage `catalog.yaml` generation wiring (ADR-18) | Not started — note `.bin/bootstrap-cluster-catalog.sh` already exists and scaffolds a minimal `clusters/<name>/catalog.yaml` (used for both `controlplane` and `observability`), but it's a manual/scripted step, not composition-driven; "wiring" likely means closing that gap, not starting from zero |
+| 6 | Chainsaw deletion/teardown test; Usage guards | **Shipped 2026-08-11, PR pending** — Tier A (validation-path suite) verified live and passing; Usage guards verified live against the real `observability` claim; Tier B (real end-to-end lifecycle suite) built but deliberately **not yet run live** (needs a `platform-kvm-network` fixture entry + separate go-ahead). See step 6 detail below |
+| 7 | Backstage `catalog.yaml` generation wiring (ADR-18) | **Done, PR #159** — fixed a real bug (`bootstrap-cluster-catalog.sh` hardcoded `owner: group:platform-engineering`, mismatching ADR-18's own convention) and enriched the script to pull `rye.ninja/trust-domain` from the claim's live status; fixed `observability`'s existing file to match; amended ADR-18 |
 | 8 | ADR: XKubernetesCluster fleet abstraction (amends ADR-14) | Not started |
 
 **Two real fleet-topology bugs found and fixed during steps 4-5, not
@@ -31,6 +31,69 @@ actually gone live — `crossplane-resources`'s Kustomization was silently
 `Ready: False` the whole time on a missing-namespace bug (PR #156) — caught
 before assuming it worked, then the whole bridge was retired in favor of
 3b's real Flux instance (PR #158, see [[remote-cluster-manifest-delivery]]).
+
+### Step 6 detail — shipped 2026-08-11
+
+**Tier A** (`tests/xkubernetescluster-validation/`): proves a claim with no
+`platform-kvm-network` entry fails fast via `validate-network-allocation`'s
+`ClaimConditions` and never provisions a `Workspace`/bootstrap `Job`. Ran
+live against `controlplane`, passed, confirmed full cleanup (claim,
+composed `XDelegatedHostedZoneAWS`, real Route53 zone + Cloudflare NS
+records all gone). **Real finding, not zero-cost as originally scoped**:
+`create-dns-delegation` in `composition.yaml` is unconditional — it composes
+a real DNS delegation on *every* claim, valid or not, since
+`validate-network-allocation` only writes advisory status, it doesn't gate
+later pipeline steps except `create-workspace`/`create-bootstrap-job`. User
+confirmed accepting the small, near-instant real cost rather than fixing the
+composition gap.
+
+**Usage guards**: pivoted from the plan's original target (protecting the
+shared `provider-terraform`/`provider-kubernetes` `ClusterProviderConfig`s)
+after live verification found a real Crossplane limitation —
+`protection.crossplane.io/v1beta1 Usage`'s deletion-blocking webhook
+(`nousages.protection.crossplane.io`) only enforces when **both** `of` and
+`by` are namespaced resources. A cluster-scoped `of` (confirmed with a
+scratch `Namespace`) is accepted by the API with no error but is silently
+unprotected. `ClusterUsage` (the cluster-scoped variant) doesn't fix this
+either — its `by.resourceRef` schema has no `namespace` field at all, so it
+can't reference a namespaced resource like a `Workspace` (strict-decoding
+error on apply). Pivoted to protecting the `{name}-kubeconfig`/
+`{name}-talosconfig` connection Secrets instead (both `of`/`by` namespaced,
+confirmed working) — these are written imperatively by the bootstrap Job,
+not Crossplane-owned, so nothing protected or garbage-collected them before
+this. Verified end-to-end against the real `observability` claim: both
+`Usage` resources compose `Ready`, and a real dry-run delete of
+`observability-kubeconfig` is genuinely denied.
+
+**New known gap surfaced by this work, documented not fixed**: because the
+connection Secrets were never Crossplane-owned, deleting the claim still
+does not clean them up — Usage guard or not. `replayDeletion` (a `Usage`
+field that would replay a blocked deletion once the `Usage` itself is
+removed) wasn't set, so this doesn't even partially help on intentional
+teardown. Tier B's suite asserts this explicitly and cleans the Secrets up
+itself rather than silently leaving them orphaned every run. A real fix
+(making the bootstrap Job's Secret writes Crossplane-composed/owned) would
+touch step 2/3's already-shipped, already-live bootstrap Job — out of scope
+for step 6, flagged for whoever next touches that Job.
+
+**Tier B** (`tests/xkubernetescluster-lifecycle/`): a real, minimal (1 CP
+node) end-to-end provision-then-delete suite, built and lint-clean but
+**deliberately not run live yet** — needs a one-time `platform-kvm-network`
+fixture entry (documented in the suite's own README, next free ULA/ASN
+block after `observability`'s) and separate explicit go-ahead given the real
+KVM/AWS/Cloudflare cost (~10-20 min per run). Also asserts the Usage guards
+deny deletion of *this* claim's own secrets (not just `observability`'s) and
+checks the real KVM host (via SSH, `virsh list`) for no orphaned domain.
+
+**Unrelated, pre-existing cluster issue found and documented while
+debugging chainsaw cleanup, not caused by this work**:
+`clientsecret.supervisor.pinniped.dev` APIService has been
+`FailedDiscoveryCheck` for 17+ days, stalling `Namespace`/`Usage`
+finalizer removal fleet-wide — see
+[[pinniped-apiservice-discovery-failure]]. Two harmless scratch objects from
+this session's live verification are stuck `Terminating` on `controlplane`
+as a result (`chainsaw-scratch-cluster-of` namespace,
+`chainsaw-scratch-ns-usage`) — clean up once that's fixed, not forced.
 
 ### Step 1 detail — DONE 2026-07-28
 

@@ -40,3 +40,4 @@
 - [provider-ansible Delete Cleanup Broken](provider-ansible-delete-cleanup-broken.md) — deletionPolicy:Delete + runPolicy:ObserveAndDelete never fires on v0.8.0, confirmed live; tracked at upstream issue #362
 - [Remote-Cluster Manifest Delivery](remote-cluster-manifest-delivery.md) — kustomize build + generated provider-kubernetes Objects for any cluster with no Flux of its own yet; retired for observability 2026-08-07
 - [Bootstrap-Cluster Generic Chain](bootstrap-cluster-generic-chain.md) — how to give a new cluster its own real Flux instance via `.bin/bootstrap-cluster-*.sh`; 3 bugs the chain had never surfaced before observability
+- [Pinniped APIService Discovery Failure](pinniped-apiservice-discovery-failure.md) — clientsecret.supervisor.pinniped.dev APIService FailedDiscoveryCheck 17d+, stalls namespace-termination sweeps cluster-wide
