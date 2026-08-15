@@ -113,6 +113,21 @@ provides:
 - Browse the `platform-engineering` owner for all platform components
 - Use the `System` view for a cluster to see all components deployed to it
 
+## Amendment (2026-08-11, M4 step 7)
+
+This ADR predates `XKubernetesCluster` (M4) and said nothing about how a
+claimed cluster gets its `catalog.yaml`. In practice, `.bin/bootstrap-cluster-catalog.sh`
+is the generation mechanism — it's the first step of the generic
+`.bin/bootstrap-cluster-*.sh` chain any new cluster (claimed or not) runs
+through (see `docs/memory/bootstrap-cluster-generic-chain.md`). It scaffolds
+the required fields above and, when a corresponding `XKubernetesCluster`
+claim already exists and is reachable on `controlplane`, best-effort enriches
+the file with `rye.ninja/trust-domain` (from the claim's own
+`status.trustDomain`) and a generated `description` — a human can still
+override either by hand afterward, same as `controlplane`'s own
+hand-authored file (which predates `XKubernetesCluster` entirely and has no
+claim to read from).
+
 ## Consequences
 
 - Every new component added to `applications/` requires a `catalog.yaml`. PRs
