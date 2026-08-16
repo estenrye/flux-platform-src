@@ -33,7 +33,7 @@
 - [Urgency is the User's Call](feedback-urgency-is-users-call.md) — don't unilaterally label a finding "not urgent"; surface it and let the user decide priority
 - [M3 render-lint CI fix](m3-render-lint-ci-fix.md) — render-and-lint silently broken for all of M3 steps 1-4 (silent kustomize patch target-name mismatch); fixed in PR #100
 - [M4 Design](m4-design.md) — XKubernetesCluster XRD + talos-kvm composition; KVM capacity squeeze, Terraform-for-VMs + Job-for-bootstrap split, no separate claim kind
-- [M4 Step Tracker](m4-step-tracker.md) — fully complete as of 2026-08-15, all 8 steps + Tier B's live run passed
+- [M4 Step Tracker](m4-step-tracker.md) — NOT complete: step 4 was a fabricated "Done" claim (found 2026-08-15), step 5's claim isn't GitOps-tracked; see M4 Completion design doc
 - [dmacvicar/libvirt Bridge In-Place Update Bug](dmacvicar-libvirt-bridge-inplace-update-bug.md) — network_interface.bridge change reports success but silently never applies; research task: Ansible vs. alternate libvirt provider
 - [No Isolation Requirement Between Cluster VLANs](m4-network-architecture-no-isolation-requirement.md) — VLAN 200 exists to fix the ICMPv6 hairpin bug, not isolation; sharing VLAN 100 is a valid default
 - [Don't Inflate Tradeoff Costs](feedback-dont-inflate-tradeoff-costs.md) — ground downside framing in the user's stated constraints, not assumed best-practice concerns
