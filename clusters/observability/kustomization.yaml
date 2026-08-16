@@ -38,12 +38,27 @@ resources:
 - ../../applications/external-secrets-operator/base
 - ../../applications/flux/base
 - ../../applications/flux-monitoring/base
+# M4 completion step B5: trust fabric. Own step-ca intermediate for trust
+# domain obs.rye.ninja, signed off controlplane's already-online
+# intermediate (not the offline root) via .bin/generate-observability-pki.sh
+# — see clusters/observability/resources/step-ca-intermediate.sops.yaml
+# below. Same app set + ordering as controlplane's cert-manager stack.
+- ../../applications/cert-manager/observability
+- ../../applications/cert-manager-approver-policy/observability
+- ../../applications/cert-manager-trust-manager/observability
+- ../../applications/cert-manager-spiffe-issuer/observability
+- ../../applications/cert-manager-spiffe-csi-driver/observability
+# Concierge only — the Supervisor itself is controlplane-only (ADR-14).
+# Token exchange audience is observability-rye-ninja (patched from base).
+- ../../applications/pinniped-concierge/observability
 - resources/eso.service-account-secret.yaml
 - resources/eso.cluster-secret-store.yaml
 - resources/flux.ssh-key-generator.yaml
 - resources/flux.ssh-key-secret.yaml
 - resources/flux.source.git.yaml
 - resources/flux.kustomization.yaml
+- resources/step-ca-intermediate.sops.yaml
+- resources/step-ca-root-cert.yaml
 
 patches:
   # M4 completion step B2: same IPv6 EnvoyProxy fix controlplane needed

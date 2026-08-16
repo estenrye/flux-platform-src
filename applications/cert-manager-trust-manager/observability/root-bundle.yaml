@@ -1,0 +1,16 @@
+# Fleet trust bundle (M2 design §4.2, A5): distributes the PUBLIC
+# ryezone-labs root (fingerprint 6cdc50de…, expires 2036) to every
+# namespace so any workload can verify any SVID. Sources the
+# SOPS-provisioned ConfigMap in the trust namespace (cert-manager).
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: ryezone-labs-root
+spec:
+  sources:
+    - configMap:
+        name: step-ca-root-ca
+        key: root.crt
+  target:
+    configMap:
+      key: root.crt

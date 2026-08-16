@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# observability variant (M4 completion step B5). base hardcodes
+# audience: controlplane-rye-ninja in the JWTAuthenticator (verified: no
+# per-cluster overlay existed before this one — controlplane consumes base
+# directly since that value happens to be right for it). Pinniped's token
+# exchange accepts a client-requested audience dynamically — no Supervisor-
+# side per-cluster registration exists or is needed (confirmed against
+# applications/pinniped-supervisor/base/resources/federation-domain.yaml,
+# a single shared FederationDomain with no audience allowlist) — so this
+# overlay only needs to patch the audience value.
+resources:
+  - ../base
+
+patches:
+  - target:
+      kind: JWTAuthenticator
+      name: ryezone-labs
+    patch: |-
+      - op: replace
+        path: /spec/audience
+        value: observability-rye-ninja

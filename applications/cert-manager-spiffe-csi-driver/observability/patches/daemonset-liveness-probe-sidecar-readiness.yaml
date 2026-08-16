@@ -1,0 +1,13 @@
+- op: add
+  path: /spec/template/spec/containers/1/ports
+  value:
+    - containerPort: 9809
+      name: healthz
+- op: add
+  path: /spec/template/spec/containers/1/readinessProbe
+  value:
+    httpGet:
+      path: /healthz
+      port: healthz
+    initialDelaySeconds: 5
+    timeoutSeconds: 5
