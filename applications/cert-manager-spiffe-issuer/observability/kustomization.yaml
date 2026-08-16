@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cert-manager
+
+# observability variant (M4 completion step B5), identical structure to
+# controlplane's: the ClusterIssuer is a CA issuer over the SOPS-provisioned
+# intermediate secret (signed by controlplane's intermediate, not the offline
+# root — see .bin/generate-observability-pki.sh). The base's selfsigned
+# ClusterIssuer, CA Certificate, and their approval plumbing
+# (CertificateRequestPolicy + use-RBAC) exist only to mint the in-cluster
+# CA that this offline-signed intermediate replaces — none of it is
+# reproduced here, same as controlplane.
+resources:
+  - resources/csi-driver-spiffe-ca.clusterissuer.yaml

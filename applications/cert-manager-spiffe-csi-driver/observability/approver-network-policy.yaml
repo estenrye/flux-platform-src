@@ -1,0 +1,52 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cert-manager-csi-driver-spiffe-approver-allow-egress
+  namespace: cert-manager
+spec:
+  podSelector:
+    matchLabels:
+      app: cert-manager-csi-driver-spiffe-approver
+  policyTypes:
+  - Egress
+  egress:
+  # apiserver targetPort - Calico evaluates egress post-DNAT
+  # (docs/memory/calico-networkpolicy-dnat.md). Talos serves the apiserver
+  # on 6443; the namespaceSelector rule below cannot match node endpoints.
+  - ports:
+    - protocol: TCP
+      port: 6443
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: default
+    ports:
+    - protocol: TCP
+      port: 443
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cert-manager-csi-driver-spiffe-approver-allow-ingress
+  namespace: cert-manager
+spec:
+  ingress:
+  - ports:
+    - port: 9402
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      app: cert-manager-csi-driver-spiffe-approver
+      app.kubernetes.io/instance: cert-manager-csi-driver-spiffe
+      app.kubernetes.io/name: cert-manager-csi-driver-spiffe
+  policyTypes:
+  - Ingress

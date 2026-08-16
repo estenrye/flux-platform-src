@@ -1,0 +1,29 @@
+# Distributes observability's own intermediate (the cert that actually
+# signs this cluster's workload SVIDs) to every namespace, alongside the
+# root bundle above — mirrors controlplane's identical pattern (M2 design
+# §4.4). controlplane's copy of this Bundle exists for AWS Roles Anywhere's
+# aws-signing-helper sidecar, which needs the intermediate for its
+# --intermediates flag; observability has no Roles Anywhere consumer today
+# (Crossplane itself is controlplane-only, ADR-14), but the general
+# "any workload can verify any SVID with the full chain" invariant is
+# still worth keeping consistent across the fleet.
+#
+# Source is a Secret, not a ConfigMap, because cert-manager's ClusterIssuer
+# stores the intermediate cert+key together as csi-driver-spiffe-ca's
+# tls.crt/tls.key (ca.crt in the same secret is controlplane's intermediate,
+# the signer of *this* intermediate — sourced by root-bundle.yaml instead).
+# trust-manager can read Secrets in its own trust namespace (cert-manager)
+# as sources without enabling secretTargets — confirmed via the existing
+# trust-manager Role's `get` verb on secrets.
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: ryezone-labs-intermediate-observability
+spec:
+  sources:
+    - secret:
+        name: csi-driver-spiffe-ca
+        key: tls.crt
+  target:
+    configMap:
+      key: intermediate.crt
