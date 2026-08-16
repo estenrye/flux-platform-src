@@ -6,13 +6,50 @@ resources:
 # calico-node runs hostNetwork: true so it doesn't itself need CNI to
 # schedule (same ordering clusters/controlplane/kustomization.yaml uses).
 - ../../applications/calico/observability
+# M4 completion step B1: default-deny (ADR-17), matching controlplane's
+# ordering (right after Calico, before everything else).
+- ../../applications/global-network-policy-default-deny/observability
 - ../../applications/priority-classes
 - ../../applications/prometheus-operator-crds/base
+- ../../applications/reloader/base
+# M4 completion step B2: ingress plumbing, needed for M5's OTLP gateway +
+# any browser-facing endpoint (e.g. Grafana). Same reusable /base dirs
+# controlplane consumes directly, no per-cluster overlay needed for the
+# charts themselves — see the IPv6 EnvoyProxy patch below though.
+- ../../applications/gateway-api-crds/base
+- ../../applications/envoy-gateway-crds/base
+- ../../applications/envoy-gateway/base
+# M4 completion step B3: storage. democratic-csi only (not truenas-csi) —
+# per the M4 design doc §6, observability's baseline never needed the
+# legacy truenas-csi path controlplane still carries pre-M3-cutover.
+# NOTE: the Helm releases below will stay unhealthy until the SOPS driver-
+# config secrets exist — run `CLUSTER=observability NFS_SERVER_ULA=<ula>
+# make provision-democratic-csi` (needs a live 1Password session, can't be
+# run from this session) before/soon after this merges.
+- ../../applications/democratic-csi/base
+# M4 completion step B4: DNS. UniFi only for now (LAN records) — deferring
+# a cloudflare/observability overlay (public DNS) until M5 actually exposes
+# a public endpoint, per the M4 completion design doc §B.4. NOTE: needs a
+# `external-dns.unifi-credentials.sops.yaml` cluster resource before this
+# comes up healthy — same manual credential-provisioning gap as B3, no
+# existing script for it (controlplane's own copy predates one); flagged
+# for the user, not run from this session.
+- ../../applications/external-dns/unifi/base
 - ../../applications/external-secrets-operator/base
 - ../../applications/flux/base
+- ../../applications/flux-monitoring/base
 - resources/eso.service-account-secret.yaml
 - resources/eso.cluster-secret-store.yaml
 - resources/flux.ssh-key-generator.yaml
 - resources/flux.ssh-key-secret.yaml
 - resources/flux.source.git.yaml
 - resources/flux.kustomization.yaml
+
+patches:
+  # M4 completion step B2: same IPv6 EnvoyProxy fix controlplane needed
+  # (M2 step 5) — observability is also v6-only.
+  - path: patches/envoy-proxy.ipfamily.yaml
+    target:
+      kind: EnvoyProxy
+      name: custom-proxy-config
+      namespace: envoy-gateway-system
