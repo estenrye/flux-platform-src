@@ -44,7 +44,27 @@
       "Bash(curl -sfL \"https://api.github.com/repos/smallstep/cli/releases/latest\")",
       "Bash(curl -sfL \"https://github.com/smallstep/cli/releases/latest/download/checksums.txt\")",
       "Bash(curl -sfL \"https://github.com/smallstep/cli/releases/latest/download/step_darwin_arm64.tar.gz\")",
-      "Bash(tar -tz)"
+      "Bash(tar -tz)",
+      "Bash(mkdir -p ~/.kube/homelab)",
+      "Bash(kubectl --kubeconfig ~/.kube/homelab/controlplane.yaml -n crossplane-system get secret observability-kubeconfig -o jsonpath='{.data.kubeconfig}')",
+      "Bash(kubectl --kubeconfig ~/.kube/homelab/observability.yaml get nodes)",
+      "Bash(make bootstrap-cluster-catalog *)",
+      "Bash(make bootstrap-cluster-environment *)",
+      "Bash(make bootstrap-cluster-rendered-repo *)",
+      "Bash(kustomize build *)",
+      "Bash(make deploy-cluster *)",
+      "Bash(ping6 -c2 fd97:45c2:b3a1:100::30)",
+      "Bash(ping6 -c2 fd97:45c2:b3a1:100::31)",
+      "Bash(curl -s https://www.githubstatus.com/api/v2/status.json)",
+      "Bash(curl -s https://www.githubstatus.com/api/v2/summary.json)",
+      "Bash(python3 -c ' *)",
+      "Bash(SCRIPTS_DIR=.bin BASE_DIR=/private/tmp/claude-501/-Users-esten-src-flux-platform-src/4f0bd919-a5ae-48ab-b081-1d4461944b35/scratchpad CLUSTER=observability KUBECONFIG=/Users/esten/.kube/homelab/observability.yaml bash .bin/bootstrap-cluster-catalog.sh)",
+      "Bash(.venv/bin/chainsaw version *)",
+      "Bash(pip show *)",
+      "Bash(.venv/bin/chainsaw docs *)",
+      "Bash(.venv/bin/chainsaw --help)",
+      "Bash(.venv/bin/chainsaw export *)",
+      "Bash(/Users/esten/src/flux-platform-src/.venv/bin/chainsaw export *)"
     ]
   }
 }
