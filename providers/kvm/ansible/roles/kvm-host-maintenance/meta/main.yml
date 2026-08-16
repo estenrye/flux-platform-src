@@ -1,0 +1,15 @@
+galaxy_info:
+  role_name: kvm_host_maintenance
+  description: >-
+    Graceful full-fleet shutdown, reboot, and restart of every libvirt
+    domain on a KVM host -- built for planned maintenance (kernel updates,
+    hardware work) on a host that carries GitOps-managed talos-kvm
+    clusters. First used against mf-ms-a2-01 (2026-08-15, pending-kernel-
+    reboot + memory-pressure alerts) -- see
+    docs/runbooks/kvm-host-maintenance.md.
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - "22.04"
+dependencies: []

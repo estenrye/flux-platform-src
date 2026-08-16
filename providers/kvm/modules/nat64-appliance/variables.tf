@@ -81,3 +81,17 @@ variable "authorized_ssh_keys" {
   type        = list(string)
   default     = []
 }
+
+variable "disk_size_bytes" {
+  description = <<-EOT
+    Root disk size. Must exceed the base cloud image's own size (~3.5G) --
+    cloud-init growpart only has room to expand into space beyond what the
+    image already occupies. 16G found live-2026-08-15: the image's default
+    ~3.5G left just ~2.4G of actual root filesystem after /boot and
+    /boot/efi, which unattended-upgrades filled within a few kernel
+    releases (two full kernel generations + apt cache exhausted it,
+    breaking unbound's trust-anchor read on the next restart).
+  EOT
+  type        = number
+  default     = 17179869184 # 16 GiB
+}

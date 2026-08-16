@@ -1,0 +1,34 @@
+# Disabled by default -- only the host(s) actually carrying the
+# controlplane cluster (and therefore OpenBao) should enable this, set via
+# host_vars in providers/kvm/ansible/inventory/kvm-hosts.yml. Everything
+# here runs delegate_to: localhost (kubectl/sops against the cluster API,
+# not virsh against the KVM host), so it's keyed by inventory host purely
+# to reuse that host's per-cluster config, not because it executes there.
+kvm_maintenance_openbao_unseal_enabled: false
+
+kvm_maintenance_openbao_kubeconfig: ""
+kvm_maintenance_openbao_namespace: openbao
+kvm_maintenance_openbao_replicas: 3
+kvm_maintenance_openbao_unseal_threshold: 3
+
+# SOPS-encrypted stringData.unseal_keys_b64 (5 shares) + stringData.root_token
+# -- docs/runbooks/openbao-unseal.md step 3. Only the shares are read here;
+# the root token is break-glass admin access, not needed for routine unseal.
+kvm_maintenance_openbao_sops_file: ""
+
+# 1Password reference (op://vault/item/field) to the SOPS age private key
+# used to decrypt kvm_maintenance_openbao_sops_file. Resolved in-process by
+# `op run` -- the key itself is never written to disk. Requires
+# OP_SERVICE_ACCOUNT_TOKEN in the environment invoking ansible-playbook;
+# that token is the one credential this role cannot fetch from 1Password
+# itself (it's what authenticates op in the first place).
+kvm_maintenance_openbao_age_key_ref: ""
+
+kvm_maintenance_openbao_api_wait_retries: 30
+kvm_maintenance_openbao_api_wait_delay: 10
+# Generous: the next ordinal's pod isn't even created until the previous
+# one reports Ready (StatefulSet OrderedReady), which doesn't happen until
+# it's unsealed -- so this wait also spans however long CNPG/postgresql
+# storage takes to be reachable for that pod's first request.
+kvm_maintenance_openbao_pod_wait_retries: 30
+kvm_maintenance_openbao_pod_wait_delay: 10

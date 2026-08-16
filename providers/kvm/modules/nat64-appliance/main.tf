@@ -12,14 +12,29 @@ locals {
 
 # RAW Ubuntu cloud image as a file-backed volume in the images dir pool:
 # zvol-backed volumes hit a libvirt/udev race on upload (device node not yet
-# present), and the appliance is cattle — file backing is fine. The provider
-# forbids size+source together, so the disk is image-sized (~3.5G — ample);
-# cloud-init growpart expands the root fs into it.
-resource "libvirt_volume" "system" {
-  name   = "${var.name}-system"
+# present), and the appliance is cattle — file backing is fine.
+#
+# Two-step because the provider forbids size+source together: `base` is a
+# plain import of the cloud image at its native size (~3.5G), and `system`
+# is a sized clone of it (base_volume_id + size IS allowed together) so
+# cloud-init growpart has real room to expand the root fs into instead of
+# just the base image's own unused slack (M0-era bug — the single-volume
+# form left ~2.4G of actual root fs after /boot + /boot/efi, which
+# unattended-upgrades filled and broke unbound; found live 2026-08-15,
+# see docs/runbooks/nat64-appliance-rebuild.md).
+resource "libvirt_volume" "system_base" {
+  name   = "${var.name}-system-base"
   pool   = var.cloudinit_pool
   source = var.base_image_path
   format = "raw"
+}
+
+resource "libvirt_volume" "system" {
+  name           = "${var.name}-system"
+  pool           = var.cloudinit_pool
+  base_volume_id = libvirt_volume.system_base.id
+  size           = var.disk_size_bytes
+  format         = "raw"
 }
 
 resource "libvirt_cloudinit_disk" "seed" {

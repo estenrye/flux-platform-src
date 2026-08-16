@@ -1,0 +1,23 @@
+---
+# Included per-domain with kvm_maintenance_domain set by the caller's loop.
+# Idempotent: a domain already running is left alone.
+
+- name: "Check current state of {{ kvm_maintenance_domain }}"
+  ansible.builtin.command:
+    cmd: "virsh domstate {{ kvm_maintenance_domain }}"
+  register: kvm_maintenance_domain_precheck
+  changed_when: false
+
+- name: "Start {{ kvm_maintenance_domain }}"
+  ansible.builtin.command:
+    cmd: "virsh start {{ kvm_maintenance_domain }}"
+  when: "'shut off' in kvm_maintenance_domain_precheck.stdout"
+  changed_when: true
+
+# Brief settle between starts rather than firing every domain on the host
+# at once -- avoids every guest's boot-time disk/CPU burst landing in the
+# same few seconds right after the host itself just came back from reboot.
+- name: "Settle after starting {{ kvm_maintenance_domain }}"
+  ansible.builtin.wait_for:
+    timeout: "{{ kvm_maintenance_domain_settle_seconds }}"
+  when: "'shut off' in kvm_maintenance_domain_precheck.stdout"

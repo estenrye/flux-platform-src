@@ -41,4 +41,5 @@
 - [Remote-Cluster Manifest Delivery](remote-cluster-manifest-delivery.md) — kustomize build + generated provider-kubernetes Objects for any cluster with no Flux of its own yet; retired for observability 2026-08-07
 - [Bootstrap-Cluster Generic Chain](bootstrap-cluster-generic-chain.md) — how to give a new cluster its own real Flux instance via `.bin/bootstrap-cluster-*.sh`; 3 bugs the chain had never surfaced before observability
 - [Pinniped APIService Discovery Failure](pinniped-apiservice-discovery-failure.md) — clientsecret.supervisor.pinniped.dev APIService FailedDiscoveryCheck 17d+, stalls namespace-termination sweeps cluster-wide
+- [1Password Account: ryefamily](1password-account-ryefamily.md) — the `crossplane` vault (sops-age-key, service-account-token) lives under ryefamily.1password.com, not familyrye.1password.com
 - [M4 Step 6 Tier B First Live Run](m4-step6-tier-b-first-live-run.md) — real end-to-end provision+teardown passed 2026-08-15; first attempt hit an unrelated sealed-OpenBao incident
