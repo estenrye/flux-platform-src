@@ -97,20 +97,17 @@ trap cleanup EXIT
 sops -d "${UNSEAL_SECRET_PATH}" > "${TMP}" \
   || fatal "failed to decrypt ${UNSEAL_SECRET_PATH} -- check SOPS_AGE_KEY_FILE (${SOPS_AGE_KEY_FILE})"
 
-# UNVERIFIED: this session never decrypted the real file (no standing
-# access to unseal-key material, correctly), so `.unseal_keys_b64` is
-# inferred from `bao operator init -format=json`'s own documented field
-# name (docs/runbooks/openbao-unseal.md step 2 reads that same field from
-# the init output) rather than confirmed against this file's actual
-# structure. If this fails with a null/empty read, `yq -r 'keys' "${TMP}"`
-# once (then shred it) to check the real top-level field names.
-SHARE_COUNT="$(yq -r '.unseal_keys_b64 | length' "${TMP}")"
+# Confirmed field path: stringData.unseal_keys_b64 (an array, currently 5
+# entries) -- the file is shaped like a Kubernetes Secret manifest
+# (data/stringData), matching this repo's usual data-only SOPS encryption
+# convention, never applied to any cluster (see the runbook).
+SHARE_COUNT="$(yq -r '.stringData.unseal_keys_b64 | length' "${TMP}")"
 [ "${SHARE_COUNT}" -ge "${UNSEAL_THRESHOLD}" ] \
   || fatal "unseal secret only has ${SHARE_COUNT} share(s), need ${UNSEAL_THRESHOLD}"
 
 i=0
 while [ "${i}" -lt "${UNSEAL_THRESHOLD}" ]; do
-  SHARE="$(yq -r ".unseal_keys_b64[${i}]" "${TMP}")"
+  SHARE="$(yq -r ".stringData.unseal_keys_b64[${i}]" "${TMP}")"
   kubectl exec -n "${NAMESPACE}" "${POD_NAME}" -c "${CONTAINER}" -- \
     bao operator unseal -tls-skip-verify "${SHARE}" >/dev/null
   i=$((i + 1))
