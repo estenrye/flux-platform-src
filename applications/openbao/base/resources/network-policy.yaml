@@ -20,14 +20,6 @@ spec:
           port: 8200
         - protocol: TCP
           port: 8201
-    # Helm test hook (openbao-server-test) polls `bao status`.
-    - from:
-        - podSelector:
-            matchLabels:
-              helm.sh/hook: test
-      ports:
-        - protocol: TCP
-          port: 8200
     # M3 step 6: ESO reads the crossplane-system ExternalSecrets (KV read +
     # kubernetes auth login) from this namespace.
     - from:
