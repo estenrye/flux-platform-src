@@ -92,7 +92,9 @@ write_files:
         interface: ${split("/", ula_address)[0]}
         interface: ::1
         interface: 127.0.0.1
-        access-control: ${dns64_allowed_cidr} allow
+%{ for cidr in dns64_allowed_cidrs ~}
+        access-control: ${cidr} allow
+%{ endfor ~}
         access-control: ::1 allow
         access-control: 127.0.0.0/8 allow
         module-config: "dns64 validator iterator"
