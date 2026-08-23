@@ -12,7 +12,6 @@ resources:
   # M4 completion step B6.
   - resources/gateway.yaml
   - resources/tls-route.yaml
-  - resources/server-8443-fullchain.bundle.yaml
 
 helmCharts:
   - name: openbao
