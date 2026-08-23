@@ -8,9 +8,9 @@ are unaffected (M1 design §4.3).
 ## Rebuild (minutes)
 
 ```sh
-tofu -chdir=providers/kvm/controlplane taint module.nat64.libvirt_domain.vm
-tofu -chdir=providers/kvm/controlplane taint module.nat64.libvirt_volume.system
-.bin/create-controlplane-cluster.sh   # re-applies; talos steps no-op on a healthy cluster
+tofu -chdir=providers/kvm/nat64 taint module.nat64.libvirt_domain.vm
+tofu -chdir=providers/kvm/nat64 taint module.nat64.libvirt_volume.system
+.bin/create-nat64.sh   # re-applies and waits for NAT64/DNS64 to verify
 ```
 
 ## Verify
