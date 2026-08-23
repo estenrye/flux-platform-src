@@ -6,7 +6,6 @@ namespace: openbao
 resources:
   - resources/namespace.yaml
   - resources/network-policy.yaml
-  - resources/test-pod-network-policy.yaml
   - resources/certificate.yaml
   - resources/certificate-request-policy.yaml
   - resources/certificate-request-policy-rbac.yaml
@@ -128,76 +127,23 @@ patches:
         path: /spec/unhealthyPodEvictionPolicy
         value: AlwaysAllow
 
-  - target:
+  # The Helm chart's test hook Pod (openbao-server-test) is applied here as
+  # a plain static manifest, not run via real `helm test` -- Flux doesn't
+  # trigger/re-trigger Helm hooks, kustomize just renders and applies it
+  # like any other resource. It never gets cleaned up between renders, so
+  # it sits there providing no ongoing validation value, while creating a
+  # real, recurring failure mode: Pod specs are immutable except for a
+  # small field allowlist (image, tolerations, etc.), so ANY future change
+  # to server.volumes/volumeMounts (which this Pod inherits) breaks the
+  # WHOLE flux-platform Kustomization's atomic dry-run apply -- confirmed
+  # live, M4 completion step B6's new volumes hit exactly this. Deleted
+  # rather than patched around; the chart has no values.yaml toggle to
+  # skip rendering it in the first place (checked: templates/tests/
+  # server-test.yaml is gated only by .mode/.serverEnabled, nothing finer).
+  - patch: |-
+      apiVersion: v1
       kind: Pod
-      name: openbao-server-test
-    patch: |-
-      - op: add
-        path: /metadata/labels
-        value:
-          helm.sh/hook: test
-      - op: add
-        path: /spec/automountServiceAccountToken
-        value: false
-      - op: add
-        path: /spec/serviceAccountName
-        value: openbao
-      - op: add
-        path: /spec/securityContext
-        value:
-          runAsNonRoot: true
-          runAsUser: 100
-          seccompProfile:
-            type: RuntimeDefault
-      - op: add
-        path: /spec/containers/0/securityContext
-        value:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - ALL
-      - op: add
-        path: /metadata/annotations/ignore-check.kube-linter.io~1no-liveness-probe
-        value: "Helm test hook Pod is a short-lived validation job with restartPolicy Never; does not need liveness monitoring."
-      - op: add
-        path: /metadata/annotations/ignore-check.kube-linter.io~1no-readiness-probe
-        value: "Helm test hook Pod is a short-lived validation job with restartPolicy Never; does not need readiness gating."
-      - op: add
-        path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
-        value: "Single-host homelab cluster; no zone or role topology to express affinity against."
-      - op: add
-        path: /metadata/annotations/ignore-check.kube-linter.io~1no-read-only-root-fs
-        value: "bao CLI writes to its home directory at runtime; readOnlyRootFilesystem is not supported upstream."
-      - op: add
-        path: /metadata/annotations/checkov.io~1skip1
-        value: "CKV_K8S_8=Helm test hook Pod is a short-lived validation job with restartPolicy Never; does not need liveness monitoring."
-      - op: add
-        path: /metadata/annotations/checkov.io~1skip2
-        value: "CKV_K8S_9=Helm test hook Pod is a short-lived validation job with restartPolicy Never; does not need readiness gating."
-      - op: add
-        path: /metadata/annotations/checkov.io~1skip3
-        value: "CKV_K8S_22=bao CLI writes to its home directory at runtime; readOnlyRootFilesystem not supported upstream."
-      - op: add
-        path: /metadata/annotations/checkov.io~1skip4
-        value: "CKV_K8S_40=UID 100 matches the main server image's fixed non-root user."
-      - op: add
-        path: /metadata/annotations/ignore-check.kube-linter.io~1unset-cpu-requirements
-        value: "Helm test hook Pod is a short-lived validation job; resource envelope not needed."
-      - op: add
-        path: /metadata/annotations/ignore-check.kube-linter.io~1unset-memory-requirements
-        value: "Helm test hook Pod is a short-lived validation job; resource envelope not needed."
-      - op: add
-        path: /metadata/annotations/checkov.io~1skip5
-        value: "CKV_K8S_10=Helm test hook Pod is a short-lived validation job; resource requests not needed."
-      - op: add
-        path: /metadata/annotations/checkov.io~1skip6
-        value: "CKV_K8S_11=Helm test hook Pod is a short-lived validation job; resource limits not needed."
-      - op: add
-        path: /metadata/annotations/checkov.io~1skip7
-        value: "CKV_K8S_12=Helm test hook Pod is a short-lived validation job; resource requests not needed."
-      - op: add
-        path: /metadata/annotations/checkov.io~1skip8
-        value: "CKV_K8S_13=Helm test hook Pod is a short-lived validation job; resource limits not needed."
-      - op: add
-        path: /metadata/annotations/ignore-check.kube-linter.io~1restart-policy
-        value: "Helm test hook Pod is a bare Pod (not a Job/Deployment); restartPolicy Never is correct — it should run once and stop, not restart on completion."
+      metadata:
+        name: openbao-server-test
+        namespace: openbao
+      $patch: delete
