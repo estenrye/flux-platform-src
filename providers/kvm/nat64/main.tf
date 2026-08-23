@@ -23,15 +23,22 @@ module "nat64" {
   # zvol upload path races udev, and the appliance is cattle).
   cloudinit_pool = libvirt_pool.images.name
 
-  base_image_path    = var.nat64_image_path
-  bridge             = local.host.bridge
-  mac                = "52:54:00:b3:a1:64"
-  ula_address        = "${local.network.allocations.nat64_appliance.ula}/64"
-  ipv4_address       = local.network.allocations.nat64_appliance.ipv4
-  ipv4_gateway       = local.network.vlan100.ipv4_gateway
-  tayga_pool_cidr    = local.network.allocations.nat64_appliance.tayga_pool
-  nat64_prefix       = local.network.allocations.nat64_appliance.nat64_prefix
-  dns64_allowed_cidr = local.network.ula_prefix
+  base_image_path = var.nat64_image_path
+  bridge          = local.host.bridge
+  mac             = "52:54:00:b3:a1:64"
+  ula_address     = "${local.network.allocations.nat64_appliance.ula}/64"
+  ipv4_address    = local.network.allocations.nat64_appliance.ipv4
+  ipv4_gateway    = local.network.vlan100.ipv4_gateway
+  tayga_pool_cidr = local.network.allocations.nat64_appliance.tayga_pool
+  nat64_prefix    = local.network.allocations.nat64_appliance.nat64_prefix
+  dns64_allowed_cidrs = [
+    local.network.ula_prefix, # site ULA /48: nodes, pods, services
+    # WireGuard remote-access client pool (separate ULA /48 assigned by the
+    # gateway's WireGuard server config, not part of the site plan above;
+    # these clients land in UniFi's External zone, not Internal/VPN --
+    # see docs/memory/unifi-zone-firewall.md).
+    "fd92:b792:95e:db94::/64",
+  ]
   lan_forward_domain = "rye.ninja"
   lan_dns_addr       = local.network.vlan100.ipv6_gateway_ula
 

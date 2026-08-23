@@ -61,9 +61,9 @@ variable "nat64_prefix" {
   default     = "64:ff9b::/96"
 }
 
-variable "dns64_allowed_cidr" {
-  description = "IPv6 CIDR allowed to query the DNS64 resolver (site ULA /48 covers nodes, pods, services)"
-  type        = string
+variable "dns64_allowed_cidrs" {
+  description = "IPv6 CIDRs allowed to query the DNS64 resolver (site ULA /48 covers nodes, pods, services; additional entries cover out-of-site networks like VPN client pools)"
+  type        = list(string)
 }
 
 variable "lan_forward_domain" {

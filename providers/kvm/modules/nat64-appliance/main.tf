@@ -55,7 +55,7 @@ resource "libvirt_cloudinit_disk" "seed" {
     tayga_pool_cidr     = var.tayga_pool_cidr
     tayga_pool_gw       = local.tayga_pool_gw
     nat64_prefix        = var.nat64_prefix
-    dns64_allowed_cidr  = var.dns64_allowed_cidr
+    dns64_allowed_cidrs = var.dns64_allowed_cidrs
     lan_forward_domain  = var.lan_forward_domain
     lan_dns_addr        = var.lan_dns_addr
     authorized_ssh_keys = var.authorized_ssh_keys
