@@ -42,11 +42,17 @@ server:
       # (SPIFFE cert auth), gated by mTLS. The 8200 listener above is
       # untouched -- same-cluster Kubernetes-auth consumers (crossplane,
       # cert-manager-acme, provider-terraform) keep working exactly as
-      # before, unaffected by this. Same server cert as 8200 (already
-      # carries the bao.rye.ninja SAN -- see resources/certificate.yaml).
+      # before, unaffected by this. tls_cert_file is the FULL CHAIN
+      # (resources/server-8443-fullchain.bundle.yaml), not the bare leaf
+      # 8200 uses -- lets a remote cluster verify with only the fleet
+      # root (already has it, every cluster's trust bundle carries it),
+      # no need to separately distribute controlplane's own intermediate
+      # to every remote cluster. tls_key_file is unchanged (same leaf
+      # cert's key, from the original secret -- trust-manager only ever
+      # touches public cert data, never this).
       listener "tcp" {
         address                        = "[::]:8443"
-        tls_cert_file                  = "/openbao/tls/tls.crt"
+        tls_cert_file                  = "/openbao/tls-8443/tls.crt"
         tls_key_file                   = "/openbao/tls/tls.key"
         tls_client_ca_file             = "/openbao/client-ca/chain.crt"
         tls_require_and_verify_client_cert = true
@@ -117,6 +123,13 @@ server:
     - name: client-ca-chain
       configMap:
         name: ryezone-labs-chain-controlplane
+    # M4 completion step B6: full chain (leaf + controlplane's own
+    # intermediate) for the 8443 listener's tls_cert_file specifically --
+    # see resources/server-8443-fullchain.bundle.yaml and the listener
+    # comment above for why 8200 doesn't use this.
+    - name: server-tls-8443-fullchain
+      secret:
+        secretName: openbao-server-8443-fullchain
 
   volumeMounts:
     - name: server-tls
@@ -124,6 +137,9 @@ server:
       readOnly: true
     - name: client-ca-chain
       mountPath: /openbao/client-ca
+      readOnly: true
+    - name: server-tls-8443-fullchain
+      mountPath: /openbao/tls-8443
       readOnly: true
 
   # M4 completion step B6: expose the new 8443 mTLS listener on the Service
