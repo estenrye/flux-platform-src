@@ -34,7 +34,13 @@ resource "libvirt_volume" "system" {
   pool           = var.cloudinit_pool
   base_volume_id = libvirt_volume.system_base.id
   size           = var.disk_size_bytes
-  format         = "raw"
+  # qcow2, not raw: libvirt only supports a backing-store reference
+  # (base_volume_id) on formats that record one in their own file structure.
+  # Raw files have no such header, so pairing base_volume_id with format =
+  # "raw" is rejected by the storage backend ("backing storage not
+  # supported for raw volumes") — found live 2026-08-23 on the first
+  # rebuild to actually exercise this path.
+  format = "qcow2"
 }
 
 resource "libvirt_cloudinit_disk" "seed" {
