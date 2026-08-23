@@ -6,6 +6,7 @@ resources:
   - network-policy.yaml
   - root-bundle.yaml
   - intermediate-bundle.yaml
+  - chain-bundle.yaml
 
 helmCharts:
   - name: trust-manager

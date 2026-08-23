@@ -1,0 +1,32 @@
+# M4 completion step B6: combines the root + controlplane's own intermediate
+# into one file, needed for OpenBao's new mTLS listener (applications/openbao)
+# to verify a REMOTE cluster's two-hop chain (leaf -> that cluster's own
+# intermediate -> controlplane intermediate -> root). Neither existing bundle
+# alone is enough: root-bundle.yaml is root-only, and
+# openbao-server-tls's own `ca.crt` field is also root-only (cert-manager
+# propagates the *issuer's* ca.crt, which for a single-hop chain is root —
+# same derivation as intermediate-bundle.yaml's own reasoning). The remote
+# cluster's client presents ITS OWN intermediate as part of its chain (see
+# applications/external-secrets-operator/observability's Bundle) — this
+# bundle only needs to supply the two certs the remote chain can't already
+# carry itself: controlplane's intermediate and the root.
+#
+# Source is a Secret (csi-driver-spiffe-ca's tls.crt), not the intermediate
+# ConfigMap intermediate-bundle.yaml already produces, purely to avoid a
+# Bundle-sourcing-a-Bundle dependency — trust-manager sources read Secrets/
+# ConfigMaps in the trust namespace directly, not other Bundles' outputs.
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: ryezone-labs-chain-controlplane
+spec:
+  sources:
+    - configMap:
+        name: step-ca-root-ca
+        key: root.crt
+    - secret:
+        name: csi-driver-spiffe-ca
+        key: tls.crt
+  target:
+    configMap:
+      key: chain.crt

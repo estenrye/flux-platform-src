@@ -57,6 +57,17 @@ spec:
       ports:
         - protocol: TCP
           port: 8200
+    # M4 completion step B6: Envoy Gateway's SNI-passthrough route
+    # (resources/gateway.yaml, resources/tls-route.yaml) for the new
+    # mTLS-gated remote-cluster listener. Same source selector pattern as
+    # step-ca's own ingress rule.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+      ports:
+        - protocol: TCP
+          port: 8443
   egress:
     # HA leader-election coordination + request forwarding between pods.
     - to:

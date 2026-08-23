@@ -38,6 +38,20 @@ server:
         tls_key_file  = "/openbao/tls/tls.key"
       }
 
+      # M4 completion step B6: separate listener for remote-cluster access
+      # (SPIFFE cert auth), gated by mTLS. The 8200 listener above is
+      # untouched -- same-cluster Kubernetes-auth consumers (crossplane,
+      # cert-manager-acme, provider-terraform) keep working exactly as
+      # before, unaffected by this. Same server cert as 8200 (already
+      # carries the bao.rye.ninja SAN -- see resources/certificate.yaml).
+      listener "tcp" {
+        address                        = "[::]:8443"
+        tls_cert_file                  = "/openbao/tls/tls.crt"
+        tls_key_file                   = "/openbao/tls/tls.key"
+        tls_client_ca_file             = "/openbao/client-ca/chain.crt"
+        tls_require_and_verify_client_cert = true
+      }
+
       storage "postgresql" {
         ha_enabled = "true"
       }
@@ -95,8 +109,28 @@ server:
     - name: server-tls
       secret:
         secretName: openbao-server-tls
+    # M4 completion step B6: root + controlplane's own intermediate,
+    # combined (applications/cert-manager-trust-manager's chain-bundle.yaml)
+    # — needed by the mTLS listener below to verify a remote cluster's
+    # two-hop chain. Neither openbao-server-tls's own ca.crt (root-only)
+    # nor the plain intermediate bundle alone is sufficient.
+    - name: client-ca-chain
+      configMap:
+        name: ryezone-labs-chain-controlplane
 
   volumeMounts:
     - name: server-tls
       mountPath: /openbao/tls
       readOnly: true
+    - name: client-ca-chain
+      mountPath: /openbao/client-ca
+      readOnly: true
+
+  # M4 completion step B6: expose the new 8443 mTLS listener on the Service
+  # so the Gateway/TLSRoute (resources/gateway.yaml, resources/tls-route.yaml)
+  # has a real port to target. The default 8200/8201 ports are untouched.
+  service:
+    extraPorts:
+      - name: https-remote
+        port: 8443
+        targetPort: 8443

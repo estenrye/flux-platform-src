@@ -1,0 +1,22 @@
+# SNI hostname for the passthrough route; must be a subset of the listener
+# hostname (resources/gateway.yaml). external-dns (gateway-tlsroute source)
+# creates the LAN AAAA from this, same mechanism already proven for
+# ca.rye.ninja. backendRef targets the NEW 8443 mTLS listener specifically
+# -- not 8200, which stays same-cluster-only and unreachable from this
+# route.
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TLSRoute
+metadata:
+  name: openbao
+  namespace: openbao
+spec:
+  parentRefs:
+    - name: openbao
+      namespace: openbao
+      sectionName: https-passthrough
+  hostnames:
+    - bao.rye.ninja
+  rules:
+    - backendRefs:
+        - name: openbao
+          port: 8443

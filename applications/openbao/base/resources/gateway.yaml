@@ -1,0 +1,22 @@
+# M4 completion step B6: LAN-only exposure for remote-cluster (SPIFFE
+# cert-auth) access, structurally identical to applications/step-ca's own
+# Gateway — SNI passthrough, no Envoy-level cert inspection. Verification
+# happens at OpenBao's own new 8443 listener (server.tls_require_and_verify
+# _client_cert), same reasoning as step-ca terminating its own TLS.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: openbao
+  namespace: openbao
+spec:
+  gatewayClassName: merged-eg
+  listeners:
+    - name: https-passthrough
+      port: 443
+      protocol: TLS
+      hostname: bao.rye.ninja
+      tls:
+        mode: Passthrough
+      allowedRoutes:
+        namespaces:
+          from: Same
