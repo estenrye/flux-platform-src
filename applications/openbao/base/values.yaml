@@ -123,13 +123,24 @@ server:
     - name: client-ca-chain
       configMap:
         name: ryezone-labs-chain-controlplane
-    # M4 completion step B6: full chain (leaf + controlplane's own
-    # intermediate) for the 8443 listener's tls_cert_file specifically --
-    # see resources/server-8443-fullchain.bundle.yaml and the listener
-    # comment above for why 8200 doesn't use this.
-    - name: server-tls-8443-fullchain
-      secret:
-        secretName: openbao-server-8443-fullchain
+    # M4 completion step B6: controlplane's own intermediate, for the
+    # init container below to combine with the server leaf into a full
+    # chain. Sourced from the pre-existing ryezone-labs-intermediate-
+    # controlplane ConfigMap (applications/cert-manager-trust-manager's
+    # intermediate-bundle.yaml, already distributed to every namespace,
+    # predates B6 entirely) rather than a new trust-manager Bundle: a
+    # first attempt tried sourcing openbao-server-tls directly as a Bundle
+    # input, but trust-manager can only read Secret sources from its
+    # configured trust namespace (cert-manager) -- openbao-server-tls
+    # lives in the openbao namespace, so that Bundle permanently failed
+    # SourceNotFound. Confirmed live, not just reasoned about.
+    - name: intermediate-cm
+      configMap:
+        name: ryezone-labs-intermediate-controlplane
+    # emptyDir target for the init container's combined output -- see
+    # extraInitContainers below.
+    - name: tls-8443-combined
+      emptyDir: {}
 
   volumeMounts:
     - name: server-tls
@@ -138,9 +149,37 @@ server:
     - name: client-ca-chain
       mountPath: /openbao/client-ca
       readOnly: true
-    - name: server-tls-8443-fullchain
+    - name: tls-8443-combined
       mountPath: /openbao/tls-8443
       readOnly: true
+
+  # M4 completion step B6: builds the 8443 listener's full-chain cert
+  # (leaf + controlplane's own intermediate) before the main container
+  # starts. Standard TLS practice applied narrowly to the one listener
+  # that needs it -- see the 8443 listener comment above for why 8200
+  # doesn't need this. Reuses the already-pinned server image (no new
+  # image to digest-pin/approve) since it has a plain shell + cat.
+  extraInitContainers:
+    - name: build-8443-fullchain
+      image: quay.io/openbao/openbao:2.6.1
+      command:
+        - sh
+        - -c
+        - cat /openbao/tls/tls.crt /openbao/intermediate/intermediate.crt > /openbao/tls-8443/tls.crt
+      # Matches the main openbao container's own securityContext exactly
+      # (extraInitContainers entries are raw, chart doesn't apply its own
+      # containerSecurityContext to them).
+      securityContext:
+        allowPrivilegeEscalation: false
+      volumeMounts:
+        - name: server-tls
+          mountPath: /openbao/tls
+          readOnly: true
+        - name: intermediate-cm
+          mountPath: /openbao/intermediate
+          readOnly: true
+        - name: tls-8443-combined
+          mountPath: /openbao/tls-8443
 
   # M4 completion step B6: expose the new 8443 mTLS listener on the Service
   # so the Gateway/TLSRoute (resources/gateway.yaml, resources/tls-route.yaml)
