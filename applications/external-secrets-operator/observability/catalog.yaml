@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: external-secrets-operator-observability
+  description: |-
+    External Secrets Operator on the observability cluster: base
+    configuration plus this cluster's own client identity (SPIFFE cert
+    auth, M4 completion step B6) for reaching controlplane's OpenBao over
+    the new mTLS-gated cross-cluster path.
+  tags:
+    - secrets
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

@@ -1,0 +1,27 @@
+# A matching CertificateRequestPolicy alone isn't sufficient --
+# cert-manager-approver-policy also requires an explicit `use` grant naming
+# the specific policy, bound to cert-manager's ServiceAccount. Mirrors
+# applications/openbao's certificate-request-policy-rbac.yaml pattern
+# exactly.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cert-manager-policy:eso-openbao-client-policy
+rules:
+  - apiGroups: ["policy.cert-manager.io"]
+    resources: ["certificaterequestpolicies"]
+    verbs: ["use"]
+    resourceNames: ["eso-openbao-client-policy"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cert-manager-policy:eso-openbao-client-policy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cert-manager-policy:eso-openbao-client-policy
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager
+    namespace: cert-manager
