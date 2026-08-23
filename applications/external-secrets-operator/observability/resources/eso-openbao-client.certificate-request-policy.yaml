@@ -1,0 +1,27 @@
+# cert-manager-approver-policy is cluster-wide; any CertificateRequest sits
+# WaitingForApproval forever unless a CertificateRequestPolicy matches it.
+# Mirrors applications/openbao's certificate-request-policy.yaml pattern
+# exactly.
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: eso-openbao-client-policy
+spec:
+  allowed:
+    commonName:
+      required: true
+      value: eso-openbao-client.observability
+    uris:
+      required: true
+      values:
+        - spiffe://obs.rye.ninja/ns/external-secrets-operator/sa/external-secrets
+    usages:
+      - client auth
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: ClusterIssuer
+      name: csi-driver-spiffe-ca
+    namespace:
+      matchNames:
+        - cert-manager

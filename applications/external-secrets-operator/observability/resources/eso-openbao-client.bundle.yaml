@@ -1,0 +1,29 @@
+# M4 completion step B6 (observability side): combines the ESO client leaf
+# cert with observability's own intermediate into one file ESO can present
+# as a full chain to OpenBao's mTLS listener. OpenBao's trust store
+# (applications/cert-manager-trust-manager/controlplane's chain-bundle.yaml)
+# already has {controlplane-intermediate, root} -- it never needs updating
+# per remote cluster. What it can't already have is THIS cluster's own
+# intermediate, since that's what changes per cluster; the client supplies
+# it by presenting it as part of its own chain instead.
+#
+# Target is a Secret, not a ConfigMap -- ESO's vault provider auth.cert
+# config needs clientCert as a secretKeySelector (see
+# applications/external-secrets-operator/observability/resources/
+# eso-openbao-client.clustersecretstore.yaml). Requires
+# cert-manager-trust-manager/observability's secretTargets.enabled: true.
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+  name: eso-openbao-client-bundle
+spec:
+  sources:
+    - secret:
+        name: eso-openbao-client-tls
+        key: tls.crt
+    - secret:
+        name: csi-driver-spiffe-ca
+        key: tls.crt
+  target:
+    secret:
+      key: client-bundle.pem

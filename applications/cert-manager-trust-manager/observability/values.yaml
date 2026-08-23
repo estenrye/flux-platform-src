@@ -166,18 +166,22 @@ serviceAccount:
 volumes: []
 # Additional volume mounts to add to the trust-manager container.
 volumeMounts: []
+# M4 completion step B6: needed so resources/eso-openbao-client.bundle.yaml
+# (applications/external-secrets-operator/observability) can target a
+# Secret -- ESO's vault provider auth.cert config needs clientCert as a
+# secretKeySelector, ConfigMaps aren't accepted there. Deliberately scoped
+# via authorizedSecrets (not authorizedSecretsAll) to exactly the one
+# target name this cluster needs. Accepted, documented tradeoff: the
+# chart's own values.yaml notes enabling this grants trust-manager READ
+# access to all secrets cluster-wide regardless of the authorizedSecrets
+# write-scoping -- narrower than authorizedSecretsAll, but still broader
+# than controlplane's trust-manager (which has no secret targets at all,
+# both its bundles target ConfigMaps only).
 secretTargets:
-  # If set to true, enable writing trust bundles to Kubernetes Secrets as a target.
-  # trust-manager can only write to secrets which are explicitly allowed via either authorizedSecrets or authorizedSecretsAll.
-  # Note that enabling secret targets will grant trust-manager read access to all secrets in the cluster.
-  enabled: false
-  # If set to true, grant read/write permission to all secrets across the cluster. Use with caution!
-  # If set, ignores the authorizedSecrets list.
+  enabled: true
   authorizedSecretsAll: false
-  # A list of secret names which trust-manager will be permitted to read and write across all namespaces.
-  # These are the only allowable Secrets that can be used as targets. If the list is empty (and authorizedSecretsAll is false),
-  # trust-manager can't write to secrets and can only read secrets in the trust namespace for use as sources.
-  authorizedSecrets: []
+  authorizedSecrets:
+    - eso-openbao-client-bundle
 # Kubernetes pod resource limits for trust.
 #
 # For example:

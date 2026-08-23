@@ -35,7 +35,10 @@ resources:
 # existing script for it (controlplane's own copy predates one); flagged
 # for the user, not run from this session.
 - ../../applications/external-dns/unifi/base
-- ../../applications/external-secrets-operator/base
+# M4 completion step B6: observability variant (was base) — adds this
+# cluster's own ESO client identity for reaching controlplane's OpenBao
+# over the new mTLS cross-cluster path. See the design doc for why.
+- ../../applications/external-secrets-operator/observability
 - ../../applications/flux/base
 - ../../applications/flux-monitoring/base
 # M4 completion step B5: trust fabric. Own step-ca intermediate for trust

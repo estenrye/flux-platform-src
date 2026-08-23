@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# observability variant (M4 completion step B6): base unchanged, plus this
+# cluster's ESO client identity for reaching controlplane's OpenBao over
+# the new mTLS-gated cross-cluster path. See resources/ for the
+# Certificate, its CertificateRequestPolicy + RBAC, the Bundle building
+# the full-chain client cert, and the ClusterSecretStore itself.
+resources:
+  - ../base
+  - resources/eso-openbao-client.certificate.yaml
+  - resources/eso-openbao-client.certificate-request-policy.yaml
+  - resources/eso-openbao-client.certificate-request-policy-rbac.yaml
+  - resources/eso-openbao-client.bundle.yaml
+  - resources/eso-openbao-client.clustersecretstore.yaml

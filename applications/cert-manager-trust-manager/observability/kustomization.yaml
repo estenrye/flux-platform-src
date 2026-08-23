@@ -27,6 +27,10 @@ patches:
   - target:
       kind: RoleBinding
     path: patches/role-binding.yaml
+  - target:
+      kind: ClusterRoleBinding
+      name: trust-manager
+    path: patches/cluster-role-binding.yaml
 
 images:
   - name: quay.io/jetstack/trust-manager

@@ -1,0 +1,35 @@
+# M4 completion step B6 (observability side): ESO's client identity for
+# authenticating to controlplane's OpenBao over the new mTLS listener
+# (applications/openbao's 8443). NOT the SPIFFE CSI ephemeral volume --
+# ESO's vault provider auth.cert config needs a static Secret reference
+# (secretKeySelector), which doesn't compose with SPIFFE's deliberately
+# ephemeral, non-Secret SVID delivery. Same reasoning, same pattern
+# openbao-server-tls already uses for the identical reason.
+#
+# Lives in cert-manager namespace: that's trust-manager's configured trust
+# namespace (sources must live there — see
+# applications/cert-manager-trust-manager/observability/values.yaml),
+# needed so resources/eso-openbao-client.bundle.yaml below can read this
+# Certificate's issued cert as a Bundle source.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: eso-openbao-client
+  namespace: cert-manager
+spec:
+  commonName: eso-openbao-client.observability
+  uris:
+    # SPIFFE ID matching the SAN OpenBao's cert-auth role
+    # (remote-observability-eso, see .bin/configure-openbao-cert-auth.sh)
+    # is configured with allowed_uri_sans for.
+    - spiffe://obs.rye.ninja/ns/external-secrets-operator/sa/external-secrets
+  duration: 2160h
+  renewBefore: 360h
+  isCA: false
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: csi-driver-spiffe-ca
+  secretName: eso-openbao-client-tls
+  usages:
+    - client auth

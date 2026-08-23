@@ -1,0 +1,3 @@
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-secrets
+  value: "M4 completion step B6: secretTargets.enabled=true (values.yaml) is required so a Bundle can target a Secret (eso-openbao-client-bundle). The chart grants get/list/watch on ALL secrets cluster-wide for this feature, regardless of authorizedSecrets write-scoping -- a real, accepted, documented tradeoff (see values.yaml's own comment), not an oversight."
