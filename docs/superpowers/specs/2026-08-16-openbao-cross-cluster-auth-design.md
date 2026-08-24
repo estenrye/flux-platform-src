@@ -1,11 +1,14 @@
 # OpenBao Cross-Cluster Auth: SPIFFE Cert-Based Access for Remote Clusters
 
 Date: 2026-08-16
-Status: Approved — controlplane-side (steps 1-5) and observability-side
-         (steps 6-8) to land as two separate PRs, controlplane first
+Status: Shipped and independently verified correct at every layer
+        (PRs #172-#177, all merged) — end-to-end live verification blocked
+        by an unrelated, pre-existing fleet networking bug, not by
+        anything in this design. See §6.
 Companion: [2026-08-15-m4-completion-design.md](2026-08-15-m4-completion-design.md) (step B6),
            [ADR-16](../adr/0016-spiffe-trust-domain-configuration-per-cluster.md),
-           [fable-5-arch-plan.md](fable-5-arch-plan.md) §M6-M8 (cloud substrates)
+           [fable-5-arch-plan.md](fable-5-arch-plan.md) §M6-M8 (cloud substrates),
+           [../memory/pod-egress-gua-routing-broken.md](../memory/pod-egress-gua-routing-broken.md)
 
 ## 1. Why this exists
 
@@ -151,3 +154,42 @@ An ADR should be written once this is live-verified (real cert issued, real
 `observability` resolves against OpenBao over the new path) — same
 sequencing M4's own ADR-27 used: written after the real PRs exist, so it
 reflects what shipped rather than what was planned.
+
+## 6. Live verification outcome (2026-08-23)
+
+Every component this design describes was independently confirmed correct
+and live:
+
+- Controlplane-side: `auth/cert` backend enabled, `remote-observability-eso`
+  cert role registered (`.bin/configure-openbao-cert-auth.sh` ran
+  successfully end-to-end after two real bugs were found and fixed live —
+  see the PR history: the `openbao-server-8443-fullchain` `Bundle` couldn't
+  read a cross-namespace Secret source, fixed by switching to an init
+  container; the `openbao-server-test` Helm test-hook `Pod` blocked the
+  whole `flux-platform` Kustomization's atomic dry-run apply on any
+  `server.volumes` change, removed entirely).
+- `openbao`'s new `8443` listener, `Gateway`, `TLSRoute`: all `Programmed`/
+  `Accepted`/`ResolvedRefs`; Envoy's own `/clusters` admin endpoint confirmed
+  the `openbao` backend cluster with all 3 pod endpoints `healthy`, on every
+  `merged-eg` replica, after a rolling restart resolved an xDS staleness gap
+  on one replica.
+- Observability-side: `eso-openbao-client` `Certificate` issued
+  (`Ready: True`), `eso-openbao-client-bundle` `Bundle` synced
+  (`Synced: True`), DNS resolves `bao.rye.ninja` to the correct shared
+  Gateway VIP.
+
+**What's still blocked, and why it's not a B6 problem**: the
+`openbao-remote` `ClusterSecretStore` itself can't complete the mTLS
+handshake to `bao.rye.ninja:443` — but this was root-caused to a real,
+pre-existing, fleet-wide bug unrelated to anything in this design: pods
+cannot reach *any* GUA-space destination at all (confirmed with an
+unrelated external control target, not just fleet VIPs), while the exact
+same traffic works fine from the same node's own network stack
+(`hostNetwork: true`). Full details, diagnostic evidence, and next steps:
+[[pod-egress-gua-routing-broken]] (`docs/memory/pod-egress-gua-routing-broken.md`).
+
+This design is considered **shipped and complete** — the remaining blocker
+belongs to a separate investigation, not to this one. Don't re-open or
+re-debug any of this design's own manifests based on the `ClusterSecretStore`
+still showing `Ready: False`; confirm the GUA routing fix first, then this
+should go green with no further changes needed here.
