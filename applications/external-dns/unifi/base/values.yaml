@@ -2,8 +2,13 @@ logLevel: info
 logFormat: json
 interval: 3m
 triggerLoopOnEvent: true
-registry: txt
-txtPrefix: edns.
+# UniFi's Static DNS feature has no TXT record type at all (confirmed live
+# against the controller API: only A/AAAA/CNAME exist across every managed
+# hostname) -- txt registry can never write its edns.* ownership markers
+# here, so it silently treats every record as unowned and refuses to touch
+# it. That's why bao.rye.ninja got stuck on a stale value indefinitely
+# while nothing ever errored. noop just syncs desired state directly.
+registry: noop
 
 extraArgs:
   - --domain-filter=rye.ninja
