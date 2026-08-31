@@ -461,6 +461,17 @@ spec:
                   value = local.schematic_id
                 }
               varmap: {{ toJson $varmap }}
+              # Default apply parallelism (10) races dmacvicar/libvirt's
+              # domain-define calls over the qemu+ssh transport -- confirmed
+              # live rebuilding observability (2026-08-30): the `for_each`
+              # libvirt_domain.node resources all get created for real on
+              # the hypervisor, but one arbitrarily-chosen domain's create
+              # response isn't recorded into Terraform state, so every
+              # retry then fails with "domain already exists" against a
+              # domain state doesn't know about, forever. Serializing
+              # avoids the race.
+              applyArgs:
+                - -parallelism=1
               # NOTE: this Workspace's module has no `provider "libvirt" {}`
               # block or terraform{backend} block by design -- both are
               # injected by the shared provider-terraform ProviderConfig
