@@ -43,4 +43,4 @@
 - [Pinniped APIService Discovery Failure](pinniped-apiservice-discovery-failure.md) — clientsecret.supervisor.pinniped.dev APIService FailedDiscoveryCheck 17d+, stalls namespace-termination sweeps cluster-wide
 - [1Password Account: ryefamily](1password-account-ryefamily.md) — the `crossplane` vault (sops-age-key, service-account-token) lives under ryefamily.1password.com, not familyrye.1password.com
 - [M4 Step 6 Tier B First Live Run](m4-step6-tier-b-first-live-run.md) — real end-to-end provision+teardown passed 2026-08-15; first attempt hit an unrelated sealed-OpenBao incident
-- [Pod Egress GUA Routing Broken](pod-egress-gua-routing-broken.md) — pods can't reach ANY GUA destination (confirmed with an external control); works fine from hostNetwork; found during M4 completion B6, unrelated to B6 itself
+- [Pod Egress GUA Routing Broken](pod-egress-gua-routing-broken.md) — root cause + fix validated (move to VLAN 200); observability cluster destroyed 2026-09-01 to free RAM, work PAUSED, original goal still unvalidated -- resume via observability-vlan-segment
