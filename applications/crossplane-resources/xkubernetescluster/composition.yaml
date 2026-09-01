@@ -472,6 +472,12 @@ spec:
               # avoids the race.
               applyArgs:
                 - -parallelism=1
+              # Same race applies in the destroy direction (parallel
+              # libvirt_domain deletes over qemu+ssh) -- serialize this too
+              # so tearing a cluster down doesn't orphan a domain from
+              # state the same way create did.
+              destroyArgs:
+                - -parallelism=1
               # NOTE: this Workspace's module has no `provider "libvirt" {}`
               # block or terraform{backend} block by design -- both are
               # injected by the shared provider-terraform ProviderConfig
