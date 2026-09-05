@@ -33,7 +33,7 @@ resources:
 
 images:
   - name: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator
-    digest: sha256:590e50477b76702b6b630cf047e4f712cb5bf37f064ce6f8d08758d7437f56ab
+    digest: sha256:d4789a6537fdbc69929dc9227900511224b2fe8e5a0938e604cc8ca56b07336e
   - name: quay.io/brancz/kube-rbac-proxy
     digest: sha256:147cb28fea35473b2cf8697892d375bbe0aec237c5740b0368719b4c0d71b290
   - name: busybox
