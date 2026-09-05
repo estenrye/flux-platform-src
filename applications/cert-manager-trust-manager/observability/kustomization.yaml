@@ -10,7 +10,7 @@ resources:
 helmCharts:
   - name: trust-manager
     repo: oci://quay.io/jetstack/charts
-    version: v0.22.0
+    version: v0.24.0
     releaseName: trust-manager
     namespace: cert-manager
     includeCRDs: true
