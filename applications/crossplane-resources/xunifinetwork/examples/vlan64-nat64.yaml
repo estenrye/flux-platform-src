@@ -1,0 +1,22 @@
+# applications/crossplane-resources/xunifinetwork/examples/vlan64-nat64.yaml
+#
+# NOT YET APPLIED via kubectl (2026-09-06): see the matching note in
+# ../../xnetworksegment/examples/vlan64-nat64.yaml. The UniFi network
+# object this claim describes was created manually via the UniFi web UI
+# instead. This file is the accurate declarative record of that manual
+# state -- apply it for real once a working kubeconfig is available.
+apiVersion: platform.rye.ninja/v1alpha1
+kind: XUnifiNetwork
+metadata:
+  name: vlan64-nat64
+  labels:
+    rye.ninja/component: xunifinetwork
+    rye.ninja/owner: platform-engineering
+    platform.rye.ninja/unifi-network-name: vlan64-nat64
+spec:
+  vlanId: 64
+  infraSubnet: "fd97:45c2:b3a1:64::/64"
+  ipv4Subnet: "10.64.64.1/24"
+  # firewallZone left at default (DMZ-Kubernetes) -- same zone VLAN 100 is
+  # already in, so DMZ-Kubernetes -> DMZ-Kubernetes: Allow All already
+  # covers reachability (docs/memory/unifi-zone-firewall.md).

@@ -597,9 +597,9 @@ spec:
                             - name: INFRA_SUBNET
                               value: {{ $networkConfig.infraSubnet }}
                             - name: NAT64_ULA
-                              value: "fd97:45c2:b3a1:100::64"
+                              value: {{ $environment.nat64Ula }}
                             - name: NAT64_PREFIX
-                              value: "64:ff9b::/96"
+                              value: {{ $environment.nat64Prefix }}
                             - name: POD_CIDR
                               value: {{ $networkConfig.podCidr }}
                             - name: SVC_CIDR

@@ -56,6 +56,15 @@ kind: EnvironmentConfig
 metadata:
   name: platform-kvm-network
 data:
+  # nat64-01 moved to its own dedicated VLAN 64 on 2026-09-06 (see
+  # docs/adr/0023-ipv6-only-cluster-ula-nat64.md's amendment and
+  # docs/superpowers/plans/2026-09-06-migrate-nat64-appliance-to-vlan-64.md).
+  # There's only one nat64-01, not one per cluster like the entries below --
+  # xkubernetescluster-composition.yaml templates NAT64_ULA/NAT64_PREFIX
+  # from these two fields instead of hardcoding them, so a future move only
+  # needs updating this file, not the composition template too.
+  nat64Ula: "fd97:45c2:b3a1:64::64"
+  nat64Prefix: "64:ff9b::/96"
   clusters:
     # CORRECTED 2026-08-01 (M4 step 5, caught live): the original ::211/
     # ::212/::213 suffixes are 3 hex digits (0x211 = 529 decimal) once fed

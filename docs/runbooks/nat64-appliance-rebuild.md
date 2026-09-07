@@ -1,9 +1,14 @@
 # Runbook: NAT64/DNS64 appliance rebuild + break-glass
 
-The `nat64-01` VM (Tayga + unbound, `fd97:45c2:b3a1:100::64`) is fully
+The `nat64-01` VM (Tayga + unbound, `fd97:45c2:b3a1:64::64`) is fully
 declarative cloud-init — never repair it, rebuild it. Its outage breaks ONLY
 IPv4-only egress (GitHub/ghcr pulls); running workloads and v6-native traffic
 are unaffected (M1 design §4.3).
+
+Moved to its own dedicated VLAN 64 (`br64`) on 2026-09-06 — see
+`docs/adr/0023-ipv6-only-cluster-ula-nat64.md`'s amendment and
+`docs/superpowers/plans/2026-09-06-migrate-nat64-appliance-to-vlan-64.md`
+for why. Was previously `fd97:45c2:b3a1:100::64` on shared VLAN 100.
 
 ## Rebuild (minutes)
 
@@ -15,17 +20,17 @@ tofu -chdir=providers/kvm/nat64 taint module.nat64.libvirt_volume.system
 
 ## Verify
 
-From a host using the appliance as resolver (`fd97:45c2:b3a1:100::64`):
+From a host using the appliance as resolver (`fd97:45c2:b3a1:64::64`):
 
 ```sh
-ping -6 -c1 64:ff9b::8c52:7003                # github.com via NAT64 (140.82.112.3)
-dig AAAA github.com @fd97:45c2:b3a1:100::64   # DNS64-synthesized 64:ff9b:: answer
-curl -6 -sI https://github.com | head -1      # end-to-end through tayga
+ping -6 -c1 64:ff9b::8c52:7003               # github.com via NAT64 (140.82.112.3)
+dig AAAA github.com @fd97:45c2:b3a1:64::64   # DNS64-synthesized 64:ff9b:: answer
+curl -6 -sI https://github.com | head -1     # end-to-end through tayga
 ```
 
-On the VM (`ssh nat64admin@fd97:45c2:b3a1:100::64`, break-glass key from
+On the VM (`ssh nat64admin@fd97:45c2:b3a1:64::64`, break-glass key from
 tofu var `nat64_authorized_ssh_keys`): `systemctl status tayga unbound`;
-`ip addr show lan` shows ULA `::64` + `10.45.0.64`.
+`ip addr show lan` shows ULA `::64` + `10.64.64.64`.
 
 ## Break-glass: appliance down and you need code/images NOW
 
@@ -37,20 +42,6 @@ Manual side-load path (M1 design §4.3):
 2. **Images**: `docker pull` + `docker save` on a dual-stack machine, copy,
    then `ctr -n k8s.io images import` via `talosctl` on the target node — or
    push to a registry that has AAAA records.
-
-## Client routing quirk (VLAN 100 residents)
-
-The UniFi static route `64:ff9b::/96 -> fd97:45c2:b3a1:100::64` serves
-clients on OTHER VLANs (symmetric through the gateway). Clients ON VLAN 100
-(the KVM host, a laptop joined to its WiFi) must route directly:
-
-```sh
-sudo route -n add -inet6 64:ff9b:: -prefixlen 96 fd97:45c2:b3a1:100::64   # macOS
-```
-
-Via the gateway their return traffic arrives on-link (asymmetric) and the
-stateful firewall drops mid-flow packets — handshakes pass, data stalls.
-Cluster nodes are unaffected (machine configs carry the direct route).
 
 ## Retirement flag
 

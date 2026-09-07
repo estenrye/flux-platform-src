@@ -24,11 +24,11 @@ module "nat64" {
   cloudinit_pool = libvirt_pool.images.name
 
   base_image_path = var.nat64_image_path
-  bridge          = local.host.bridge
+  bridge          = local.network.vlan64.bridge
   mac             = "52:54:00:b3:a1:64"
   ula_address     = "${local.network.allocations.nat64_appliance.ula}/64"
   ipv4_address    = local.network.allocations.nat64_appliance.ipv4
-  ipv4_gateway    = local.network.vlan100.ipv4_gateway
+  ipv4_gateway    = local.network.vlan64.ipv4_gateway
   tayga_pool_cidr = local.network.allocations.nat64_appliance.tayga_pool
   nat64_prefix    = local.network.allocations.nat64_appliance.nat64_prefix
   dns64_allowed_cidrs = [
@@ -40,7 +40,8 @@ module "nat64" {
     "fd92:b792:95e:db94::/64",
   ]
   lan_forward_domain = "rye.ninja"
-  lan_dns_addr       = local.network.vlan100.ipv6_gateway_ula
+  lan_dns_addr       = local.network.vlan64.ipv6_gateway_ula
+  tayga_ula_prefix   = "fd97:45c2:b3a1:64"
 
   authorized_ssh_keys = var.nat64_authorized_ssh_keys
 }

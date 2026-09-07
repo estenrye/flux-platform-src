@@ -32,6 +32,16 @@ vlan100:
   ipv6_gateway_ula: fd97:45c2:b3a1:100::1
   ipv6_gateway_link_local: fe80::ae8b:a9ff:fe6e:13de
 
+# Dedicated tagged VLAN for nat64-01 only (migrated off VLAN 100
+# 2026-09-06 to fix an ICMPv6-redirect hairpin bug -- see ADR-23
+# amendment and docs/runbooks/nat64-appliance-rebuild.md). Only the
+# appliance and the UniFi gateway itself are ever on this segment.
+vlan64:
+  bridge: br64 # nat64/main.tf reads this directly -- do NOT read hosts.yaml's shared bridge field for this.
+  ipv4_subnet: 10.64.64.0/24
+  ipv4_gateway: 10.64.64.1
+  ipv6_gateway_ula: fd97:45c2:b3a1:64::1
+
 allocations:
   infra_subnet: fd97:45c2:b3a1:100::/64 # node addresses, apiserver VIP, appliance, internal LB VIPs
   apiserver_vip: fd97:45c2:b3a1:100::10 # Talos shared L2 VIP; api.controlplane.rye.ninja (internal DNS)
@@ -44,8 +54,8 @@ allocations:
     controlplane-wk-2: fd97:45c2:b3a1:100::22
     controlplane-wk-3: fd97:45c2:b3a1:100::23
   nat64_appliance:
-    ula: fd97:45c2:b3a1:100::64
-    ipv4: 10.45.0.64/16 # translated-traffic egress toward the v4 gateway
+    ula: fd97:45c2:b3a1:64::64
+    ipv4: 10.64.64.64/24 # translated-traffic egress toward the v4 gateway, now on its own dedicated VLAN
     tayga_pool: 192.168.255.0/24 # private dynamic pool on the tayga TUN interface
     nat64_prefix: 64:ff9b::/96 # RFC 6052 well-known prefix
   truenas:
