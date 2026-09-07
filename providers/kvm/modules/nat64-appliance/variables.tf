@@ -25,7 +25,7 @@ variable "base_image_path" {
 }
 
 variable "bridge" {
-  description = "Host bridge carrying VLAN 100"
+  description = "Host bridge carrying this appliance's dedicated VLAN"
   type        = string
 }
 
@@ -36,6 +36,11 @@ variable "mac" {
 
 variable "ula_address" {
   description = "Static ULA address with prefix length, e.g. fd97:45c2:b3a1:100::64/64"
+  type        = string
+}
+
+variable "tayga_ula_prefix" {
+  description = "ULA /64 prefix (without trailing ::) this appliance's VLAN uses, for tayga's own internal tun-device addresses (::6401/::6402) -- distinct from ula_address, which is the appliance's own primary interface address on the same prefix."
   type        = string
 }
 

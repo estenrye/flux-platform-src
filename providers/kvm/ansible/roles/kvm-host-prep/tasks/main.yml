@@ -1,0 +1,52 @@
+---
+# See docs/runbooks/kvm-host-prep-ansible.md for the full narrative this
+# encodes -- reverse-engineered from the live mf-ms-a2-01 host (2026-09-01).
+# Values come from providers/kvm/hosts.yaml + network.yaml, loaded by the
+# calling playbook (playbooks/kvm-host-prep.yml) and passed in as role vars
+# -- see defaults/main.yml for which ones and why.
+
+- name: Assert this host matches the facts we were given
+  ansible.builtin.assert:
+    that:
+      - kvm_host_prep_expected_host == inventory_hostname
+    fail_msg: >-
+      kvm_host_prep_expected_host ({{ kvm_host_prep_expected_host }}) doesn't
+      match inventory_hostname ({{ inventory_hostname }}) -- wrong host, or
+      hosts.yaml/inventory have drifted apart. Mirrors prep-kvm-host.sh's own
+      EXPECTED_HOST guard.
+
+- ansible.builtin.include_tasks:
+    file: packages.yml
+    apply:
+      tags: [packages]
+  tags: [packages]
+
+- ansible.builtin.include_tasks:
+    file: network.yml
+    apply:
+      tags: [network]
+  tags: [network]
+
+- ansible.builtin.include_tasks:
+    file: apparmor.yml
+    apply:
+      tags: [apparmor]
+  tags: [apparmor]
+
+- ansible.builtin.include_tasks:
+    file: zfs.yml
+    apply:
+      tags: [zfs]
+  tags: [zfs]
+
+- ansible.builtin.include_tasks:
+    file: ksm.yml
+    apply:
+      tags: [ksm]
+  tags: [ksm]
+
+- ansible.builtin.include_tasks:
+    file: libvirt_pools.yml
+    apply:
+      tags: [libvirt-pools]
+  tags: [libvirt-pools]

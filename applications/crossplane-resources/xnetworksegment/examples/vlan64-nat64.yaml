@@ -1,0 +1,36 @@
+# applications/crossplane-resources/xnetworksegment/examples/vlan64-nat64.yaml
+#
+# NOT YET APPLIED via kubectl (2026-09-06): the kubeconfig at
+# ~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml points to
+# a stale Rackspace Spot hostname (confirmed NXDOMAIN against both the
+# local resolver and 1.1.1.1). The bridge and UniFi network this claim
+# describes were created manually instead (br64/bond0.64 via a hand-added
+# /etc/netplan/60-br64.yaml on mf-ms-a2-01, matching this Composition's own
+# documented file-naming convention; the UniFi network object via the web
+# UI). This file is the accurate declarative record of that manual state,
+# kept in sync by hand the same way vlan100's own example-claim.yaml is --
+# apply it for real once a working kubeconfig is available, so Crossplane's
+# state catches up to reality instead of trying to create these from
+# scratch a second time.
+apiVersion: platform.rye.ninja/v1alpha1
+kind: XNetworkSegment
+metadata:
+  name: vlan64-nat64
+  labels:
+    rye.ninja/component: xnetworksegment
+    rye.ninja/owner: platform-engineering
+    platform.rye.ninja/network-segment-name: vlan64-nat64
+spec:
+  vlanId: 64
+  # taggedVlan defaults to true, bondInterface defaults to "bond0" -- both
+  # omitted deliberately, matching a genuinely new segment (unlike vlan100's
+  # adopted br0). bridgeName omitted too -- derives "br64", matching what
+  # was actually created by hand.
+  dhcp4: false
+  dhcp6: false # ULA + static IPv4 only, same dual-stack-exception shape nat64-01 already has -- no GUA/PD need on this segment.
+  addresses:
+    mf-ms-a2-01:
+      - "fd97:45c2:b3a1:64::2000/64" # matches every other bridge on this host (br0/br200/br250test all follow the same ::2000 kvm-host convention)
+  routes: {} # Deliberately empty -- see xrd.yaml's own warning: a nested on-link route here is exactly the bug class this migration fixes.
+  unifiNetworkRef:
+    name: vlan64-nat64

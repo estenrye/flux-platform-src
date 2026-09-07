@@ -1,0 +1,106 @@
+---
+# ZFS mirror pool + datasets + ARC cap. Ports prep-kvm-host.sh's ZFS step,
+# including its safety refusals -- this will NOT touch a disk that already
+# carries partitions or a foreign ZFS/filesystem label, same as the script.
+
+- name: Check whether the ZFS pool already exists
+  ansible.builtin.command:
+    cmd: "zpool list {{ kvm_host_prep_pool }}"
+  register: kvm_host_prep_zpool_check
+  changed_when: false
+  failed_when: false
+
+- name: Create the ZFS mirror pool (only when it doesn't already exist)
+  when: kvm_host_prep_zpool_check.rc != 0
+  block:
+    - name: Verify each vdev disk exists
+      ansible.builtin.stat:
+        path: "/dev/{{ item }}"
+      loop: "{{ kvm_host_prep_disks }}"
+      register: kvm_host_prep_disk_stat
+      failed_when: not kvm_host_prep_disk_stat.stat.exists
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Refuse any disk that already has partitions
+      ansible.builtin.command:
+        cmd: "lsblk -no NAME /dev/{{ item }}"
+      loop: "{{ kvm_host_prep_disks }}"
+      register: kvm_host_prep_lsblk_check
+      changed_when: false
+      failed_when: kvm_host_prep_lsblk_check.stdout_lines | length > 1
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Refuse any disk that carries a filesystem/ZFS label
+      ansible.builtin.command:
+        cmd: "blkid /dev/{{ item }}"
+      loop: "{{ kvm_host_prep_disks }}"
+      register: kvm_host_prep_blkid_check
+      changed_when: false
+      failed_when: kvm_host_prep_blkid_check.rc == 0
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Resolve stable by-id paths for each vdev disk
+      ansible.builtin.shell:
+        cmd: >-
+          find /dev/disk/by-id -lname "*/{{ item }}"
+          \( -name 'nvme-*' ! -name '*_[0-9]' \) | sort | head -1
+      loop: "{{ kvm_host_prep_disks }}"
+      register: kvm_host_prep_byid
+      changed_when: false
+      failed_when: kvm_host_prep_byid.stdout | length == 0
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Create the ZFS mirror pool
+      ansible.builtin.command:
+        cmd: >-
+          zpool create -o ashift=12 {{ kvm_host_prep_pool }} mirror
+          {{ kvm_host_prep_byid.results | map(attribute='stdout') | join(' ') }}
+
+- name: Set compression/atime on the pool
+  ansible.builtin.command:
+    cmd: "zfs set compression=lz4 atime=off {{ kvm_host_prep_pool }}"
+  changed_when: true
+
+- name: Check whether the vms/appliances datasets exist
+  ansible.builtin.command:
+    cmd: "zfs list {{ kvm_host_prep_pool }}/{{ item }}"
+  loop: [vms, appliances]
+  register: kvm_host_prep_dataset_check
+  changed_when: false
+  failed_when: false
+  loop_control:
+    label: "{{ item }}"
+
+- name: Create the vms/appliances datasets
+  ansible.builtin.command:
+    cmd: "zfs create {{ kvm_host_prep_pool }}/{{ item.item }}"
+  loop: "{{ kvm_host_prep_dataset_check.results }}"
+  when: item.rc != 0
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Cap ZFS ARC at the configured max (runtime)
+  ansible.builtin.shell:
+    cmd: "echo {{ kvm_host_prep_arc_max_bytes }} > /sys/module/zfs/parameters/zfs_arc_max"
+  changed_when: true
+
+# "8 GiB" below is a literal string, same as prep-kvm-host.sh's own comment
+# text (it doesn't compute a human-readable size from ARC_MAX_BYTES either)
+# -- update it by hand if kvm_host_prep_arc_max_bytes ever changes.
+- name: Cap ZFS ARC at the configured max (persistent across reboots)
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/zfs-arc.conf
+    mode: "0644"
+    content: |
+      # ARC capped at 8 GiB: guest RAM is over-committed on this host (M1 design 7.3)
+      options zfs zfs_arc_max={{ kvm_host_prep_arc_max_bytes }}
+  register: kvm_host_prep_arc_conf
+
+- name: Refresh initramfs if the ARC cap config changed
+  ansible.builtin.command:
+    cmd: "update-initramfs -u -k {{ ansible_kernel }}"
+  when: kvm_host_prep_arc_conf.changed

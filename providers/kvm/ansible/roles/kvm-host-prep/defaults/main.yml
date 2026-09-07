@@ -1,0 +1,77 @@
+# Host facts (disks, ZFS pool name, ARC cap) and network.yaml-derived
+# addressing are passed in by the caller (playbooks/kvm-host-prep.yml),
+# which loads providers/kvm/hosts.yaml + network.yaml directly rather than
+# duplicating a third copy of values already recorded there -- same
+# single-source-of-truth reasoning those files' own headers state. The
+# fail-fast asserts below exist because this role has no sane default for
+# any of them; a second host would need its own inventory entry passing
+# real values, not new defaults here.
+kvm_host_prep_expected_host: ""
+kvm_host_prep_disks: []
+kvm_host_prep_pool: ""
+kvm_host_prep_arc_max_bytes: ""
+kvm_host_prep_ula_address: ""
+kvm_host_prep_infra_subnet: ""
+kvm_host_prep_gateway_ula: ""
+kvm_host_prep_truenas_ula: ""
+
+# network.yaml's `allocations.kvm_host` only records the ULA (`ula:`) --
+# unlike the numbered cluster node addresses, it has no explicit GUA
+# counterpart to derive from. This mirrors kvm_host_prep_ula_address's host
+# suffix (::2000) under network.yaml's gua_prefix, kept as an explicit,
+# manually-tracked value since there's nothing to compute it from. GUA
+# RENUMBER: update this alongside network.yaml on ISP re-delegation
+# (docs/runbooks/gua-prefix-renumber.md) -- it will NOT follow automatically.
+kvm_host_prep_gua_address: "2607:3640:1064:270::2000"
+
+# Hardware-specific: mf-ms-a2-01's 2x Intel X710 10GbE ports (hosts.yaml).
+# Not derived from any YAML source of truth (interface names aren't
+# recorded there, only "2x X710 10GbE" as a text comment) and not
+# parameterized per-host yet -- same position providers/kvm/ansible/roles/
+# bridge/defaults/main.yml is in, for the same reason (one host today).
+kvm_host_prep_bond_name: bond0
+kvm_host_prep_bond_members:
+  - enp5s0f0
+  - enp5s0f1
+kvm_host_prep_bridge_name: br0
+
+# Two bridges that predate this project and carry the host's own general
+# LAN/management connectivity (br61 holds the host's default route) --
+# observed on the live host, not part of the `controlplane` cluster design,
+# and not recorded in network.yaml (which only documents VLAN 100). Captured
+# here verbatim so this role's rendered netplan config is a byte-for-byte,
+# safe-to-reapply match of the live file -- NOT because this role considers
+# them its own to own; see docs/runbooks/kvm-host-prep-ansible.md's "Out of
+# scope" section before changing either.
+kvm_host_prep_extra_bridges_yaml: |
+      br5:
+        addresses:
+        - 10.6.0.150/24
+        interfaces:
+        - bond0.5
+        nameservers:
+          addresses: []
+          search: []
+      br61:
+        addresses:
+        - 10.5.176.1/16
+        interfaces:
+        - bond0.61
+        nameservers:
+          addresses:
+          - 10.5.0.1
+          - 1.1.1.1
+          - 8.8.8.8
+          search:
+          - rye.ninja
+          - usmnblm01.rye.ninja
+        routes:
+        - to: default
+          via: 10.5.0.1
+kvm_host_prep_extra_vlans_yaml: |
+      bond0.5:
+        id: 5
+        link: bond0
+      bond0.61:
+        id: 61
+        link: bond0

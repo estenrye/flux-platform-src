@@ -12,6 +12,7 @@ IPv6-only Talos Linux cluster on the `mf-ms-a2-01` KVM host. Design:
 | [hosts.yaml](hosts.yaml) | KVM host inventory (list-shaped so a second host slots in later) |
 | [unifi-frr.conf](unifi-frr.conf) | FRR BGP config uploaded by hand to the UniFi gateway (drift-checked by tests) |
 | [scripts/prep-kvm-host.sh](scripts/prep-kvm-host.sh) | One-time host prep: ZFS mirror `vmpool`, ARC cap, KSM, libvirt pools |
+| [ansible/roles/kvm-host-prep/](ansible/roles/kvm-host-prep/) | Ansible port of the above + base bond0/br0 networking; drift-check tool (docs/runbooks/kvm-host-prep-ansible.md) |
 | [scripts/etcd-snapshot.*](scripts/) | 6-hourly etcd snapshot to TrueNAS (systemd timer on the host) |
 | [scripts/zfs-replicate-vms.*](scripts/) | Nightly zvol replication to TrueNAS (systemd timer on the host) |
 | [modules/talos-vm/](modules/talos-vm/) | zvol + libvirt domain; boots factory ISO only while the disk is empty |
@@ -58,9 +59,11 @@ tofu -chdir=providers/kvm/controlplane plan \
 
 ## Design invariants worth knowing before touching anything
 
-- **No IPv4 on cluster nodes.** The NAT64 appliance (`fd97:45c2:b3a1:100::64`)
-  is the single dual-stack exception; nodes reach IPv4-only endpoints
-  (GitHub, ghcr.io) through DNS64 + `64:ff9b::/96`.
+- **No IPv4 on cluster nodes.** The NAT64 appliance (`fd97:45c2:b3a1:64::64`,
+  its own dedicated VLAN 64 as of 2026-09-06 — see
+  `docs/adr/0023-ipv6-only-cluster-ula-nat64.md`) is the single dual-stack
+  exception; nodes reach IPv4-only endpoints (GitHub, ghcr.io) through
+  DNS64 + `64:ff9b::/96`.
 - **ULA is identity, GUA is reachability.** Node addresses, etcd, and the
   apiserver VIP live on ULA and survive ISP renumbering; anything derived
   from `gua_prefix` must stay derived (runbook: gua-prefix-renumber).

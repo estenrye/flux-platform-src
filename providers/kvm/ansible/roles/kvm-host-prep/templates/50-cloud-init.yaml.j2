@@ -1,0 +1,32 @@
+network:
+  bonds:
+    {{ kvm_host_prep_bond_name }}:
+      interfaces:
+{% for iface in kvm_host_prep_bond_members %}
+      - {{ iface }}
+{% endfor %}
+      parameters:
+        lacp-rate: fast
+        mode: 802.3ad
+        transmit-hash-policy: layer2+3
+  bridges:
+    {{ kvm_host_prep_bridge_name }}:
+      dhcp6: true
+      interfaces:
+      - {{ kvm_host_prep_bond_name }}
+      addresses:
+      - {{ kvm_host_prep_ula_address }}/64
+      - {{ kvm_host_prep_gua_address }}/64
+      routes:
+      - to: {{ kvm_host_prep_infra_subnet }}
+        via: {{ kvm_host_prep_gateway_ula }}
+      - to: {{ kvm_host_prep_truenas_ula }}/128
+        scope: link
+        from: {{ kvm_host_prep_ula_address }}
+{{ kvm_host_prep_extra_bridges_yaml | indent(4, true) }}  ethernets:
+{% for iface in kvm_host_prep_bond_members %}
+    {{ iface }}: {}
+{% endfor %}
+  version: 2
+  vlans:
+{{ kvm_host_prep_extra_vlans_yaml | indent(4, true) }}  wifis: {}

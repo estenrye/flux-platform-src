@@ -186,13 +186,27 @@ done
 node_names=()
 node_addrs=()
 render_node() {
-  local name="$1" ula="$2" role="$3" base vip_block=""
+  local name="$1" ula="$2" role="$3" base vip_block="" routes_block=""
   base="${RENDER_DIR}/controlplane.yaml"
   [ "${role}" = "worker" ] && base="${RENDER_DIR}/worker.yaml"
   if [ "${role}" = "controlplane" ]; then
     vip_block="
         vip:
           ip: ${APISERVER_VIP}"
+  fi
+  # An explicit route to NAT64_ULA is only installable when it's actually
+  # on-link for this node's own subnet -- the kernel rejects an off-link
+  # route outright ("no route to host"), which blocks cri/kubelet/etcd
+  # from ever starting. Same bug already fixed in bootstrap.sh
+  # (images/docker/talos-cluster-bootstrap/bootstrap.sh, "CORRECTED
+  # 2026-08-05"). Always false for controlplane after nat64-01 moved to
+  # its own VLAN (2026-09-06) -- nodes fall back to their existing
+  # default route, now symmetric since nat64-01 is genuinely off-link.
+  if [ "${NAT64_ULA%%::*}" = "${INFRA_SUBNET%%::*}" ]; then
+    routes_block="
+        routes:
+          - network: ${NAT64_PREFIX}
+            gateway: ${NAT64_ULA}"
   fi
   cat > "${RENDER_DIR}/patch-${name}.yaml" <<EOF
 machine:
@@ -205,10 +219,7 @@ machine:
           physical: true
         dhcp: false
         addresses:
-          - ${ula}/64
-        routes:
-          - network: ${NAT64_PREFIX}
-            gateway: ${NAT64_ULA}${vip_block}
+          - ${ula}/64${routes_block}${vip_block}
 EOF
   talosctl machineconfig patch "${base}" \
     --patch "@${RENDER_DIR}/patch-${name}.yaml" \

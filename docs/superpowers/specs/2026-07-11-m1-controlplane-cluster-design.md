@@ -5,6 +5,19 @@ Status: Approved design, ready for implementation
 Parent: [fable-5-arch-plan.md](fable-5-arch-plan.md) milestone M1, [fable-5-arch-spec.md](fable-5-arch-spec.md)
 Executor: Sonnet 4.6 under human review
 
+**Superseded 2026-09-06** (address + one design claim below, not the
+architecture): `nat64-01` moved off shared VLAN 100 to its own dedicated
+VLAN 64 — see `docs/adr/0023-ipv6-only-cluster-ula-nat64.md`'s amendment
+and `docs/superpowers/plans/2026-09-06-migrate-nat64-appliance-to-vlan-64.md`.
+Every `fd97:45c2:b3a1:100::64` below is now `fd97:45c2:b3a1:64::64`.
+More significantly, §6.2's claim that machine configs "carry a static
+route" to it is no longer true for `controlplane` specifically: that
+route is only installable when the appliance is on-link (it caused a real
+outage the one other place this fleet tried an off-link version — see the
+migration plan) — nodes now reach it via their existing default route
+instead, which is symmetric now that the appliance isn't sharing their
+VLAN.
+
 ## 1. Goal
 
 Build the new fleet control plane cluster — `controlplane`, trust domain

@@ -40,7 +40,7 @@ write_files:
       # tayga's own addresses inside the translator (must not collide with
       # host addresses):
       ipv4-addr ${tayga_pool_gw}
-      ipv6-addr fd97:45c2:b3a1:100::6401
+      ipv6-addr ${tayga_ula_prefix}::6401
       prefix ${nat64_prefix}
       dynamic-pool ${tayga_pool_cidr}
       data-dir /var/spool/tayga
@@ -54,7 +54,7 @@ write_files:
       # NAT44 for the pool is handled explicitly in /etc/nftables.conf.
       CONFIGURE_NAT44="no"
       IPV4_TUN_ADDR="192.168.255.2"
-      IPV6_TUN_ADDR="fd97:45c2:b3a1:100::6402"
+      IPV6_TUN_ADDR="${tayga_ula_prefix}::6402"
       DAEMON_OPTS=""
 
   - path: /etc/nftables.conf
