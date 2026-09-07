@@ -1,0 +1,25 @@
+---
+- name: Install conservative ksmtuned profile (RAM over-commit tuning, M1 design 7.3)
+  ansible.builtin.copy:
+    dest: /etc/ksmtuned.conf
+    mode: "0644"
+    content: |
+      # Conservative KSM tuning for RAM over-commit (M1 design 7.3).
+      # Longer sleep + smaller page boost than defaults: trade dedup latency for CPU.
+      KSM_MONITOR_INTERVAL=60
+      KSM_SLEEP_MSEC=200
+      KSM_NPAGES_BOOST=300
+      KSM_NPAGES_DECAY=-50
+      KSM_NPAGES_MIN=64
+      KSM_NPAGES_MAX=1250
+      KSM_THRES_COEF=20
+  notify: restart ksmtuned
+
+- name: Enable and start ksm + ksmtuned
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  loop:
+    - ksm
+    - ksmtuned

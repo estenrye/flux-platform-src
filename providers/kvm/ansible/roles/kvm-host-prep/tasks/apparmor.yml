@@ -1,0 +1,49 @@
+---
+# virt-aa-helper whitelists the /dev/zvol/... symlink but qemu opens the
+# resolved /dev/zdN device (DENIED without a rule), and it skips
+# <disk type="volume"> sources from custom dir pools (controlplane-images
+# for the Talos ISO, nat64-images for the appliance disk/cloud-init).
+#
+# These rules go in the /etc/apparmor.d/local/ include -- NOT the
+# distro-shipped abstraction -- so an apt upgrade of libvirt/apparmor
+# cannot silently drop them (which would leave qemu unable to open the
+# zvols after the next reboot). Ports prep-kvm-host.sh's AppArmor step
+# exactly.
+
+- name: Ensure the local AppArmor abstractions directory exists
+  ansible.builtin.file:
+    path: /etc/apparmor.d/local/abstractions
+    state: directory
+    mode: "0755"
+
+- name: Remove any zvol/dir-pool rules previously appended to the shipped abstraction
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/abstractions/libvirt-qemu
+    regexp: "{{ item }}"
+    state: absent
+  loop:
+    - '^\s*/dev/zd\[0-9\]\* rwk,\s*$'
+    - '^\s*/var/lib/libvirt/\*-images/\*\* rwk,\s*$'
+
+- name: Ensure the local libvirt-qemu AppArmor include exists
+  ansible.builtin.file:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+    state: touch
+    mode: "0644"
+    modification_time: preserve
+    access_time: preserve
+
+- name: Allow qemu to open zvol block devices and custom dir-pool media
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+    line: "  {{ item }}"
+    insertafter: EOF
+  loop:
+    - "/dev/zd[0-9]* rwk,"
+    - "/var/lib/libvirt/*-images/** rwk,"
+  register: kvm_host_prep_apparmor_local
+
+- name: Reload AppArmor if the local include changed
+  ansible.builtin.command:
+    cmd: systemctl reload apparmor
+  when: kvm_host_prep_apparmor_local.changed

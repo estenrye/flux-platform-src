@@ -1,0 +1,15 @@
+galaxy_info:
+  role_name: kvm_host_prep
+  description: >-
+    Reverse-engineered from the live mf-ms-a2-01 host (2026-09-01): ports
+    providers/kvm/scripts/prep-kvm-host.sh (ZFS mirror, ARC cap, KSM,
+    AppArmor, libvirt ZFS storage pools) to Ansible, and captures the base
+    bond0/br0 netplan config that predates all of this project's tooling and
+    had never been recorded anywhere before -- see
+    docs/runbooks/kvm-host-prep-ansible.md.
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - "22.04"
+dependencies: []

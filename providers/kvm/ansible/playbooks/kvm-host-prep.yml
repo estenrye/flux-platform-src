@@ -1,0 +1,49 @@
+---
+# Ansible equivalent of providers/kvm/scripts/prep-kvm-host.sh, plus the
+# base bond0/br0 networking that predates all of this project's tooling and
+# had never been captured anywhere before -- reverse-engineered from the
+# live mf-ms-a2-01 host, 2026-09-01. See
+# docs/runbooks/kvm-host-prep-ansible.md before running this; it covers
+# what's in scope, what's deliberately NOT (br5/br61/br200/br250test, kcli,
+# netdata, podman, openvswitch -- all observed on the host but unrelated to
+# this project), and how this relates to the existing bash-script runbook
+# (docs/runbooks/kvm-host-prep.md).
+#
+# Loads providers/kvm/hosts.yaml + network.yaml directly (rather than
+# duplicating disks/pool/ARC/addressing a third time in inventory) so
+# those files stay the single source of truth they already claim to be.
+#
+# Idempotent -- verified against the live host to render a byte-identical
+# netplan config and a no-op ZFS/libvirt/KSM/AppArmor state as of
+# 2026-09-01. Safe to re-run, but read the runbook's blast-radius notes
+# before running this against a host with a live cluster on it.
+#
+# Usage (from providers/kvm/ansible/, so ansible.cfg's roles_path/inventory
+# defaults apply):
+#   cd providers/kvm/ansible
+#   ansible-playbook playbooks/kvm-host-prep.yml --limit mf-ms-a2-01
+#
+# Tags: packages, network, apparmor, zfs, ksm, libvirt-pools -- run a subset
+# with --tags, e.g. --tags network to touch only the netplan config.
+
+- name: KVM host prep (packages, ZFS/ARC/KSM/AppArmor, libvirt pools, base network)
+  hosts: kvm_hosts
+  become: true
+  gather_facts: true
+
+  vars:
+    kvm_prep_hosts_yaml: "{{ (lookup('file', playbook_dir + '/../../hosts.yaml') | from_yaml).hosts }}"
+    kvm_prep_network_yaml: "{{ lookup('file', playbook_dir + '/../../network.yaml') | from_yaml }}"
+    kvm_prep_host_facts: "{{ kvm_prep_hosts_yaml | selectattr('name', 'equalto', inventory_hostname) | first }}"
+
+  roles:
+    - role: kvm-host-prep
+      vars:
+        kvm_host_prep_expected_host: "{{ kvm_prep_host_facts.name }}"
+        kvm_host_prep_disks: "{{ kvm_prep_host_facts.vm_disks }}"
+        kvm_host_prep_pool: "{{ kvm_prep_host_facts.zfs.pool }}"
+        kvm_host_prep_arc_max_bytes: "{{ kvm_prep_host_facts.zfs.arc_max_bytes }}"
+        kvm_host_prep_ula_address: "{{ kvm_prep_network_yaml.allocations.kvm_host.ula }}"
+        kvm_host_prep_infra_subnet: "{{ kvm_prep_network_yaml.allocations.infra_subnet }}"
+        kvm_host_prep_gateway_ula: "{{ kvm_prep_network_yaml.vlan100.ipv6_gateway_ula }}"
+        kvm_host_prep_truenas_ula: "{{ kvm_prep_network_yaml.allocations.truenas.ula_reserved }}"

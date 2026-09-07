@@ -3,6 +3,11 @@
 Scope: preparing a fresh (or replacement) KVM host to carry the
 `controlplane` cluster. Design: M1 design §3, §5.1, §5.2.
 
+An Ansible port of this script (plus the base bond0/br0 networking, never
+captured as code before it) exists for drift-checking an already-prepped
+host — see `docs/runbooks/kvm-host-prep-ansible.md`. It doesn't replace the
+steps below for a new host.
+
 ## Prerequisites
 
 - Ubuntu 22.04+, libvirt installed, `automation-user` with libvirt group and

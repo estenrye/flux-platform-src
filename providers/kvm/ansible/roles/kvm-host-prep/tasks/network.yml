@@ -1,0 +1,33 @@
+---
+# Base host networking: LACP bond0 (2x 10GbE, 802.3ad) + br0 (native VLAN
+# 100, the `controlplane` cluster's network) plus the two other bridges
+# (br5, br61) that predate this project and live in the same file. This is
+# the piece that was NEVER captured in code anywhere before this role --
+# not by prep-kvm-host.sh, not by providers/kvm/ansible/roles/bridge (which
+# explicitly creates *sibling* VLAN bridges on this same bond, not br0
+# itself). See docs/runbooks/kvm-host-prep-ansible.md before touching this
+# task -- br0 carries the `controlplane` cluster's only network path, and
+# br61 carries the host's own default route.
+#
+# The rendered file is verified byte-for-byte identical to the live
+# /etc/netplan/50-cloud-init.yaml as of 2026-09-01 (see the runbook), so a
+# first run against that exact host is a confirmed no-op. It will NOT stay
+# a no-op forever -- if br5/br61 or their addressing change by hand later,
+# this task and the live file will drift apart until someone updates
+# kvm_host_prep_extra_bridges_yaml/kvm_host_prep_extra_vlans_yaml to match.
+
+- name: Render base netplan config (bond0, br0, br5, br61)
+  ansible.builtin.template:
+    src: 50-cloud-init.yaml.j2
+    dest: /etc/netplan/50-cloud-init.yaml
+    mode: "0600"
+  register: kvm_host_prep_netplan
+
+- name: Apply netplan
+  ansible.builtin.command:
+    cmd: netplan apply
+  when: kvm_host_prep_netplan.changed
+  # netplan apply always "succeeds" regardless of whether anything changed --
+  # gating on the file write is what makes this idempotent (same idiom as
+  # providers/kvm/ansible/roles/bridge/tasks/main.yml).
+  changed_when: true

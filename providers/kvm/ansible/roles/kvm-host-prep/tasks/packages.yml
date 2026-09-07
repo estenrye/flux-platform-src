@@ -1,0 +1,34 @@
+---
+# Base KVM/libvirt packages -- these predate prep-kvm-host.sh (which assumes
+# they're already present) but were never captured anywhere as code before
+# this role.
+- name: Install KVM/libvirt/QEMU packages
+  ansible.builtin.apt:
+    name:
+      - qemu-kvm
+      - qemu-utils
+      - libvirt-daemon-system
+      - libvirt-clients
+      - virtinst
+      - ovmf
+      - bridge-utils
+    state: present
+    update_cache: true
+
+# Mirrors prep-kvm-host.sh's own package + restart step exactly: Ubuntu
+# ships libvirt's ZFS storage backend as a separate driver package, and
+# without it pool-define fails with "missing backend for pool type (zfs)".
+- name: Install ZFS/KSM tooling and libvirt's ZFS storage driver
+  ansible.builtin.apt:
+    name:
+      - zfsutils-linux
+      - ksmtuned
+      - libvirt-daemon-driver-storage-zfs
+    state: present
+  register: kvm_host_prep_zfs_packages
+
+- name: Restart libvirtd to load the ZFS storage backend (domains keep running)
+  ansible.builtin.systemd:
+    name: libvirtd
+    state: restarted
+  when: kvm_host_prep_zfs_packages.changed
