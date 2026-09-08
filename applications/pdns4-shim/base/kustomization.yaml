@@ -25,3 +25,18 @@ resources:
   - resources/gateway.yaml
   - resources/http-route.yaml
   - resources/network-policy.yaml
+
+patches:
+  - target:
+      kind: Deployment
+      name: pdns4-shim
+    path: patches/deployment.yaml
+
+images:
+  # Pinned by digest for real (see values.yaml's comment on why the tag
+  # alone can't be "0.1.0" here) -- also satisfies CKV_K8S_43 regardless of
+  # the tag string the chart renders. amd64/arm64 image index published
+  # 2026-09-08 under the "0.1"/"0"/"latest"/"main" tags (Docker Hub content
+  # API confirms "0.1.0" resolves to this chart's own Helm artifact instead).
+  - name: docker.io/estenrye/pdns4-shim
+    digest: sha256:0a3b2c7ad452e6f113c68ee5ab1782c90d01f957d684dde7cae1310ec42f665d
