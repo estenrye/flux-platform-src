@@ -34,7 +34,15 @@ config:
   # Empty -> defaults to the release namespace (external-dns), where
   # ExternalDNS's `crd` source watches cluster-wide anyway.
   k8sNamespace: ""
-  listenAddr: "0.0.0.0:8081"
+  # "[::]" (IPv6 wildcard), not "0.0.0.0": the shim binds exactly one
+  # tokio::net::TcpListener socket (src/main.rs), and on Linux an IPv6
+  # wildcard socket is dual-stack by default (accepts IPv4-mapped
+  # connections too) unless IPV6_V6ONLY is set, which this binary never
+  # does. "0.0.0.0" would only accept IPv4. Designate needs to reach this
+  # over both families -- the controlplane cluster's pod network is
+  # IPv6-only, but pdns4-shim.rye.ninja's public DNS record and any
+  # IPv4-only caller arrive via NAT64 (see .bin/create-nat64.sh).
+  listenAddr: "[::]:8081"
   defaultNameservers: "ns1.rye.ninja."
   hostmaster: "hostmaster.rye.ninja."
   # trace: full HTTP request/response bodies and the exact DNSEndpoint CR
