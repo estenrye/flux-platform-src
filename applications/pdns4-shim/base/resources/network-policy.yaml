@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pdns4-shim
+  namespace: external-dns
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: pdns4-shim
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Envoy Gateway (pdns4-shim.rye.ninja HTTPS-terminate listener) forwarding
+    # to the shim's Service.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+      ports:
+        - protocol: TCP
+          port: 8081
+  egress:
+    # apiserver targetPort — post-DNAT rule, see the Calico DNAT memory —
+    # for writing DNSEndpoint objects.
+    - ports:
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

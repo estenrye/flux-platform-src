@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: pdns4-shim
+  description: |-
+    Impersonates the PowerDNS Authoritative Server REST API (v1) so Rackspace's
+    OpenStack Designate pdns4 backend can drive ExternalDNS DNSEndpoint objects
+    instead of talking to a real PowerDNS server. Exposed publicly at
+    pdns4-shim.rye.ninja.
+  tags:
+    - dns
+    - external-dns
+    - designate
+    - powerdns
+    - platform
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

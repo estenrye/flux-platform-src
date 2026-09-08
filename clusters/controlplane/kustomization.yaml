@@ -17,6 +17,11 @@ resources:
   - ../../applications/envoy-gateway/base
   - ../../applications/external-dns/unifi/base
   - ../../applications/external-dns/cloudflare/controlplane
+  # PowerDNS-API shim for Rackspace's OpenStack Designate pdns4 backend --
+  # writes DNSEndpoint objects that the external-dns instances above then
+  # publish. Must render after external-dns/unifi/base (owns the
+  # dnsendpoints.externaldns.k8s.io CRD via includeCRDs: true).
+  - ../../applications/pdns4-shim/base
   - ../../applications/truenas-csi/base
   # M3 step 3: Garage 3-node S3 cluster (50 GiB iSCSI per node). Layout and
   # bucket provisioning handled by the bucket-init job in the controlplane overlay.
@@ -153,6 +158,9 @@ resources:
   # Garage S3 access key (read-only) for openbao-snapshots-sync's off-site
   # mirror to Cloudflare R2 (M3 step 7).
   - secrets/openbao-snapshots-sync-credentials.sops.yaml
+  # Shared secret Designate's pdns4 target sends as X-API-Key to
+  # pdns4-shim.rye.ninja; generated with `openssl rand -hex 32`.
+  - secrets/pdns4-shim-api-key.sops.yaml
   # Cloudflare R2 credential + Garage read-only key for step-ca-db's own
   # off-site mirror (same pattern as step 7, applied to step-ca-db).
   - secrets/cloudflare-r2-step-ca-db-snapshots.sops.yaml

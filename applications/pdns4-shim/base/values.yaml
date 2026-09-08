@@ -1,0 +1,53 @@
+replicaCount: 1
+
+image:
+  repository: docker.io/estenrye/pdns4-shim
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+
+# Grants get/list/watch/create/update/patch/delete on DNSEndpoint objects in
+# the release namespace (external-dns) -- the shim writes these directly,
+# ExternalDNS (external-dns/unifi and external-dns/cloudflare, same
+# namespace, both watch the `crd` source cluster-wide) then publishes them.
+rbac:
+  create: true
+
+# false: external-dns/unifi/base's chart already installs the
+# dnsendpoints.externaldns.k8s.io CRD (includeCRDs: true) and must render
+# before this app in clusters/controlplane/kustomization.yaml.
+installCRDs: false
+
+service:
+  type: ClusterIP
+  port: 8081
+
+config:
+  # Empty -> defaults to the release namespace (external-dns), where
+  # ExternalDNS's `crd` source watches cluster-wide anyway.
+  k8sNamespace: ""
+  listenAddr: "0.0.0.0:8081"
+  defaultNameservers: "ns1.rye.ninja."
+  hostmaster: "hostmaster.rye.ninja."
+  logLevel: "info"
+
+# Production pattern per the chart's own values.yaml comment: keep the key
+# out of `helm get values`/release history. Value lives in
+# clusters/controlplane/secrets/pdns4-shim-api-key.sops.yaml -- coordinate
+# rotations with whatever configures Designate's pdns4 backend target.
+apiKey:
+  existingSecret: pdns4-shim-api-key
+  existingSecretKey: API_KEY
+
+otel:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
