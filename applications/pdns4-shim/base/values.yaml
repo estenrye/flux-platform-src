@@ -1,0 +1,71 @@
+replicaCount: 1
+
+# tag is "0.1" (floating minor), not "0.1.0": that exact tag is occupied by
+# this same chart's own OCI Helm artifact (oci://.../pdns4-shim:0.1.0) --
+# defaulting to .Chart.AppVersion (0.1.0) would resolve to the Helm chart
+# blob, not a container image. Pinned for real by digest below via
+# kustomization.yaml's `images:` override, which also satisfies
+# CKV_K8S_43 regardless of what tag is written here.
+image:
+  repository: docker.io/estenrye/pdns4-shim
+  tag: "0.1"
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+
+# Grants get/list/watch/create/update/patch/delete on DNSEndpoint objects in
+# the release namespace (external-dns) -- the shim writes these directly,
+# ExternalDNS (external-dns/unifi and external-dns/cloudflare, same
+# namespace, both watch the `crd` source cluster-wide) then publishes them.
+rbac:
+  create: true
+
+# false: external-dns/unifi/base's chart already installs the
+# dnsendpoints.externaldns.k8s.io CRD (includeCRDs: true) and must render
+# before this app in clusters/controlplane/kustomization.yaml.
+installCRDs: false
+
+service:
+  type: ClusterIP
+  port: 8081
+
+config:
+  # Empty -> defaults to the release namespace (external-dns), where
+  # ExternalDNS's `crd` source watches cluster-wide anyway.
+  k8sNamespace: ""
+  # "[::]" (IPv6 wildcard), not "0.0.0.0": the shim binds exactly one
+  # tokio::net::TcpListener socket (src/main.rs), and on Linux an IPv6
+  # wildcard socket is dual-stack by default (accepts IPv4-mapped
+  # connections too) unless IPV6_V6ONLY is set, which this binary never
+  # does. "0.0.0.0" would only accept IPv4. Designate needs to reach this
+  # over both families -- the controlplane cluster's pod network is
+  # IPv6-only, but pdns4-shim.rye.ninja's public DNS record and any
+  # IPv4-only caller arrive via NAT64 (see .bin/create-nat64.sh).
+  listenAddr: "[::]:8081"
+  defaultNameservers: "ns1.rye.ninja."
+  hostmaster: "hostmaster.rye.ninja."
+  # trace: full HTTP request/response bodies and the exact DNSEndpoint CR
+  # written to Kubernetes, on top of info's per-RecordSet summary -- useful
+  # while verifying the Designate pdns4 integration. Dial back to "info"
+  # once that's confirmed working; trace is chatty for steady-state.
+  logLevel: "trace"
+
+# Production pattern per the chart's own values.yaml comment: keep the key
+# out of `helm get values`/release history. Value lives in
+# clusters/controlplane/secrets/pdns4-shim-api-key.sops.yaml -- coordinate
+# rotations with whatever configures Designate's pdns4 backend target.
+apiKey:
+  existingSecret: pdns4-shim-api-key
+  existingSecretKey: API_KEY
+
+otel:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
