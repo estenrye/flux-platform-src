@@ -31,7 +31,11 @@ config:
   listenAddr: "0.0.0.0:8081"
   defaultNameservers: "ns1.rye.ninja."
   hostmaster: "hostmaster.rye.ninja."
-  logLevel: "info"
+  # trace: full HTTP request/response bodies and the exact DNSEndpoint CR
+  # written to Kubernetes, on top of info's per-RecordSet summary -- useful
+  # while verifying the Designate pdns4 integration. Dial back to "info"
+  # once that's confirmed working; trace is chatty for steady-state.
+  logLevel: "trace"
 
 # Production pattern per the chart's own values.yaml comment: keep the key
 # out of `helm get values`/release history. Value lives in
