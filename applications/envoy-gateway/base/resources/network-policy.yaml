@@ -91,6 +91,9 @@ spec:
         # declared 443, since Calico evaluates egress post-DNAT).
         - protocol: TCP
           port: 8443
+        # pdns4-shim backend (pdns4-shim.rye.ninja HTTPS-terminate).
+        - protocol: TCP
+          port: 8081
         - protocol: TCP
           port: 53
         - protocol: UDP
