@@ -5,6 +5,15 @@ metadata:
   namespace: envoy-gateway-system
 spec:
   mergeGateways: true
+  # Root cause found live 2026-09-09 (docs/memory/node-gua-onlink-reply-unreliable.md):
+  # EnvoyProxy.spec.ipFamily defaults to IPv4-only if unset -- on this
+  # IPv6-only cluster that meant every listener (including the readiness
+  # probe on 19003) bound to 0.0.0.0 instead of [::], so kubelet's probe
+  # (hitting the pod's real IPv6 address) could never connect, and neither
+  # could real client traffic. custom-proxy-config's fleet only avoided
+  # this because it carries the same setting live but undeclared in git
+  # (now fixed alongside this).
+  ipFamily: IPv6
   # LAN-internal-only Envoy fleet, separate from custom-proxy-config
   # (merged-eg's GUA-ingress fleet). Pinning the shared Service's
   # LoadBalancer IP to Calico's lb-internal-ula-routed IPPool means every
