@@ -1,6 +1,6 @@
 ---
 name: node-gua-onlink-reply-unreliable
-description: A GUA-sourced connection from a VLAN-100 client (in the same /64 TFiber's PD delegates to VLAN 100) to a fleet ingress VIP completes its TCP handshake but has the next packet silently dropped, every time — NDP/on-link delivery itself is reliable, confirmed via 30/30 ping and live tcpdump. A ULA-sourced connection from the same client succeeds reliably (proven via curl --interface A/B test) and is the validated, not-yet-implemented fix direction (internal Gateway + split-horizon DNS), no Talos-side change needed.
+description: DISPROVEN 2026-09-09 that this is GUA-specific — a Talos node's SYN-ACK reply to ANY genuinely VLAN-100-resident peer (GUA or ULA address, since ens3 carries connected routes for both VLAN 100 prefixes) gets silently dropped after the handshake, every time. The "move to a ULA-internal VIP" fix (PR #189-191) only helps non-VLAN-100 clients — it does NOT fix the real Designate/pcd-ce-hyp-01 consumer, which is itself VLAN-100-resident and hits the identical bug against the new ULA VIP. Still not fixed; the three original 2026-09-08 candidate directions (Talos-side policy routing, disabling on-link/NDP behavior, TFiber/gateway-side change) are back in play.
 metadata:
   type: project
 ---
@@ -130,46 +130,65 @@ Designate host") sharpened the diagnosis:
   comment. The comment should be corrected/removed in a follow-up PR to
   avoid re-confusing this investigation later.
 
-## Fix direction now validated, not yet implemented
+## ULA-VIP fix built (PR #189, #190, #191), then disproven as a real fix, 2026-09-09
 
-Because the real Designate caller is confirmed VLAN-100-resident (not
-internet-external), the ULA-source workaround just proven live is a real,
-low-risk candidate fix — no Talos machine-config or kernel-level change
-needed on any of the 6 nodes:
+The "move `pdns4-shim` to a ULA-internal VIP" direction below was designed,
+built, and landed across three PRs — worth keeping for the real bugs it
+fixed, but it **does not solve the connectivity problem for the actual
+consumer**.
 
-- **Envoy Gateway's shared LoadBalancer Service currently has only one
-  VIP**: `envoy-merged-eg-668ac7ae` in `envoy-gateway-system`, GUA-only
-  (`2607:3640:1064:27f::9280`, the `lb-ingress-gua-routed`/`ippool-lb-ingress-routed`
-  pool). `mergeGateways: true` means every Gateway-fronted hostname in the
-  fleet shares this one Service/VIP — there is currently no
-  ULA-internal-routed counterpart wired up for it, unlike the pattern
-  ADR-22 already established at the IPPool level (`ippool-lb-internal(-routed)`
-  exists but nothing currently binds a Gateway listener to it).
-- **Candidate fix, not yet built**: stand up an internal-facing Gateway
-  (or a second listener/Service bound to the ULA-internal IPPool) for
-  `pdns4-shim.rye.ninja` (and potentially other Gateway-fronted hostnames
-  VLAN-100 clients call), plus split-horizon DNS so VLAN-100-resident
-  callers resolve to the ULA VIP while genuine internet clients keep
-  resolving to the GUA ingress VIP. TLS should still terminate correctly
-  either way since Envoy matches by SNI/Host header, not by which VIP was
-  hit.
-- Not yet evaluated: whether this generalizes cleanly to a
-  fleet-wide split-horizon policy for all Gateway-fronted hostnames, or
-  should stay scoped to just `pdns4-shim` for now. Also not yet checked:
-  whether Calico/Kubernetes Services support a clean way to give one
-  Service two IPv6 LB addresses (one GUA, one ULA) versus needing a
-  wholly separate internal Gateway/Service object.
-- **Still open, deliberately not pursued given the above**: the three
-  2026-09-08 candidate directions (Talos-side policy routing, disabling
-  on-link/NDP behavior fleet-wide, TFiber/gateway-side changes) — the
-  ULA-source fix is strictly simpler and lower-risk than any of them, so
-  they're superseded unless the ULA approach turns out not to generalize.
-- Worth testing whether this reproduces identically for other GUA-fronted
+- **What got built**: a new `internal-eg` GatewayClass/`EnvoyProxy`
+  (`applications/envoy-gateway/base/resources/internal-proxy-config.envoyproxy.yaml`)
+  whose Service is pinned to the `lb-internal-ula-routed` IPPool via
+  Calico's `projectcalico.org/ipv6pools` annotation (not
+  `cni.projectcalico.org/ipv6pools` — that prefix is for pod IPAM, silently
+  ignored for Services; wasted one full PR cycle discovering this),
+  `externalTrafficPolicy: Cluster` (2 lightweight replicas instead of
+  mirroring `merged-eg`'s 6-replica/required-anti-affinity ECMP mitigation,
+  which starved a near-capacity node), and — the real blocker —
+  `spec.ipFamily: IPv6` (undocumented anywhere in git for the *existing*
+  `merged-eg` fleet either; it only works because someone set it
+  imperatively on the live object and Flux's server-side-apply doesn't own
+  or revert un-declared fields; both `EnvoyProxy` objects now declare it
+  explicitly). `EnvoyProxy.spec.ipFamily` defaults to **IPv4-only** — on
+  this IPv6-only cluster that silently broke every listener, including the
+  kubelet readiness probe, until fixed.
+- **Why it doesn't fix the real problem**: `pcd-ce-hyp-01` — a real
+  standalone consumer of `pdns4-shim` (`10.45.60.1`, confirmed
+  VLAN-100-resident, `br-tun` interface with both a `fd97:45c2:b3a1:100::/64`
+  ULA and a `2607:3640:1064:270::/64` GUA address, SLAAC-assigned same as
+  every other VLAN-100 host) — hit the **identical bug signature** against
+  the new ULA VIP: `tcpdump` on the Talos node's `ens3` (matching the
+  exact 2026-09-08 GUA-case capture) showed the SYN-ACK repeatedly
+  retransmitted out `ens3`, never ACKed. `ens3` carries a connected route
+  for `fd97:45c2:b3a1:100::/64` (the node's *own* subnet) exactly as it
+  does for the GUA prefix — so a genuinely VLAN-100-resident peer's ULA
+  address is *just as on-link* as its GUA one, and hits the same drop.
+- **Corrected discriminator**: it was never "GUA vs ULA." The 2026-09-08
+  `br200`-forced test succeeded because that source address was on a
+  *different VLAN entirely* (200, not 100) — genuinely off-link with
+  `ens3`'s connected routes for either VLAN-100 prefix. Any client
+  genuinely resident on VLAN 100 — GUA or ULA sourced, doesn't matter —
+  hits this bug against any VIP a Talos node replies to on-link for. Since
+  the real Designate caller and `pcd-ce-hyp-01` are both confirmed
+  VLAN-100-resident, **no VIP-relocation fix can work for them** — the fix
+  has to live at the on-link-reply mechanism itself.
+- **Net assessment**: the three PRs are good infrastructure to keep (fixed
+  three real, independent bugs: the annotation, the oversized replica
+  fleet, the missing `ipFamily`) but do not close out this investigation.
+  The three original 2026-09-08 candidate directions are back in scope:
+  policy-based routing on each Talos node, disabling on-link/NDP-direct
+  behavior for VLAN 100's connected-route prefixes in favor of always
+  routing through the gateway (even for genuinely on-link peers — matching
+  behavior a *normal* router would use is not obviously the same as what a
+  Talos node identity should do here, still needs research), or a
+  TFiber/gateway-side change. None evaluated yet.
+- Worth testing whether this reproduces identically for other Gateway-fronted
   services (`id.rye.ninja`, `ca.rye.ninja`, `sso.rye.ninja`, `bao.rye.ninja`)
-  once the fix direction is implemented — expect yes, same shared Envoy
-  Service.
-- **Blocks `controlplane`'s VLAN 179 migration's final cutover step**
+  — expect yes, since the mechanism is about the *client's* VLAN-100
+  residency, not which Service/VIP is targeted.
+- **Still blocks `controlplane`'s VLAN 179 migration's final cutover step**
   (removing VLAN 100 from the gateway's BGP peer-group) and the original
   goal that started this whole investigation (Designate's automatic retry
   loop successfully creating the pending `usmnblm01.rye.ninja` zone) —
-  neither should proceed until this is fixed.
+  neither should proceed until this is actually fixed.
