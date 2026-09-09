@@ -265,11 +265,14 @@ fleet-wide the same day. Full record:
   manual intervention — `pdns4-shim` logs show
   `"created zone","zone":"usmnblm01.rye.ninja.","status":201`. This is
   the original goal that started this entire investigation.
-- Unblocks `controlplane`'s VLAN 179 migration's final cutover step
+- Unblocked `controlplane`'s VLAN 179 migration's final cutover step
   (removing VLAN 100 from the gateway's BGP peer-group) — see plan
   Task 9 of
-  [2026-09-08-controlplane-bgp-vlan179.md](../superpowers/plans/2026-09-08-controlplane-bgp-vlan179.md),
-  not yet resumed as of this closing update.
+  [2026-09-08-controlplane-bgp-vlan179.md](../superpowers/plans/2026-09-08-controlplane-bgp-vlan179.md).
+  **Done 2026-09-09**: applied by Esten on the UDM-SE, verified live (all
+  6 BGP sessions re-established cleanly on VLAN 179 only, `pdns4-shim`
+  still reachable, full cluster health clean). The VLAN 179 migration is
+  now fully complete.
 - The exact packet-drop mechanism this fix routes around (conntrack?
   driver/NIC offload? something gateway-side?) was never isolated — the
   fix sidesteps it rather than explains it. If VLAN 100's addressing, the

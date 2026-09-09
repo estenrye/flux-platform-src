@@ -281,13 +281,27 @@ surface exists), OpenTofu (`providers/kvm/`), Talos machine config
 
 **Files:** `providers/kvm/unifi-frr.conf`
 
-- [ ] Remove both VLAN 100 listen-range lines
+**DONE 2026-09-09.** Was blocked on
+[docs/memory/node-gua-onlink-reply-unreliable.md](../../memory/node-gua-onlink-reply-unreliable.md)
+(ADR-28) until that was resolved the same day.
+
+- [x] Remove both VLAN 100 listen-range lines
       (`fd97:45c2:b3a1:100::/64` and `2607:3640:1064:270::/64`) from the
-      tracked file.
-- [ ] Manually apply via UniFi UI (same no-API constraint as Task 4).
-- [ ] Verify: `vtysh -c 'show bgp ipv6 unicast summary'` shows only VLAN
+      tracked file. (PR #200)
+- [x] Manually apply via UniFi UI (same no-API constraint as Task 4).
+      Applied by Esten on the UDM-SE.
+- [x] Verify: `vtysh -c 'show bgp ipv6 unicast summary'` shows only VLAN
       179-sourced sessions; re-run one final reproduction pass to confirm
-      nothing regressed.
+      nothing regressed. **Confirmed**: all 6 sessions re-established
+      cleanly on VLAN 179 within seconds of the config reload (same
+      route counts recovered, 18 received/1 sent each), running-config
+      shows only the VLAN 179 listen range. `pdns4-shim.rye.ninja` still
+      reachable (`HTTP 200`, ~84ms) from a VLAN-100 client. Full cluster
+      health clean: all 6 nodes `Ready`, no non-`Running` pods.
+
+**Migration complete.** Both the peering-address move (this plan) and the
+underlying on-link reply-drop bug that blocked its final step (ADR-28,
+`applications/vlan100-onlink-routing-fix/`) are resolved.
 
 ## Task 10: Documentation updates
 
