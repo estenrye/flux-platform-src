@@ -1,6 +1,6 @@
 ---
 name: dmacvicar-libvirt-bridge-inplace-update-bug
-description: dmacvicar/libvirt's network_interface.bridge change on an already-running domain reports Terraform/Crossplane success but never touches the real libvirt XML (persistent or live) -- research task, evaluate Ansible or an alternative provider
+description: dmacvicar/libvirt's network_interface changes (bridge change, or adding a whole new block) on an already-running domain report Terraform success but never touch the real libvirt XML (persistent or live) -- confirmed via plain tofu apply, not Crossplane-specific; research task, evaluate Ansible or an alternative provider
 metadata:
   type: project
 ---
@@ -52,6 +52,36 @@ the bridge bug above, but hits the identical taint-and-recreate path,
 documented as its own runbook step in
 [talos-node-replace.md](../runbooks/talos-node-replace.md#before-you-taintdestroy-clear-zfs-snapshots-first)
 rather than automated here (see the research task below, item 3).
+
+## Second confirmed occurrence, 2026-09-08 (rules out the Workspace theory)
+
+Found again rolling out `controlplane`'s VLAN 179 second NIC
+([2026-09-08-calico-bgp-peering-vlan179-design.md](../superpowers/specs/2026-09-08-calico-bgp-peering-vlan179-design.md)):
+adding a brand-new `network_interface` block (not changing `.bridge` on an
+existing one) to all 6 already-running `controlplane` domains via a
+**plain, direct `tofu apply`** — no Crossplane, no `Workspace`, no
+`provider-terraform` in the path at all. Same exact symptom: `Modifications
+complete after 0s`, state correctly showed both `network_interface` blocks
+afterward, but `virsh domiflist`/`dumpxml` (live and persistent) on the KVM
+host showed only the original interface on every node.
+
+This **rules out** the original working theory that Crossplane's
+`Workspace` reconcile loop was suppressing a force-replacement diff — the
+exact same silent no-op happens with a bare `tofu apply` in an interactive
+terminal. This is squarely a `dmacvicar/libvirt` provider bug (confirmed
+version: whatever `~> 0.8` resolved to for `providers/kvm/controlplane` as
+of this date), not an artifact of how Crossplane drives `tofu`.
+
+**Lower-risk workaround this time** (the domains already held real,
+non-disposable state — an etcd quorum, unlike `observability`'s
+never-bootstrapped case above): `virsh attach-device <domain> <iface.xml>
+--live --config` per node, hand-authoring the interface XML to match what
+Terraform's own state already recorded. No reboot, no destroy/recreate,
+one node at a time with etcd-health verification between each. State and
+reality matched afterward with no further Terraform involvement needed —
+future `tofu plan`s against these domains show no drift, exactly the trap
+that makes this bug dangerous (state already says "done" the moment the
+buggy apply "succeeds").
 
 ## Research task for later
 

@@ -34,7 +34,7 @@
 - [M3 render-lint CI fix](m3-render-lint-ci-fix.md) — render-and-lint silently broken for all of M3 steps 1-4 (silent kustomize patch target-name mismatch); fixed in PR #100
 - [M4 Design](m4-design.md) — XKubernetesCluster XRD + talos-kvm composition; KVM capacity squeeze, Terraform-for-VMs + Job-for-bootstrap split, no separate claim kind
 - [M4 Step Tracker](m4-step-tracker.md) — NOT complete: step 4 was a fabricated "Done" claim (found 2026-08-15), step 5's claim isn't GitOps-tracked; see M4 Completion design doc
-- [dmacvicar/libvirt Bridge In-Place Update Bug](dmacvicar-libvirt-bridge-inplace-update-bug.md) — network_interface.bridge change reports success but silently never applies; research task: Ansible vs. alternate libvirt provider
+- [dmacvicar/libvirt Bridge In-Place Update Bug](dmacvicar-libvirt-bridge-inplace-update-bug.md) — network_interface changes (bridge change or new block) report success but silently never apply, confirmed via plain tofu apply not just Crossplane; workaround: virsh attach-device --live --config
 - [No Isolation Requirement Between Cluster VLANs](m4-network-architecture-no-isolation-requirement.md) — VLAN 200 exists to fix the ICMPv6 hairpin bug, not isolation; sharing VLAN 100 is a valid default
 - [Don't Inflate Tradeoff Costs](feedback-dont-inflate-tradeoff-costs.md) — ground downside framing in the user's stated constraints, not assumed best-practice concerns
 - [provider-ansible Delete Cleanup Broken](provider-ansible-delete-cleanup-broken.md) — deletionPolicy:Delete + runPolicy:ObserveAndDelete never fires on v0.8.0, confirmed live; tracked at upstream issue #362
@@ -43,4 +43,4 @@
 - [Pinniped APIService Discovery Failure](pinniped-apiservice-discovery-failure.md) — clientsecret.supervisor.pinniped.dev APIService FailedDiscoveryCheck 17d+, stalls namespace-termination sweeps cluster-wide
 - [1Password Account: ryefamily](1password-account-ryefamily.md) — the `crossplane` vault (sops-age-key, service-account-token) lives under ryefamily.1password.com, not familyrye.1password.com
 - [M4 Step 6 Tier B First Live Run](m4-step6-tier-b-first-live-run.md) — real end-to-end provision+teardown passed 2026-08-15; first attempt hit an unrelated sealed-OpenBao incident
-- [Pod Egress GUA Routing Broken](pod-egress-gua-routing-broken.md) — pods can't reach ANY GUA destination (confirmed with an external control); works fine from hostNetwork; found during M4 completion B6, unrelated to B6 itself
+- [Pod Egress GUA Routing Broken](pod-egress-gua-routing-broken.md) — pods can't reach ANY GUA destination; found during M4 B6; likely also blocks external-client-to-VIP ingress replies (2026-09-08), still open, blocks controlplane's VLAN 179 final cutover
