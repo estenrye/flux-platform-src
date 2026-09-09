@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: vlan100-onlink-routing-fix-controlplane
+  description: |-
+    controlplane deployment of the VLAN-100 on-link routing fix. Pilot
+    phase: scoped to one node via the base DaemonSet's nodeSelector until
+    plan Task 4 confirms it fleet-wide.
+  tags:
+    - networking
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: experimental
+  owner: platform-engineering

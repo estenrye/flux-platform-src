@@ -1,0 +1,27 @@
+# Defensive: hostNetwork pods may or may not get a Calico WorkloadEndpoint
+# (and therefore may or may not actually be subject to the default-deny
+# GlobalNetworkPolicy) -- not yet confirmed live for this Calico version
+# (plan Task 3). Cheap to add regardless: the reconcile script needs
+# apiserver egress for Node-API peer discovery and DNS to resolve
+# "kubernetes.default.svc" (Calico evaluates egress post-DNAT --
+# docs/memory/calico-networkpolicy-dnat.md -- so the pod targetPort 6443,
+# not the Service's 443, is what matters).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vlan100-onlink-routing-fix-apiserver-allow
+  namespace: vlan100-onlink-routing-fix
+spec:
+  podSelector:
+    matchLabels:
+      app: vlan100-onlink-routing-fix
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

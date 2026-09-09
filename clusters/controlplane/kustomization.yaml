@@ -9,6 +9,10 @@ kind: Kustomization
 resources:
   - ../../applications/calico/controlplane
   - ../../applications/global-network-policy-default-deny/controlplane
+  # Policy-routing DaemonSet for the VLAN-100 on-link reply-drop bug
+  # (docs/memory/node-gua-onlink-reply-unreliable.md). Pilot phase --
+  # scoped to one node via the base DaemonSet's nodeSelector.
+  - ../../applications/vlan100-onlink-routing-fix/controlplane
   - ../../applications/priority-classes
   - ../../applications/prometheus-operator-crds/base
   - ../../applications/reloader/base

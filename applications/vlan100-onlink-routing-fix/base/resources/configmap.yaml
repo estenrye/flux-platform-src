@@ -1,0 +1,84 @@
+# Reconcile script for the VLAN-100 on-link routing fix
+# (docs/memory/node-gua-onlink-reply-unreliable.md,
+# docs/superpowers/specs/2026-09-09-vlan100-onlink-routing-daemonset-design.md).
+#
+# Forces the two VLAN-100 prefixes ($VLAN100_PREFIXES) through the default
+# gateway instead of on-link NDP, with a /128 on-link exception for every
+# node's own address (discovered dynamically via the Node API) so cluster
+# traffic (etcd, kubelet, Calico's BGP mesh) stays genuinely on-link and
+# unaffected. Self is included in the peer list deliberately, not
+# excluded: the kernel's `local` table (priority 0) always wins for a
+# node's own address before this custom rule (priority $RULE_PRIORITY) is
+# even consulted, so no special-casing is needed.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vlan100-onlink-routing-fix
+  namespace: vlan100-onlink-routing-fix
+data:
+  reconcile.sh: |
+    #!/bin/sh
+    set -eu
+
+    TOKEN_FILE=/var/run/secrets/kubernetes.io/serviceaccount/token
+    CA_FILE=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    API_SERVER="https://kubernetes.default.svc"
+
+    TABLE="${ROUTE_TABLE:-100}"
+    PRIORITY="${RULE_PRIORITY:-100}"
+    INTERVAL="${RECONCILE_INTERVAL_SECONDS:-60}"
+    PREFIXES="${VLAN100_PREFIXES:?VLAN100_PREFIXES must be set}"
+
+    log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*"; }
+
+    ensure_rules() {
+      for prefix in $(echo "$PREFIXES" | tr ',' ' '); do
+        if ! ip -6 rule show | grep -q "to $prefix lookup $TABLE"; then
+          log "adding ip rule: to $prefix lookup $TABLE"
+          ip -6 rule add to "$prefix" lookup "$TABLE" priority "$PRIORITY"
+        fi
+      done
+    }
+
+    reconcile_table() {
+      # Discover the gateway's link-local next-hop and egress interface
+      # from the node's own existing default route -- no hardcoded
+      # interface name or gateway address, so this stays correct if
+      # either ever changes.
+      default_route=$(ip -6 route show default | head -1)
+      gw=$(echo "$default_route" | grep -oE 'via [0-9a-fA-F:]+' | awk '{print $2}')
+      dev=$(echo "$default_route" | grep -oE 'dev [^ ]+' | awk '{print $2}')
+      if [ -z "$gw" ] || [ -z "$dev" ]; then
+        log "WARNING: could not determine default gateway/interface this cycle, keeping last-applied table"
+        return 1
+      fi
+
+      peers=$(curl -sS --max-time 10 \
+        --cacert "$CA_FILE" \
+        -H "Authorization: Bearer $(cat "$TOKEN_FILE")" \
+        "$API_SERVER/api/v1/nodes" \
+        | jq -r '.items[].status.addresses[] | select(.type=="InternalIP") | .address') || {
+        log "WARNING: Node API query failed this cycle, keeping last-applied table"
+        return 1
+      }
+      if [ -z "$peers" ]; then
+        log "WARNING: Node API returned no peers this cycle, keeping last-applied table"
+        return 1
+      fi
+
+      log "rebuilding table $TABLE: prefixes=[$PREFIXES] gw=$gw dev=$dev peers=[$(echo "$peers" | tr '\n' ' ')]"
+      ip -6 route flush table "$TABLE" >/dev/null 2>&1 || true
+      for prefix in $(echo "$PREFIXES" | tr ',' ' '); do
+        ip -6 route replace "$prefix" via "$gw" dev "$dev" table "$TABLE"
+      done
+      echo "$peers" | while read -r peer; do
+        [ -n "$peer" ] && ip -6 route replace "${peer}/128" dev "$dev" table "$TABLE"
+      done
+    }
+
+    log "starting vlan100-onlink-routing-fix reconcile loop (table=$TABLE priority=$PRIORITY interval=${INTERVAL}s prefixes=[$PREFIXES])"
+    ensure_rules
+    while true; do
+      reconcile_table || log "reconcile cycle failed, will retry next interval"
+      sleep "$INTERVAL"
+    done

@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# controlplane-only: the VLAN 100 / TFiber PD-delegation on-link bug this
+# fixes is specific to this cluster's KVM host and gateway. Thin overlay
+# today (no cluster-specific additions beyond the base) -- kept separate
+# from ../base per this repo's own lesson learned 2026-09-09
+# (applications/envoy-gateway/controlplane/): a shared base silently
+# reaches every cluster that consumes it, including ones (like
+# observability) that have no use for this fix.
+resources:
+  - ../base
