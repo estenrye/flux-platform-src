@@ -1,0 +1,25 @@
+# Binds the Gateway's `dns` listener (resources/gateway.yaml) to the
+# shim's own Service -- the same routing role http-route.yaml plays for
+# the `https` listener, just for the UDP NOTIFY/SOA-poll path Designate's
+# pdns4 backend needs (see
+# docs/specs/2026-09-09-dns-notify-soa-responder.md in the
+# pdns4-external-dns-rest-http-cr-shim repo). UDPRoute is
+# gateway.networking.k8s.io/v1alpha2 -- unlike HTTPRoute it hasn't
+# graduated past alpha, but Envoy Gateway (1.8.1, already deployed here)
+# supports it and the cluster's Gateway API CRDs are installed via the
+# experimental channel (applications/gateway-api-crds) specifically so
+# alpha route kinds like this one are available.
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: UDPRoute
+metadata:
+  name: pdns4-shim
+  namespace: external-dns
+spec:
+  parentRefs:
+    - name: pdns4-shim
+      namespace: external-dns
+      sectionName: dns
+  rules:
+    - backendRefs:
+        - name: pdns4-shim
+          port: 53

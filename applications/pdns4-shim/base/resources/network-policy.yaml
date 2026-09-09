@@ -20,6 +20,21 @@ spec:
       ports:
         - protocol: TCP
           port: 8081
+    # Designate's pdns4 backend NOTIFY/SOA-poll traffic (pdns4-shim 0.1.1+,
+    # exposed via UDPRoute -- resources/udp-route.yaml -- since 0.1.2),
+    # forwarded by the same internal-eg Envoy fleet as the rule above, just
+    # over UDP/53 instead of TCP/8081. Port 10053, not 53 -- NetworkPolicy
+    # ports match the pod's actual containerPort post-Service-DNAT (see the
+    # apiserver egress rule below for the same convention), and the DNS
+    # listener binds an unprivileged port precisely so this container never
+    # needs NET_BIND_SERVICE.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+      ports:
+        - protocol: UDP
+          port: 10053
   egress:
     # apiserver targetPort — post-DNAT rule, see the Calico DNAT memory —
     # for writing DNSEndpoint objects.

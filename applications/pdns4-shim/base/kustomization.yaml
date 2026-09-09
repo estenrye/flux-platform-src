@@ -15,7 +15,7 @@ namespace: external-dns
 helmCharts:
   - name: pdns4-shim
     repo: oci://registry-1.docker.io/estenrye
-    version: 0.1.0
+    version: 0.1.2
     releaseName: pdns4-shim
     namespace: external-dns
     valuesFile: values.yaml
@@ -24,6 +24,7 @@ resources:
   - resources/certificate.yaml
   - resources/gateway.yaml
   - resources/http-route.yaml
+  - resources/udp-route.yaml
   - resources/network-policy.yaml
 
 patches:
@@ -34,9 +35,15 @@ patches:
 
 images:
   # Pinned by digest for real (see values.yaml's comment on why the tag
-  # alone can't be "0.1.0" here) -- also satisfies CKV_K8S_43 regardless of
-  # the tag string the chart renders. amd64/arm64 image index published
-  # 2026-09-08 under the "0.1"/"0"/"latest"/"main" tags (Docker Hub content
-  # API confirms "0.1.0" resolves to this chart's own Helm artifact instead).
+  # alone can't be "0.1.2" here, same collision as every version before
+  # it) -- also satisfies CKV_K8S_43 regardless of the tag string the
+  # chart renders. amd64/arm64 image index published 2026-09-09 under the
+  # "0.1"/"0"/"latest"/"main" tags (`docker buildx imagetools inspect
+  # docker.io/estenrye/pdns4-shim:0.1.2` confirms that exact tag now
+  # resolves to this chart's own OCI Helm artifact instead of the image --
+  # the CI/CD helm job's `helm package --version "$chart_version"` reuses
+  # the same tag string as the image's `type=semver,pattern={{version}}`
+  # tag and runs after the docker job, so it wins the tag. The floating
+  # "0.1" tag isn't touched by the helm job and resolves correctly.
   - name: docker.io/estenrye/pdns4-shim
-    digest: sha256:0a3b2c7ad452e6f113c68ee5ab1782c90d01f957d684dde7cae1310ec42f665d
+    digest: sha256:74b5e361b2abd88679b055a1459ae877da92f40c49d80ed225f093ba91127515
