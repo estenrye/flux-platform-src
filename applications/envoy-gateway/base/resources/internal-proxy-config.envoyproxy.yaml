@@ -16,29 +16,23 @@ spec:
     type: Kubernetes
     kubernetes:
       envoyService:
+        # Pool-selection annotation for Services is "projectcalico.org/..."
+        # (no "cni." prefix -- that prefix is for pod IPAM, a different
+        # mechanism). Confirmed live 2026-09-09: the "cni."-prefixed form is
+        # silently ignored, and Calico falls back to its default pool
+        # (which landed on the GUA pool, defeating the point).
         annotations:
-          cni.projectcalico.org/ipv6pools: '["lb-internal-ula-routed"]'
+          projectcalico.org/ipv6pools: '["lb-internal-ula-routed"]'
+        # Cluster (not the envoyDeployment default of Local): this fleet is
+        # low-traffic and internal-only (pdns4-shim/pcd-ce-lab today), so
+        # kube-proxy's cross-node redirect is an acceptable cost -- it
+        # avoids the ECMP-locality bug custom-proxy-config's 6-replica/
+        # full-node-anti-affinity mitigates for the GUA-ingress fleet
+        # (docs/memory/vip-renumber-flakiness-investigation.md), so this
+        # fleet doesn't need to mirror that expensive workaround. Confirmed
+        # live 2026-09-09: mirroring it here (replicas: 6 + required
+        # anti-affinity) starved node CPU and left one pod permanently
+        # Pending -- oversized for what this fleet actually needs.
+        externalTrafficPolicy: Cluster
       envoyDeployment:
-        replicas: 6
-        # Same ECMP-consistency mitigation as custom-proxy-config
-        # (docs/memory/vip-renumber-flakiness-investigation.md): Calico
-        # advertises a LoadBalancer service's BGP host route from every node
-        # regardless of externalTrafficPolicy: Local endpoint locality, so
-        # every ECMP next-hop needs a working local kube-proxy redirect.
-        strategy:
-          type: RollingUpdate
-          rollingUpdate:
-            maxSurge: 0
-            maxUnavailable: 1
-        pod:
-          affinity:
-            podAntiAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                - labelSelector:
-                    matchLabels:
-                      gateway.envoyproxy.io/owning-gatewayclass: internal-eg
-                  topologyKey: kubernetes.io/hostname
-          tolerations:
-            - key: node-role.kubernetes.io/control-plane
-              operator: Exists
-              effect: NoSchedule
+        replicas: 2
