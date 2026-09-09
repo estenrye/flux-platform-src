@@ -224,39 +224,64 @@ designed, with three deviations worth recording for later reference:
 
 **Files:** `applications/vlan100-onlink-routing-fix/base/resources/daemonset.yaml`
 
-- [ ] Remove the pilot-only `nodeSelector`/`nodeAffinity` restriction so
+**DONE 2026-09-09** (PR #198 in flux-platform-src).
+
+- [x] Remove the pilot-only `nodeSelector`/`nodeAffinity` restriction so
       the `DaemonSet` covers all 6 nodes (keep the control-plane
       toleration).
-- [ ] PR + merge + render-PR-merge + reconcile.
-- [ ] Verify: all 6 nodes show a `Running`/`Ready` pod for this
+- [x] PR + merge + render-PR-merge + reconcile.
+- [x] Verify: all 6 nodes show a `Running`/`Ready` pod for this
       `DaemonSet`; spot-check the routing table/rules on 2-3 more nodes
-      beyond the pilot.
+      beyond the pilot. **Confirmed**: rolled out to all 6 nodes cleanly
+      (the pilot's own pod on `wk-1` cycled to a fresh one via the normal
+      RollingUpdate, briefly 5/6 ready mid-rollout, then 6/6). Spot-checked
+      `cp-2` and `wk-3` — both show identical `ip -6 rule`/table 100
+      state (2 prefix routes + 6 peer `/128`s = 8 routes each). Zero
+      cluster-health impact (`kubectl get nodes` all `Ready`,
+      `calico-system`/`kube-system` no non-`Running` pods).
 
 ## Task 5: Fleet-wide verification
 
 **Files:** none (verification only)
 
-- [ ] Repeated (10+) back-to-back `curl` attempts from `pcd-ce-hyp-01`
+**PASSED 2026-09-09 — investigation closed.**
+
+- [x] Repeated (10+) back-to-back `curl` attempts from `pcd-ce-hyp-01`
       against `pdns4-shim.rye.ninja`, regardless of which node ECMP/the
-      Envoy replica selects.
-- [ ] Same test from `mf-ms-a2-01` (the original stand-in client) for
-      cross-confirmation.
-- [ ] Full cluster health sweep: `kubectl get nodes` all `Ready`, no new
+      Envoy replica selects. **10/10 succeeded**, consistently ~80ms
+      (no more per-attempt variance — the whole fleet has the fix now, so
+      it no longer matters which node handles a given connection).
+- [x] Same test from `mf-ms-a2-01` (the original stand-in client) for
+      cross-confirmation. **3/3 succeeded**, ~30ms.
+- [x] Full cluster health sweep: `kubectl get nodes` all `Ready`, no new
       `CrashLoopBackOff`/`NotReady` anywhere, `calico-system` BGP mesh
-      sessions all up, etcd healthy.
-- [ ] Confirm Designate's own automatic retry loop successfully creates
+      sessions all up, etcd healthy. **Confirmed clean**: all 6 nodes
+      `Ready`, every `calico-system` pod `Running` with 0 new restarts,
+      one `calico-node` per node (BGP mesh intact), all 3 etcd members
+      `Running`/`HEALTH OK` with no interruption events since before this
+      session started.
+- [x] Confirm Designate's own automatic retry loop successfully creates
       the pending `usmnblm01.rye.ninja` zone without manual intervention
       — the original goal that started this entire investigation.
+      **CONFIRMED LIVE**: `pdns4-shim` logs show
+      `"message":"created zone","zone":"usmnblm01.rye.ninja.","status":201`;
+      `kubectl get dnsendpoint -A` shows `usmnblm01.rye.ninja` freshly
+      created. This is the original goal of the entire investigation,
+      achieved without any manual intervention on Designate's side —
+      its own pre-existing retry loop simply succeeded once the
+      underlying connectivity was fixed.
 
 ## Task 6: Documentation
 
 **Files:** `docs/memory/node-gua-onlink-reply-unreliable.md`,
 `docs/adr/0028-vlan100-onlink-routing-daemonset.md`
 
-- [ ] Update the memory file with the final outcome — root cause
+**DONE 2026-09-09.**
+
+- [x] Update the memory file with the final outcome — root cause
       confirmed/fixed, or, if the design failed validation at Task 1,
       record that clearly so this direction isn't re-attempted blindly.
-- [ ] If successful: write ADR-0028 recording this as a deliberate,
+- [x] If successful: write ADR-0028 recording this as a deliberate,
       permanent exception to Talos's immutable-host model — what it does,
       why it's needed, and the scoping discipline (peer exceptions,
       `NET_ADMIN` not full `privileged`) that keeps its blast radius
