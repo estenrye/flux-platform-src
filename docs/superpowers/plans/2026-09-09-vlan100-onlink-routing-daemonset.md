@@ -291,9 +291,16 @@ designed, with three deviations worth recording for later reference:
 
 **Files:** none (cross-reference only)
 
-- [ ] Resume [2026-09-08-controlplane-bgp-vlan179.md](2026-09-08-controlplane-bgp-vlan179.md)'s
+**DONE 2026-09-09.**
+
+- [x] Resume [2026-09-08-controlplane-bgp-vlan179.md](2026-09-08-controlplane-bgp-vlan179.md)'s
       Task 9 (remove VLAN 100 from the BGP peer-group — the final
       cutover step that's been blocked on this whole investigation).
+      PR #200 updated the declarative record; Esten applied it on the
+      UDM-SE; verified live — all 6 BGP sessions re-established cleanly
+      on VLAN 179 only, `pdns4-shim` still reachable, full cluster
+      health clean. **The VLAN 179 migration is now fully complete, and
+      this investigation is closed.**
 
 ## Automatable vs. manual summary
 
