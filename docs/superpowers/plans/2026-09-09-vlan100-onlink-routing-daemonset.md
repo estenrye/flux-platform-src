@@ -157,39 +157,56 @@ validation, Flux (Kustomize rendering).
 
 **Files:** `applications/vlan100-onlink-routing-fix/**`
 
-- [ ] `base/resources/rbac.yaml`: `ServiceAccount`, `ClusterRole`
-      (`apiGroups: [""]`, `resources: ["nodes"]`, `verbs: ["get", "list",
-      "watch"]` — nothing else), `ClusterRoleBinding`.
-- [ ] `base/resources/configmap.yaml`: the reconcile script — queries
-      `https://kubernetes.default.svc/api/v1/nodes` (bearer token + CA
-      cert from the projected `ServiceAccount` volume) for
-      `.status.addresses[type=InternalIP]`, builds table `100` and the
-      two `ip rule`s idempotently (`ip route replace`, existence checks
-      before `ip rule add`), loops on a ~60s interval, and does **not**
-      wipe the table on a transient API failure.
-- [ ] `base/resources/daemonset.yaml`: `hostNetwork: true`,
-      `securityContext.capabilities: [NET_ADMIN]` (not full
-      `privileged`), the same control-plane toleration pattern as
-      `custom-proxy-config.envoyproxy.yaml`, a minimal image with
-      `iproute2` + `curl`/`jq`, mounts the `ConfigMap` script.
-      **Scope the initial rollout to the Task 1 pilot node only** via
-      `nodeSelector`/`nodeAffinity` — do not go fleet-wide yet.
-- [ ] `controlplane/kustomization.yaml`: cluster-specific overlay (this
-      fix does not apply to any other cluster).
-- [ ] Verify: `kustomize build --enable-helm
-      applications/vlan100-onlink-routing-fix/controlplane` renders
-      cleanly; `kube-linter` clean.
+**DONE 2026-09-09** (PR #196 in flux-platform-src). Built as
+designed, with three deviations worth recording for later reference:
+
+- [x] `base/resources/rbac.yaml`, `base/resources/configmap.yaml`,
+      `base/resources/daemonset.yaml`, `base/resources/namespace.yaml`
+      (privileged PSA — `hostNetwork` needs it), `base/resources/network-policy.yaml`
+      (defensive apiserver egress — not yet confirmed whether hostNetwork
+      pods are actually subject to Calico's default-deny for this Calico
+      version, but confirmed live it doesn't hurt to have).
+- [x] `controlplane/kustomization.yaml`: thin overlay (`resources:
+      [../base]` only), kept separate from `base` from the start —
+      learned the hard way earlier tonight (#195) that a shared
+      `envoy-gateway/base` had silently leaked resources to the
+      `observability` cluster.
+- [x] Verify: renders cleanly, `kube-linter` clean.
+- **Deviation 1 — `dnsPolicy`**: `hostNetwork: true` pods default to the
+      *node's own* DNS resolver, not cluster DNS — without
+      `dnsPolicy: ClusterFirstWithHostNet`, `kubernetes.default.svc`
+      (used for peer discovery) never resolves. Not in the original
+      design; added once noticed during scaffolding.
+- **Deviation 2 — root confirmed genuinely required**: empirically tested
+      (throwaway pod, `wk-1`) whether `NET_ADMIN` alone as non-root
+      (UID 65532) suffices for `ip -6 route add` — it does not
+      (`RTNETLINK answers: Operation not permitted`). Runs as root
+      (with `capabilities: {drop: [ALL], add: [NET_ADMIN]}` still set),
+      not the originally-hoped-for non-root minimal-capability shape.
+- **Deviation 3 — checkov skip syntax**: checkov's Kubernetes framework
+      skips via `metadata.annotations` (`checkov.io/skip#:
+      CKV_K8S_XX=reason`), **not** inline `# checkov:skip=...` comments
+      (that syntax is Terraform/CloudFormation-specific) — an inline-
+      comment attempt was silently ignored by CI, caught and fixed after
+      seeing it fail live.
 
 ## Task 3: Pilot the DaemonSet for real (one node, via Flux)
 
 **Files:** none (verification only)
 
-- [ ] PR + merge + render-PR-merge + reconcile, same flow as PRs
+**PASSED 2026-09-09.**
+
+- [x] PR + merge + render-PR-merge + reconcile, same flow as PRs
       #189-191 earlier this session.
-- [ ] Verify the pilot node's pod comes up, applies the same table/rules
+- [x] Verify the pilot node's pod comes up, applies the same table/rules
       Task 1 validated by hand, and cluster health stays clean
       (`kubectl get nodes`, `calico-system`/`kube-system` pods).
-- [ ] Re-run the reproduction against the pilot node (same as Task 1) —
+      **Confirmed**: pod `1/1 Ready` within ~35s, logs show it correctly
+      discovered all 6 node peers via the Node API and built table 100
+      identically to Task 1's hand-run version; `ip -6 rule
+      show`/`ip -6 route show table 100` matched exactly. Zero
+      cluster-health impact.
+- [x] Re-run the reproduction against the pilot node (same as Task 1) —
       confirm it still passes through the DaemonSet-managed path, not
       just the earlier hand-run one. **Reuse Task 1's revised
       methodology**: with `internal-eg`'s `externalTrafficPolicy:
@@ -199,6 +216,9 @@ validation, Flux (Kustomize rendering).
       `Service` to `externalTrafficPolicy: Local` to isolate the pilot
       node for testing, then revert. This complication goes away once
       Task 4 covers all 6 nodes.
+      **Confirmed**: 2 of 3 attempts under the temporary `Local` policy
+      returned `HTTP 200` (the third landed on an unfixed node, as
+      expected). Reverted to `Cluster` immediately after.
 
 ## Task 4: Fleet-wide rollout
 
