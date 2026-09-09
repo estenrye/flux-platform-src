@@ -32,3 +32,21 @@ spec:
       allowedRoutes:
         namespaces:
           from: Same
+    # Designate's pdns4 backend NOTIFY/SOA-poll traffic (pdns4-shim 0.1.2+,
+    # see docs/specs/2026-09-09-dns-notify-soa-responder.md in the
+    # pdns4-external-dns-rest-http-cr-shim repo), bound via UDPRoute
+    # (resources/udp-route.yaml). No `hostname` or `tls` -- neither is
+    # supported for a non-HTTP(S) protocol; Designate points at
+    # pdns4-shim.rye.ninja:53, the same hostname/VIP as the https listener
+    # above, just a different port -- this listener shares that VIP
+    # deliberately (internal-eg's shared Service is pinned to Calico's
+    # lb-internal-ula-routed IPPool, which is what keeps VLAN-100-resident
+    # clients like pcd-ce-lab off the on-link reply bug documented on the
+    # https listener above; a standalone LoadBalancer Service for this
+    # would need that same pinning independently re-verified).
+    - name: dns
+      port: 53
+      protocol: UDP
+      allowedRoutes:
+        namespaces:
+          from: Same

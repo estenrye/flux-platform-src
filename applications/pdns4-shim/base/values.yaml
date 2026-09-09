@@ -43,6 +43,17 @@ config:
   # IPv6-only, but pdns4-shim.rye.ninja's public DNS record and any
   # IPv4-only caller arrive via NAT64 (see .bin/create-nat64.sh).
   listenAddr: "[::]:8081"
+  # Same IPv6-wildcard-for-dual-stack reasoning as `listenAddr` above,
+  # applied to the DNS NOTIFY/SOA UDP responder (src/dns/, added in
+  # pdns4-shim 0.1.1, exposed via UDPRoute in 0.1.2): the chart's own
+  # default ("0.0.0.0:10053") would only accept IPv4 on a pod network
+  # that has no IPv4 address at all. Designate's pdns4 pool
+  # target/nameservers entries point at pdns4-shim.rye.ninja:53 -- the
+  # same hostname/VIP as the HTTPS listener, via resources/udp-route.yaml,
+  # not a separate Service -- see
+  # docs/specs/2026-09-09-dns-notify-soa-responder.md in the
+  # pdns4-external-dns-rest-http-cr-shim repo.
+  dnsListenAddr: "[::]:10053"
   defaultNameservers: "ns1.rye.ninja."
   hostmaster: "hostmaster.rye.ninja."
   # trace: full HTTP request/response bodies and the exact DNSEndpoint CR
