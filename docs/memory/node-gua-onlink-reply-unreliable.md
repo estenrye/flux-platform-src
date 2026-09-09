@@ -1,6 +1,6 @@
 ---
 name: node-gua-onlink-reply-unreliable
-description: Root cause confirmed and a fix VALIDATED (manual single-node test, 2026-09-09) — see docs/superpowers/plans/2026-09-09-vlan100-onlink-routing-daemonset.md. Any genuinely VLAN-100-resident peer's connection (GUA or ULA address, since ens3 carries connected routes for both VLAN 100 prefixes) gets its reply silently dropped on-link. Policy-routing (custom table + ip -6 rule forcing those two prefixes through the gateway instead of on-link NDP, with /128 peer exceptions for other Talos nodes) fixed it in a hand-run test on one node (wk-1): 4/6 attempts succeeded (the other 2 landed on unfixed nodes, as expected), zero cluster-health impact. Not yet built as a permanent DaemonSet — that's the plan's remaining Tasks 2-7.
+description: RESOLVED 2026-09-09 — see ADR-28 (docs/adr/0028-vlan100-onlink-routing-daemonset.md). Root cause was a Talos node's ens3 treating both VLAN 100 prefixes (GUA and ULA) as on-link, silently dropping replies to any genuinely VLAN-100-resident peer. Fixed fleet-wide via a policy-routing DaemonSet (applications/vlan100-onlink-routing-fix/). Confirmed live: 10/10 and 3/3 clean end-to-end connections from two independent real VLAN-100 clients, zero cluster-health impact, and Designate's own retry loop successfully created the pending usmnblm01.rye.ninja zone — the original goal of this entire investigation. Unblocks VLAN 179's final cutover (plan Task 9 of the 2026-09-08 migration).
 metadata:
   type: project
 ---
@@ -237,3 +237,42 @@ Plan: [2026-09-09-vlan100-onlink-routing-daemonset.md](../superpowers/plans/2026
   reverted, debug namespaces deleted). The permanent fix (a `DaemonSet`
   covering all 6 nodes, RBAC, dynamic peer discovery) is plan Tasks 2-7,
   not yet built.
+
+## RESOLVED, 2026-09-09 — see ADR-28
+
+The permanent fix (plan Tasks 2-7) was built, piloted, and rolled out
+fleet-wide the same day. Full record:
+[ADR-28](../adr/0028-vlan100-onlink-routing-daemonset.md),
+[the plan](../superpowers/plans/2026-09-09-vlan100-onlink-routing-daemonset.md)
+(execution detail and every live-verification result),
+[the spec](../superpowers/specs/2026-09-09-vlan100-onlink-routing-daemonset-design.md)
+(design and risk analysis).
+
+- `applications/vlan100-onlink-routing-fix/` — a privileged `hostNetwork`
+  `DaemonSet` on all 6 `controlplane` nodes, reconciling a custom `ip -6`
+  routing table that forces VLAN 100's two prefixes through the gateway
+  instead of on-link, with `/128` peer exceptions (discovered dynamically
+  via the Node API) keeping cluster traffic genuinely on-link.
+- **Fleet-wide verification, 2026-09-09**: 10/10 clean connections from
+  `pcd-ce-hyp-01`, 3/3 from `mf-ms-a2-01`, both ~30-80ms — no more
+  per-attempt variance, since every node now has the fix regardless of
+  which one ECMP/kube-proxy routes a given connection to. Zero
+  cluster-health impact across the entire rollout (pilot and fleet-wide):
+  all 6 nodes `Ready` throughout, zero new pod restarts anywhere, etcd
+  and Calico's BGP mesh unaffected.
+  Confirmed: **Designate's own pre-existing automatic retry loop
+  successfully created the pending `usmnblm01.rye.ninja` zone** with zero
+  manual intervention — `pdns4-shim` logs show
+  `"created zone","zone":"usmnblm01.rye.ninja.","status":201`. This is
+  the original goal that started this entire investigation.
+- Unblocks `controlplane`'s VLAN 179 migration's final cutover step
+  (removing VLAN 100 from the gateway's BGP peer-group) — see plan
+  Task 9 of
+  [2026-09-08-controlplane-bgp-vlan179.md](../superpowers/plans/2026-09-08-controlplane-bgp-vlan179.md),
+  not yet resumed as of this closing update.
+- The exact packet-drop mechanism this fix routes around (conntrack?
+  driver/NIC offload? something gateway-side?) was never isolated — the
+  fix sidesteps it rather than explains it. If VLAN 100's addressing, the
+  gateway, or TFiber's PD-delegation behavior changes materially in the
+  future, re-verify this fix's assumptions rather than assuming they
+  still hold.
