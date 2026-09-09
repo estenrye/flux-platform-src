@@ -39,12 +39,8 @@ spec:
       # "kubernetes.default.svc" (used for peer discovery) never resolves.
       dnsPolicy: ClusterFirstWithHostNet
       restartPolicy: Always
-      # PILOT PHASE (plan Task 2/3): scoped to the Task 1 validation node
-      # only. Task 4 removes this nodeSelector to go fleet-wide once Task 3
-      # confirms the DaemonSet-managed path matches Task 1's hand-run
-      # result -- do not remove this before then.
-      nodeSelector:
-        kubernetes.io/hostname: controlplane-wk-1
+      # Fleet-wide since plan Task 4 (2026-09-09) -- was pinned to
+      # controlplane-wk-1 alone for the Task 2/3 pilot, which passed.
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
