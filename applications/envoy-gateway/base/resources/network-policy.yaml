@@ -64,6 +64,12 @@ spec:
           port: 10080
         - protocol: TCP
           port: 19001
+        # pdns4-shim's UDPRoute listener (dns/53) -- external clients
+        # (Designate) connecting to the merged internal-eg Service's UDP
+        # port, same "no `from:` restriction" shape as the TCP listeners
+        # above, since this Envoy fleet is externally reachable by design.
+        - protocol: UDP
+          port: 53
   egress:
     - to:
         - podSelector:
@@ -94,6 +100,14 @@ spec:
         # pdns4-shim backend (pdns4-shim.rye.ninja HTTPS-terminate).
         - protocol: TCP
           port: 8081
+        # pdns4-shim's DNS NOTIFY/SOA backend (UDPRoute -> Service dns/53 ->
+        # pod's real containerPort 10053, not 53 -- same post-DNAT
+        # convention as the TCP rules above). Confirmed live 2026-09-09:
+        # without this, the UDPRoute path times out identically to the
+        # earlier missing-8081 gap on the HTTPS path -- Envoy's proxy pod
+        # can't originate the packet to pdns4-shim's pod at all.
+        - protocol: UDP
+          port: 10053
         - protocol: TCP
           port: 53
         - protocol: UDP
