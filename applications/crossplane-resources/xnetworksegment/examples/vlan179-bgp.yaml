@@ -1,0 +1,40 @@
+# applications/crossplane-resources/xnetworksegment/examples/vlan179-bgp.yaml
+#
+# NOT YET APPLIED via kubectl (2026-09-08): the kubeconfig at
+# ~/.kube/spot/ryezone-labs/crossplane-controlplane-cluster.yaml points to
+# a stale Rackspace Spot hostname (confirmed NXDOMAIN), same blocker the
+# NAT64 migration hit. The bridge and UniFi network this claim describes
+# get created manually instead (br179/bond0.179 via a hand-added
+# /etc/netplan/60-br179.yaml on mf-ms-a2-01, matching this Composition's
+# own documented file-naming convention; the UniFi network object via a
+# standalone `tofu apply` against the `filipowm/unifi` provider). This
+# file is the accurate declarative record of that manual state, kept in
+# sync by hand the same way vlan64-nat64.yaml is -- apply it for real once
+# a working kubeconfig is available.
+#
+# Purpose: dedicated, client-free VLAN for Calico's BGP peering session
+# addresses only (docs/superpowers/specs/2026-09-08-calico-bgp-peering-vlan179-design.md).
+# A genuine second NIC per controlplane VM attaches here (Option B --
+# physically-enforced split from VLAN 100's egress traffic), not a VLAN
+# sub-interface on the existing NIC.
+apiVersion: platform.rye.ninja/v1alpha1
+kind: XNetworkSegment
+metadata:
+  name: vlan179-bgp
+  labels:
+    rye.ninja/component: xnetworksegment
+    rye.ninja/owner: platform-engineering
+    platform.rye.ninja/network-segment-name: vlan179-bgp
+spec:
+  vlanId: 179
+  # taggedVlan defaults to true, bondInterface defaults to "bond0" -- both
+  # omitted deliberately, matching a genuinely new segment (unlike
+  # vlan100's adopted br0). bridgeName omitted too -- derives "br179".
+  dhcp4: false
+  dhcp6: false # ULA + static IPv4 only, same dual-stack-exception shape vlan64 has -- no GUA/PD need on this segment.
+  addresses:
+    mf-ms-a2-01:
+      - "fd97:45c2:b3a1:179::2000/64" # matches every other bridge on this host (br0/br64/br200 all follow the same ::2000 kvm-host convention)
+  routes: {} # Deliberately empty -- see xrd.yaml's own warning: a nested on-link route here is exactly the bug class this migration fixes.
+  unifiNetworkRef:
+    name: vlan179-bgp

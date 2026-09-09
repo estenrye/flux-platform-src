@@ -186,7 +186,15 @@ done
 node_names=()
 node_addrs=()
 render_node() {
-  local name="$1" ula="$2" role="$3" base vip_block="" routes_block=""
+  local name="$1" ula="$2" role="$3" base vip_block="" routes_block="" mac_octet mac mac2
+  # Same MAC formula as providers/kvm/controlplane/locals.tf: 52:54:00:b3:a1:<octet>
+  # for the primary NIC, 52:54:01:b3:a1:<octet> for the VLAN 179 BGP-peering
+  # NIC (Option B -- docs/superpowers/specs/2026-09-08-calico-bgp-peering-vlan179-design.md).
+  # Recomputed here (not read from Terraform output) so this script stays
+  # the single source of truth for what config gets applied.
+  mac_octet=$(printf '%02x' "0x${ula##*::}")
+  mac="52:54:00:b3:a1:${mac_octet}"
+  mac2="52:54:01:b3:a1:${mac_octet}"
   base="${RENDER_DIR}/controlplane.yaml"
   [ "${role}" = "worker" ] && base="${RENDER_DIR}/worker.yaml"
   if [ "${role}" = "controlplane" ]; then
@@ -213,13 +221,24 @@ machine:
   network:
     hostname: ${name}
     interfaces:
-      # deviceSelector, not a name: QEMU virtio NICs come up as ensN
-      # (predictable naming), and the VMs have exactly one physical NIC.
+      # deviceSelector by hardwareAddr (NOT "hardwareAddress" -- confirmed
+      # live against a real v1.13.5 node via talosctl patch machineconfig
+      # --dry-run; that name is rejected as an unknown key), not
+      # "physical: true": the VM now has two virtio NICs (VLAN 100 egress +
+      # VLAN 179 BGP peering), so "physical: true" would match both
+      # ambiguously.
       - deviceSelector:
-          physical: true
+          hardwareAddr: ${mac}
         dhcp: false
         addresses:
           - ${ula}/64${routes_block}${vip_block}
+      # Dedicated VLAN 179 BGP-peering NIC (Option B). No static address --
+      # SLAAC/RA only, matching the "no clients, ever" design (this segment
+      # is client-free by construction, so there's nothing to route through
+      # it besides the Calico BGP session itself).
+      - deviceSelector:
+          hardwareAddr: ${mac2}
+        dhcp: false
 EOF
   talosctl machineconfig patch "${base}" \
     --patch "@${RENDER_DIR}/patch-${name}.yaml" \

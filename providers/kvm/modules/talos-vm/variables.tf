@@ -52,3 +52,20 @@ variable "autostart" {
   type        = bool
   default     = true
 }
+
+variable "bridge2" {
+  description = <<-EOT
+    Optional second host bridge (e.g. controlplane's dedicated VLAN 179
+    BGP-peering segment). Both bridge2 and mac2 must be set together for
+    the second network_interface to materialize; leave both null for a
+    single-NIC VM (every caller other than providers/kvm/controlplane).
+  EOT
+  type        = string
+  default     = null
+}
+
+variable "mac2" {
+  description = "Fixed MAC address for the optional second NIC (see bridge2)."
+  type        = string
+  default     = null
+}

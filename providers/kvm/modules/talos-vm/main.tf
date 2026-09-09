@@ -45,6 +45,35 @@ resource "libvirt_domain" "vm" {
     mac    = var.mac
   }
 
+  # Optional second NIC (e.g. controlplane's dedicated VLAN 179 BGP-peering
+  # segment, kept physically separate from var.bridge's egress traffic --
+  # docs/superpowers/specs/2026-09-08-calico-bgp-peering-vlan179-design.md).
+  # Omitted by every other caller of this module (e.g. talos-cluster, used
+  # by XKubernetesCluster-managed clusters) -- both bridge2 and mac2 default
+  # to null, so this block only materializes when a caller opts in.
+  #
+  # CONFIRMED live 2026-09-08, adding this to all 6 controlplane VMs: when
+  # bridge2/mac2 are added to an ALREADY-CREATED domain, dmacvicar/libvirt
+  # (tested: v0.8.x line) reports "Modifications complete" and updates state
+  # to show both network_interface blocks, but never actually attaches the
+  # second NIC to the running OR persistent domain XML (confirmed via `virsh
+  # domiflist`/`dumpxml` immediately after a "successful" apply -- only the
+  # first interface was present). State then matches config, so a later
+  # `tofu plan` shows no drift and never surfaces the gap. The fix that
+  # avoids a reboot: `virsh attach-device <domain> <iface.xml> --live
+  # --config` by hand, once, per existing VM -- this is ONLY needed for a
+  # NIC added to a domain that already existed before the config change;
+  # a brand-new domain created with both blocks from the start (e.g. a
+  # from-scratch cluster rebuild, or a genuinely new node) attaches both
+  # NICs correctly at create time and needs no manual step.
+  dynamic "network_interface" {
+    for_each = var.bridge2 != null && var.mac2 != null ? [1] : []
+    content {
+      bridge = var.bridge2
+      mac    = var.mac2
+    }
+  }
+
   console {
     type        = "pty"
     target_port = "0"
