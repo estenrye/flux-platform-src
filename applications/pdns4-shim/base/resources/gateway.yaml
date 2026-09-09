@@ -1,15 +1,25 @@
-# HTTPS-terminate, same reasoning as keycloak's id.rye.ninja: Rackspace's
-# Designate calls in from outside the home network, so it needs a
-# publicly-trusted cert rather than step-ca's self-signed chain.
-# gatewayClassName: merged-eg shares the same Envoy proxy fleet/external
-# address as every other app's own Gateway object.
+# HTTPS-terminate, same certificate reasoning as keycloak's id.rye.ninja
+# (publicly-trusted cert rather than step-ca's self-signed chain, so
+# pcd-ce-lab -- the only current consumer -- doesn't need to trust step-ca).
+# Issuance is DNS-01 via Cloudflare (letsencrypt-prod ClusterIssuer), so this
+# doesn't require the service to be internet-reachable.
+#
+# gatewayClassName: internal-eg (not merged-eg): pdns4-shim is only called
+# by pcd-ce-lab, which is VLAN-100-resident, so it never needs a GUA-ingress
+# VIP -- and putting it on merged-eg's shared GUA VIP would make it exactly
+# the traffic pattern that hits the on-link reply bug root-caused in
+# docs/memory/node-gua-onlink-reply-unreliable.md (a GUA-sourced VLAN-100
+# client's connection to a GUA VIP has its post-handshake packets silently
+# dropped). internal-eg pins its shared Service to Calico's
+# lb-internal-ula-routed IPPool instead, sidestepping the bug entirely
+# rather than needing split-horizon DNS or a Talos-side fix.
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: pdns4-shim
   namespace: external-dns
 spec:
-  gatewayClassName: merged-eg
+  gatewayClassName: internal-eg
   listeners:
     - name: https
       hostname: pdns4-shim.rye.ninja

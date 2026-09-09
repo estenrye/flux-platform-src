@@ -1,0 +1,44 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: internal-proxy-config
+  namespace: envoy-gateway-system
+spec:
+  mergeGateways: true
+  # LAN-internal-only Envoy fleet, separate from custom-proxy-config
+  # (merged-eg's GUA-ingress fleet). Pinning the shared Service's
+  # LoadBalancer IP to Calico's lb-internal-ula-routed IPPool means every
+  # hostname on this GatewayClass draws a ULA VIP, never a GUA-ingress one --
+  # so VLAN-100-resident clients (e.g. pdns4-shim's pcd-ce-lab consumer)
+  # never source or target the delegated GUA /64 and can't hit the on-link
+  # reply bug root-caused in docs/memory/node-gua-onlink-reply-unreliable.md.
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        annotations:
+          cni.projectcalico.org/ipv6pools: '["lb-internal-ula-routed"]'
+      envoyDeployment:
+        replicas: 6
+        # Same ECMP-consistency mitigation as custom-proxy-config
+        # (docs/memory/vip-renumber-flakiness-investigation.md): Calico
+        # advertises a LoadBalancer service's BGP host route from every node
+        # regardless of externalTrafficPolicy: Local endpoint locality, so
+        # every ECMP next-hop needs a working local kube-proxy redirect.
+        strategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 0
+            maxUnavailable: 1
+        pod:
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      gateway.envoyproxy.io/owning-gatewayclass: internal-eg
+                  topologyKey: kubernetes.io/hostname
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
