@@ -68,8 +68,16 @@ spec:
         # (Designate) connecting to the merged internal-eg Service's UDP
         # port, same "no `from:` restriction" shape as the TCP listeners
         # above, since this Envoy fleet is externally reachable by design.
+        # Port 10053, NOT 53 -- confirmed live 2026-09-09 via `envoy
+        # /listeners` admin API and the Service's own port spec
+        # (port: 53, targetPort: 10053): Envoy Gateway internally binds
+        # every listener at 10000+<logical port> (443->10443, matching
+        # the TCP rule above, which is why this file already used 10443/
+        # 10080 instead of 443/80). My first attempt at this rule used 53
+        # by mistake and the fix in PR #203 didn't actually unblock the
+        # UDPRoute path -- this corrects it.
         - protocol: UDP
-          port: 53
+          port: 10053
   egress:
     - to:
         - podSelector:
