@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: vlan100-onlink-routing-fix
+  description: |-
+    Policy-routing DaemonSet fixing the VLAN-100 on-link reply-drop bug
+    (docs/memory/node-gua-onlink-reply-unreliable.md): forces VLAN 100's
+    two prefixes through the gateway instead of on-link NDP, with dynamic
+    /128 peer exceptions (via the Node API) keeping inter-node cluster
+    traffic genuinely on-link. Pilot-scoped to one node until validated
+    fleet-wide (docs/superpowers/plans/2026-09-09-vlan100-onlink-routing-daemonset.md).
+  tags:
+    - networking
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: experimental
+  owner: platform-engineering

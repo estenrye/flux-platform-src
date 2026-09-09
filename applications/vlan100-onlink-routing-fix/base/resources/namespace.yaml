@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vlan100-onlink-routing-fix
+  labels:
+    # hostNetwork + NET_ADMIN needs the "privileged" Pod Security level --
+    # baseline/restricted both reject hostNetwork outright.
+    pod-security.kubernetes.io/enforce: privileged

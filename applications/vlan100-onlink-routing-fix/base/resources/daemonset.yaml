@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vlan100-onlink-routing-fix
+  namespace: vlan100-onlink-routing-fix
+  annotations:
+    ignore-check.kube-linter.io/host-network: "Required: this reconciles the node's own IPv6 routing tables/rules (docs/superpowers/specs/2026-09-09-vlan100-onlink-routing-daemonset-design.md), which only exist in the host network namespace."
+    ignore-check.kube-linter.io/no-node-affinity: "The pilot-phase nodeSelector below is temporary (plan Task 2/3, removed in Task 4) -- once fleet-wide, this DaemonSet intentionally runs on every eligible node, so no affinity rule is meaningful long-term."
+    ignore-check.kube-linter.io/run-as-non-root: "Confirmed live 2026-09-09: NET_ADMIN alone as non-root (UID 65532) fails with 'RTNETLINK answers: Operation not permitted' on a plain ip route add. Root is genuinely required for this workload, not an oversight."
+    # checkov's Kubernetes framework uses annotations for skips, not
+    # inline comments (docs.checkov.io/2.Basics/Suppressing and Skipping
+    # Policies -- confirmed live 2026-09-09, an earlier inline-comment
+    # attempt here was silently ignored). CKV_K8S_9 (readiness) and
+    # CKV_K8S_29/31/11 (pod-level security context, seccomp, CPU limit)
+    # are fixed for real below instead of skipped.
+    checkov.io/skip1: "CKV_K8S_19=Required -- reconciles the node's own IPv6 routing tables/rules, which only exist in the host network namespace."
+    checkov.io/skip2: "CKV_K8S_25=NET_ADMIN is the entire point of this DaemonSet (route/rule manipulation); ALL other capabilities are explicitly dropped."
+    checkov.io/skip3: "CKV_K8S_38=Node-API peer discovery needs the token; automountServiceAccountToken: true is explicit, not a default left unexamined."
+    checkov.io/skip4: "CKV_K8S_23=Confirmed live 2026-09-09: NET_ADMIN alone as non-root fails ('Operation not permitted') on a plain ip route add -- root is genuinely required here."
+    checkov.io/skip5: "CKV_K8S_40=Same root requirement as CKV_K8S_23."
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: vlan100-onlink-routing-fix
+  template:
+    metadata:
+      labels:
+        app: vlan100-onlink-routing-fix
+    spec:
+      serviceAccountName: vlan100-onlink-routing-fix
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      hostNetwork: true
+      # hostNetwork pods default to the node's own DNS resolver, which
+      # doesn't know cluster-internal service names -- without this,
+      # "kubernetes.default.svc" (used for peer discovery) never resolves.
+      dnsPolicy: ClusterFirstWithHostNet
+      restartPolicy: Always
+      # PILOT PHASE (plan Task 2/3): scoped to the Task 1 validation node
+      # only. Task 4 removes this nodeSelector to go fleet-wide once Task 3
+      # confirms the DaemonSet-managed path matches Task 1's hand-run
+      # result -- do not remove this before then.
+      nodeSelector:
+        kubernetes.io/hostname: controlplane-wk-1
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: routing-fix
+          # nicolaka/netshoot: already proven throughout this investigation's
+          # live debugging (iproute2 + curl + jq in one image). Pinned
+          # digest, resolved from :latest 2026-09-09 -- a smaller
+          # purpose-built image could replace this later if desired.
+          image: docker.io/nicolaka/netshoot@sha256:147f2c4cb0aa7a741151bce2bfef71d9e1a04631636e24665ee2a5ed799feb47
+          command: ["/scripts/reconcile.sh"]
+          securityContext:
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_ADMIN"]
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+          livenessProbe:
+            exec:
+              command: ["pgrep", "-f", "reconcile.sh"]
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            exec:
+              command: ["pgrep", "-f", "reconcile.sh"]
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          env:
+            - name: VLAN100_PREFIXES
+              # TFiber's PD-delegated GUA + Calico/VLAN 100's ULA --
+              # fleet-specific to controlplane
+              # (docs/memory/node-gua-onlink-reply-unreliable.md).
+              value: "fd97:45c2:b3a1:100::/64,2607:3640:1064:270::/64"
+            - name: ROUTE_TABLE
+              value: "100"
+            - name: RULE_PRIORITY
+              value: "100"
+            - name: RECONCILE_INTERVAL_SECONDS
+              value: "60"
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      volumes:
+        - name: script
+          configMap:
+            name: vlan100-onlink-routing-fix
+            defaultMode: 0o500
+        - name: tmp
+          emptyDir: {}
