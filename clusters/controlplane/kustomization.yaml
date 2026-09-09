@@ -14,7 +14,7 @@ resources:
   - ../../applications/reloader/base
   - ../../applications/gateway-api-crds/base
   - ../../applications/envoy-gateway-crds/base
-  - ../../applications/envoy-gateway/base
+  - ../../applications/envoy-gateway/controlplane
   - ../../applications/external-dns/unifi/base
   - ../../applications/external-dns/cloudflare/controlplane
   # PowerDNS-API shim for Rackspace's OpenStack Designate pdns4 backend --

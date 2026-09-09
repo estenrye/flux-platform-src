@@ -6,8 +6,6 @@ resources:
   - resources/namespace.yaml
   - resources/custom-proxy-config.envoyproxy.yaml
   - resources/merged-eg.gatewayclass.yaml
-  - resources/internal-proxy-config.envoyproxy.yaml
-  - resources/internal-eg.gatewayclass.yaml
   - resources/network-policy.yaml
 
 helmCharts:

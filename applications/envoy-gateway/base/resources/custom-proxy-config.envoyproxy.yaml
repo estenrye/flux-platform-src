@@ -5,16 +5,17 @@ metadata:
   namespace: envoy-gateway-system
 spec:
   mergeGateways: true
-  # Codifies undeclared live drift found 2026-09-09 while debugging
-  # internal-proxy-config (docs/memory/node-gua-onlink-reply-unreliable.md):
-  # this fleet's live EnvoyProxy object already carries ipFamily: IPv6 (set
-  # imperatively at some point -- Flux's server-side apply doesn't own or
-  # revert fields absent from source), which is the only reason its
-  # listeners bind IPv6 instead of the CRD's documented IPv4-only default.
-  # Declaring it explicitly here matches current live behavior exactly (no
-  # functional change) and stops it from being one un-owned field away from
-  # silently reverting to IPv4-only on this IPv6-only cluster.
-  ipFamily: IPv6
+  # ipFamily: IPv6 is NOT set here -- this base is shared with the
+  # observability cluster (also v6-only) via clusters/*/kustomization.yaml.
+  # Each cluster patches it in independently
+  # (clusters/{controlplane,observability}/patches/envoy-proxy.ipfamily.yaml,
+  # M2 step 5 / M4 completion step B2) rather than hardcoding it in the
+  # shared base, keeping this reusable for a future non-IPv6-only consumer.
+  # (Corrected 2026-09-09: an earlier pass here mistakenly assumed this
+  # field was undeclared live drift and added it inline -- it wasn't; the
+  # cluster-level patch was simply missed during that investigation. See
+  # docs/memory/node-gua-onlink-reply-unreliable.md.)
+  #
   # Mitigation for the ingress VIP flakiness root-caused 2026-07-15
   # (docs/memory/vip-renumber-flakiness-investigation.md): Calico advertises
   # a LoadBalancer service's BGP host route from every node regardless of
