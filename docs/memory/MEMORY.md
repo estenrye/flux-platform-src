@@ -43,4 +43,5 @@
 - [Pinniped APIService Discovery Failure](pinniped-apiservice-discovery-failure.md) — clientsecret.supervisor.pinniped.dev APIService FailedDiscoveryCheck 17d+, stalls namespace-termination sweeps cluster-wide
 - [1Password Account: ryefamily](1password-account-ryefamily.md) — the `crossplane` vault (sops-age-key, service-account-token) lives under ryefamily.1password.com, not familyrye.1password.com
 - [M4 Step 6 Tier B First Live Run](m4-step6-tier-b-first-live-run.md) — real end-to-end provision+teardown passed 2026-08-15; first attempt hit an unrelated sealed-OpenBao incident
-- [Pod Egress GUA Routing Broken](pod-egress-gua-routing-broken.md) — pods can't reach ANY GUA destination; found during M4 B6; likely also blocks external-client-to-VIP ingress replies (2026-09-08), still open, blocks controlplane's VLAN 179 final cutover
+- [Pod Egress GUA Routing Broken](pod-egress-gua-routing-broken.md) — pods can't reach ANY GUA destination; found during M4 B6; DISPROVEN fleet-wide 2026-09-08, see node-gua-onlink-reply-unreliable for what actually explained the ingress symptom
+- [Node GUA On-Link Reply Unreliable](node-gua-onlink-reply-unreliable.md) — Talos node treats external GUA clients on its own connected /64 as on-link, replies via flaky direct NDP bypassing routing; confirmed root cause blocking controlplane's VLAN 179 final cutover; not yet fixed
