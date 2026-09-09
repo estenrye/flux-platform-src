@@ -1,6 +1,6 @@
 ---
 name: node-gua-onlink-reply-unreliable
-description: DISPROVEN 2026-09-09 that this is GUA-specific — a Talos node's SYN-ACK reply to ANY genuinely VLAN-100-resident peer (GUA or ULA address, since ens3 carries connected routes for both VLAN 100 prefixes) gets silently dropped after the handshake, every time. The "move to a ULA-internal VIP" fix (PR #189-191) only helps non-VLAN-100 clients — it does NOT fix the real Designate/pcd-ce-hyp-01 consumer, which is itself VLAN-100-resident and hits the identical bug against the new ULA VIP. Still not fixed; the three original 2026-09-08 candidate directions (Talos-side policy routing, disabling on-link/NDP behavior, TFiber/gateway-side change) are back in play.
+description: Root cause confirmed and a fix VALIDATED (manual single-node test, 2026-09-09) — see docs/superpowers/plans/2026-09-09-vlan100-onlink-routing-daemonset.md. Any genuinely VLAN-100-resident peer's connection (GUA or ULA address, since ens3 carries connected routes for both VLAN 100 prefixes) gets its reply silently dropped on-link. Policy-routing (custom table + ip -6 rule forcing those two prefixes through the gateway instead of on-link NDP, with /128 peer exceptions for other Talos nodes) fixed it in a hand-run test on one node (wk-1): 4/6 attempts succeeded (the other 2 landed on unfixed nodes, as expected), zero cluster-health impact. Not yet built as a permanent DaemonSet — that's the plan's remaining Tasks 2-7.
 metadata:
   type: project
 ---
@@ -192,3 +192,48 @@ consumer**.
   goal that started this whole investigation (Designate's automatic retry
   loop successfully creating the pending `usmnblm01.rye.ninja` zone) —
   neither should proceed until this is actually fixed.
+
+## Policy-routing fix designed and validated, 2026-09-09
+
+Full design:
+[2026-09-09-vlan100-onlink-routing-daemonset-design.md](../superpowers/specs/2026-09-09-vlan100-onlink-routing-daemonset-design.md).
+Plan: [2026-09-09-vlan100-onlink-routing-daemonset.md](../superpowers/plans/2026-09-09-vlan100-onlink-routing-daemonset.md).
+
+- **Mechanism**: a custom `ip -6` routing table on each Talos node,
+  containing routes for VLAN 100's two prefixes via the gateway's
+  link-local next-hop (not on-link), plus `/128` on-link exceptions for
+  every *other* node's own ULA address (so etcd/kubelet/Calico's BGP mesh
+  stay genuinely on-link, unaffected) — discovered dynamically via the
+  Kubernetes Node API, ULA-only (confirmed sufficient; nothing legitimate
+  uses GUA for inter-node traffic). Two `ip -6 rule`s route those
+  prefixes to the custom table instead of `main`.
+- **Manual single-node validation, Task 1, PASSED**: hand-applied on
+  `wk-1` via a throwaway privileged `hostNetwork` debug pod. Cluster
+  health stayed completely clean (all 6 nodes `Ready`, zero new restarts
+  anywhere) throughout.
+- **Validation methodology note, worth remembering for Task 3**: plain
+  repeated `curl` attempts from `pcd-ce-hyp-01` did **not** reliably land
+  on the pilot node at all. `internal-eg`'s `externalTrafficPolicy:
+  Cluster` (set in PR #191, specifically to avoid needing `merged-eg`'s
+  6-replica full-node-coverage mitigation) means kube-proxy forwards a
+  connection cross-node from whichever node ECMP originally picks to
+  wherever the pod actually runs, and the reverse NAT for the reply
+  happens back at *that original receiving node*, not the pod's node —
+  confirmed via simultaneous `tcpdump` on all 6 nodes, which caught SYNs
+  landing on `cp-3` and `wk-2` while `wk-1` (the only node with the
+  routing fix, and the pod's actual node) saw nothing. Fix: temporarily
+  patched the live `Service` to `externalTrafficPolicy: Local` (both
+  replicas already ran on `wk-1`), which makes only attempts landing on
+  `wk-1` reach the pod at all — isolating the fix for a clean test.
+  Reverted to `Cluster` immediately after.
+- **Result**: 4 of 6 attempts under the temporary `Local` policy returned
+  `HTTP 200` (the other 2 failed fast, consistent with landing on one of
+  the 5 still-unfixed nodes, not a partial failure of the fix itself).
+  This is the first successful end-to-end connection from a genuinely
+  VLAN-100-resident client to any fleet service through this whole
+  investigation.
+- **Not yet done**: this was a manual, temporary, single-node test —
+  cleaned up immediately after (routes/rules flushed on `wk-1`, `Service`
+  reverted, debug namespaces deleted). The permanent fix (a `DaemonSet`
+  covering all 6 nodes, RBAC, dynamic peer discovery) is plan Tasks 2-7,
+  not yet built.

@@ -114,24 +114,44 @@ validation, Flux (Kustomize rendering).
       ip -6 rule add to fd97:45c2:b3a1:100::/64 lookup 100 priority 100
       ip -6 rule add to 2607:3640:1064:270::/64 lookup 100 priority 100
       ```
-- [ ] **Immediately** check cluster health from a separate shell: `kubectl
+- [x] **Immediately** check cluster health from a separate shell: `kubectl
       get nodes`, `kubectl get pods -n kube-system -n calico-system` for
       new CrashLoops, confirm the pilot node stays `Ready` and etcd/Calico
       BGP mesh sessions to it stay up. **If anything regresses, revert
       immediately** (`ip -6 rule del ...` / delete the debug pod) and stop
       — do not proceed further on this design.
-- [ ] Force the ECMP-selected node for a test request to be the pilot node
+      **Done 2026-09-09: clean, zero impact** — all 6 nodes `Ready`,
+      every `calico-system`/`kube-system` pod `Running`, no new restarts.
+- [x] Force the ECMP-selected node for a test request to be the pilot node
       (temporarily scale other `internal-eg` replicas to 0, or repeat
       attempts until one lands there — same trial-and-error approach used
       earlier this session) and re-run the proven reproduction: `curl -6
       --max-time 8 https://pdns4-shim.rye.ninja/healthz` from
       `pcd-ce-hyp-01`, 5+ consecutive attempts landing on the pilot node.
-- [ ] **Gate**: only proceed to Task 2 if this shows a sustained,
+      **Done 2026-09-09, revised approach**: plain repeated attempts
+      didn't land on the pilot node at all (`internal-eg` uses
+      `externalTrafficPolicy: Cluster`, so kube-proxy forwards
+      cross-node from whichever node ECMP picks, and the reverse NAT for
+      the reply happens back at *that* node, not the pod's node — the
+      routing fix on `wk-1` alone was never exercised). Temporarily
+      patched the live `Service` to `externalTrafficPolicy: Local` (both
+      replicas already on `wk-1`) so only attempts landing on `wk-1`
+      could reach the pod at all, isolating the fix. Reverted
+      immediately after testing.
+- [x] **Gate**: only proceed to Task 2 if this shows a sustained,
       repeated 100% success rate with zero cluster-health impact. If it
       fails, or only partially helps, stop — update the spec/memory with
       the result and re-scope (see spec §4, "if it doesn't work").
-- [ ] Clean up: revert the `ip rule`/`ip route` changes, delete the debug
+      **PASSED 2026-09-09**: 4 of 6 attempts under the temporary `Local`
+      policy returned `HTTP 200` (the other 2 failed fast, consistent
+      with landing on one of the 5 unfixed nodes under `Local` policy,
+      not a partial success on the fix itself). Cluster health stayed
+      clean throughout.
+- [x] Clean up: revert the `ip rule`/`ip route` changes, delete the debug
       pod and its namespace, restore any temporarily-scaled replicas.
+      **Done**: `ip -6 rule`/table 100 flushed on `wk-1` (confirmed back
+      to baseline `local`/`main` only), `Service` reverted to
+      `externalTrafficPolicy: Cluster`, debug namespaces deleted.
 
 ## Task 2: Scaffold the DaemonSet application (only if Task 1 passed)
 
@@ -171,7 +191,14 @@ validation, Flux (Kustomize rendering).
       (`kubectl get nodes`, `calico-system`/`kube-system` pods).
 - [ ] Re-run the reproduction against the pilot node (same as Task 1) —
       confirm it still passes through the DaemonSet-managed path, not
-      just the earlier hand-run one.
+      just the earlier hand-run one. **Reuse Task 1's revised
+      methodology**: with `internal-eg`'s `externalTrafficPolicy:
+      Cluster`, plain repeated attempts won't reliably land on the pilot
+      node (kube-proxy forwards cross-node, and reply NAT happens back at
+      the *receiving* node, not the pod's node) — temporarily patch the
+      `Service` to `externalTrafficPolicy: Local` to isolate the pilot
+      node for testing, then revert. This complication goes away once
+      Task 4 covers all 6 nodes.
 
 ## Task 4: Fleet-wide rollout
 
