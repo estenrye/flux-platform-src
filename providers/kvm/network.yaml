@@ -42,6 +42,18 @@ vlan64:
   ipv4_gateway: 10.64.64.1
   ipv6_gateway_ula: fd97:45c2:b3a1:64::1
 
+# Dedicated, client-free VLAN for Calico's BGP peering session addresses
+# only (docs/superpowers/specs/2026-09-08-calico-bgp-peering-vlan179-design.md).
+# Every controlplane VM gets a genuine second NIC bridged here (Option B --
+# physically-enforced split from VLAN 100's egress traffic), not a VLAN
+# sub-interface on the existing NIC. No clients, no other appliances, ever
+# placed on this VLAN -- that's the fix.
+vlan179:
+  bridge: br179 # providers/kvm/controlplane/main.tf reads this directly for each node's second network_interface.
+  ipv4_subnet: 10.179.0.0/16
+  ipv4_gateway: 10.179.0.1
+  ipv6_gateway_ula: fd97:45c2:b3a1:179::1
+
 allocations:
   infra_subnet: fd97:45c2:b3a1:100::/64 # node addresses, apiserver VIP, appliance, internal LB VIPs
   apiserver_vip: fd97:45c2:b3a1:100::10 # Talos shared L2 VIP; api.controlplane.rye.ninja (internal DNS)

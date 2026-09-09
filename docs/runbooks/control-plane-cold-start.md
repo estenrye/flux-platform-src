@@ -35,37 +35,42 @@ Until M2 completes, the control plane is the Spot cluster and recovery is:
 
 Recovery order — each layer must be verified before the next:
 
-1. **Network** (UniFi): VLAN 100 up, BGP enabled (AS 64512), static route
-   for `fd97:45c2:b3a1:100::/64`. Verify: gateway reachable, RA/SLAAC on
+1. **Network** (UniFi): VLAN 100 up, static route for
+   `fd97:45c2:b3a1:100::/64`. Verify: gateway reachable, RA/SLAAC on
    VLAN 100.
-2. **TrueNAS Scale** (`nas.rye.ninja`): pools imported, iSCSI + NFS services
+2. **BGP peering** (UniFi, AS 64512): VLAN 179 up (dedicated, client-free —
+   see ADR-22's 2026-09-08 amendment). Verify: `vtysh -c 'show bgp ipv6
+   unicast summary'` shows sessions sourced from `fd97:45c2:b3a1:179::/64`,
+   not VLAN 100. Split out from step 1 above: VLAN 100 connectivity and BGP
+   peering are on separate VLANs now and can be up/down independently.
+3. **TrueNAS Scale** (`nas.rye.ninja`): pools imported, iSCSI + NFS services
    up, API reachable. Verify: `curl -k https://nas.rye.ninja/api/...`.
    TODO(M1): exact dataset list and service checklist.
-3. **KVM host** (`mf-ms-a2-01`, ULA `fd97:45c2:b3a1:100::2000`): libvirt up,
+4. **KVM host** (`mf-ms-a2-01`, ULA `fd97:45c2:b3a1:100::2000`): libvirt up,
    `zpool import vmpool`, bridges up. Verify: `virsh list --all`,
    `zpool status vmpool`. TODO(M1): host prep script reference.
-4. **NAT64/DNS64 appliance** (`nat64-01`, ULA `::64`): boots with the
+5. **NAT64/DNS64 appliance** (`nat64-01`, ULA `::64`): boots with the
    cluster VMs; without it, IPv4-only egress (GitHub/ghcr) is down and Flux
    cannot pull. Verify: DNS64 synthesizes AAAA for `github.com`; v6 ping
    `64:ff9b::` prefix. Break-glass if unrecoverable: TODO(M1) git bundle /
    image side-load procedure.
-5. **controlplane cluster VMs**: start control plane nodes first, then
+6. **controlplane cluster VMs**: start control plane nodes first, then
    workers (`virsh start`), or rebuild via
    `.bin/create-controlplane-cluster.sh` + etcd snapshot restore.
    Verify: `talosctl health`. TODO(M1): etcd restore procedure reference.
-6. **step-ca**: CNPG cluster recovers from barman (Garage, after M3) or
+7. **step-ca**: CNPG cluster recovers from barman (Garage, after M3) or
    redeploys with root material from SOPS. Verify: fingerprint check
    (docs/memory/step-ca-connectivity-validation.md) matches
    `454b03bf485f2a70f84b6c290e3ff3eaaef30ef192822c5f69d8c593f7635add`
    (update if root legitimately rotates - see M0 inventory PKI section).
    TODO(M2): exact restore-vs-redeploy decision tree.
-7. **OpenBao**: unseal ceremony per `openbao-unseal.md` (SOPS-encrypted
+8. **OpenBao**: unseal ceremony per `openbao-unseal.md` (SOPS-encrypted
    key shares; storage backend is CNPG/PostgreSQL, not Raft, so the
    `openbao-db` Cluster must be healthy first and recovers via its own
    barman-to-Garage path like `step-ca-db`, not a raft snapshot
    restore). Until OpenBao is up, ESO across the fleet cannot sync
    (workloads keep running on last-synced secrets).
-8. **Keycloak**: TODO(M3) - CNPG restore; verify OIDC discovery endpoint;
+9. **Keycloak**: TODO(M3) - CNPG restore; verify OIDC discovery endpoint;
    Pinniped Supervisor follows.
 9. **Fleet reconciliation**: workload clusters reconnect automatically
    (Flux pulls, leaf NATS replays after M10). Verify fleet health in

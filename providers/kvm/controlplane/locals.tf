@@ -31,9 +31,16 @@ locals {
   nodes = merge(
     {
       for name, ula in local.network.allocations.controlplane_nodes : name => {
-        role            = "controlplane"
-        ula             = ula
-        mac             = format("52:54:00:b3:a1:%02x", local.node_mac_octet[name])
+        role = "controlplane"
+        ula  = ula
+        mac  = format("52:54:00:b3:a1:%02x", local.node_mac_octet[name])
+        # Second NIC, dedicated VLAN 179 BGP-peering segment (Option B --
+        # docs/superpowers/specs/2026-09-08-calico-bgp-peering-vlan179-design.md).
+        # Same octet, same recognizable b3:a1 site-ULA signature as the
+        # primary MAC, distinguished only by the third byte (01 vs 00) --
+        # cannot collide with any primary-NIC or NAT64-appliance MAC, all
+        # of which live under 52:54:00:...
+        mac2            = format("52:54:01:b3:a1:%02x", local.node_mac_octet[name])
         vcpu            = 4
         memory_mb       = var.controlplane_memory_mb
         disk_size_bytes = 100 * 1024 * 1024 * 1024
@@ -44,6 +51,7 @@ locals {
         role            = "worker"
         ula             = ula
         mac             = format("52:54:00:b3:a1:%02x", local.node_mac_octet[name])
+        mac2            = format("52:54:01:b3:a1:%02x", local.node_mac_octet[name])
         vcpu            = 4
         memory_mb       = var.worker_memory_mb
         disk_size_bytes = 200 * 1024 * 1024 * 1024
@@ -65,5 +73,18 @@ check "node_mac_octets" {
   assert {
     condition     = length(values(local.node_mac_octet)) == length(distinct(values(local.node_mac_octet)))
     error_message = "Two node ULAs map to the same MAC last octet — node MACs would collide. Fix allocations in providers/kvm/network.yaml."
+  }
+  # The second-NIC MAC scheme (52:54:01:b3:a1:<octet>) reuses the same
+  # per-node octet as the primary MAC (52:54:00:b3:a1:<octet>) by design --
+  # they can never collide with each other or with the NAT64 appliance
+  # (52:54:00:b3:a1:64) since the third byte (00 vs 01) differs. This
+  # assertion exists only to catch a future refactor that breaks that
+  # invariant, e.g. if the two schemes are ever computed independently.
+  assert {
+    condition = alltrue([
+      for name, n in local.nodes :
+      substr(n.mac, 0, 8) == "52:54:00" && substr(n.mac2, 0, 8) == "52:54:01" && substr(n.mac, 9, -1) == substr(n.mac2, 9, -1)
+    ])
+    error_message = "Primary and secondary NIC MACs must share the same per-node octet and differ only in the third byte (52:54:00 vs 52:54:01)."
   }
 }

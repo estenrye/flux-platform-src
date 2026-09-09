@@ -36,5 +36,9 @@ module "talos_node" {
   iso_path        = libvirt_volume.talos_iso.id
   bridge          = local.host.bridge
   mac             = each.value.mac
+  # Dedicated VLAN 179 BGP-peering segment (Option B -- see locals.tf and
+  # docs/superpowers/specs/2026-09-08-calico-bgp-peering-vlan179-design.md).
+  bridge2 = local.network.vlan179.bridge
+  mac2    = each.value.mac2
 }
 

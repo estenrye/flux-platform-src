@@ -15,14 +15,19 @@ installation:
         natOutgoing: Enabled # pods are ULA — SNAT to node address for egress
         blockSize: 122
         nodeSelector: all()
-    # Pin the BGP source to each node's Kubernetes InternalIP (the static
-    # ULA ::11-::13/::21-::23). A `cidrs: [::/64]` match was ambiguous — the
-    # /64 also holds each node's EUI-64 SLAAC address and the floating
-    # apiserver VIP (::10), so nodes peered the UniFi gateway from a mix of
-    # sources (some SLAAC; cp-1 via the VIP it holds). NodeInternalIP is
-    # always the configured static ULA and never the floating VIP.
+    # 2026-09-08 (ADR-22 amendment): BGP peering moved off VLAN 100 onto its
+    # own dedicated, client-free VLAN 179 -- fixes a confirmed-live hairpin
+    # bug where any VLAN-100-resident client hitting a BGP-advertised
+    # LoadBalancer VIP had its ACK/ClientHello silently dropped (same class
+    # as the 2026-07-15 VIP-pool move, recurring at the peering-session
+    # layer). Every controlplane VM now has a genuine second NIC on VLAN
+    # 179 (docs/superpowers/specs/2026-09-08-calico-bgp-peering-vlan179-design.md);
+    # this cidrs match is unambiguous because that /64 carries nothing else
+    # (no SLAAC GUA, no floating VIP -- VLAN 179 is BGP-peering-only by
+    # design), unlike VLAN 100's old NodeInternalIP match which existed
+    # specifically to disambiguate from that VLAN's other addresses.
     nodeAddressAutodetectionV6:
-      kubernetes: NodeInternalIP
+      cidrs: ["fd97:45c2:b3a1:179::/64"]
   # Talos: default paths work with operator-managed Calico; kubelet volume
   # plugin path patching is not required on Talos >= 1.5.
 apiServer:
