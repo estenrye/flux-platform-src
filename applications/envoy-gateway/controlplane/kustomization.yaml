@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: envoy-gateway-system
+
+# controlplane overlay: adds the internal-eg GatewayClass/EnvoyProxy
+# (docs/memory/node-gua-onlink-reply-unreliable.md) on top of the shared
+# base. This does NOT belong in ../base -- that directory is also
+# consumed by clusters/observability, which has no VLAN-100 on-link bug
+# to work around and shouldn't get a second, unused Envoy fleet. Found
+# live 2026-09-09: these two resources were originally added directly to
+# ../base and had already reached observability's rendered repo (and
+# possibly its live cluster) before this was caught.
+resources:
+  - ../base
+  - resources/internal-eg.gatewayclass.yaml
+  - resources/internal-proxy-config.envoyproxy.yaml

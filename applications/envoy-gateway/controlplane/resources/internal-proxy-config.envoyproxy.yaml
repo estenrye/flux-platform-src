@@ -10,9 +10,10 @@ spec:
   # IPv6-only cluster that meant every listener (including the readiness
   # probe on 19003) bound to 0.0.0.0 instead of [::], so kubelet's probe
   # (hitting the pod's real IPv6 address) could never connect, and neither
-  # could real client traffic. custom-proxy-config's fleet only avoided
-  # this because it carries the same setting live but undeclared in git
-  # (now fixed alongside this).
+  # could real client traffic. custom-proxy-config's fleet avoids this via
+  # a cluster-level patch instead (clusters/controlplane/patches/envoy-proxy.ipfamily.yaml)
+  # -- this resource lives only in the controlplane overlay already, so
+  # there's no shared-base reason to do the same here; inline is simplest.
   ipFamily: IPv6
   # LAN-internal-only Envoy fleet, separate from custom-proxy-config
   # (merged-eg's GUA-ingress fleet). Pinning the shared Service's

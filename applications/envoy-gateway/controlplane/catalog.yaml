@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: envoy-gateway-controlplane
+  description: |-
+    controlplane overlay: adds the internal-eg GatewayClass/EnvoyProxy
+    fleet, pinned to the ULA-internal Calico IPPool, so VLAN-100-resident
+    LAN clients (e.g. pdns4-shim's pcd-ce-lab consumer) never need a
+    GUA-ingress VIP. Inherits the shared merged-eg fleet from the base.
+  tags:
+    - gateway
+    - networking
+    - operators
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
