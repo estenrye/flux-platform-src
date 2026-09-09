@@ -157,7 +157,7 @@ validation, Flux (Kustomize rendering).
 
 **Files:** `applications/vlan100-onlink-routing-fix/**`
 
-**DONE 2026-09-09** (PRs #196, #197 in flux-platform-src). Built as
+**DONE 2026-09-09** (PR #196 in flux-platform-src). Built as
 designed, with three deviations worth recording for later reference:
 
 - [x] `base/resources/rbac.yaml`, `base/resources/configmap.yaml`,
