@@ -1,6 +1,6 @@
 ---
 name: pod-egress-gua-routing-broken
-description: Pod-sourced traffic cannot reach ANY GUA-space destination (confirmed with an unrelated external control, not just fleet VIPs) — a real, previously-unknown Calico/BGP routing gap, unrelated to M4 completion step B6. Also now confirmed as the likely blocker for external-client-to-VIP ingress (see 2026-09-08 update) — the reply is pod-sourced traffic egressing to the client's GUA address, so this may be one bug, not two
+description: Pod-sourced traffic cannot reach ANY GUA-space destination (confirmed with an unrelated external control, not just fleet VIPs) — a real, previously-unknown Calico/BGP routing gap, unrelated to M4 completion step B6. DISPROVEN as fleet-wide 2026-09-08 — pod-initiated GUA egress confirmed working fine on controlplane; see [[node-gua-onlink-reply-unreliable]] for the actually-confirmed cause of the symptom this was first suspected to explain
 metadata:
   type: project
 ---
@@ -96,47 +96,24 @@ needs to change. Don't re-open or re-debug B6's own manifests based on this
 finding — the next session should treat this as a wholly separate
 investigation into fleet pod-egress networking.
 
-## 2026-09-08 update: likely the same bug, seen from the ingress side
+## 2026-09-08 update: disproven as the explanation for the VLAN 179 symptom
 
-Found again while validating
-[2026-09-08-calico-bgp-peering-vlan179-design.md](../superpowers/specs/2026-09-08-calico-bgp-peering-vlan179-design.md)
-(moving `controlplane`'s Calico BGP peering session to a dedicated VLAN
-179 to fix a *different*, confirmed-and-fixed hairpin bug at the gateway).
-That migration's own fix was verified working exactly as designed —
-`tcpdump` on both the gateway's `br100` and `br179` during a live attempt
-showed the client's packet correctly transiting `br100` → `br179` toward
-the real BGP next-hop, no more same-interface loop.
+Initially suspected (see prior revision of this section) as the explanation
+for why `controlplane`'s VLAN 179 BGP-peering migration
+([design doc](../superpowers/specs/2026-09-08-calico-bgp-peering-vlan179-design.md))
+didn't fix the actual Designate-to-`pdns4-shim.rye.ninja` symptom. **Directly
+disproven the same session**: a plain pod-network pod on `controlplane`
+(`nicolaka/netshoot`, no `hostNetwork`) successfully reached both an
+external GUA control (Google DNS `2001:4860:4860::8888`, Cloudflare
+`2606:4700:4700::1111`) and the fleet's own `pdns4-shim` VIP — fast, clean
+`301`/`302`/`200` responses, no hang. Pod-initiated GUA egress works fine
+on `controlplane`. Whether it's still broken on `observability` (the
+original finding, never independently re-tested there) is unknown — this
+disproof is `controlplane`-specific.
 
-**But the end-to-end symptom that started the whole VLAN 179 investigation
-(an external VLAN-100 client — reproduced from the KVM host itself,
-same bug class as the original Designate host — calling
-`https://pdns4-shim.rye.ninja/healthz`, a `2607:3640:1064:27f::/64`
-ingress VIP) still hangs identically after the TLS ClientHello, HTTP 000,
-every time**, completely unchanged by the VLAN 179 fix. The client's TCP
-handshake appears to complete (its own ACK implies a SYN-ACK was received,
-even though no such reply appears in the `br100`/`br179` captures — it
-must arrive via some other path), but no application data ever comes
-back.
-
-This matches this bug's own hypothesis exactly: the pod's SYN-ACK/reply
-*is* pod-sourced traffic egressing toward a GUA destination (the external
-client's address) — if pod-egress-to-GUA is broken generally, an
-external-client-to-VIP ingress flow would show precisely this signature
-(inbound reaches the pod fine, DNAT/ingress all correct, but the pod's own
-reply can never route back). **Not yet confirmed as the same root cause**
-— the design doc's own author was explicit about not conflating the two
-during that migration's validation — but the symptom match is strong
-enough that the next investigation into this bug should test the ingress
-direction too, not just pod-initiated egress. If confirmed as one bug,
-fixing it would unblock both the original B6 finding and Designate's
-pending `usmnblm01.rye.ninja` zone creation.
-
-`controlplane`'s VLAN 179 migration itself is complete and correct on its
-own terms (PR #186, merged) — this finding is why its final cutover step
-(removing VLAN 100 from the gateway's BGP peer-group) was deliberately
-left undone: the phased-migration design's own gate for that step
-("Designate's own retry loop successfully creates the pending zone") was
-not met, and won't be until this bug is fixed.
+The actual cause of the VLAN 179 symptom turned out to be a different,
+node-level (not pod-level) issue — see
+[[node-gua-onlink-reply-unreliable]] for the confirmed root cause.
 
 ## Session context this was found in
 
