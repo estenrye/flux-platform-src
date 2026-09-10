@@ -13,11 +13,21 @@
 # dropped). internal-eg pins its shared Service to Calico's
 # lb-internal-ula-routed IPPool instead, sidestepping the bug entirely
 # rather than needing split-horizon DNS or a Talos-side fix.
+# cert-manager.io/cluster-issuer here (not a standalone Certificate
+# resource, unlike keycloak/step-ca's Gateways in this repo) -- cert-manager's
+# gateway-shim controller is enabled cluster-wide
+# (applications/cert-manager/base/values.yaml's `config.enableGatewayAPI:
+# true`) and watches Gateways for this exact annotation, auto-creating a
+# Certificate per TLS listener from its `certificateRefs`/`hostname`. This
+# is a one-off for pdns4-shim, not a repo-wide convention change -- the
+# other Gateways' standalone Certificate resources are untouched.
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: pdns4-shim
   namespace: external-dns
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   gatewayClassName: internal-eg
   listeners:
