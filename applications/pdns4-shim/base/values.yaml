@@ -1,14 +1,14 @@
 replicaCount: 1
 
-# tag is "0.1" (floating minor), not "0.1.0": that exact tag is occupied by
-# this same chart's own OCI Helm artifact (oci://.../pdns4-shim:0.1.0) --
-# defaulting to .Chart.AppVersion (0.1.0) would resolve to the Helm chart
+# tag is "0.2" (floating minor), not "0.2.0": that exact tag is occupied by
+# this same chart's own OCI Helm artifact (oci://.../pdns4-shim:0.2.0) --
+# defaulting to .Chart.AppVersion (0.2.0) would resolve to the Helm chart
 # blob, not a container image. Pinned for real by digest below via
 # kustomization.yaml's `images:` override, which also satisfies
 # CKV_K8S_43 regardless of what tag is written here.
 image:
   repository: docker.io/estenrye/pdns4-shim
-  tag: "0.1"
+  tag: "0.2"
   pullPolicy: IfNotPresent
 
 serviceAccount:
