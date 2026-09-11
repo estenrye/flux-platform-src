@@ -45,3 +45,13 @@ spec:
           port: 53
         - protocol: UDP
           port: 53
+        # AXFR pull from a zone's configured master (pdns4-shim 0.2.0+,
+        # src/dns/axfr.rs) -- outbound TCP the shim itself initiates,
+        # unlike every other rule above which is inbound-forwarded or
+        # DNS/apiserver traffic. designate-mdns's AXFR listener
+        # (docs/specs/2026-09-10-axfr-zone-transfer.md in the
+        # pdns4-external-dns-rest-http-cr-shim repo) is port 5354, not 53.
+        # No `to:` restriction, matching this block's existing pattern —
+        # the destination is whatever host a zone's `masters` names.
+        - protocol: TCP
+          port: 5354
