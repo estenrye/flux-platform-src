@@ -33,8 +33,9 @@ new spare nibble, not just updating one variable.
    Networks first) and record the choice the same way `27f` was chosen
    2026-07-15.
 2. **Regenerate + re-upload the FRR config**: update the GUA-derived lines
-   in `providers/kvm/unifi-frr.conf` (BGP listen range uses `gua_prefix`;
-   `CALICO-VIPS-IN` seq 20 uses `ingress_vip_pool`) to the new values;
+   in `providers/kvm/unifi-frr.conf` (only `CALICO-VIPS-IN` seq 20, which uses
+   `ingress_vip_subnet`; the BGP listen range is ULA-only since the 2026-09-09
+   VLAN 179 cutover) to the new values;
    upload via UniFi UI. (ULA lines never change.) Do **not** create a UniFi
    Network/VLAN for the ingress VIP `/64` — it must stay unprovisioned
    (no RA, no on-link membership) or the gateway will misroute it exactly
