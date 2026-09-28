@@ -100,7 +100,7 @@ write_files:
       # below -- same self/tun split as the public instance, see that
       # spec's Section 1 for why they're meant to differ):
       ipv4-addr 192.168.254.1
-      ipv6-addr ${tayga_ula_prefix}:65::1
+      ipv6-addr ${tayga_ula_prefix}:66::1
       prefix ${tayga_ula_prefix}:65::/96
       dynamic-pool 192.168.254.0/24
       data-dir /var/spool/tayga-priv
@@ -128,7 +128,7 @@ write_files:
       # NAT64 boundary and large TLS records blackhole otherwise.
       ExecStartPre=-/sbin/ip link set dev nat64priv mtu 1280
       ExecStartPre=-/sbin/ip addr add 192.168.254.2 dev nat64priv
-      ExecStartPre=-/sbin/ip addr add ${tayga_ula_prefix}:65::2 dev nat64priv
+      ExecStartPre=-/sbin/ip addr add ${tayga_ula_prefix}:66::2 dev nat64priv
       ExecStartPre=-/sbin/ip route add 192.168.254.0/24 dev nat64priv
       ExecStartPre=-/sbin/ip route add ${tayga_ula_prefix}:65::/96 dev nat64priv
       ExecStart=/usr/sbin/tayga -c /etc/tayga-priv.conf --pidfile /run/tayga-priv.pid
@@ -151,7 +151,8 @@ write_files:
       # new mechanism. STALE IF pcd.rye.ninja's IPv4 EVER CHANGES: this is
       # a manually maintained value, not derived from anything (spec
       # 2026-09-28-nat64-private-nsp-design.md, "Operational notes").
-      local-data: "pcd.rye.ninja. AAAA ${tayga_ula_prefix}:65::a2d:2d2d"
+      server:
+        local-data: "pcd.rye.ninja. AAAA ${tayga_ula_prefix}:66::a2d:2d2d"
 
   - path: /etc/unbound/unbound.conf.d/dns64.conf
     content: |
