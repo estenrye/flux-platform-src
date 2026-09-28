@@ -69,7 +69,9 @@ allocations:
     ula: fd97:45c2:b3a1:64::64
     ipv4: 10.64.64.64/24 # translated-traffic egress toward the v4 gateway, now on its own dedicated VLAN
     tayga_pool: 192.168.255.0/24 # private dynamic pool on the tayga TUN interface
-    nat64_prefix: 64:ff9b::/96 # RFC 6052 well-known prefix
+    nat64_prefix: 64:ff9b::/96 # RFC 6052 well-known prefix, public IPv4 destinations only
+    tayga_priv_pool: 192.168.254.0/24 # private dynamic pool for the NSP (private-destination) tayga instance
+    nat64_priv_prefix: fd97:45c2:b3a1:64:65::/96 # NSP, carved from this appliance's own /64; private (RFC1918) destinations only -- see docs/superpowers/specs/2026-09-28-nat64-private-nsp-design.md
   truenas:
     ula_reserved: fd97:45c2:b3a1:100::1000
     gua: 2607:3640:1064:270::1000
