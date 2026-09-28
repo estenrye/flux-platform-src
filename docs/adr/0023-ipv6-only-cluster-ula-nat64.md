@@ -141,3 +141,16 @@ Full design:
   §1 for why (Tayga's own self-address and the tun interface's OS-bound
   address are meant to differ; the IPv4 side already uses the identical
   `.1`/`.2` split). Recorded so it isn't re-investigated.
+- **Correction, confirmed live 2026-09-28 (Task 3 of the implementation
+  plan), after this amendment was first drafted:** the "no new route
+  needed anywhere" claim above is wrong. Carving the NSP from the
+  appliance's own already-routed `/64` does not make it reachable from
+  other VLANs on its own — the site's router still has to be told to
+  deliver packets for that specific `/96`. Live testing found packets to
+  the NSP from another VLAN (the `controlplane` cluster) actively
+  rejected by that VLAN's own gateway, before ever reaching the
+  appliance. Fixed manually, outside Terraform: a static route for the
+  `/96` via the appliance's own address, plus a UniFi Policy Table rule
+  with Destination scope = IP for that `/96` — the same pattern
+  `docs/memory/unifi-zone-firewall.md` already documents for the
+  well-known prefix. See the design doc's §3.2 for the full correction.

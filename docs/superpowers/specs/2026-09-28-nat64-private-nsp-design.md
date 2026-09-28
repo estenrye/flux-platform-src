@@ -95,6 +95,42 @@ own init script installs the more-specific `/96` route to its tun device
 locally, exactly as it already does for the WKP (`ip route add
 "$IPV6_PREFIX" dev "$TUN_DEVICE"`, confirmed in `/etc/init.d/tayga`).
 
+**Correction, confirmed live 2026-09-28 (Task 3) — the "no new route
+anywhere" claim above is wrong:** being carved from an on-link,
+already-routed `/64` does not make a more specific `/96` automatically
+reachable from other VLANs. The site's router still has to be told to
+deliver packets for that specific `/96` — being a sub-block of an
+already-routed prefix isn't the same as being routed itself. Confirmed
+live: `ping`/`curl` to the NSP address from a different VLAN (the
+`controlplane` cluster, on its own peering VLAN) failed with an immediate
+ICMPv6 "Destination unreachable: Address unreachable" from *that
+cluster's own gateway* — an active rejection, not a timeout, and it
+happened before the packet could ever reach the appliance's VLAN. NDP
+proxying (`ndppd`) was installed and tested live on the appliance as a
+candidate fix and made no difference, ruling it out as the (sole) cause —
+the rejection happens before NDP resolution would ever be attempted. The
+actual fix, added manually by the site operator, outside Terraform
+(matching how `docs/memory/unifi-zone-firewall.md` already documents the
+identical problem for the *existing* well-known-prefix path when it was
+first stood up): a static route for `fd97:45c2:b3a1:64:65::/96` via the
+appliance's own address (`fd97:45c2:b3a1:64::64`), plus a UniFi Policy
+Table rule with Destination scope = IP for that specific `/96` (not a
+zone-to-zone rule) — the same pattern already used for `64:ff9b::/96`. No
+Terraform/Crossplane resource in this repo manages this kind of rule
+(checked; none exists) — it's manual UniFi configuration, same as it was
+for the well-known prefix.
+
+What's still true from the reasoning above: the `/96` genuinely is
+collision-free within the client-free `vlan64` segment (no other host on
+that VLAN needed to be considered), and Tayga's own init script does
+still install the more-specific local route to its tun device once
+traffic actually arrives at the appliance — that part was never in
+question and needed no change. What was wrong is the inference from
+those two true facts to "no new route anywhere": carving the NSP from an
+on-link `/64` saved a *second `/64` allocation*, not the router-level
+route/firewall work needed to make the `/96` reachable from off-VLAN in
+the first place.
+
 Chosen prefix: `fd97:45c2:b3a1:64:65::/96` — the `65` (16th bit-group)
 is unused by anything currently on this VLAN (`::1` gateway, `::64`
 appliance, `::6401`/`::6402` Tayga, and one MAC-derived SLAAC address in
