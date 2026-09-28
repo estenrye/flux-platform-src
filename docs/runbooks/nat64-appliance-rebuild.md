@@ -50,11 +50,9 @@ VLANs — confirmed live 2026-09-28. `ping`/`curl` to the NSP address from a
 different VLAN (the `controlplane` cluster, on its own peering VLAN)
 failed with an immediate ICMPv6 "Destination unreachable: Address
 unreachable" from *that cluster's own gateway* — an active rejection, not
-a timeout, before the packet ever reached the appliance's VLAN. Installing
-and testing `ndppd` (NDP proxying) on the appliance made no difference,
-because the rejection happens before NDP resolution would ever be tried.
-The fix, done manually on the UniFi gateway (nothing in this repo manages
-it — no Terraform/Crossplane resource for it exists):
+a timeout, before the packet ever reached the appliance's VLAN. The
+confirmed fix, done manually on the UniFi gateway (nothing in this repo
+manages it — no Terraform/Crossplane resource for it exists):
 
 1. A static route for `fd97:45c2:b3a1:64:65::/96` via the appliance's own
    address, `fd97:45c2:b3a1:64::64`.
@@ -67,6 +65,27 @@ If this appliance is ever rebuilt against a *different* site network (new
 VLAN, new `/64`), redo both of these by hand — they are gateway
 configuration, not part of the cloud-init template, and this repo
 re-creates neither of them on rebuild.
+
+**`ndppd` status: enabled live, never isolated as necessary or
+unnecessary.** Before the route/rule above were in place, `ndppd` (NDP
+proxying — `net.ipv6.conf.lan.proxy_ndp=1` plus a `static` rule for
+`fd97:45c2:b3a1:64:65::/96` on the `lan` interface) was installed and
+enabled on the appliance to test the hypothesis that the gateway couldn't
+discover `nat64-01` as the next-hop via Neighbor Discovery. Enabling it
+alone made no observable difference — but that only rules it out as the
+*sole* blocker, since the rejection happened before NDP resolution would
+ever be attempted, so the test couldn't have shown a difference either
+way. It was left running when the route/rule above were added and
+end-to-end verification then succeeded, so **the confirmed-working
+configuration includes `ndppd` running**, not the route/rule alone in
+isolation. Whether `ndppd` turned out to actually be required (the
+gateway needing NDP-proxied resolution to reach `nat64-01` once it
+decides to route there) or is simply harmless-and-untested-for-removal is
+genuinely unknown. On a future rebuild: try the static route + Policy
+Table rule alone first; only add `ndppd` (config above) if that alone
+isn't sufficient. If you do have to fall back to `ndppd`, please update
+this note with the result — this is the one part of the private-NSP setup
+that hasn't been cleanly isolated.
 
 ### Checks
 

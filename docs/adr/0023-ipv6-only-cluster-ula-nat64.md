@@ -142,7 +142,7 @@ Full design:
   address are meant to differ; the IPv4 side already uses the identical
   `.1`/`.2` split). Recorded so it isn't re-investigated.
 - **Correction, confirmed live 2026-09-28 (Task 3 of the implementation
-  plan), after this amendment was first drafted:** the "no new route
+  plan), after this amendment was first drafted:** the "no new route is
   needed anywhere" claim above is wrong. Carving the NSP from the
   appliance's own already-routed `/64` does not make it reachable from
   other VLANs on its own — the site's router still has to be told to
