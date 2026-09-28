@@ -74,9 +74,14 @@ needs two daemons on `nat64-01`:
 | tun device | `nat64` | `nat64priv` |
 | prefix | `64:ff9b::/96` (RFC 6052 Well-Known Prefix) | `fd97:45c2:b3a1:64:65::/96` (Network-Specific Prefix — see §3.2) |
 | dynamic pool | `192.168.255.0/24` | `192.168.254.0/24` |
-| Tayga self-address (v4/v6) | `192.168.255.1` / `fd97:45c2:b3a1:64::6401` (unchanged, see §1) | `192.168.254.1` / `fd97:45c2:b3a1:64:65::1` |
-| tun interface address (v4/v6) | `192.168.255.2` / `fd97:45c2:b3a1:64::6402` | `192.168.254.2` / `fd97:45c2:b3a1:64:65::2` |
+| Tayga self-address (v4/v6) | `192.168.255.1` / `fd97:45c2:b3a1:64::6401` (unchanged, see §1) | `192.168.254.1` / `fd97:45c2:b3a1:64:66::1`¹ |
+| tun interface address (v4/v6) | `192.168.255.2` / `fd97:45c2:b3a1:64::6402` | `192.168.254.2` / `fd97:45c2:b3a1:64:66::2`¹ |
 | systemd unit | `tayga.service` (unchanged) | `tayga-priv.service` (new) |
+
+¹ Corrected from an earlier `:65::1`/`:65::2` (inside the prefix itself)
+after Tayga rejected that at startup; deliberately in a different `/96`
+sub-block than the `:65::/96` prefix — see the runbook's "Gotchas found
+rebuilding this path" section for why.
 
 RFC 6052's private-IPv4 restriction applies only to the Well-Known Prefix;
 a Network-Specific Prefix is the network operator's own address space, and
@@ -166,14 +171,33 @@ leave `nat64-01`.
 All within `providers/kvm/`, no other repo, no other module:
 
 - `modules/nat64-appliance/templates/user-data.yaml.tftpl`: new
-  `write_files` entries (`/etc/tayga-priv.conf`, `/etc/default/tayga-priv`,
-  `/etc/systemd/system/tayga-priv.service.d/mtu.conf`), an added
-  `local-data` line (a new `unbound.conf.d/pcd-private.conf` drop-in,
-  matching how `lan-forward.conf` is already split out rather than
-  growing `dns64.conf`), an added masquerade rule in the existing
-  `nftables.conf` block, and `tayga-priv` added to `runcmd`'s
-  `systemctl enable --now`/`restart` lines. The existing `tayga.conf`/
-  `default/tayga` blocks are untouched (see §1 — no bug there).
+  `write_files` entries — `/etc/tayga-priv.conf` (the second instance's
+  Tayga config) and `/etc/systemd/system/tayga-priv.service`, a **native
+  systemd unit**, not a `/etc/default/tayga-priv` env file plus an
+  `/etc/init.d/tayga`-derived sysv script or a `tayga.service.d/mtu.conf`
+  drop-in on a generated unit (an earlier draft of this section described
+  both, matching the public instance's shape; neither exists in the
+  committed template). This was the single most consequential design
+  decision in this change: the packaged `/etc/init.d/tayga` script
+  extracts `TUN_DEVICE`/`IPV6_PREFIX`/`DYNAMIC_POOL` via `sed` against the
+  hardcoded path `/etc/tayga.conf`, not `/etc/$NAME.conf` — a renamed copy
+  (`NAME=tayga-priv`) would still read the *original* WKP config for those
+  values, misconfiguring the new instance against the *public* instance's
+  tun device. `tayga-priv.service` instead calls `tayga` directly with
+  `-c`/`--config` and `-p`/`--pidfile` (per `tayga(8)`) and does its own
+  `ip link`/`ip addr`/`ip route`/MTU setup in `ExecStartPre`, needing no
+  init-script copy or drop-in at all. Also new: an added `local-data` line
+  (a new `unbound.conf.d/pcd-private.conf` drop-in, matching how
+  `lan-forward.conf` is already split out rather than growing
+  `dns64.conf`), an added masquerade rule in the existing `nftables.conf`
+  block, and, in `runcmd`, a `mkdir -p /var/spool/tayga-priv` line (Tayga
+  does not create its own `data-dir`), a `systemctl daemon-reload` (needed
+  because `tayga-priv.service` is a hand-written unit systemd hasn't seen
+  before, unlike `tayga.service`, which the sysv generator already
+  produces at boot from the packaged init script), and `tayga-priv` added
+  to the `systemctl enable --now`/`restart` lines. The existing
+  `tayga.conf`/`default/tayga` blocks are untouched (see §1 — no bug
+  there).
 - `network.yaml`: two new lines under the existing `allocations.nat64_appliance`
   block — `tayga_priv_pool: 192.168.254.0/24` and
   `nat64_priv_prefix: fd97:45c2:b3a1:64:65::/96`.
@@ -191,11 +215,33 @@ All within `providers/kvm/`, no other repo, no other module:
   cost.
 - **Rebuild.** `nat64-01` is cattle (`docs/runbooks/nat64-appliance-rebuild.md`);
   both instances and the DNS override come back identically from the one
-  template on any rebuild.
+  template on any rebuild — but that is only true of the appliance's own
+  config. **Correction:** the private-NSP path as a whole is not fully
+  reproduced by a rebuild. The runbook's "One-time site-network setup"
+  section documents a manual static route (`fd97:45c2:b3a1:64:65::/96` via
+  the appliance's own address) and a UniFi Policy Table rule, made
+  directly on the site's router/gateway, that are required for the `/96`
+  to be reachable from off-VLAN at all — neither is created or restored by
+  any `tofu apply`/rebuild of the appliance, since neither is a Terraform
+  resource. A rebuild that doesn't also re-verify this manual config can
+  silently leave the private path unreachable from other VLANs even
+  though the appliance itself looks healthy.
 - **Rollback.** Deleting the added `write_files`/`runcmd` lines and
-  re-applying removes the private path entirely. The existing WKP
-  instance, its unit, and its nftables rule are never touched by this
-  change at all, so reverting carries no risk to public egress.
+  re-applying removes the private path's *appliance-side* config. The
+  existing WKP instance, its unit, and its nftables rule are never touched
+  by this change at all, so reverting carries no risk to public egress.
+  **Correction:** "re-applying" here is not a bare `tofu apply`. This
+  project separately confirmed (plan Task 3 Step 1; runbook "Gotchas")
+  that a bare `tofu apply` for a template-only change does not actually
+  rebuild the guest — `instance-id: nat64-01` never changes, so
+  cloud-init's NoCloud datasource skips re-running `write_files`/`runcmd`
+  for an instance-id it has already provisioned. `tofu taint` on the
+  domain and volume resources is required first (see the runbook's
+  "Rebuild" section). Also note rollback here is silent on the manual
+  UniFi route/rule above: removing the template's `write_files` doesn't
+  remove that gateway config, so a rolled-back appliance leaves an orphaned
+  (harmless but stale) route/rule on the gateway until someone removes it
+  by hand.
 
 ## 6. Testing
 
