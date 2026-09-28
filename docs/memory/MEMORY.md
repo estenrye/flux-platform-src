@@ -45,3 +45,4 @@
 - [M4 Step 6 Tier B First Live Run](m4-step6-tier-b-first-live-run.md) — real end-to-end provision+teardown passed 2026-08-15; first attempt hit an unrelated sealed-OpenBao incident
 - [Pod Egress GUA Routing Broken](pod-egress-gua-routing-broken.md) — pods can't reach ANY GUA destination; found during M4 B6; DISPROVEN fleet-wide 2026-09-08, see node-gua-onlink-reply-unreliable for what actually explained the ingress symptom
 - [Node GUA On-Link Reply Unreliable](node-gua-onlink-reply-unreliable.md) — RESOLVED 2026-09-09 (ADR-28): VLAN-100 on-link reply drop fixed fleet-wide via policy-routing DaemonSet; Designate's zone creation succeeded, unblocks VLAN 179 final cutover
+- [NAT64 Private-NSP Manual Config](nat64-private-nsp-manual-config.md) — manual UniFi route/Policy Table rule for `fd97:45c2:b3a1:64:65::/96` (not in Terraform); `ndppd`/`proxy_ndp` enabled live on `nat64-01` but not in the cloud-init template, with a testable prediction it's unnecessary

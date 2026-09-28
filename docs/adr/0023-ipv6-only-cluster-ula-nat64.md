@@ -101,3 +101,56 @@ Full migration:
   — fixed to template from a new top-level `nat64Ula`/`nat64Prefix` on
   `crossplane.environment-config.kvm-network.yaml` instead, so a future
   move is a one-file change again, not a second hardcode to remember.
+
+## Amendment 2026-09-28 (a second, NSP-based translation path for private-IPv4 destinations)
+
+Full design:
+[2026-09-28-nat64-private-nsp-design.md](../superpowers/specs/2026-09-28-nat64-private-nsp-design.md).
+
+- The RFC 6052 Well-Known Prefix (`64:ff9b::/96`) this appliance has used
+  since M1 only translates to *global* IPv4 addresses — RFC 6052 §3.1
+  forbids embedding a private (RFC 1918) address in it, and Tayga
+  enforces this. Found live (2026-09-27/28): `pcd.rye.ninja`, a private
+  OpenStack cloud's Keystone endpoint the `CloudControllerManager` work
+  needs to reach, resolves to `10.45.45.45` — unreachable via the
+  existing path no matter how it's configured, while the identical path
+  to a public destination (`github.com`) works.
+- `nat64-01` gets a second, independent Tayga instance
+  (`tayga-priv.service`, tun device `nat64priv`) using a **Network-Specific
+  Prefix** instead — `fd97:45c2:b3a1:64:65::/96`, carved out of the
+  appliance's own already-routed `fd97:45c2:b3a1:64::/64` rather than a
+  new `/64` allocation, so no new route is needed anywhere (`vlan64` is a
+  dedicated, client-free VLAN — no collision risk). An NSP is the
+  network operator's own address space and carries none of the WKP's
+  private-address restriction.
+- Unbound gets one static `local-data` AAAA line for `pcd.rye.ninja`
+  pointing at its NSP-embedded address, rather than a second DNS64
+  instance (`dns64-prefix` is global to an Unbound instance) — the same
+  targeted-override pattern `lan-forward.conf` already uses for
+  `rye.ninja`. Scoped to this one hostname; a future private destination
+  is one more line, not a new mechanism.
+- The "single deliberate dual-stack exception" framing still holds — the
+  appliance now runs two translation instances for two genuinely
+  different, RFC-6052-compliant traffic classes, not two appliances.
+  Nothing about the existing WKP path, `composition.yaml`, or any Talos
+  node config changes: per the 2026-09-06 amendment above, nodes already
+  reach the appliance via their default route, so a new prefix within its
+  existing `/64` needs no node-side awareness.
+- A `.6401`/`.6402` address discrepancy on the existing instance looked
+  like a bug during live debugging and is not one — see the design doc's
+  §1 for why (Tayga's own self-address and the tun interface's OS-bound
+  address are meant to differ; the IPv4 side already uses the identical
+  `.1`/`.2` split). Recorded so it isn't re-investigated.
+- **Correction, confirmed live 2026-09-28 (Task 3 of the implementation
+  plan), after this amendment was first drafted:** the "no new route is
+  needed anywhere" claim above is wrong. Carving the NSP from the
+  appliance's own already-routed `/64` does not make it reachable from
+  other VLANs on its own — the site's router still has to be told to
+  deliver packets for that specific `/96`. Live testing found packets to
+  the NSP from another VLAN (the `controlplane` cluster) actively
+  rejected by that VLAN's own gateway, before ever reaching the
+  appliance. Fixed manually, outside Terraform: a static route for the
+  `/96` via the appliance's own address, plus a UniFi Policy Table rule
+  with Destination scope = IP for that `/96` — the same pattern
+  `docs/memory/unifi-zone-firewall.md` already documents for the
+  well-known prefix. See the design doc's §3.2 for the full correction.

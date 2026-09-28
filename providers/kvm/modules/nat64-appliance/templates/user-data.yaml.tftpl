@@ -65,6 +65,7 @@ write_files:
         chain postrouting {
           type nat hook postrouting priority srcnat; policy accept;
           ip saddr ${tayga_pool_cidr} oifname "lan" masquerade
+          ip saddr 192.168.254.0/24 oifname "lan" masquerade
         }
       }
       # MSS clamp both directions through the translator: PMTUD does not
@@ -83,6 +84,75 @@ write_files:
       # then trigger local fragmentation/PTB instead of blackholing.
       [Service]
       ExecStartPost=/usr/sbin/ip link set dev nat64 mtu 1280
+
+  - path: /etc/tayga-priv.conf
+    content: |
+      # Userspace NAT64 (RFC 6146), PRIVATE instance: translates a
+      # Network-Specific Prefix (not the well-known prefix) so this
+      # appliance can also reach RFC 1918 destinations, which the
+      # well-known-prefix instance (tayga.service) cannot -- RFC 6052
+      # section 3.1 forbids embedding a non-global IPv4 address in the
+      # well-known prefix, and tayga enforces it.
+      # See docs/superpowers/specs/2026-09-28-nat64-private-nsp-design.md.
+      tun-device nat64priv
+      # tayga's own addresses inside this translator (distinct from the
+      # public instance's pool and from the tun interface's own address
+      # below -- same self/tun split as the public instance, see that
+      # spec's Section 1 for why they're meant to differ):
+      ipv4-addr 192.168.254.1
+      ipv6-addr ${tayga_ula_prefix}:66::1
+      prefix ${tayga_ula_prefix}:65::/96
+      dynamic-pool 192.168.254.0/24
+      data-dir /var/spool/tayga-priv
+
+  - path: /etc/systemd/system/tayga-priv.service
+    content: |
+      # Native unit, not a copy of the packaged /etc/init.d/tayga: that
+      # script's TUN_DEVICE/IPV6_PREFIX/DYNAMIC_POOL are extracted from
+      # the hardcoded path /etc/tayga.conf (not /etc/$NAME.conf), so a
+      # renamed copy would misconfigure this instance against the
+      # PUBLIC instance's tun device. See tayga(8) for -c/--config and
+      # -p/--pidfile.
+      [Unit]
+      Description=Userspace NAT64, private NSP instance (nat64priv)
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=forking
+      PIDFile=/run/tayga-priv.pid
+      ExecStartPre=-/usr/sbin/tayga -c /etc/tayga-priv.conf --mktun
+      ExecStartPre=-/sbin/ip link set nat64priv up
+      # Clamp to the IPv6 minimum MTU, same reasoning as the public
+      # instance's mtu.conf drop-in: PMTUD does not complete across the
+      # NAT64 boundary and large TLS records blackhole otherwise.
+      ExecStartPre=-/sbin/ip link set dev nat64priv mtu 1280
+      ExecStartPre=-/sbin/ip addr add 192.168.254.2 dev nat64priv
+      ExecStartPre=-/sbin/ip addr add ${tayga_ula_prefix}:66::2 dev nat64priv
+      ExecStartPre=-/sbin/ip route add 192.168.254.0/24 dev nat64priv
+      ExecStartPre=-/sbin/ip route add ${tayga_ula_prefix}:65::/96 dev nat64priv
+      ExecStart=/usr/sbin/tayga -c /etc/tayga-priv.conf --pidfile /run/tayga-priv.pid
+      ExecStopPost=-/sbin/ip link set nat64priv down
+      ExecStopPost=-/usr/sbin/tayga -c /etc/tayga-priv.conf --rmtun
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/unbound/unbound.conf.d/pcd-private.conf
+    content: |
+      # Targeted override, not a second Unbound instance: dns64-prefix is
+      # global to the instance and stays the well-known prefix (for
+      # github.com/ghcr.io, unbound.conf.d/dns64.conf). This one name
+      # bypasses DNS64 synthesis entirely and points straight at its
+      # NSP-embedded address. Scoped to this one host on purpose -- a
+      # second private hostname is one more local-data line here, not a
+      # new mechanism. STALE IF pcd.rye.ninja's IPv4 EVER CHANGES: this is
+      # a manually maintained value, not derived from anything (spec
+      # 2026-09-28-nat64-private-nsp-design.md, "Operational notes").
+      server:
+        local-data: "pcd.rye.ninja. AAAA ${tayga_ula_prefix}:65::a2d:2d2d"
 
   - path: /etc/unbound/unbound.conf.d/dns64.conf
     content: |
@@ -118,7 +188,9 @@ write_files:
 
 runcmd:
   - sysctl --system
+  - mkdir -p /var/spool/tayga-priv
   - systemctl enable --now qemu-guest-agent nftables
   - systemctl restart nftables
-  - systemctl enable --now tayga unbound
-  - systemctl restart tayga unbound
+  - systemctl daemon-reload
+  - systemctl enable --now tayga unbound tayga-priv
+  - systemctl restart tayga unbound tayga-priv
