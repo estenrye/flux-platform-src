@@ -13,3 +13,4 @@ resources:
 - resources/flux.source.git.yaml
 - resources/flux.kustomization.yaml
 - ../../applications/calico/base
+- ../../applications/spegel/base
