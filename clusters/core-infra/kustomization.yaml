@@ -14,3 +14,4 @@ resources:
 - resources/flux.kustomization.yaml
 - ../../applications/calico/base
 - ../../applications/spegel/base
+- ../../applications/cinder-csi/base
