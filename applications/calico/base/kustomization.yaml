@@ -30,10 +30,10 @@ patches:
       metadata:
         name: tigera-operator-uninstall
         namespace: tigera-operator
-  # - target:
-  #     kind: Deployment
-  #     name: tigera-operator
-  #   path: patches/deployment.yaml
+  - target:
+      kind: Deployment
+      name: tigera-operator
+    path: patches/deployment.yaml
   - target:
       kind: ClusterRole
       name: tigera-operator
