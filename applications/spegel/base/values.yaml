@@ -1,0 +1,26 @@
+# Spegel hardening. The registry must run as root to reach the containerd
+# socket and write the host's containerd registry config, but everything else
+# is locked down.
+securityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 128Mi
+livenessProbe:
+  enabled: true
+priorityClassName: platform-critical
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
