@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: csi-cinder-nodeplugin
+  namespace: kube-system
+  annotations:
+    checkov.io/skip90: "CKV2_K8S_6=The CSI plugin only makes egress calls to the Kubernetes and OpenStack APIs and serves no ingress; no NetworkPolicy is managed for kube-system."
+    checkov.io/skip01: "CKV_K8S_16=The node plugin must be privileged to format and mount block devices for kubelet."
+    checkov.io/skip02: "CKV_K8S_20=Mounting volumes into kubelet's mount namespace requires privilege escalation."
+    checkov.io/skip03: "CKV_K8S_25=The node plugin needs SYS_ADMIN to mount volumes."
+    checkov.io/skip04: "CKV_K8S_37=The node plugin needs SYS_ADMIN to mount volumes."
+    checkov.io/skip05: "CKV_K8S_39=SYS_ADMIN is required for mount operations."
+    checkov.io/skip06: "CKV_K8S_19=The node plugin uses hostNetwork to reach the OpenStack metadata service and APIs from the node."
+    checkov.io/skip07: "CKV_K8S_23=Root is required to access kubelet plugin directories and host devices."
+    checkov.io/skip08: "CKV_K8S_40=Root (UID 0) is required to access kubelet plugin directories and host devices."
+    checkov.io/skip09: "CKV_K8S_22=The privileged cinder-csi-plugin container manages host mounts and devices and is not run with a read-only root filesystem."
+    checkov.io/skip10: "CKV_K8S_8=CSI sidecars expose no HTTP endpoint; the cinder-csi-plugin container has a liveness probe and the liveness-probe sidecar monitors the CSI socket."
+    checkov.io/skip11: "CKV_K8S_9=CSI node containers serve no traffic; readiness is not meaningful."
+    checkov.io/skip12: "CKV_K8S_38=The node plugin uses its service account token to query the Kubernetes API."
+    checkov.io/skip13: "CKV_K8S_43=Images are pinned to immutable release tags managed by the upstream manifests; digests are not published with them."
+    checkov.io/skip14: "CKV_K8S_28=The privileged plugin container does not drop NET_RAW; it requires host access."
+    checkov.io/skip15: "CKV_K8S_29=The privileged plugin container requires a bespoke security context."
+    checkov.io/skip16: "CKV_K8S_30=The privileged plugin container requires a bespoke security context."
+    checkov.io/skip17: "CKV_K8S_31=The privileged plugin container runs unconfined to manage host mounts."
+    ignore-check.kube-linter.io/drop-net-raw-capability: "The privileged plugin container requires host access and is not capability-restricted."
+    ignore-check.kube-linter.io/host-mounts: "Mounts kubelet and /dev directories from the host by design."
+    ignore-check.kube-linter.io/host-network: "Needs node network access to reach OpenStack APIs."
+    ignore-check.kube-linter.io/no-liveness-probe: "CSI sidecars expose no HTTP endpoint; the plugin has a probe."
+    ignore-check.kube-linter.io/no-node-affinity: "DaemonSet runs on every node."
+    ignore-check.kube-linter.io/no-read-only-root-fs: "The privileged plugin manages host mounts and devices."
+    ignore-check.kube-linter.io/no-readiness-probe: "CSI node containers serve no traffic."
+    ignore-check.kube-linter.io/non-isolated-pod: "Node plugin uses hostNetwork and serves no ingress."
+    ignore-check.kube-linter.io/privilege-escalation-container: "Required to mount block devices for kubelet."
+    ignore-check.kube-linter.io/privileged-container: "Required to mount block devices for kubelet."
+    ignore-check.kube-linter.io/run-as-non-root: "Root is required to access kubelet plugin directories and host devices."
+    ignore-check.kube-linter.io/sensitive-host-mounts: "Mounts kubelet and /dev directories from the host by design."
+    ignore-check.kube-linter.io/writable-host-mount: "Writes the CSI socket and mounts volumes under kubelet by design."
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    spec:
+      restartPolicy: Always
+      serviceAccount: null
+      serviceAccountName: csi-cinder-node-sa
+      containers:
+        - name: node-driver-registrar
+          imagePullPolicy: Always
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+        - name: liveness-probe
+          imagePullPolicy: Always
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+        - name: cinder-csi-plugin
+          imagePullPolicy: Always
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}

@@ -8,3 +8,7 @@ resources:
   - "https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/v1.36.0/manifests/cinder-csi-plugin/cinder-csi-controllerplugin.yaml"
   - "https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/v1.36.0/manifests/cinder-csi-plugin/cinder-csi-nodeplugin-rbac.yaml"
   - "https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/v1.36.0/manifests/cinder-csi-plugin/cinder-csi-nodeplugin.yaml"
+
+patches:
+  - path: patches/controllerplugin.yaml
+  - path: patches/nodeplugin.yaml
