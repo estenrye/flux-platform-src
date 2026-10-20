@@ -12,3 +12,4 @@ resources:
 - resources/flux.ssh-key-secret.yaml
 - resources/flux.source.git.yaml
 - resources/flux.kustomization.yaml
+- ../../applications/calico/base

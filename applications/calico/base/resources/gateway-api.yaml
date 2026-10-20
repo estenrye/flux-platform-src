@@ -1,0 +1,23 @@
+apiVersion: operator.tigera.io/v1
+kind: GatewayAPI
+metadata:
+  name: default
+spec:
+  crdManagement: Reconcile
+  gatewayClasses:
+  - envoyProxyRef:
+      name: external-dedicated-proxy-config
+      namespace: envoy-gateway-system
+    name: external-dedicated
+  - envoyProxyRef:
+      name: custom-proxy-config
+      namespace: envoy-gateway-system
+    name: external-merged
+  - envoyProxyRef:
+      name: internal-dedicated-proxy-config
+      namespace: envoy-gateway-system
+    name: internal-dedicated
+  - envoyProxyRef:
+      name: internal-proxy-config
+      namespace: envoy-gateway-system
+    name: internal-merged

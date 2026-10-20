@@ -1,0 +1,112 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  annotations:
+    config.k8s.io/owning-inventory: talos-bootstrap-manifests-inventory
+  name: custom-proxy-config
+  namespace: envoy-gateway-system
+spec:
+  ipFamily: IPv6
+  logging:
+    level:
+      default: warn
+  mergeGateways: true
+  provider:
+    kubernetes:
+      envoyDeployment:
+        pod:
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchLabels:
+                    gateway.envoyproxy.io/owning-gatewayclass: merged-eg
+                topologyKey: kubernetes.io/hostname
+          tolerations:
+          - effect: NoSchedule
+            key: node-role.kubernetes.io/control-plane
+            operator: Exists
+        replicas: 2
+        strategy:
+          rollingUpdate:
+            maxSurge: 0
+            maxUnavailable: 1
+          type: RollingUpdate
+      envoyService:
+        annotations:
+          projectcalico.org/ipv6pools: '["lb-ingress-routed"]'
+        externalTrafficPolicy: Cluster
+        type: LoadBalancer
+    type: Kubernetes
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  annotations:
+    config.k8s.io/owning-inventory: talos-bootstrap-manifests-inventory
+  name: external-dedicated-proxy-config
+  namespace: envoy-gateway-system
+spec:
+  ipFamily: IPv6
+  logging:
+    level:
+      default: warn
+  mergeGateways: false
+  provider:
+    kubernetes:
+      envoyDeployment:
+        replicas: 2
+      envoyService:
+        annotations:
+          projectcalico.org/ipv6pools: '["lb-ingress-routed"]'
+        externalTrafficPolicy: Cluster
+        type: LoadBalancer
+    type: Kubernetes
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  annotations:
+    config.k8s.io/owning-inventory: talos-bootstrap-manifests-inventory
+  name: internal-dedicated-proxy-config
+  namespace: envoy-gateway-system
+spec:
+  ipFamily: IPv6
+  logging:
+    level:
+      default: warn
+  mergeGateways: false
+  provider:
+    kubernetes:
+      envoyDeployment:
+        replicas: 2
+      envoyService:
+        annotations:
+          projectcalico.org/ipv6pools: '["lb-internal-routed"]'
+        externalTrafficPolicy: Cluster
+        type: LoadBalancer
+    type: Kubernetes
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  annotations:
+    config.k8s.io/owning-inventory: talos-bootstrap-manifests-inventory
+  name: internal-proxy-config
+  namespace: envoy-gateway-system
+spec:
+  ipFamily: IPv6
+  logging:
+    level:
+      default: warn
+  mergeGateways: true
+  provider:
+    kubernetes:
+      envoyDeployment:
+        replicas: 2
+      envoyService:
+        annotations:
+          projectcalico.org/ipv6pools: '["lb-internal-routed"]'
+        externalTrafficPolicy: Cluster
+        type: LoadBalancer
+    type: Kubernetes
