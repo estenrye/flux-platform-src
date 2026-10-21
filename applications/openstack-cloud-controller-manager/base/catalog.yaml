@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: openstack-cloud-controller-manager
+  description: |-
+    This service provides cloud controller functionality
+    for OpenStack environments
+  tags:
+    - cloud controller manager
+    - ccm
+    - crds
+    - operators
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
