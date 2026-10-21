@@ -18,3 +18,4 @@ resources:
 - ../../applications/cinder-csi/base
 - ../../applications/external-csi-snapshotter/base
 - ../../applications/kubelet-serving-cert-approver/base
+- ../../applications/metrics-server/base
