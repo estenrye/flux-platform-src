@@ -16,6 +16,8 @@ resources:
 - ../../applications/openstack-cloud-controller-manager/base
 - ../../applications/spegel/base
 - ../../applications/cinder-csi/base
+- resources/storageclass.csi-cinder-sc-delete.yaml
+- resources/storageclass.csi-cinder-sc-retain.yaml
 - ../../applications/external-csi-snapshotter/base
 - ../../applications/kubelet-serving-cert-approver/base
 - ../../applications/metrics-server/base
