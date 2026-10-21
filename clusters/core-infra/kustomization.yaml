@@ -19,4 +19,6 @@ resources:
 - ../../applications/external-csi-snapshotter/base
 - ../../applications/kubelet-serving-cert-approver/base
 - ../../applications/metrics-server/base
+- ../../applications/prometheus-operator-crds/base
+- ../../applications/opentelemetry-operator/base
 - ../../applications/cert-manager/base
