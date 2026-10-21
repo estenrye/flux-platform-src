@@ -1,0 +1,32 @@
+# cert-manager-approver-policy is cluster-wide and the built-in approver is
+# disabled, so the operator's webhook serving Certificate sits
+# WaitingForApproval forever unless a CertificateRequestPolicy matches it.
+# Mirrors applications/openbao's certificate-request-policy.yaml pattern.
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: opentelemetry-operator-webhook-policy
+spec:
+  allowed:
+    dnsNames:
+      required: true
+      values:
+        - opentelemetry-operator-webhook.opentelemetry-operator-system.svc
+        - opentelemetry-operator-webhook.opentelemetry-operator-system.svc.cluster.local
+    subject:
+      organizationalUnits:
+        values:
+          - opentelemetry-operator
+    isCA: false
+    usages:
+      - digital signature
+      - key encipherment
+      - server auth
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: Issuer
+      name: opentelemetry-operator-selfsigned-issuer
+    namespace:
+      matchNames:
+        - opentelemetry-operator-system

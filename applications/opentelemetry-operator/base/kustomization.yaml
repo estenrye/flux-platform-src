@@ -28,6 +28,8 @@ patches:
 resources:
   - resources/namespace.yaml
   - resources/networkpolicy.deployment.yaml
+  - resources/certificate-request-policy.yaml
+  - resources/certificate-request-policy-rbac.yaml
 
 images:
   - name: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator
