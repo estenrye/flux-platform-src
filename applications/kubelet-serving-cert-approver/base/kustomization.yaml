@@ -5,3 +5,12 @@ namespace: kubelet-serving-cert-approver
 resources:
   - "https://raw.githubusercontent.com/alex1989hu/kubelet-serving-cert-approver/v0.12.1/deploy/standalone-install.yaml"
 
+patches:
+  - target:
+      kind: Deployment
+      name: kubelet-serving-cert-approver
+    path: patches/deployment.yaml
+  - target:
+      kind: ClusterRole
+      name: certificates:kubelet-serving-cert-approver
+    path: patches/clusterrole.yaml

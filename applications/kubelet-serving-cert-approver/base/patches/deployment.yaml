@@ -1,0 +1,7 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubelet-serving-cert-approver
+  annotations:
+    checkov.io/skip1: "CKV_K8S_38=The approver uses its service account token to list and approve kubelet serving CertificateSigningRequests through the Kubernetes API."
+    checkov.io/skip2: "CKV_K8S_43=Image is pinned to an immutable upstream release tag via the upstream manifest."
