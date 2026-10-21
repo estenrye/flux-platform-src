@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: external-csi-snapshotter
+  description: |-
+    This service provides external CSI snapshotter functionality
+    for Kubernetes environments
+  tags:
+    - external csi snapshotter
+    - csi
+    - snapshotter
+    - crds
+    - operators
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

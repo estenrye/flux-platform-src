@@ -13,6 +13,7 @@ resources:
 - resources/flux.source.git.yaml
 - resources/flux.kustomization.yaml
 - ../../applications/calico/base
+- ../../applications/openstack-cloud-controller-manager/base
 - ../../applications/spegel/base
 - ../../applications/cinder-csi/base
-- ../../applications/openstack-cloud-controller-manager/base
+- ../../applications/external-csi-snapshotter/base
