@@ -203,15 +203,6 @@ priorityClassName: "platform-critical"
 #            values:
 #            - master
 affinity:
-  nodeAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 1
-        preference:
-          matchExpressions:
-            - key: servers.ngpc.rxt.io/type
-              operator: In
-              values:
-                - ondemand
   podAntiAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:
       - podAffinityTerm:
