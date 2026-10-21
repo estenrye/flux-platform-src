@@ -27,6 +27,7 @@ patches:
     path: patches/clusterRoleBinding.yaml
 
 resources:
+  - resources/namespace.yaml
   - resources/networkpolicy.test-pods.yaml
   - resources/networkpolicy.deployment.yaml
   - resources/serviceaccount.test.yaml
