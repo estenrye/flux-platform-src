@@ -41,6 +41,14 @@ spec:
               type: RuntimeDefault
         - name: csi-provisioner
           imagePullPolicy: Always
+          # Topology off: Nova's zone (pcd-ce-lab) != Cinder's (nova), so zone-pinned PVs could never schedule.
+          args:
+            - --csi-address=$(ADDRESS)
+            - --timeout=3m
+            - --default-fstype=ext4
+            - --feature-gates=Topology=false
+            - --extra-create-metadata
+            - --leader-election=true
           resources:
             requests: {cpu: 10m, memory: 32Mi}
             limits: {cpu: 200m, memory: 128Mi}
@@ -97,6 +105,15 @@ spec:
               type: RuntimeDefault
         - name: cinder-csi-plugin
           imagePullPolicy: Always
+          # Topology off: Nova's zone (pcd-ce-lab) != Cinder's (nova), so zone-pinned PVs could never schedule.
+          args:
+            - /bin/cinder-csi-plugin
+            - --endpoint=$(CSI_ENDPOINT)
+            - --cloud-config=$(CLOUD_CONFIG)
+            - --cluster=$(CLUSTER_NAME)
+            - --pvc-annotations
+            - --with-topology=false
+            - --v=1
           resources:
             requests: {cpu: 10m, memory: 32Mi}
             limits: {cpu: 200m, memory: 128Mi}
