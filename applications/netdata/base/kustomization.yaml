@@ -17,3 +17,16 @@ resources:
   - resources/eso.external-secret.claim.yaml
   - resources/eso.uuid-generator.stream-key.yaml
   - resources/eso.external-secret.stream-conf.yaml
+  - resources/network-policy.yaml
+
+patches:
+  - path: patches/daemonset.child.yaml
+  - path: patches/deployment.parent.yaml
+  - path: patches/deployment.k8s-state.yaml
+  - path: patches/clusterrolebinding.yaml
+
+images:
+  - name: netdata/netdata
+    digest: sha256:5cfa05a5fa5686b98e0c70e884f00685fb3c662e9c5d727cf46c96d8e37b7818
+  - name: alpine
+    digest: sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8

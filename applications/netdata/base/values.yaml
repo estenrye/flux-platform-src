@@ -68,7 +68,7 @@ initContainersImage:
   repository: alpine
   # -- Init containers' image tag
   # @section -- General settings
-  tag: latest
+  tag: "3.22"
   # -- Init containers' image pull policy
   # @section -- General settings
   pullPolicy: Always
@@ -245,7 +245,13 @@ parent:
   port: 19999
   # -- Resources for the parent deployment
   # @section -- Parent
-  resources: {}
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 2Gi
     # limits:
     #  cpu: 4
     #  memory: 4096Mi
@@ -461,20 +467,20 @@ child:
   port: "{{ .Values.parent.port }}"
   # -- An update strategy to replace existing DaemonSet pods with new pods
   # @section -- Child
-  updateStrategy: {}
-    # type: RollingUpdate
-    # rollingUpdate:
-    #   maxUnavailable: 1
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
 
   # -- Resources for the child DaemonSet
   # @section -- Child
-  resources: {}
-    # limits:
-    #  cpu: 4
-    #  memory: 4096Mi
-    # requests:
-    #  cpu: 4
-    #  memory: 4096Mi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
 
   livenessProbe:
     # -- Number of seconds after the container has started before liveness probes are initiated
@@ -689,7 +695,13 @@ k8sState:
 
   # -- Compute resources required by this Deployment
   # @section -- K8s State
-  resources: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
     # limits:
     #  cpu: 4
     #  memory: 4096Mi

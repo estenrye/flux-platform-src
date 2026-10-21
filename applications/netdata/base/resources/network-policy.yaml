@@ -1,0 +1,86 @@
+# Netdata pods: role=parent receives every child/k8s-state stream; role=child
+# is a hostNetwork DaemonSet, so the CNI does not enforce policy on it (its
+# policy below documents intent and satisfies the isolation lint).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: netdata-parent
+  namespace: netdata
+spec:
+  podSelector:
+    matchLabels:
+      app: netdata
+      role: parent
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # No `from:` restriction: children are hostNetwork pods, so their streams
+    # arrive from node IPs that no pod selector can match; the Gateway's Envoy
+    # proxy pods (envoy-gateway-system) also reach the UI here.
+    - ports:
+        - protocol: TCP
+          port: 19999
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443 # Netdata Cloud (ACLK)
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: netdata-k8s-state
+  namespace: netdata
+spec:
+  podSelector:
+    matchLabels:
+      app: netdata
+      role: k8sState
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        # apiserver targetPort -- Calico evaluates egress post-DNAT
+        # (docs/memory/calico-networkpolicy-dnat.md); Talos serves 6443.
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 19999 # stream to the parent
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: netdata-child
+  namespace: netdata
+spec:
+  podSelector:
+    matchLabels:
+      app: netdata
+      role: child
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 10250 # kubelet
+        - protocol: TCP
+          port: 19999 # stream to the parent
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
