@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: netdata
+
+helmCharts:
+  - name: netdata
+    repo: https://netdata.github.io/helmchart/
+    version: 3.7.176
+    releaseName: netdata
+    namespace: netdata
+    includeCRDs: true
+    valuesFile: values.yaml
+
+resources:
+  - resources/namespace.yaml
+  - resources/gateway.yaml
+  - resources/eso.external-secret.claim.yaml
+  - resources/eso.uuid-generator.stream-key.yaml
+  - resources/eso.external-secret.stream-conf.yaml

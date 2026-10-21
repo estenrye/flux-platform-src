@@ -19,6 +19,18 @@ resources:
 - ../../applications/external-csi-snapshotter/base
 - ../../applications/kubelet-serving-cert-approver/base
 - ../../applications/metrics-server/base
-- ../../applications/prometheus-operator-crds/base
 - ../../applications/opentelemetry-operator/base
 - ../../applications/cert-manager/base
+- ../../applications/cert-manager-approver-policy/base
+- ../../applications/cert-manager-acme/base
+- ../../applications/external-dns/cloudflare/base
+- resources/eso.external-secret.cloudflare-api-token.yaml
+- resources/eso.external-secret.cloudflare-dns.yaml
+- ../../applications/netdata/base
+
+patches:
+- path: patches/netdata.gateway.hostname.yaml
+  target:
+    kind: Gateway
+    name: netdata
+    namespace: netdata
