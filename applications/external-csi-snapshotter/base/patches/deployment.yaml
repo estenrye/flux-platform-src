@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snapshot-controller
+  namespace: kube-system
+  annotations:
+    checkov.io/skip1: "CKV_K8S_38=The snapshot controller uses its service account token to watch and update VolumeSnapshot resources through the Kubernetes API."
+    checkov.io/skip2: "CKV_K8S_43=Image is pinned to an immutable upstream release tag via the upstream manifest."
+    checkov.io/skip3: "CKV2_K8S_6=The snapshot controller serves no inbound traffic other than metrics and health checks."
+    ignore-check.kube-linter.io/minimum-three-replicas: "Upstream runs two replicas with leader election; only one is active at a time."
+    ignore-check.kube-linter.io/no-node-affinity: "The snapshot controller has no node placement requirements."
+    ignore-check.kube-linter.io/non-isolated-pod: "The snapshot controller serves no inbound traffic other than metrics and health checks."
+spec:
+  template:
+    spec:
+      restartPolicy: Always
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: snapshot-controller
+      securityContext:
+        runAsUser: 65532
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: snapshot-controller
+          imagePullPolicy: Always
+          args:
+            - "--v=5"
+            - "--leader-election=true"
+            - "--http-endpoint=:8080"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
