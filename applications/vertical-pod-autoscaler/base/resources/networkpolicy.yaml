@@ -4,6 +4,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: vpa-allow-egress
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This Component is also rendered on its own, where the VPA Deployments from the release overlays are absent; the overlay renders do match pods."
 spec:
   podSelector:
     matchExpressions:
@@ -31,6 +33,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: vpa-admission-controller-allow-ingress
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This Component is also rendered on its own, where the VPA Deployments from the release overlays are absent; the overlay renders do match pods."
 spec:
   podSelector:
     matchLabels:
@@ -48,6 +52,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: vpa-recommender-allow-ingress
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This Component is also rendered on its own, where the VPA Deployments from the release overlays are absent; the overlay renders do match pods."
 spec:
   podSelector:
     matchLabels:
@@ -63,6 +69,8 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: vpa-updater-allow-ingress
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This Component is also rendered on its own, where the VPA Deployments from the release overlays are absent; the overlay renders do match pods."
 spec:
   podSelector:
     matchLabels:
