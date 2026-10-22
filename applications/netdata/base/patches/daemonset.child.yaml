@@ -43,3 +43,14 @@ spec:
           limits:
             cpu: 100m
             memory: 64Mi
+      containers:
+      - name: netdata
+        env:
+        # cgroup-name builds https://$KUBERNETES_SERVICE_HOST:443 without
+        # brackets, which is an invalid URL on this IPv6-only cluster. Ask the
+        # kubelet (host network) for pod metadata instead so cgroups get their
+        # k8s_pod_name and k8s_namespace labels.
+        - name: USE_KUBELET_FOR_PODS_METADATA
+          value: "1"
+        - name: KUBELET_URL
+          value: https://[::1]:10250
