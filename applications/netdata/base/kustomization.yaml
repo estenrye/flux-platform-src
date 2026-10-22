@@ -24,6 +24,7 @@ patches:
   - path: patches/daemonset.child.yaml
   - path: patches/deployment.parent.yaml
   - path: patches/deployment.k8s-state.yaml
+  - path: patches/deployment.otel.yaml
   - path: patches/clusterrolebinding.yaml
 
 images:
