@@ -6,6 +6,9 @@ spec:
   mode: daemonset
   terminationGracePeriodSeconds: 600
   hostNetwork: true
+  # hostNetwork pods default to the node's resolver; this lets them resolve
+  # cluster Service names such as the netdata-otel exporter endpoint.
+  dnsPolicy: ClusterFirstWithHostNet
   image: otel/opentelemetry-collector-k8s:0.157.0
   serviceAccount: opentelemetry-collector
   resources:
@@ -29,7 +32,7 @@ spec:
           network: {}
     exporters:
       otlp_grpc/netdata:
-        endpoint: "[::1]:4317"
+        endpoint: "netdata-otel.netdata.svc.cluster.local:4317"
         tls:
           insecure: true
     service:

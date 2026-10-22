@@ -84,3 +84,30 @@ spec:
           port: 53
         - protocol: UDP
           port: 53
+---
+# OTLP gRPC ingest. The only expected client is the hostNetwork collector
+# DaemonSet, whose traffic arrives from node IPs that no pod selector can
+# match, so there is no `from:` restriction.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: netdata-otel
+  namespace: netdata
+spec:
+  podSelector:
+    matchLabels:
+      app: netdata
+      role: otel
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 4317
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
