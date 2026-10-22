@@ -8,7 +8,7 @@ metadata:
     # the Certificate for the https listener's certificateRef.
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
-  gatewayClassName: external-dedicated
+  gatewayClassName: internal-dedicated
   listeners:
     - name: https
       protocol: HTTPS

@@ -36,6 +36,9 @@ spec:
         annotations:
           projectcalico.org/ipv6pools: '["lb-ingress-routed"]'
         externalTrafficPolicy: Cluster
+        # Claimed by Calico's LB IPAM only; a class makes OCCM ignore the Service
+        # instead of also creating an Octavia load balancer for it.
+        loadBalancerClass: calico
         type: LoadBalancer
     type: Kubernetes
 ---
@@ -60,6 +63,9 @@ spec:
         annotations:
           projectcalico.org/ipv6pools: '["lb-ingress-routed"]'
         externalTrafficPolicy: Cluster
+        # Claimed by Calico's LB IPAM only; a class makes OCCM ignore the Service
+        # instead of also creating an Octavia load balancer for it.
+        loadBalancerClass: calico
         type: LoadBalancer
     type: Kubernetes
 ---
@@ -84,6 +90,9 @@ spec:
         annotations:
           projectcalico.org/ipv6pools: '["lb-internal-routed"]'
         externalTrafficPolicy: Cluster
+        # Claimed by Calico's LB IPAM only; a class makes OCCM ignore the Service
+        # instead of also creating an Octavia load balancer for it.
+        loadBalancerClass: calico
         type: LoadBalancer
     type: Kubernetes
 ---
@@ -108,5 +117,8 @@ spec:
         annotations:
           projectcalico.org/ipv6pools: '["lb-internal-routed"]'
         externalTrafficPolicy: Cluster
+        # Claimed by Calico's LB IPAM only; a class makes OCCM ignore the Service
+        # instead of also creating an Octavia load balancer for it.
+        loadBalancerClass: calico
         type: LoadBalancer
     type: Kubernetes
