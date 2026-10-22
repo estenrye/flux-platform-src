@@ -30,6 +30,7 @@ resources:
 - resources/eso.external-secret.cloudflare-api-token.yaml
 - resources/eso.external-secret.cloudflare-dns.yaml
 - ../../applications/netdata/base
+- ../../applications/opentelemetry-collector-daemonset/base
 
 patches:
 - path: patches/netdata.gateway.hostname.yaml

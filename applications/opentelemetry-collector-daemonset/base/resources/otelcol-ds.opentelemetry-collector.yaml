@@ -1,0 +1,39 @@
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otelcol-ds
+spec:
+  mode: daemonset
+  terminationGracePeriodSeconds: 600
+  hostNetwork: true
+  image: otel/opentelemetry-collector-k8s:0.157.0
+  serviceAccount: opentelemetry-collector
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+  env:
+    - name: K8S_NODE_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName
+  config:
+    receivers:
+      hostmetrics:
+        collection_interval: 10s
+        scrapers:
+          cpu: {}
+          memory: {}
+          network: {}
+    exporters:
+      otlp_grpc/netdata:
+        endpoint: "[::1]:4317"
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        metrics:
+          receivers: [hostmetrics]
+          exporters: [otlp_grpc/netdata]

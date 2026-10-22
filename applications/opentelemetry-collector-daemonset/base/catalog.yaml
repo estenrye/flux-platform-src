@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: opentelemetry-collector-daemonset
+  description: |-
+    This component provides the OpenTelemetry Collector DaemonSet that
+    scrapes metrics from the nodes and sends them to the configured exporters.
+  tags:
+    - monitoring
+    - opentelemetry
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   
