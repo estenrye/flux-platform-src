@@ -18,6 +18,7 @@ resources:
   - resources/eso.uuid-generator.stream-key.yaml
   - resources/eso.external-secret.stream-conf.yaml
   - resources/network-policy.yaml
+  - resources/vpa.yaml
 
 patches:
   - path: patches/daemonset.child.yaml

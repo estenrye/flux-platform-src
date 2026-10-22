@@ -933,13 +933,14 @@ netdataOpentelemetry:
 
   # -- Compute resources required by this Deployment
   # @section -- Netdata OpenTelemetry
-  resources: {}
-    # limits:
-    #  cpu: 4
-    #  memory: 4096Mi
-    # requests:
-    #  cpu: 4
-    #  memory: 4096Mi
+  resources:
+    # Baseline for the VPA (resources/vpa.yaml), which scales from this ratio.
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
 
   livenessProbe:
     # -- Number of seconds after the container has started before liveness probes are initiated
