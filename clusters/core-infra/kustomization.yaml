@@ -24,6 +24,7 @@ resources:
 - ../../applications/opentelemetry-operator/base
 - ../../applications/cert-manager/base
 - ../../applications/cert-manager-approver-policy/base
+- ../../applications/vertical-pod-autoscaler/v1.8
 - ../../applications/cert-manager-acme/base
 - ../../applications/external-dns/cloudflare/base
 - resources/eso.external-secret.cloudflare-api-token.yaml
