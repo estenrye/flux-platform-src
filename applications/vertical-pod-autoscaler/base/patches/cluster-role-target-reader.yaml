@@ -1,0 +1,6 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:vpa-target-reader
+  annotations:
+    checkov.io/skip1: "CKV_K8S_49=The VPA must read the scale subresource of any workload kind that a VerticalPodAutoscaler targets, including custom resources, so upstream RBAC uses apiGroups '*' with resources '*/scale' (get/watch only)."

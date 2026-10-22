@@ -20,3 +20,11 @@ patches:
       kind: Deployment
       name: vpa-admission-controller
     path: patches/admission-controller.yaml
+  - target:
+      kind: ClusterRole
+      name: system:vpa-target-reader
+    path: patches/cluster-role-target-reader.yaml
+  - target:
+      kind: ClusterRole
+      name: system:vpa-admission-controller
+    path: patches/cluster-role-admission-controller.yaml

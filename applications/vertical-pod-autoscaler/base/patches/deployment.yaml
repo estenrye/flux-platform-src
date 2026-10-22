@@ -21,3 +21,10 @@
       drop:
         - ALL
     readOnlyRootFilesystem: true
+- op: add
+  path: /spec/strategy
+  value:
+    type: RollingUpdate
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: Always
