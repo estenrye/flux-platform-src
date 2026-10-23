@@ -44,6 +44,17 @@ spec:
                 - ^dummy\d+$
                 - ^bond\d+$
                 - ^teql\d+$
+    processors:
+      # Tag every metric with the node it came from; without this the three
+      # collectors' series are indistinguishable and merge into one chart.
+      resource/node:
+        attributes:
+          - key: k8s.node.name
+            value: ${env:K8S_NODE_NAME}
+            action: upsert
+          - key: host.name
+            value: ${env:K8S_NODE_NAME}
+            action: upsert
     exporters:
       otlp_grpc/netdata:
         endpoint: "netdata-otel.netdata.svc.cluster.local:4317"
@@ -53,4 +64,5 @@ spec:
       pipelines:
         metrics:
           receivers: [hostmetrics]
+          processors: [resource/node]
           exporters: [otlp_grpc/netdata]
