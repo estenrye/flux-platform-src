@@ -29,7 +29,21 @@ spec:
         scrapers:
           cpu: {}
           memory: {}
-          network: {}
+          network:
+            # Calico adds a cali* veth per pod plus several unused tunnel and
+            # dummy devices; per-interface series blow up chart cardinality in
+            # netdata. Keep physical NICs (eth*, ens*, ...).
+            exclude:
+              match_type: regexp
+              interfaces:
+                - ^cali.*
+                - ^lo$
+                - ^tunl\d+$
+                - ^ip6tnl\d+$
+                - ^sit\d+$
+                - ^dummy\d+$
+                - ^bond\d+$
+                - ^teql\d+$
     exporters:
       otlp_grpc/netdata:
         endpoint: "netdata-otel.netdata.svc.cluster.local:4317"
