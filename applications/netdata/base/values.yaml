@@ -1076,18 +1076,11 @@ netdataOpentelemetry:
           apps = no
           python.d = no
           fping = no
+    # Rendered by the netdata-stream-conf ExternalSecret and mounted via extraVolumes.
     stream:
-      enabled: true
+      enabled: false
       path: /etc/netdata/stream.conf
-      data: |
-        [stream]
-          enabled = {{ ternary "yes" "no" .Values.parent.enabled }}
-          destination = netdata:{{ .Values.service.port }}
-          api key = 11111111-2222-3333-4444-555555555555
-          timeout seconds = 60
-          buffer size bytes = 1048576
-          reconnect delay seconds = 5
-          initial clock resync iterations = 60
+      data: ""
     otel:
       enabled: true
       path: /etc/netdata/otel.yaml
@@ -1140,11 +1133,19 @@ netdataOpentelemetry:
 
   # -- Additional volumeMounts
   # @section -- Netdata OpenTelemetry
-  extraVolumeMounts: []
+  extraVolumeMounts:
+    - name: stream-conf
+      mountPath: /etc/netdata/stream.conf
+      subPath: sender.conf
+      readOnly: true
 
   # -- Additional volumes
   # @section -- Netdata OpenTelemetry
-  extraVolumes: []
+  extraVolumes:
+    - name: stream-conf
+      secret:
+        secretName: netdata-stream-conf
+        defaultMode: 0444
 
 # OpenTelemetry Collector subchart configuration
 # This is an optional component that allows to gather logs from k8s cluster (in this configuration).
