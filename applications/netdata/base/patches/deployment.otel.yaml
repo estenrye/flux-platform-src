@@ -17,3 +17,4 @@ metadata:
     checkov.io/skip5: CKV_K8S_28=The chart does not drop NET_RAW; Netdata's network probes (e.g. fping) may rely on it.
     checkov.io/skip6: CKV_K8S_37=The chart does not drop capabilities; Netdata's plugins rely on defaults.
     checkov.io/skip7: CKV_K8S_31=The chart does not set a seccomp profile.
+    checkov.io/skip8: CKV_K8S_35=Netdata only reads the Netdata Cloud claim token from environment variables (NETDATA_CLAIM_TOKEN / NETDATA_CLAIM_ROOMS), sourced from the netdata-claim Secret synced by ESO.
