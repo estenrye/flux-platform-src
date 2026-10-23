@@ -108,6 +108,8 @@ spec:
   egress:
     - ports:
         - protocol: TCP
+          port: 443 # Netdata Cloud claiming / ACLK
+        - protocol: TCP
           port: 19999 # stream to the parent
         - protocol: TCP
           port: 53

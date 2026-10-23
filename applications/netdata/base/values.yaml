@@ -1098,17 +1098,17 @@ netdataOpentelemetry:
 
   # -- Set environment parameters from ConfigMap and/or Secrets
   # @section -- Netdata OpenTelemetry
-  envFrom: []
-    ## E.g. to read Netdata Cloud claim token from an existing secret "netdata" set this to:
-    # - secretRef:
-    #     name: netdata
-    ## And create it with: kubectl create secret generic netdata --from-literal="NETDATA_CLAIM_TOKEN=<token>"
-    ## Also ensure that claim.token is empty
+  envFrom:
+    # NETDATA_CLAIM_TOKEN / NETDATA_CLAIM_ROOMS, synced from 1Password by the
+    # netdata-claim ExternalSecret. Same secret for parent, child and otel.
+    - secretRef:
+        name: netdata-claim
 
   claiming:
     # -- Enable claiming for netdata cloud
     # @section -- Netdata OpenTelemetry
-    enabled: false
+    # Token and rooms come from envFrom (netdata-claim), so they stay empty here.
+    enabled: true
     # -- Claim token
     # @section -- Netdata OpenTelemetry
     token: ""
