@@ -45,8 +45,11 @@ spec:
       filelog/pods:
         include: [/var/log/pods/*/*/*.log]
         # Skip the collector's own logs so exporter errors cannot feed back
-        # into the pipeline.
-        exclude: [/var/log/pods/opentelemetry-collector_*/*/*.log]
+        # into the pipeline, and netdata-otel's, whose log lines for every
+        # query of the stored logs would otherwise be ingested again.
+        exclude:
+          - /var/log/pods/netdata_netdata-otel-*/*/*.log
+          - /var/log/pods/opentelemetry-collector_*/*/*.log
         # Only tail new lines; replaying every pod log on each restart would
         # overrun the memory limit.
         start_at: end
@@ -94,6 +97,12 @@ spec:
                 - ^dummy\d+$
                 - ^bond\d+$
                 - ^teql\d+$
+      # Applications on the node send OTLP traces here (gRPC). The collector is
+      # hostNetwork, so clients reach it at the node IP (status.hostIP).
+      otlp:
+        protocols:
+          grpc:
+            endpoint: "[::]:4317"
     processors:
       # Tag every metric with the node it came from; without this the three
       # collectors' series are indistinguishable and merge into one chart.
@@ -115,6 +124,8 @@ spec:
             - k8s.daemonset.name
             - k8s.deployment.name
             - k8s.job.name
+            - k8s.namespace.name
+            - k8s.pod.name
             - k8s.statefulset.name
         filter:
           node_from_env_var: K8S_NODE_NAME
@@ -123,6 +134,9 @@ spec:
           - sources:
               - from: resource_attribute
                 name: k8s.pod.uid
+          # Traces carry no pod UID; match on the sender's IP instead.
+          - sources:
+              - from: connection
       # Netdata files logs without service.name under "unattributed". Use the
       # owning workload, falling back to the container name for bare pods, and
       # the pod's namespace as service.namespace.
@@ -152,4 +166,8 @@ spec:
         logs:
           receivers: [filelog/pods]
           processors: [k8sattributes, resource/node, transform/service]
+          exporters: [otlp_grpc/netdata]
+        traces:
+          receivers: [otlp]
+          processors: [k8sattributes, resource/node]
           exporters: [otlp_grpc/netdata]
