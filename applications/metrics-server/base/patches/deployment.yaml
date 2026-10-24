@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-server
+  annotations:
+    checkov.io/skip1: "CKV_K8S_38=metrics-server uses its service account token to query kubelets and the Kubernetes API."
+    checkov.io/skip2: "CKV_K8S_43=Image is pinned to an immutable upstream release tag via the upstream manifest."
+    ignore-check.kube-linter.io/minimum-three-replicas: "metrics-server is a single-instance aggregator; a brief outage only pauses resource metrics (HPA, kubectl top)."
+    ignore-check.kube-linter.io/no-node-affinity: "metrics-server has no node placement requirements."
+    ignore-check.kube-linter.io/non-isolated-pod: "metrics-server must accept traffic from the kube-apiserver aggregation layer."
+spec:
+  strategy:
+    type: RollingUpdate
+  template:
+    spec:
+      restartPolicy: Always
+      priorityClassName: platform-critical
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: metrics-server
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: 100m
+              memory: 200Mi
+            limits:
+              cpu: 200m
+              memory: 400Mi
+          securityContext:
+            runAsUser: 10001
+            runAsGroup: 10001

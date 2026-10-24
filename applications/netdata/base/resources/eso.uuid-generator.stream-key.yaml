@@ -1,0 +1,6 @@
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: UUID
+metadata:
+  name: netdata-stream-key
+  namespace: netdata
+spec: {}

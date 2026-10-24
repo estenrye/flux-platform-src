@@ -1,0 +1,144 @@
+# Netdata pods: role=parent receives every child/k8s-state stream; role=child
+# is a hostNetwork DaemonSet, so the CNI does not enforce policy on it (its
+# policy below documents intent and satisfies the isolation lint).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: netdata-parent
+  namespace: netdata
+spec:
+  podSelector:
+    matchLabels:
+      app: netdata
+      role: parent
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # The agent's web port (19999) accepts commands, so only the known clients
+    # may reach it (https://status.netdata.cloud/incidents/d17pqkt1s8rr).
+    - from:
+        # Children are hostNetwork pods, so their streams arrive from node IPs
+        # that no pod selector can match.
+        - ipBlock:
+            cidr: fd97:45c2:b3a1:1179::/64
+        # Same-node clients (the child and pods reaching the netdata Service)
+        # show up as Talos' host address after kube-proxy translation.
+        - ipBlock:
+            cidr: fd54:616c:6f73::/64
+        # k8s-state and the OTLP receiver stream over the pod network.
+        - podSelector:
+            matchExpressions:
+              - key: role
+                operator: In
+                values: [k8sState, otel]
+      ports:
+        - protocol: TCP
+          port: 19999
+    # The Gateway's Envoy proxy pods serve the UI.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tigera-gateway
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              gateway.envoyproxy.io/owning-gateway-name: netdata
+              gateway.envoyproxy.io/owning-gateway-namespace: netdata
+      ports:
+        - protocol: TCP
+          port: 19999
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443 # Netdata Cloud (ACLK)
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: netdata-k8s-state
+  namespace: netdata
+spec:
+  podSelector:
+    matchLabels:
+      app: netdata
+      role: k8sState
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        # apiserver targetPort -- Calico evaluates egress post-DNAT
+        # (docs/memory/calico-networkpolicy-dnat.md); Talos serves 6443.
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 19999 # stream to the parent
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: netdata-child
+  namespace: netdata
+spec:
+  podSelector:
+    matchLabels:
+      app: netdata
+      role: child
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 10250 # kubelet
+        - protocol: TCP
+          port: 19999 # stream to the parent
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+---
+# OTLP gRPC ingest. The only expected client is the hostNetwork collector
+# DaemonSet, whose traffic arrives from node IPs that no pod selector can
+# match, so there is no `from:` restriction.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: netdata-otel
+  namespace: netdata
+spec:
+  podSelector:
+    matchLabels:
+      app: netdata
+      role: otel
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 4317
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443 # Netdata Cloud claiming / ACLK
+        - protocol: TCP
+          port: 19999 # stream to the parent
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

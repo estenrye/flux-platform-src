@@ -1,0 +1,19 @@
+# Scrapes every Envoy proxy that Calico's Gateway API deploys, across all
+# gateway classes (dedicated and merged). The opentelemetry-collector target
+# allocator picks this up and the per-node collector scrapes it, keeping Envoy
+# metrics independent of netdata.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: envoy-proxy
+  namespace: tigera-gateway
+spec:
+  namespaceSelector:
+    matchNames:
+      - tigera-gateway
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: envoy
+  podMetricsEndpoints:
+    - portNumber: 19001
+      path: /stats/prometheus

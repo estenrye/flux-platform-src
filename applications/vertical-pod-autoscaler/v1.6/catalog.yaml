@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: vertical-pod-autoscaler-1-6-x
+  description: |-
+    This service automatically adjusts pod CPU and memory requests
+    based on observed usage (recommender, updater and admission controller).
+
+    This is the 1.6.x version of the Vertical Pod Autoscaler which supports Kubernetes 1.34 to 1.36.
+  tags:
+    - autoscaling
+    - operators
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

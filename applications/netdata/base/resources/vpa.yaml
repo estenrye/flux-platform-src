@@ -1,0 +1,87 @@
+# The parent is a stateful singleton (RWO volumes, Recreate strategy), so an
+# eviction drops every child stream until it restarts. Recommendations only;
+# copy them into values.yaml by hand.
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: netdata-parent
+  namespace: netdata
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: netdata-parent
+  updatePolicy:
+    updateMode: "Off"
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: netdata-child
+  namespace: netdata
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: DaemonSet
+    name: netdata-child
+  updatePolicy:
+    updateMode: InPlaceOrRecreate
+  resourcePolicy:
+    containerPolicies:
+      - containerName: netdata
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits
+        minAllowed:
+          cpu: 50m
+          memory: 128Mi
+        maxAllowed:
+          cpu: "2"
+          memory: 2Gi
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: netdata-k8s-state
+  namespace: netdata
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: netdata-k8s-state
+  updatePolicy:
+    updateMode: InPlaceOrRecreate
+  resourcePolicy:
+    containerPolicies:
+      - containerName: netdata
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits
+        minAllowed:
+          cpu: 25m
+          memory: 64Mi
+        maxAllowed:
+          cpu: "1"
+          memory: 1Gi
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: netdata-otel
+  namespace: netdata
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: netdata-otel
+  updatePolicy:
+    updateMode: InPlaceOrRecreate
+  resourcePolicy:
+    containerPolicies:
+      - containerName: netdata
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits
+        minAllowed:
+          cpu: 50m
+          memory: 128Mi
+        maxAllowed:
+          cpu: "1"
+          memory: 1Gi

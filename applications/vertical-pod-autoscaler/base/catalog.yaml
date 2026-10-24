@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: vertical-pod-autoscaler
+  description: |-
+    This service automatically adjusts pod CPU and memory requests
+    based on observed usage (recommender, updater and admission controller).
+  tags:
+    - autoscaling
+    - operators
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

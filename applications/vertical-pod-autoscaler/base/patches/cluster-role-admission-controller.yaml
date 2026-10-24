@@ -1,0 +1,6 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:vpa-admission-controller
+  annotations:
+    checkov.io/skip1: "CKV_K8S_155=The VPA admission controller registers and maintains its own MutatingWebhookConfiguration (vpa-webhook-config), so it needs create/delete/get/list/patch on mutatingwebhookconfigurations."

@@ -1,0 +1,26 @@
+# VPA 1.7.3 — supports Kubernetes 1.35 – 1.37.
+# Built from the static manifests published with the upstream release.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Upstream hardcodes kube-system; this sets it explicitly for every namespaced resource.
+namespace: kube-system
+
+resources:
+  - https://raw.githubusercontent.com/kubernetes/autoscaler/vertical-pod-autoscaler-1.7.3/vertical-pod-autoscaler/deploy/vpa-v1-crd-gen.yaml
+  - https://raw.githubusercontent.com/kubernetes/autoscaler/vertical-pod-autoscaler-1.7.3/vertical-pod-autoscaler/deploy/vpa-rbac.yaml
+  - https://raw.githubusercontent.com/kubernetes/autoscaler/vertical-pod-autoscaler-1.7.3/vertical-pod-autoscaler/deploy/admission-controller-deployment.yaml
+  - https://raw.githubusercontent.com/kubernetes/autoscaler/vertical-pod-autoscaler-1.7.3/vertical-pod-autoscaler/deploy/admission-controller-service.yaml
+  - https://raw.githubusercontent.com/kubernetes/autoscaler/vertical-pod-autoscaler-1.7.3/vertical-pod-autoscaler/deploy/recommender-deployment.yaml
+  - https://raw.githubusercontent.com/kubernetes/autoscaler/vertical-pod-autoscaler-1.7.3/vertical-pod-autoscaler/deploy/updater-deployment.yaml
+
+components:
+  - ../base
+
+# Pinned by digest, as elsewhere in this repo.
+images:
+  - name: registry.k8s.io/autoscaling/vpa-admission-controller
+    digest: sha256:404b5e7389ae85881c8e06147035244c9f0aa366d5b1b10cbb1ca8eda72ee07e
+  - name: registry.k8s.io/autoscaling/vpa-recommender
+    digest: sha256:3b207e6e719e8a88b96b5777afa6f6fb261e73669fa39f487c04560d85bf2e7d
+  - name: registry.k8s.io/autoscaling/vpa-updater
+    digest: sha256:666e5fe1b933c85c0bc01dfca9cd7fac93bcc5618072e32d6bece16b77e39d14

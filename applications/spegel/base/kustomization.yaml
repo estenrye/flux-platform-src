@@ -1,0 +1,53 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: spegel
+
+resources:
+  - resources/namespace.yaml
+
+helmCharts:
+  - name: spegel
+    repo: oci://ghcr.io/spegel-org/helm-charts
+    version: 0.8.0
+    releaseName: spegel
+    namespace: spegel
+    includeCRDs: true
+    valuesFile: values.yaml
+
+patches:
+  # The chart's post-delete helm hooks (cleanup DaemonSet, Service and
+  # cleanup-wait Pod) render as plain resources under kustomize; applied by
+  # Flux they would RUN immediately and strip Spegel's containerd mirror config.
+  - patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: DaemonSet
+      metadata:
+        name: spegel-cleanup
+        namespace: spegel
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: spegel-cleanup
+        namespace: spegel
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: spegel-cleanup-wait
+        namespace: spegel
+  - target:
+      kind: DaemonSet
+      name: spegel
+    path: patches/daemonset.yaml
+  - target:
+      kind: Service
+      name: spegel-registry
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          ignore-check.kube-linter.io/exposed-services: "Containerd on each node pulls through the Spegel registry via NodePort 30020 on the node IP; this is how mirroring works."

@@ -1,0 +1,16 @@
+# Upstream expects a Secret named vpa-tls-certs holding caCert.pem,
+# serverCert.pem and serverKey.pem (made by its gencerts.sh). Use the
+# cert-manager-issued Secret (tls.crt, tls.key, ca.crt) instead. The controller
+# registers its own MutatingWebhookConfiguration using the CA file as caBundle.
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --client-ca-file=/etc/tls-certs/ca.crt
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --tls-cert-file=/etc/tls-certs/tls.crt
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --tls-private-key=/etc/tls-certs/tls.key
+- op: replace
+  path: /spec/template/spec/volumes/0/secret/secretName
+  value: vpa-admission-controller-tls

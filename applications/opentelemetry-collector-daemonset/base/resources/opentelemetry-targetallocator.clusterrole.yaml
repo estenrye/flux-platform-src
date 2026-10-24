@@ -1,0 +1,19 @@
+# Read-only access for the target allocator to discover scrape targets from
+# PodMonitor/ServiceMonitor resources and the pods, services and endpoints
+# they select.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: opentelemetry-targetallocator
+rules:
+  - apiGroups: [""]
+    resources: [namespaces, nodes, nodes/metrics, pods, services, endpoints]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: [monitoring.coreos.com]
+    resources: [podmonitors, servicemonitors]
+    verbs: [get, list, watch]
+  - nonResourceURLs: [/metrics]
+    verbs: [get]

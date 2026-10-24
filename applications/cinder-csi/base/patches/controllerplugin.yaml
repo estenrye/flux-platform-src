@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: csi-cinder-controllerplugin
+  namespace: kube-system
+  annotations:
+    checkov.io/skip90: "CKV2_K8S_6=The CSI plugin only makes egress calls to the Kubernetes and OpenStack APIs and serves no ingress; no NetworkPolicy is managed for kube-system."
+    checkov.io/skip01: "CKV_K8S_8=CSI sidecars expose no HTTP endpoint to probe; the cinder-csi-plugin container has a liveness probe and the liveness-probe sidecar monitors the CSI socket."
+    checkov.io/skip02: "CKV_K8S_9=CSI sidecars serve no traffic; readiness is not meaningful for them or the controller plugin, which is a leader-elected gRPC backend."
+    checkov.io/skip03: "CKV_K8S_38=The CSI controller sidecars and plugin call the Kubernetes and OpenStack APIs using the service account token."
+    checkov.io/skip04: "CKV_K8S_43=Images are pinned to immutable release tags managed by the upstream manifests; digests are not published with them."
+    ignore-check.kube-linter.io/minimum-three-replicas: "CSI controller is leader-elected; a single replica is sufficient for this cluster."
+    ignore-check.kube-linter.io/no-anti-affinity: "Single replica; no anti-affinity to express."
+    ignore-check.kube-linter.io/no-liveness-probe: "CSI sidecars expose no HTTP endpoint; the liveness-probe sidecar and plugin probe cover health."
+    ignore-check.kube-linter.io/no-node-affinity: "Controller may run on any schedulable node."
+    ignore-check.kube-linter.io/no-readiness-probe: "CSI sidecars serve no traffic; readiness is not meaningful."
+    ignore-check.kube-linter.io/non-isolated-pod: "Controller pod only makes egress calls to the Kubernetes and OpenStack APIs."
+spec:
+  template:
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      restartPolicy: Always
+      serviceAccount: null
+      serviceAccountName: csi-cinder-controller-sa
+      containers:
+        - name: csi-attacher
+          imagePullPolicy: Always
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+        - name: csi-provisioner
+          imagePullPolicy: Always
+          # Topology off: Nova's zone (pcd-ce-lab) != Cinder's (nova), so zone-pinned PVs could never schedule.
+          args:
+            - --csi-address=$(ADDRESS)
+            - --timeout=3m
+            - --default-fstype=ext4
+            - --feature-gates=Topology=false
+            - --extra-create-metadata
+            - --leader-election=true
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+        - name: csi-snapshotter
+          imagePullPolicy: Always
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+        - name: csi-resizer
+          imagePullPolicy: Always
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+        - name: liveness-probe
+          imagePullPolicy: Always
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+        - name: cinder-csi-plugin
+          imagePullPolicy: Always
+          # Topology off: Nova's zone (pcd-ce-lab) != Cinder's (nova), so zone-pinned PVs could never schedule.
+          args:
+            - /bin/cinder-csi-plugin
+            - --endpoint=$(CSI_ENDPOINT)
+            - --cloud-config=$(CLOUD_CONFIG)
+            - --cluster=$(CLUSTER_NAME)
+            - --pvc-annotations
+            - --with-topology=false
+            - --v=1
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+      volumes:
+        - name: socket-dir
+          emptyDir: {}

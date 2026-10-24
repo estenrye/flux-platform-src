@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: spegel
+  description: |-
+    This service caches docker images locally on the cluster and
+    serves them to the nodes.
+  tags:
+    - cicd
+    - operators
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   

@@ -6,7 +6,9 @@ WORKSPACE_DIR="${SCRIPT_DIR}/.."
 DEFAULT_BIN_DIR="${WORKSPACE_DIR}/.venv/bin"
 BIN_DIR=${1:-"${DEFAULT_BIN_DIR}"}
 CHECKOV_VENV_DIR="${WORKSPACE_DIR}/.venv-checkov"
-CHECKOV_PYTHON_BIN="${CHECKOV_VENV_DIR}/bin/python3"
+# Resolved by find_venv_python once the venv exists; the interpreter name
+# inside a venv depends on how it was created (python3, python, python3.14, ...).
+CHECKOV_PYTHON_BIN=""
 CHECKOV_EXECUTABLE="${CHECKOV_VENV_DIR}/bin/checkov"
 
 # Helper functions for logs
@@ -24,16 +26,34 @@ get_bootstrap_python() {
         BOOTSTRAP_PYTHON="${DEFAULT_BIN_DIR}/python3"
     elif command -v python3 >/dev/null 2>&1; then
         BOOTSTRAP_PYTHON="$(command -v python3)"
+    elif command -v python >/dev/null 2>&1; then
+        BOOTSTRAP_PYTHON="$(command -v python)"
     else
         fatal 'python3 is required to create the checkov virtual environment'
     fi
 }
 
+# Sets CHECKOV_PYTHON_BIN to the first working interpreter in the venv, or
+# returns non-zero if there is none (missing, or a dangling symlink).
+find_venv_python() {
+    local candidate
+    CHECKOV_PYTHON_BIN=""
+    for candidate in "${CHECKOV_VENV_DIR}"/bin/python3 "${CHECKOV_VENV_DIR}"/bin/python "${CHECKOV_VENV_DIR}"/bin/python3.[0-9]*; do
+        if [[ -x "${candidate}" ]] && "${candidate}" -c 'import sys' >/dev/null 2>&1; then
+            CHECKOV_PYTHON_BIN="${candidate}"
+            return 0
+        fi
+    done
+    return 1
+}
+
 setup_checkov_venv() {
-    if [[ ! -x "${CHECKOV_PYTHON_BIN}" ]]; then
+    if ! find_venv_python; then
         info "Creating isolated checkov virtual environment at ${CHECKOV_VENV_DIR}"
-        "${BOOTSTRAP_PYTHON}" -m venv "${CHECKOV_VENV_DIR}"
+        "${BOOTSTRAP_PYTHON}" -m venv --clear "${CHECKOV_VENV_DIR}"
+        find_venv_python || fatal "no working python interpreter found in ${CHECKOV_VENV_DIR}/bin"
     fi
+    info "Using ${CHECKOV_PYTHON_BIN}"
 
     info 'Upgrading pip in isolated checkov virtual environment'
     "${CHECKOV_PYTHON_BIN}" -m pip install --upgrade pip

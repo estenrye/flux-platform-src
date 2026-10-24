@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netdata-parent
+  namespace: netdata
+  annotations:
+    ignore-check.kube-linter.io/no-node-affinity: No zone or role topology to express node affinity against.
+    ignore-check.kube-linter.io/no-read-only-root-fs: Netdata writes its config, cache and runtime state under /etc/netdata, /var/lib/netdata and /var/cache/netdata inside the container.
+    ignore-check.kube-linter.io/writable-host-mount: Netdata needs /sys, /etc/os-release, /var/log and its persistence directory mounted from the host; the chart does not offer read-only mounts for these.
+    ignore-check.kube-linter.io/minimum-three-replicas: 'The parent is a stateful singleton: it owns an RWO database volume and receives all streams, so it cannot be scaled out.'
+    ignore-check.kube-linter.io/no-rolling-update-strategy: 'Recreate is required: the parent''s RWO volumes cannot be mounted by two pods at once.'
+    checkov.io/skip1: CKV_K8S_22=Netdata writes its config, cache and runtime state inside the container; the root filesystem cannot be read-only.
+    checkov.io/skip2: CKV_K8S_35=Netdata only reads the Netdata Cloud claim token from environment variables (NETDATA_CLAIM_TOKEN / NETDATA_CLAIM_ROOMS), sourced from the netdata-claim Secret synced by ESO.
+    checkov.io/skip3: CKV_K8S_40=Netdata's image does not support a configurable high UID; the container's user is set by the upstream image.
+    checkov.io/skip4: CKV_K8S_23=The netdata container starts as root so its entrypoint can fix ownership of its state directories.
+    checkov.io/skip5: CKV_K8S_20=Netdata's entrypoint requires root; allowPrivilegeEscalation is not set to false by the chart.
+    checkov.io/skip6: CKV_K8S_28=The chart does not drop NET_RAW; Netdata's network probes (e.g. fping) may rely on it.
+    checkov.io/skip7: CKV_K8S_37=The chart does not drop capabilities; Netdata's plugins rely on defaults.
+    checkov.io/skip8: CKV_K8S_30=The chart does not set a container security context.
+    checkov.io/skip9: CKV_K8S_31=The chart does not set a seccomp profile.
+    checkov.io/skip10: CKV_K8S_38=Netdata mounts the service account token by default; the parent does not use it but the chart offers no switch to disable it.
+    ignore-check.kube-linter.io/sorted-keys: Annotation keys include checkov.io/skip10+, which sort before skip2; the skip annotations are numbered sequentially.
+spec:
+  template:
+    spec:
+      restartPolicy: Always

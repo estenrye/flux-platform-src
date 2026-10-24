@@ -1,0 +1,15 @@
+# Lets the Envoy Gateway proxy config (internal-dedicated-proxy-config) send
+# traces to the collector's OTLP receiver across namespaces.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: envoyproxy-tracing
+spec:
+  from:
+    - group: gateway.envoyproxy.io
+      kind: EnvoyProxy
+      namespace: envoy-gateway-system
+  to:
+    - group: ""
+      kind: Service
+      name: otelcol-ds-collector

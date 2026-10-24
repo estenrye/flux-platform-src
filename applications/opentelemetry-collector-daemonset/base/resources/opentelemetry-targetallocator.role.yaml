@@ -1,0 +1,9 @@
+# The target allocator watches Secret metadata in its own namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: opentelemetry-targetallocator
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get, list, watch]

@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: metrics-server
+  description: |-
+    This service provides resource metrics for the Kubernetes cluster.
+  tags:
+    - metrics
+    - operators
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering   

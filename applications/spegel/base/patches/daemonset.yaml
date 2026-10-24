@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spegel
+  namespace: spegel
+  annotations:
+    checkov.io/skip1: "CKV_K8S_23=Spegel must run as root to access the containerd socket and write the host containerd registry configuration."
+    checkov.io/skip2: "CKV_K8S_40=Spegel must run as root (UID 0) to access the containerd socket and host containerd paths."
+    checkov.io/skip3: "CKV_K8S_38=Spegel uses its service account token for leader election and peer discovery via the Kubernetes API."
+    checkov.io/skip4: "CKV2_K8S_6=Spegel serves node-local registry and peer traffic on host-reachable ports; ingress is intentionally open to nodes and peers."
+    ignore-check.kube-linter.io/run-as-non-root: "Spegel must run as root to access the containerd socket and write the host containerd registry configuration."
+    ignore-check.kube-linter.io/host-mounts: "Spegel mounts the containerd socket and registry config directory from the host by design."
+    ignore-check.kube-linter.io/sensitive-host-mounts: "Spegel mounts the containerd socket and registry config directory from the host by design."
+    ignore-check.kube-linter.io/writable-host-mount: "Spegel writes the containerd registry mirror config, its data directory and talks to the containerd socket on the host by design."
+    ignore-check.kube-linter.io/no-node-affinity: "Spegel is a DaemonSet that must run on every node; there is no affinity to express."
+    ignore-check.kube-linter.io/non-isolated-pod: "Spegel serves node-local registry and peer traffic on host-reachable ports; ingress is intentionally open to nodes and peers."
+    ignore-check.kube-linter.io/docker-sock: "Spegel mounts the containerd socket (not docker) from the host by design."
+spec:
+  template:
+    spec:
+      restartPolicy: Always

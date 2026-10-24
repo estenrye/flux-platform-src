@@ -1,0 +1,14 @@
+# Read-only access for the k8sattributes processor to resolve pod -> owner
+# workload (Deployment, DaemonSet, StatefulSet, ...). Replicasets are needed
+# to map a Deployment's ReplicaSet back to the Deployment name.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: opentelemetry-collector-k8sattributes
+rules:
+  - apiGroups: [""]
+    resources: [namespaces, pods]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [replicasets]
+    verbs: [get, list, watch]

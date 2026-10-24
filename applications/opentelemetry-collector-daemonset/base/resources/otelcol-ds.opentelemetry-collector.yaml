@@ -1,0 +1,191 @@
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otelcol-ds
+  annotations:
+    ignore-check.kube-linter.io/sorted-keys: kube-linter walks spec.config as an unordered map, so the reported key order changes between runs even though the keys in this file are already sorted.
+spec:
+  mode: daemonset
+  terminationGracePeriodSeconds: 600
+  hostNetwork: true
+  # hostNetwork pods default to the node's resolver; this lets them resolve
+  # cluster Service names such as the netdata-otel exporter endpoint.
+  dnsPolicy: ClusterFirstWithHostNet
+  image: otel/opentelemetry-collector-k8s:0.157.0
+  serviceAccount: opentelemetry-collector
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+  # Control-plane nodes are tainted NoSchedule; tolerate only that taint so the
+  # collector also covers them.
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  env:
+    - name: K8S_NODE_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: spec.nodeName
+  # The pod log files under /var/log/pods are root-owned and not world-readable.
+  securityContext:
+    runAsUser: 0
+    runAsGroup: 0
+  # Resolves PodMonitor/ServiceMonitor resources into scrape targets. per-node
+  # hands each daemonset collector only the targets on its own node, matching
+  # the node-local view of the k8sattributes processor.
+  targetAllocator:
+    enabled: true
+    serviceAccount: opentelemetry-targetallocator
+    allocationStrategy: per-node
+    prometheusCR:
+      enabled: true
+      podMonitorSelector: {}
+      serviceMonitorSelector: {}
+  volumes:
+    - name: varlogpods
+      hostPath:
+        path: /var/log/pods
+  volumeMounts:
+    - name: varlogpods
+      mountPath: /var/log/pods
+      readOnly: true
+  config:
+    receivers:
+      filelog/pods:
+        include: [/var/log/pods/*/*/*.log]
+        # Skip the collector's own logs so exporter errors cannot feed back
+        # into the pipeline, and netdata-otel's, whose log lines for every
+        # query of the stored logs would otherwise be ingested again.
+        exclude:
+          - /var/log/pods/netdata_netdata-otel-*/*/*.log
+          - /var/log/pods/opentelemetry-collector_*/*/*.log
+        # Only tail new lines; replaying every pod log on each restart would
+        # overrun the memory limit.
+        start_at: end
+        include_file_path: true
+        operators:
+          # Parses the CRI log line format and derives k8s.namespace.name,
+          # k8s.pod.name, k8s.pod.uid and k8s.container.name from the path.
+          - type: container
+      hostmetrics:
+        collection_interval: 10s
+        scrapers:
+          cpu:
+            metrics:
+              system.cpu.time:
+                enabled: true
+              system.cpu.frequency:
+                enabled: false
+              system.cpu.logical.count:
+                enabled: true
+              system.cpu.physical.count:
+                enabled: false
+              system.cpu.utilization:
+                enabled: true
+          load:
+            metrics:
+              system.cpu.load_average.15m:
+                enabled: true
+              system.cpu.load_average.1m:
+                enabled: true
+              system.cpu.load_average.5m:
+                enabled: true
+          memory: {}
+          network:
+            # Calico adds a cali* veth per pod plus several unused tunnel and
+            # dummy devices; per-interface series blow up chart cardinality in
+            # netdata. Keep physical NICs (eth*, ens*, ...).
+            exclude:
+              match_type: regexp
+              interfaces:
+                - ^cali.*
+                - ^lo$
+                - ^tunl\d+$
+                - ^ip6tnl\d+$
+                - ^sit\d+$
+                - ^dummy\d+$
+                - ^bond\d+$
+                - ^teql\d+$
+      # Applications on the node send OTLP traces here (gRPC). The collector is
+      # hostNetwork, so clients reach it at the node IP (status.hostIP).
+      otlp:
+        protocols:
+          grpc:
+            endpoint: "[::]:4317"
+      # Scrape targets come from the target allocator (PodMonitor/ServiceMonitor
+      # resources); the operator injects the http_sd config into this receiver.
+      prometheus:
+        config:
+          scrape_configs: []
+    processors:
+      # Tag every metric with the node it came from; without this the three
+      # collectors' series are indistinguishable and merge into one chart.
+      resource/node:
+        attributes:
+          - key: k8s.node.name
+            value: ${env:K8S_NODE_NAME}
+            action: upsert
+          - key: host.name
+            value: ${env:K8S_NODE_NAME}
+            action: upsert
+      # Adds the owning workload (k8s.deployment.name, k8s.daemonset.name, ...)
+      # to pod logs. Each collector only watches pods on its own node.
+      k8sattributes:
+        auth_type: serviceAccount
+        extract:
+          metadata:
+            - k8s.cronjob.name
+            - k8s.daemonset.name
+            - k8s.deployment.name
+            - k8s.job.name
+            - k8s.namespace.name
+            - k8s.pod.name
+            - k8s.statefulset.name
+        filter:
+          node_from_env_var: K8S_NODE_NAME
+        passthrough: false
+        pod_association:
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.uid
+          # Traces carry no pod UID; match on the sender's IP instead.
+          - sources:
+              - from: connection
+      # Netdata files logs without service.name under "unattributed". Use the
+      # owning workload, falling back to the container name for bare pods, and
+      # the pod's namespace as service.namespace.
+      transform/service:
+        error_mode: ignore
+        log_statements:
+          - context: resource
+            statements:
+              - set(attributes["service.name"], attributes["k8s.deployment.name"]) where attributes["service.name"] == nil and attributes["k8s.deployment.name"] != nil
+              - set(attributes["service.name"], attributes["k8s.daemonset.name"]) where attributes["service.name"] == nil and attributes["k8s.daemonset.name"] != nil
+              - set(attributes["service.name"], attributes["k8s.statefulset.name"]) where attributes["service.name"] == nil and attributes["k8s.statefulset.name"] != nil
+              - set(attributes["service.name"], attributes["k8s.cronjob.name"]) where attributes["service.name"] == nil and attributes["k8s.cronjob.name"] != nil
+              - set(attributes["service.name"], attributes["k8s.job.name"]) where attributes["service.name"] == nil and attributes["k8s.job.name"] != nil
+              - set(attributes["service.name"], attributes["k8s.container.name"]) where attributes["service.name"] == nil and attributes["k8s.container.name"] != nil
+              - set(attributes["service.namespace"], attributes["k8s.namespace.name"]) where attributes["service.namespace"] == nil and attributes["k8s.namespace.name"] != nil
+    exporters:
+      otlp_grpc/netdata:
+        endpoint: "netdata-otel.netdata.svc.cluster.local:4317"
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        metrics:
+          receivers: [hostmetrics, prometheus]
+          processors: [resource/node]
+          exporters: [otlp_grpc/netdata]
+        logs:
+          receivers: [filelog/pods]
+          processors: [k8sattributes, resource/node, transform/service]
+          exporters: [otlp_grpc/netdata]
+        traces:
+          receivers: [otlp]
+          processors: [k8sattributes, resource/node]
+          exporters: [otlp_grpc/netdata]

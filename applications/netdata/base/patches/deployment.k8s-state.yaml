@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netdata-k8s-state
+  namespace: netdata
+  annotations:
+    ignore-check.kube-linter.io/no-node-affinity: No zone or role topology to express node affinity against.
+    ignore-check.kube-linter.io/no-read-only-root-fs: Netdata writes its config, cache and runtime state under /etc/netdata, /var/lib/netdata and /var/cache/netdata inside the container.
+    ignore-check.kube-linter.io/writable-host-mount: Netdata needs /sys, /etc/os-release, /var/log and its persistence directory mounted from the host; the chart does not offer read-only mounts for these.
+    ignore-check.kube-linter.io/minimum-three-replicas: k8s-state must run as a single instance; multiple replicas would duplicate the cluster state it streams to the parent.
+    ignore-check.kube-linter.io/no-rolling-update-strategy: 'Recreate is required: the k8s-state RWO volume cannot be mounted by two pods at once.'
+    ignore-check.kube-linter.io/run-as-non-root: The netdata image starts as root so its entrypoint can fix ownership of its state directories.
+    checkov.io/skip1: CKV_K8S_22=Netdata writes its config, cache and runtime state inside the container; the root filesystem cannot be read-only.
+    checkov.io/skip2: CKV_K8S_38=The netdata service account token is required to discover pods and services and to read Kubernetes state.
+    checkov.io/skip3: CKV_K8S_40=Netdata's image does not support a configurable high UID; the container's user is set by the upstream image.
+    checkov.io/skip4: CKV_K8S_23=The netdata container starts as root so its entrypoint can fix ownership of its state directories.
+    checkov.io/skip5: CKV_K8S_20=Netdata's entrypoint requires root; allowPrivilegeEscalation is not set to false by the chart.
+    checkov.io/skip6: CKV_K8S_28=The chart does not drop NET_RAW; Netdata's network probes (e.g. fping) may rely on it.
+    checkov.io/skip7: CKV_K8S_37=The chart does not drop capabilities; Netdata's plugins rely on defaults.
+    checkov.io/skip8: CKV_K8S_30=The chart does not set a container security context.
+    checkov.io/skip9: CKV_K8S_31=The chart does not set a seccomp profile.

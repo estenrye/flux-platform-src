@@ -1,0 +1,6 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: netdata
+  annotations:
+    ignore-check.kube-linter.io/access-to-secrets: "Netdata's service discovery and k8s-state collector read Secrets cluster-wide; the chart's ClusterRole grants get/list/watch."

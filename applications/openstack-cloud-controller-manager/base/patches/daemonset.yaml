@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: openstack-cloud-controller-manager
+  namespace: kube-system
+  annotations:
+    checkov.io/skip1: "CKV_K8S_19=The cloud controller manager runs on the control-plane host network by design so it can reach the OpenStack APIs and the node's kubelet/metadata endpoints before the CNI is available."
+    checkov.io/skip2: "CKV_K8S_38=The cloud controller manager uses its service account token to talk to the Kubernetes API (nodes, services, leases)."
+    checkov.io/skip3: "CKV_K8S_40=The upstream image runs as UID 1001, which must match ownership of the host PKI files mounted from the control plane."
+    checkov.io/skip4: "CKV_K8S_43=Image is pinned to the immutable release tag v1.36.0 via the upstream manifest."
+    checkov.io/skip5: "CKV2_K8S_6=The cloud controller manager runs on the host network, where NetworkPolicy does not apply; it serves no inbound traffic other than localhost health checks."
+    ignore-check.kube-linter.io/host-network: "The cloud controller manager runs on the control-plane host network by design."
+    ignore-check.kube-linter.io/host-mounts: "The cloud controller manager reads the control-plane PKI and CA certificates from the host by design."
+    ignore-check.kube-linter.io/sensitive-host-mounts: "The cloud controller manager reads the control-plane PKI and CA certificates from the host (read-only) by design."
+    ignore-check.kube-linter.io/no-node-affinity: "Node affinity to control-plane nodes is defined by the upstream manifest."
+    ignore-check.kube-linter.io/non-isolated-pod: "The cloud controller manager serves no inbound traffic other than health checks on localhost."
+spec:
+  template:
+    spec:
+      restartPolicy: Always
+      securityContext:
+        runAsUser: 1001
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: openstack-cloud-controller-manager
+          imagePullPolicy: Always
+          ports:
+            - name: healthz
+              containerPort: 10258
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 200m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              host: 127.0.0.1
+              scheme: HTTPS
+              path: /healthz
+              port: 10258
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              host: 127.0.0.1
+              scheme: HTTPS
+              path: /healthz
+              port: 10258
+            initialDelaySeconds: 10
+            periodSeconds: 10

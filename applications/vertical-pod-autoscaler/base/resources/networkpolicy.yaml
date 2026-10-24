@@ -1,0 +1,83 @@
+# All three components talk only to the apiserver (and DNS). Calico evaluates
+# egress post-DNAT (docs/memory/calico-networkpolicy-dnat.md); Talos serves 6443.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vpa-allow-egress
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This Component is also rendered on its own, where the VPA Deployments from the release overlays are absent; the overlay renders do match pods."
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - vpa-admission-controller
+          - vpa-recommender
+          - vpa-updater
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+---
+# The kube-apiserver calls the mutating webhook on the container port (8000).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vpa-admission-controller-allow-ingress
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This Component is also rendered on its own, where the VPA Deployments from the release overlays are absent; the overlay renders do match pods."
+spec:
+  podSelector:
+    matchLabels:
+      app: vpa-admission-controller
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8000
+        - protocol: TCP
+          port: 8944
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vpa-recommender-allow-ingress
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This Component is also rendered on its own, where the VPA Deployments from the release overlays are absent; the overlay renders do match pods."
+spec:
+  podSelector:
+    matchLabels:
+      app: vpa-recommender
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8942
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vpa-updater-allow-ingress
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "This Component is also rendered on its own, where the VPA Deployments from the release overlays are absent; the overlay renders do match pods."
+spec:
+  podSelector:
+    matchLabels:
+      app: vpa-updater
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8943

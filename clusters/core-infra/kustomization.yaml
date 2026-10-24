@@ -12,3 +12,29 @@ resources:
 - resources/flux.ssh-key-secret.yaml
 - resources/flux.source.git.yaml
 - resources/flux.kustomization.yaml
+- ../../applications/calico/base
+- ../../applications/openstack-cloud-controller-manager/base
+- ../../applications/spegel/base
+- ../../applications/cinder-csi/base
+- resources/storageclass.csi-cinder-sc-delete.yaml
+- resources/storageclass.csi-cinder-sc-retain.yaml
+- ../../applications/external-csi-snapshotter/base
+- ../../applications/kubelet-serving-cert-approver/base
+- ../../applications/metrics-server/base
+- ../../applications/opentelemetry-operator/base
+- ../../applications/cert-manager/base
+- ../../applications/cert-manager-approver-policy/base
+- ../../applications/vertical-pod-autoscaler/v1.8
+- ../../applications/cert-manager-acme/base
+- ../../applications/external-dns/cloudflare/base
+- resources/eso.external-secret.cloudflare-api-token.yaml
+- resources/eso.external-secret.cloudflare-dns.yaml
+- ../../applications/netdata/base
+- ../../applications/opentelemetry-collector-daemonset/base
+
+patches:
+- path: patches/netdata.gateway.hostname.yaml
+  target:
+    kind: Gateway
+    name: netdata
+    namespace: netdata
