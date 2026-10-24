@@ -168,6 +168,23 @@ rotate-cluster-service-account-token:
 rotate-cluster-sops-key:
 	CLUSTER=$(CLUSTER) .bin/rotate-cluster-sops-key.sh
 
+install-calicoctl:
+	mkdir -p .venv/bin
+	.bin/install-calicoctl.sh
+
+# Detect leaked Calico LoadBalancer IPAM allocations that make an address flap.
+# Usage: CLUSTER=core-infra make detect-calico-ipam-flapping
+#        add WATCH=330 to also watch Services/Gateways for address changes.
+detect-calico-ipam-flapping:
+	CLUSTER=$(CLUSTER) .bin/detect-calico-ipam-flapping.sh $(if $(WATCH),--watch $(WATCH))
+
+# Release a leaked Calico LoadBalancer IPAM allocation (see the script header).
+# Usage: CLUSTER=core-infra IP=<address> make release-calico-ipam-allocation
+#        add DRY_RUN=true to preview without releasing.
+release-calico-ipam-allocation: install-calicoctl
+	@test -n "$(IP)" || { echo "Usage: CLUSTER=<cluster> IP=<address> [DRY_RUN=true] make release-calico-ipam-allocation" >&2; exit 1; }
+	CLUSTER=$(CLUSTER) .bin/release-calico-ipam-allocation.sh $(IP) $(if $(filter true,$(DRY_RUN)),--dry-run)
+
 rotate-github-app-credentials:
 	.bin/rotate-github-app-credentials.sh
 
