@@ -28,7 +28,11 @@ patches:
   - path: patches/clusterrolebinding.yaml
 
 images:
+  # v2.12.2 fixes the remote code execution flaw in v2.12.1
+  # (https://status.netdata.cloud/incidents/d17pqkt1s8rr). The chart still
+  # ships v2.12.1, so the digest is pinned here. Drop this override and bump
+  # the chart once a release with appVersion >= v2.12.2 is published.
   - name: netdata/netdata
-    digest: sha256:5cfa05a5fa5686b98e0c70e884f00685fb3c662e9c5d727cf46c96d8e37b7818
+    digest: sha256:3d00de3756e1e9150c6121080934168ab5f2ceffce6d494573316c09c18adf83
   - name: alpine
     digest: sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8

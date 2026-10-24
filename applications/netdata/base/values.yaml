@@ -16,7 +16,8 @@ image:
   repository: netdata/netdata
   # -- Container image tag
   # @section -- General settings
-  tag: "{{ .Chart.AppVersion }}"
+  # Chart 3.7.176 ships v2.12.1; v2.12.2 fixes the RCE (see kustomization.yaml).
+  tag: "v2.12.2"
   # -- Container image pull policy
   # @section -- General settings
   pullPolicy: Always

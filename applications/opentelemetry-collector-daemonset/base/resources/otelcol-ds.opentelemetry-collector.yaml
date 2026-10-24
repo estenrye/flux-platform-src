@@ -105,6 +105,39 @@ spec:
           - key: host.name
             value: ${env:K8S_NODE_NAME}
             action: upsert
+      # Adds the owning workload (k8s.deployment.name, k8s.daemonset.name, ...)
+      # to pod logs. Each collector only watches pods on its own node.
+      k8sattributes:
+        auth_type: serviceAccount
+        extract:
+          metadata:
+            - k8s.cronjob.name
+            - k8s.daemonset.name
+            - k8s.deployment.name
+            - k8s.job.name
+            - k8s.statefulset.name
+        filter:
+          node_from_env_var: K8S_NODE_NAME
+        passthrough: false
+        pod_association:
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.uid
+      # Netdata files logs without service.name under "unattributed". Use the
+      # owning workload, falling back to the container name for bare pods, and
+      # the pod's namespace as service.namespace.
+      transform/service:
+        error_mode: ignore
+        log_statements:
+          - context: resource
+            statements:
+              - set(attributes["service.name"], attributes["k8s.deployment.name"]) where attributes["service.name"] == nil and attributes["k8s.deployment.name"] != nil
+              - set(attributes["service.name"], attributes["k8s.daemonset.name"]) where attributes["service.name"] == nil and attributes["k8s.daemonset.name"] != nil
+              - set(attributes["service.name"], attributes["k8s.statefulset.name"]) where attributes["service.name"] == nil and attributes["k8s.statefulset.name"] != nil
+              - set(attributes["service.name"], attributes["k8s.cronjob.name"]) where attributes["service.name"] == nil and attributes["k8s.cronjob.name"] != nil
+              - set(attributes["service.name"], attributes["k8s.job.name"]) where attributes["service.name"] == nil and attributes["k8s.job.name"] != nil
+              - set(attributes["service.name"], attributes["k8s.container.name"]) where attributes["service.name"] == nil and attributes["k8s.container.name"] != nil
+              - set(attributes["service.namespace"], attributes["k8s.namespace.name"]) where attributes["service.namespace"] == nil and attributes["k8s.namespace.name"] != nil
     exporters:
       otlp_grpc/netdata:
         endpoint: "netdata-otel.netdata.svc.cluster.local:4317"
@@ -118,5 +151,5 @@ spec:
           exporters: [otlp_grpc/netdata]
         logs:
           receivers: [filelog/pods]
-          processors: [resource/node]
+          processors: [k8sattributes, resource/node, transform/service]
           exporters: [otlp_grpc/netdata]

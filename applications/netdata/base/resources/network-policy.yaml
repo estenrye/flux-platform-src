@@ -15,10 +15,37 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # No `from:` restriction: children are hostNetwork pods, so their streams
-    # arrive from node IPs that no pod selector can match; the Gateway's Envoy
-    # proxy pods (envoy-gateway-system) also reach the UI here.
-    - ports:
+    # The agent's web port (19999) accepts commands, so only the known clients
+    # may reach it (https://status.netdata.cloud/incidents/d17pqkt1s8rr).
+    - from:
+        # Children are hostNetwork pods, so their streams arrive from node IPs
+        # that no pod selector can match.
+        - ipBlock:
+            cidr: fd97:45c2:b3a1:1179::/64
+        # Same-node clients (the child and pods reaching the netdata Service)
+        # show up as Talos' host address after kube-proxy translation.
+        - ipBlock:
+            cidr: fd54:616c:6f73::/64
+        # k8s-state and the OTLP receiver stream over the pod network.
+        - podSelector:
+            matchExpressions:
+              - key: role
+                operator: In
+                values: [k8sState, otel]
+      ports:
+        - protocol: TCP
+          port: 19999
+    # The Gateway's Envoy proxy pods serve the UI.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tigera-gateway
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              gateway.envoyproxy.io/owning-gateway-name: netdata
+              gateway.envoyproxy.io/owning-gateway-namespace: netdata
+      ports:
         - protocol: TCP
           port: 19999
   egress:
