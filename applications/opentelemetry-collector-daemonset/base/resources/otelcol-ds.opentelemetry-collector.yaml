@@ -2,6 +2,8 @@ apiVersion: opentelemetry.io/v1beta1
 kind: OpenTelemetryCollector
 metadata:
   name: otelcol-ds
+  annotations:
+    ignore-check.kube-linter.io/sorted-keys: kube-linter walks spec.config as an unordered map, so the reported key order changes between runs even though the keys in this file are already sorted.
 spec:
   mode: daemonset
   terminationGracePeriodSeconds: 600
