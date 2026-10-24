@@ -38,3 +38,8 @@ patches:
     kind: Gateway
     name: netdata
     namespace: netdata
+- path: patches/netdata.httproute.hostname.yaml
+  target:
+    kind: HTTPRoute
+    name: netdata
+    namespace: netdata
