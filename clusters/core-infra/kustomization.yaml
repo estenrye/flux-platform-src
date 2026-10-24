@@ -43,3 +43,8 @@ patches:
     kind: HTTPRoute
     name: netdata
     namespace: netdata
+- path: patches/external-dns.txt-owner-id.yaml
+  target:
+    kind: Deployment
+    name: external-dns
+    namespace: external-dns
