@@ -11,6 +11,47 @@ spec:
     level:
       default: warn
   mergeGateways: true
+  # Traces go to the otelcol-ds collector's OTLP receiver (cross-namespace
+  # backendRef allowed by the ReferenceGrant in
+  # opentelemetry-collector-daemonset). The collector's exporter decides where
+  # they end up, so this stays independent of netdata.
+  telemetry:
+    # Replaces Envoy Gateway's default access log. JSON on stdout so the
+    # collector's pod-log pipeline ingests it; trace_id joins a request to its
+    # trace.
+    accessLog:
+      settings:
+        - format:
+            type: JSON
+            json:
+              start_time: "%START_TIME%"
+              method: "%REQ(:METHOD)%"
+              path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              protocol: "%PROTOCOL%"
+              response_code: "%RESPONSE_CODE%"
+              response_flags: "%RESPONSE_FLAGS%"
+              bytes_received: "%BYTES_RECEIVED%"
+              bytes_sent: "%BYTES_SENT%"
+              duration_ms: "%DURATION%"
+              upstream_host: "%UPSTREAM_HOST%"
+              authority: "%REQ(:AUTHORITY)%"
+              x_forwarded_for: "%REQ(X-FORWARDED-FOR)%"
+              user_agent: "%REQ(USER-AGENT)%"
+              request_id: "%REQ(X-REQUEST-ID)%"
+              trace_id: "%TRACE_ID%"
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout
+    tracing:
+      # Percent of requests sampled.
+      samplingRate: 10
+      provider:
+        type: OpenTelemetry
+        backendRefs:
+          - name: otelcol-ds-collector
+            namespace: opentelemetry-collector
+            port: 4317
   provider:
     kubernetes:
       envoyDeployment:
@@ -55,6 +96,47 @@ spec:
     level:
       default: warn
   mergeGateways: false
+  # Traces go to the otelcol-ds collector's OTLP receiver (cross-namespace
+  # backendRef allowed by the ReferenceGrant in
+  # opentelemetry-collector-daemonset). The collector's exporter decides where
+  # they end up, so this stays independent of netdata.
+  telemetry:
+    # Replaces Envoy Gateway's default access log. JSON on stdout so the
+    # collector's pod-log pipeline ingests it; trace_id joins a request to its
+    # trace.
+    accessLog:
+      settings:
+        - format:
+            type: JSON
+            json:
+              start_time: "%START_TIME%"
+              method: "%REQ(:METHOD)%"
+              path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              protocol: "%PROTOCOL%"
+              response_code: "%RESPONSE_CODE%"
+              response_flags: "%RESPONSE_FLAGS%"
+              bytes_received: "%BYTES_RECEIVED%"
+              bytes_sent: "%BYTES_SENT%"
+              duration_ms: "%DURATION%"
+              upstream_host: "%UPSTREAM_HOST%"
+              authority: "%REQ(:AUTHORITY)%"
+              x_forwarded_for: "%REQ(X-FORWARDED-FOR)%"
+              user_agent: "%REQ(USER-AGENT)%"
+              request_id: "%REQ(X-REQUEST-ID)%"
+              trace_id: "%TRACE_ID%"
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout
+    tracing:
+      # Percent of requests sampled.
+      samplingRate: 10
+      provider:
+        type: OpenTelemetry
+        backendRefs:
+          - name: otelcol-ds-collector
+            namespace: opentelemetry-collector
+            port: 4317
   provider:
     kubernetes:
       envoyDeployment:
@@ -82,6 +164,47 @@ spec:
     level:
       default: warn
   mergeGateways: false
+  # Traces go to the otelcol-ds collector's OTLP receiver
+  # (cross-namespace backendRef allowed by the ReferenceGrant in
+  # opentelemetry-collector-daemonset). The collector's exporter decides where
+  # they end up, so this stays independent of netdata.
+  telemetry:
+    # Replaces Envoy Gateway's default access log. JSON on stdout so the
+    # collector's pod-log pipeline ingests it; trace_id joins a request to its
+    # trace.
+    accessLog:
+      settings:
+        - format:
+            type: JSON
+            json:
+              start_time: "%START_TIME%"
+              method: "%REQ(:METHOD)%"
+              path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              protocol: "%PROTOCOL%"
+              response_code: "%RESPONSE_CODE%"
+              response_flags: "%RESPONSE_FLAGS%"
+              bytes_received: "%BYTES_RECEIVED%"
+              bytes_sent: "%BYTES_SENT%"
+              duration_ms: "%DURATION%"
+              upstream_host: "%UPSTREAM_HOST%"
+              authority: "%REQ(:AUTHORITY)%"
+              x_forwarded_for: "%REQ(X-FORWARDED-FOR)%"
+              user_agent: "%REQ(USER-AGENT)%"
+              request_id: "%REQ(X-REQUEST-ID)%"
+              trace_id: "%TRACE_ID%"
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout
+    tracing:
+      # Percent of requests sampled.
+      samplingRate: 10
+      provider:
+        type: OpenTelemetry
+        backendRefs:
+          - name: otelcol-ds-collector
+            namespace: opentelemetry-collector
+            port: 4317
   provider:
     kubernetes:
       envoyDeployment:
@@ -109,6 +232,47 @@ spec:
     level:
       default: warn
   mergeGateways: true
+  # Traces go to the otelcol-ds collector's OTLP receiver (cross-namespace
+  # backendRef allowed by the ReferenceGrant in
+  # opentelemetry-collector-daemonset). The collector's exporter decides where
+  # they end up, so this stays independent of netdata.
+  telemetry:
+    # Replaces Envoy Gateway's default access log. JSON on stdout so the
+    # collector's pod-log pipeline ingests it; trace_id joins a request to its
+    # trace.
+    accessLog:
+      settings:
+        - format:
+            type: JSON
+            json:
+              start_time: "%START_TIME%"
+              method: "%REQ(:METHOD)%"
+              path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              protocol: "%PROTOCOL%"
+              response_code: "%RESPONSE_CODE%"
+              response_flags: "%RESPONSE_FLAGS%"
+              bytes_received: "%BYTES_RECEIVED%"
+              bytes_sent: "%BYTES_SENT%"
+              duration_ms: "%DURATION%"
+              upstream_host: "%UPSTREAM_HOST%"
+              authority: "%REQ(:AUTHORITY)%"
+              x_forwarded_for: "%REQ(X-FORWARDED-FOR)%"
+              user_agent: "%REQ(USER-AGENT)%"
+              request_id: "%REQ(X-REQUEST-ID)%"
+              trace_id: "%TRACE_ID%"
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout
+    tracing:
+      # Percent of requests sampled.
+      samplingRate: 10
+      provider:
+        type: OpenTelemetry
+        backendRefs:
+          - name: otelcol-ds-collector
+            namespace: opentelemetry-collector
+            port: 4317
   provider:
     kubernetes:
       envoyDeployment:

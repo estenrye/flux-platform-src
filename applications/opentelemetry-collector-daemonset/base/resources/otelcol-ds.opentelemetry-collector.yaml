@@ -32,6 +32,17 @@ spec:
   securityContext:
     runAsUser: 0
     runAsGroup: 0
+  # Resolves PodMonitor/ServiceMonitor resources into scrape targets. per-node
+  # hands each daemonset collector only the targets on its own node, matching
+  # the node-local view of the k8sattributes processor.
+  targetAllocator:
+    enabled: true
+    serviceAccount: opentelemetry-targetallocator
+    allocationStrategy: per-node
+    prometheusCR:
+      enabled: true
+      podMonitorSelector: {}
+      serviceMonitorSelector: {}
   volumes:
     - name: varlogpods
       hostPath:
@@ -103,6 +114,11 @@ spec:
         protocols:
           grpc:
             endpoint: "[::]:4317"
+      # Scrape targets come from the target allocator (PodMonitor/ServiceMonitor
+      # resources); the operator injects the http_sd config into this receiver.
+      prometheus:
+        config:
+          scrape_configs: []
     processors:
       # Tag every metric with the node it came from; without this the three
       # collectors' series are indistinguishable and merge into one chart.
@@ -160,7 +176,7 @@ spec:
     service:
       pipelines:
         metrics:
-          receivers: [hostmetrics]
+          receivers: [hostmetrics, prometheus]
           processors: [resource/node]
           exporters: [otlp_grpc/netdata]
         logs:

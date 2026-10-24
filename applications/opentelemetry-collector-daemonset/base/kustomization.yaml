@@ -8,4 +8,8 @@ resources:
   - resources/opentelemetry-collector.sa.yaml
   - resources/opentelemetry-collector.clusterrole.yaml
   - resources/opentelemetry-collector.clusterrolebinding.yaml
+  - resources/otelcol-ds.reference-grant.yaml
+  - resources/opentelemetry-targetallocator.sa.yaml
+  - resources/opentelemetry-targetallocator.clusterrole.yaml
+  - resources/opentelemetry-targetallocator.clusterrolebinding.yaml
   - resources/otelcol-ds.vpa.yaml
