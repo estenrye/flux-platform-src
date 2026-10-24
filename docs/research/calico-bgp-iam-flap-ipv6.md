@@ -15,14 +15,66 @@ cluster on 2026-10-24 (UTC). Sections 1 and 2 are written to be pasted into
 
 An IPv6-only Gateway's LoadBalancer address (served by Calico's LoadBalancer
 IPAM) intermittently disappeared and reappeared, and external-dns, which
-publishes that address to DNS, saw a wrong address and then an empty one. Two
-separate Calico behaviors were involved. (1) A **leaked IPAM allocation** from
-a previous incarnation of the same-named Service made the LoadBalancer
-controller alternate the Service's status between two addresses. After
-releasing the leaked allocation by hand, (2) the controller **still clears the
-Service's `status.loadBalancer.ingress` for 1-2 seconds on every periodic sync**
-(every 5 minutes), even though the Service already holds exactly the address it
-should.
+publishes that address to DNS, saw a wrong address and then an empty one. Both
+symptoms come from one defect in the kube-controllers LoadBalancer controller
+(v3.32.1): after a Service is recreated under the same name, an IPAM
+allocation keyed to the *old* Service UID remains, and `syncService` applies
+that stale key to the *live* Service because it looks the Service up by name
+only. While the old allocation existed, the stale key wrote its address into
+the Service status (**issue A**, a flip between two addresses). After the
+allocation was released by hand, the stale key stayed in the controller's
+in-memory tracker as an empty entry and wrote an **empty** status on every
+sync (**issue B**, a 1-2 second clear every few minutes). Restarting
+kube-controllers made the clears stop. See "Root cause" below.
+
+## Root cause (from the v3.32.1 source)
+
+File: `kube-controllers/pkg/controllers/loadbalancer/loadbalancer_controller.go`
+at tag `v3.32.1`.
+
+1. **A handle includes the Service UID.** `createHandle` returns `"lb-" +
+   base64(sha256("<name>-<namespace>-<uid>"))`. A Service recreated under the
+   same name has a new UID and therefore a new handle.
+2. **The tracker is keyed by `serviceKey{handle, name, namespace}`**, built from
+   the IPAM block attributes in `handleBlockUpdate`. After a recreate that
+   leaked the old allocation, the tracker holds two keys for the same
+   `namespace/name`: the live handle and the stale one.
+3. **`syncIPAM` runs `syncService` for every tracker key**, in addition to every
+   live Service (it adds `for svcKey := range c.allocationTracker.ipsByService`
+   to the set).
+4. **`syncService` finds the Service by name only.** It calls
+   `serviceLister.Services(svcKey.namespace).Get(svcKey.name)` and then uses
+   that live Service with the stale `svcKey`. It never checks that
+   `svcKey.handle` matches the Service's current handle. The "Service was
+   deleted" garbage-collection branch only runs when that lookup returns
+   NotFound, so a Service recreated under the same name masks the leak.
+5. **With the stale key**, `needsIPsAssigned` (`len(ipsByService[svcKey]) != 1`)
+   and `needsStatusUpdate` are evaluated against the stale key's IP set, and
+   `updateServiceStatus` builds `status.loadBalancer.ingress` from that set:
+   - stale key holds `{...9284}` -> status written as `[...9284]` (issue A);
+   - stale key holds `{}` -> status written as `[]` (issue B).
+6. **A released key is never removed.** `releaseAddressFromService` does
+   `delete(t.ipsByService[svcKey], ip)` and leaves the (now empty) map under
+   `ipsByService[svcKey]`, so `syncIPAM` keeps iterating it until the process
+   restarts. (`assignIP` then logs "No new IPs to assign" and returns an empty
+   slice, which is the `Assigned IPs []` line, but the status is written from
+   the stale key, not from that slice.)
+7. **Triggers:** the 5-minute periodic sync, and any `syncChan` kick, which
+   every IPAM block update causes.
+
+This was verified by experiment: after `calico-kube-controllers` was restarted
+(23:01:05Z), the tracker was rebuilt from IPAM without the stale key and a
+420-second watch, spanning the periodic sync at 23:06:11Z, saw no address
+change and none of the `requires an IP assignment` / `Assigned IPs []` log
+lines that preceded every earlier clear.
+
+### Suggested fix directions (for maintainers)
+
+- In `syncService`, compare `svcKey.handle` with `createHandle(svc)` for the
+  Service found by name. If they differ, treat the key as stale: release its
+  allocation and do not touch the Service's status.
+- In `allocationTracker.releaseAddressFromService`, delete `ipsByService[svcKey]`
+  when its set becomes empty.
 
 ## Environment
 
@@ -125,8 +177,9 @@ addresses.
   Gateway (the proxy Service is owned by its Gateway) around 2026-10-22 00:38 -
   01:13 UTC, but we do not have logs from that window and have not reproduced
   it on a clean cluster.
-- Whether the controller deliberately picks among multiple allocations or this
-  is an ordering artifact. We only observed the alternation.
+
+The alternation between the two addresses is explained by the "Root cause"
+section above (the stale key's handler rewrites the live Service's status).
 
 ---
 
@@ -138,26 +191,31 @@ its address, every periodic sync
 
 ### Summary
 
-With the leaked allocation from issue A removed, every Service in the pool
-still has exactly one allocation matching its status. Even so, the LoadBalancer
+With the leaked allocation from issue A released, every Service in the pool
+has exactly one allocation matching its status. Even so, the LoadBalancer
 controller briefly **clears** the Service's `status.loadBalancer.ingress` and
-then restores it 1-2 seconds later. It happens on the controller's 5-minute
+then restores it 1-2 seconds later (until kube-controllers is restarted). It happens on the controller's 5-minute
 periodic sync and also on some event-driven reconciles. Any consumer of the
 Service/Gateway address (here: external-dns, an Envoy Gateway `Gateway`'s
 `status.addresses`) sees the address disappear and reappear.
 
-### Reproduction
+### Reproduction (as understood; step 2 is untested)
 
-We see it every cycle on this cluster, where this is the only Service holding a
-Calico-assigned LoadBalancer address (`type: LoadBalancer`,
-`loadBalancerClass: calico`, a `LoadBalancer`-use pool, `assignIPs:
-AllServices`). We have not tried a minimal cluster.
+The clear needs a stale tracker key for a Service name that is still in use,
+which is what an allocation leaked across a Service recreate and then released
+leaves behind. A single healthy Service does not clear.
 
-1. Have a LoadBalancer Service that already has its IP assigned from a Calico
-   pool.
-2. Watch it:
+1. Have a `type: LoadBalancer` Service `S` with a Calico-assigned address
+   (`loadBalancerClass: calico`, a `LoadBalancer`-use pool, `assignIPs:
+   AllServices`).
+2. Leak an allocation for an earlier UID of `S`. We do not know how this
+   happened on our cluster (see issue A). One untested way to try: stop
+   kube-controllers, delete and recreate `S`, restart kube-controllers.
+3. Release the leaked allocation: `calicoctl ipam release --ip=<leaked-ip>`.
+4. Watch `S`:
    `kubectl get svc -n <ns> <name> -w -o jsonpath='{.metadata.name} {.status.loadBalancer.ingress[*].ip}{"\n"}'`
-3. Wait for the controller's periodic sync (every 5 minutes).
+   and note the status going empty on each periodic sync (5 minutes) and on
+   IPAM block updates, until `calico-kube-controllers` is restarted.
 
 ### Expected behavior
 
@@ -211,16 +269,13 @@ At 22:14:50 the same handling also logged:
 `kube-controllers / Update / status`, with the timestamp matching these events
 (e.g. `2026-10-24T22:02:12Z`).
 
-### Suspected cause (hypothesis, not confirmed)
+### Cause
 
-The sequence "`No new IPs to assign, Service already has desired LB
-addresses`" followed immediately by "`Assigned IPs []`" suggests the
-assignment function returns an empty slice when nothing new is needed, and the
-caller then writes that empty slice into `status.loadBalancer.ingress` instead
-of leaving the existing status alone. The next reconcile sees the Service
-needs an address, finds the existing allocation and restores it. We have not
-read the source for the exact code path; the log line numbers (590-602, 649,
-740-758) are v3.32.1.
+See "Root cause" above. The empty write comes from the stale tracker key left
+behind (as an empty entry) after the leaked allocation was released, not from
+`assignIP` returning an empty slice. An earlier hypothesis in this document
+that `assignIP`'s empty return value was written to the status was wrong: the
+status is built from the tracker entry for the key being synced.
 
 ### Impact
 
@@ -232,15 +287,23 @@ read the source for the exact code path; the log line numbers (590-602, 649,
 
 ### Workaround
 
-None found. Releasing the leaked allocation in issue A removed the address
-*flip*, but not this clear-and-restore.
+Release the leaked allocation, then restart `calico-kube-controllers` so its
+in-memory tracker is rebuilt without the stale key:
+
+```
+calicoctl ipam release --ip=<leaked-ip>
+kubectl delete pod -n calico-system -l k8s-app=calico-kube-controllers
+```
+
+Releasing alone removed the address flip but not the clear; the restart removed
+the clear. The condition returns if a Service is recreated under the same name
+and leaks again.
 
 ### Questions for maintainers
 
-- Is this intended? If not, is there a fix in a newer release (v3.33.0 or
-  main)?
-- Is there a supported way to make the controller skip Services that already
-  have a matching allocation?
+- Is the by-name lookup in `syncService` intended, or should it verify the
+  handle? Is there a fix in a newer release (v3.33.0 or main)?
+- Should releasing an allocation also remove the empty `ipsByService` entry?
 
 ---
 
@@ -305,7 +368,7 @@ Reproducible with the scripts in this repo (`flux-platform-src`):
 ## Not verified / limits of this report
 
 - No clean-cluster reproduction of either issue.
-- No source-level confirmation of the suspected cause in section 2.
+- The creation of the leaked allocation was not captured; the rest of the root cause was read from the v3.32.1 source and confirmed by restarting kube-controllers (one periodic sync observed afterward).
 - No test of Calico v3.33.0 or any newer release.
 - The creation event of the leaked allocation (issue A) was not captured.
 - A search of the upstream issue tracker for these symptoms found no matching
