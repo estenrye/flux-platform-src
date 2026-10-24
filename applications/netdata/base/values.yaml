@@ -593,6 +593,11 @@ child:
           enabled = no
         [ml]
           enabled = no
+        # The child is hostNetwork; its otel-plugin would listen on
+        # 127.0.0.1:4317 on every node and block the opentelemetry-collector
+        # DaemonSet's OTLP receiver. OTLP is ingested by netdata-otel instead.
+        [plugins]
+          otel = no
     # Rendered by the netdata-stream-conf ExternalSecret and mounted via extraVolumes.
     stream:
       enabled: false
