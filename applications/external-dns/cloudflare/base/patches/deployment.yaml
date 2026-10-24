@@ -19,7 +19,10 @@
   value: "Secret comes from an external source."
 - op: replace
   path: /spec/replicas
-  value: 3
+  value: 1
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
+  value: "Deliberately a single replica: concurrent replicas race on record changes under --policy=sync, and a replica syncing while Calico briefly clears the Gateway address could withdraw the record. See docs/research/calico-bgp-iam-flap-ipv6.md."
 - op: add
   path: /metadata/annotations/checkov.io~1skip1
   value: "CKV_K8S_38=external-dns requires the service account token to watch Services and Ingresses and manage DNS records."
