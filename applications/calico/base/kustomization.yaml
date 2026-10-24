@@ -9,7 +9,7 @@ kind: Kustomization
 helmCharts:
   - name: tigera-operator
     repo: https://docs.tigera.io/calico/charts
-    version: v3.32.1
+    version: v3.32.2
     releaseName: calico
     namespace: tigera-operator
     includeCRDs: true
@@ -46,4 +46,4 @@ patches:
 
 images:
   - name: quay.io/tigera/operator
-    digest: sha256:4f32a054d5da52731f5f633816ac29cd98ffe97f69903cc04ec5ac60c86e6a02
+    digest: sha256:3a03d460f8a102e0e6129253d6d1106556b293735ec502c3b67889dbec61aaaf

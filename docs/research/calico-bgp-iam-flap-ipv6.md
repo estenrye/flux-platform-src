@@ -68,13 +68,156 @@ This was verified by experiment: after `calico-kube-controllers` was restarted
 change and none of the `requires an IP assignment` / `Assigned IPs []` log
 lines that preceded every earlier clear.
 
-### Suggested fix directions (for maintainers)
+### Newer releases (source review, not run)
 
-- In `syncService`, compare `svcKey.handle` with `createHandle(svc)` for the
-  Service found by name. If they differ, treat the key as stale: release its
-  allocation and do not touch the Service's status.
-- In `allocationTracker.releaseAddressFromService`, delete `ipsByService[svcKey]`
-  when its set becomes empty.
+`loadbalancer_controller.go` was compared at `v3.32.1`, `v3.32.2`, `v3.33.0`
+(published 2026-10-01) and `master`. The defect is unchanged in all of them:
+
+| Code path | v3.32.1 | v3.32.2 | v3.33.0 | master |
+|---|---|---|---|---|
+| `syncIPAM` also syncs every tracker key | yes | yes | yes | yes |
+| `syncService` looks the Service up by name only (no handle/UID check) | yes | yes | yes | yes |
+| `releaseAddressFromService` leaves an empty `ipsByService` entry | yes | yes | yes | yes |
+
+Changes between `v3.32.1` and `v3.33.0` in this file are unrelated: tombstone
+handling in `onServiceDelete`, log wording, and a fallback to
+`spec.loadBalancerIP`. `master` adds a nil-pointer guard for allocations with
+no handle (#14108, after `v3.33.0`). Upstream issue and PR searches for these
+symptoms returned nothing, which does not prove none exist.
+
+### Proposed fixes
+
+Two small changes against `v3.33.0` (the same code is in `v3.32.2` and `master`).
+They address different halves of the problem and are independent.
+
+#### Fix 1: do not apply a stale key to the live Service (`syncService`)
+
+This removes the root cause: the stale key's handler no longer rewrites a
+Service it does not own. **Not compiled or tested**: it needs the full
+controller package; only the reasoning above supports it. Suggested placement
+is right after the Service lookup succeeds, before `IsCalicoManagedLoadBalancer`:
+
+```diff
+ 	svc, err := c.serviceLister.Services(svcKey.namespace).Get(svcKey.name)
+ 	if apierrors.IsNotFound(err) {
+ 		...
+ 	}
+ 	if err != nil {
+ 		log.WithError(err).Error("Error getting service from serviceLister")
+ 		return
+ 	}
++
++	// svcKey may belong to an earlier incarnation of a Service that was deleted and recreated
++	// under the same name (a new UID gives a new handle). Never apply a stale key to the live
++	// Service: doing so rewrites its status from the stale key's addresses.
++	if liveKey, err := serviceKeyFromService(svc); err == nil && liveKey.handle != svcKey.handle {
++		log.Warnf("Ignoring IPAM handle %s for Service %s/%s: it does not belong to the current Service (handle %s)",
++			svcKey.handle, svcKey.namespace, svcKey.name, liveKey.handle)
++		return
++	}
+```
+
+The conservative form above only ignores the stale key. Releasing it
+(`c.releaseIPsByHandle(svcKey)` before returning, which also drops the key from
+the tracker) would also fix the leak itself, but maintainers should decide
+whether that is safe: if any earlier release derived `createHandle` differently,
+a mismatch would not mean "stale" and the release would free a valid
+allocation. Tests this needs: a controller-level test with a fake clientset and
+IPAM where a Service is recreated under the same name and the old handle's
+allocation is left in IPAM; assert the Service's status is never written from
+the old handle's addresses.
+
+#### Fix 2: drop empty tracker entries (`releaseAddressFromService`)
+
+This removes the second symptom (the clear) even if a stale allocation was
+released out of band. **Tested in isolation**: the tracker code was copied
+verbatim from `v3.33.0` into a dependency-free module; the test below fails on
+the unmodified code and passes with the patch.
+
+```diff
+ func (t *allocationTracker) releaseAddressFromService(svcKey serviceKey, ip string) {
+ 	delete(t.servicesByIP, ip)
+ 	delete(t.ipsByService[svcKey], ip)
++	if len(t.ipsByService[svcKey]) == 0 {
++		// Do not leave an empty entry behind: syncIPAM syncs every key in ipsByService.
++		delete(t.ipsByService, svcKey)
++	}
+ 	for block, ips := range t.ipsByBlock {
+```
+
+`deleteService` ranges over `t.ipsByService[svcKey]` while releasing; deleting the
+outer entry during that range is safe because the range holds the inner map.
+
+```go
+package tracker
+
+import "testing"
+
+func newTracker() *allocationTracker {
+	return &allocationTracker{
+		servicesByIP: map[string]serviceKey{},
+		ipsByService: map[serviceKey]map[string]bool{},
+		ipsByBlock:   map[string]map[string]bool{},
+	}
+}
+
+// A Service recreated under the same name has a new UID and therefore a new handle,
+// so the tracker holds one key per handle for the same namespace/name.
+var (
+	oldKey  = serviceKey{handle: "lb-old-uid", namespace: "tigera-gateway", name: "envoy"}
+	liveKey = serviceKey{handle: "lb-new-uid", namespace: "tigera-gateway", name: "envoy"}
+)
+
+// Releasing the last address of a key (what a block update does after the address is released
+// in IPAM) must not leave the key behind: syncIPAM syncs every key still in ipsByService.
+func TestReleasingLastAddressRemovesKey(t *testing.T) {
+	tr := newTracker()
+	tr.assignAddressToBlock("block", "fd97::9284", oldKey)
+	tr.assignAddressToBlock("block", "fd97::9285", liveKey)
+
+	tr.releaseAddressFromBlock("block", "fd97::9284")
+
+	if _, present := tr.ipsByService[oldKey]; present {
+		t.Fatalf("stale key %+v is still tracked with %d addresses; syncIPAM will keep syncing it against the live Service",
+			oldKey, len(tr.ipsByService[oldKey]))
+	}
+	if !tr.ipsByService[liveKey]["fd97::9285"] {
+		t.Fatalf("the live key lost its address")
+	}
+}
+
+// The controller's own release path (releaseIPsByHandle -> deleteService) already removes the key.
+func TestDeleteServiceRemovesKey(t *testing.T) {
+	tr := newTracker()
+	tr.assignAddressToBlock("block", "fd97::9284", oldKey)
+	tr.deleteService(oldKey)
+	if _, present := tr.ipsByService[oldKey]; present {
+		t.Fatalf("deleteService left the key behind")
+	}
+}
+
+// Releasing one of two addresses must keep the key and the remaining address.
+func TestReleasingOneOfTwoKeepsKey(t *testing.T) {
+	tr := newTracker()
+	tr.assignAddressToBlock("block", "10.0.0.1", liveKey)
+	tr.assignAddressToBlock("block", "fd97::9285", liveKey)
+	tr.releaseAddressFromBlock("block", "10.0.0.1")
+	if !tr.ipsByService[liveKey]["fd97::9285"] || len(tr.ipsByService[liveKey]) != 1 {
+		t.Fatalf("expected only fd97::9285 to remain, got %v", tr.ipsByService[liveKey])
+	}
+}
+```
+
+Result against the unmodified `v3.33.0` tracker:
+
+```
+--- FAIL: TestReleasingLastAddressRemovesKey
+    stale key {handle:lb-old-uid name:envoy namespace:tigera-gateway} is still tracked with 0 addresses; syncIPAM will keep syncing it against the live Service
+```
+
+and with the patch all three tests pass. Fix 2 alone does not stop the *flip*
+(a stale key that still has an allocation keeps rewriting the status); Fix 1
+does.
 
 ## Environment
 
@@ -302,7 +445,8 @@ and leaks again.
 ### Questions for maintainers
 
 - Is the by-name lookup in `syncService` intended, or should it verify the
-  handle? Is there a fix in a newer release (v3.33.0 or main)?
+  handle? (By source review the same code is present in v3.32.2, v3.33.0 and
+  `master`; see "Newer releases" above.)
 - Should releasing an allocation also remove the empty `ipsByService` entry?
 
 ---
@@ -369,7 +513,7 @@ Reproducible with the scripts in this repo (`flux-platform-src`):
 
 - No clean-cluster reproduction of either issue.
 - The creation of the leaked allocation was not captured; the rest of the root cause was read from the v3.32.1 source and confirmed by restarting kube-controllers (one periodic sync observed afterward).
-- No test of Calico v3.33.0 or any newer release.
+- Newer releases were reviewed by reading source only, not run (see "Newer releases" above).
 - The creation event of the leaked allocation (issue A) was not captured.
 - A search of the upstream issue tracker for these symptoms found no matching
   issue; the nearest, [#10412](https://github.com/projectcalico/calico/issues/10412)

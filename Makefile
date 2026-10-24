@@ -178,6 +178,13 @@ install-calicoctl:
 detect-calico-ipam-flapping:
 	CLUSTER=$(CLUSTER) .bin/detect-calico-ipam-flapping.sh $(if $(WATCH),--watch $(WATCH))
 
+# Reproduce the Calico LoadBalancer stale-handle bug on a throwaway Service and
+# report whether the running Calico version has it (docs/research/calico-bgp-iam-flap-ipv6.md).
+# Briefly force-restarts calico-kube-controllers. Takes about 6 minutes.
+# Usage: CLUSTER=core-infra make reproduce-calico-lb-stale-handle
+reproduce-calico-lb-stale-handle: install-calicoctl
+	CLUSTER=$(CLUSTER) .bin/reproduce-calico-lb-stale-handle.sh
+
 # Release a leaked Calico LoadBalancer IPAM allocation (see the script header).
 # Usage: CLUSTER=core-infra IP=<address> make release-calico-ipam-allocation
 #        add DRY_RUN=true to preview without releasing.
