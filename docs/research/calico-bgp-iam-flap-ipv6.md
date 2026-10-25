@@ -68,10 +68,24 @@ This was verified by experiment: after `calico-kube-controllers` was restarted
 change and none of the `requires an IP assignment` / `Assigned IPs []` log
 lines that preceded every earlier clear.
 
-### Newer releases (source review, not run)
+### Newer releases (source review and runtime validation)
 
-`loadbalancer_controller.go` was compared at `v3.32.1`, `v3.32.2`, `v3.33.0`
-(published 2026-10-01) and `master`. The defect is unchanged in all of them:
+**Runtime validation.** `make reproduce-calico-lb-stale-handle` (see the appendix)
+was run against the real cluster on each version after upgrading it:
+
+| Calico | Phase 1: address flips | Phase 2: clear after releasing the stale IP | Phase 3: events after restart | Verdict |
+|---|---|---|---|---|
+| v3.32.1 | 4 | 1 | 0 | BUG PRESENT |
+| v3.32.2 | 2 | 1 | 0 | BUG PRESENT |
+| v3.33.0 | 4 | 1 | 0 | BUG PRESENT |
+
+The three signatures match the original incident each time: flips between the
+leaked and the live address, one status clear after the leaked address is
+released, and a quiet controller after a restart.
+
+**Source review.** `loadbalancer_controller.go` was compared at `v3.32.1`,
+`v3.32.2`, `v3.33.0` (published 2026-10-01) and `master`. The defect is
+unchanged in all of them:
 
 | Code path | v3.32.1 | v3.32.2 | v3.33.0 | master |
 |---|---|---|---|---|
@@ -82,8 +96,9 @@ lines that preceded every earlier clear.
 Changes between `v3.32.1` and `v3.33.0` in this file are unrelated: tombstone
 handling in `onServiceDelete`, log wording, and a fallback to
 `spec.loadBalancerIP`. `master` adds a nil-pointer guard for allocations with
-no handle (#14108, after `v3.33.0`). Upstream issue and PR searches for these
-symptoms returned nothing, which does not prove none exist.
+no handle (#14108, after `v3.33.0`). The v3.33.0 release notes do not mention
+this behavior. Upstream issue and PR searches for these symptoms returned
+nothing, which does not prove none exist.
 
 ### Proposed fixes
 
@@ -506,6 +521,10 @@ Reproducible with the scripts in this repo (`flux-platform-src`):
   (issue B).
 - `make release-calico-ipam-allocation CLUSTER=<cluster> IP=<address>`
   releases a leaked allocation after refusing anything a live Service uses.
+- `make reproduce-calico-lb-stale-handle CLUSTER=<cluster>` reproduces the
+  stale-handle bug on a throwaway Service (briefly force-restarts
+  kube-controllers) and prints a `BUG PRESENT` / `NOT REPRODUCED` verdict; this
+  produced the runtime validation table above.
 - `.bin/test/test-detect-calico-ipam-flapping.sh` has fixture tests for the
   leak detector, including the exact duplicate-allocation case from issue A.
 
@@ -513,7 +532,7 @@ Reproducible with the scripts in this repo (`flux-platform-src`):
 
 - No clean-cluster reproduction of either issue.
 - The creation of the leaked allocation was not captured; the rest of the root cause was read from the v3.32.1 source and confirmed by restarting kube-controllers (one periodic sync observed afterward).
-- Newer releases were reviewed by reading source only, not run (see "Newer releases" above).
+- The runtime validation is a single run per version (the repro was developed on v3.32.1 and re-run unchanged on the others).
 - The creation event of the leaked allocation (issue A) was not captured.
 - A search of the upstream issue tracker for these symptoms found no matching
   issue; the nearest, [#10412](https://github.com/projectcalico/calico/issues/10412)
