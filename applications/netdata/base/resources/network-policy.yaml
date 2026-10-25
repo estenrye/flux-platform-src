@@ -6,6 +6,8 @@ kind: NetworkPolicy
 metadata:
   name: netdata-parent
   namespace: netdata
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The Gateway's Envoy proxy pods are created at runtime by the Envoy Gateway controller in this namespace; they are not in the static rendered manifests but exist at runtime."
 spec:
   podSelector:
     matchLabels:
