@@ -24,6 +24,8 @@ resources:
 - ../../applications/opentelemetry-operator/base
 - ../../applications/cert-manager/base
 - ../../applications/cert-manager-approver-policy/base
+- ../../applications/cert-manager-spiffe-issuer/base
+- ../../applications/cert-manager-trust-manager/base
 - ../../applications/vertical-pod-autoscaler/v1.8
 - ../../applications/cert-manager-acme/base
 - ../../applications/external-dns/cloudflare/base
