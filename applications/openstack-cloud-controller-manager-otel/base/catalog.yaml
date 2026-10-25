@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: openstack-cloud-controller-manager-otel
+  description: |-
+    This component provides an OpenTelemetry Collector sidecar that scrapes the
+    OpenStack cloud controller manager metrics and forwards them to the node's
+    OpenTelemetry Collector DaemonSet.
+  tags:
+    - monitoring
+    - opentelemetry
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

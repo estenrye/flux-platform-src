@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: kube-system
+
+# Requires the opentelemetry-operator (OpenTelemetryCollector CRD and the pod
+# injection webhook). Kept out of openstack-cloud-controller-manager/base so the
+# cloud controller manager does not depend on the operator. The injection
+# annotation is applied from the cluster kustomization.
+resources:
+  - resources/ccm-sidecar.opentelemetry-collector.yaml
+  - resources/ccm-metrics.clusterrole.yaml
+  - resources/ccm-metrics.clusterrolebinding.yaml

@@ -178,7 +178,7 @@ spec:
     service:
       pipelines:
         metrics:
-          receivers: [hostmetrics, prometheus]
+          receivers: [hostmetrics, prometheus, otlp]
           processors: [resource/node]
           exporters: [otlp_grpc/netdata]
         logs:

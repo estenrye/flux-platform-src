@@ -1,0 +1,13 @@
+# Injects the ccm-sidecar collector (applications/openstack-cloud-controller-manager-otel)
+# into the cloud controller manager pods. Applied from the cluster rather than the
+# CCM base so the CCM does not reference the opentelemetry-operator.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: openstack-cloud-controller-manager
+  namespace: kube-system
+spec:
+  template:
+    metadata:
+      annotations:
+        sidecar.opentelemetry.io/inject: kube-system/ccm-sidecar
