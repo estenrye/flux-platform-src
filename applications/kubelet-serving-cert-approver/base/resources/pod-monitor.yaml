@@ -1,0 +1,11 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: kubelet-serving-cert-approver
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubelet-serving-cert-approver
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 60s

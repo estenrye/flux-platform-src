@@ -1,0 +1,19 @@
+# Metrics for the VPA recommender (8942), updater (8943) and admission
+# controller (8944); each upstream Deployment names that container port
+# "prometheus". The namespace comes from the release overlay.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: vpa
+spec:
+  selector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - vpa-admission-controller
+          - vpa-recommender
+          - vpa-updater
+  podMetricsEndpoints:
+    - port: prometheus
+      interval: 60s

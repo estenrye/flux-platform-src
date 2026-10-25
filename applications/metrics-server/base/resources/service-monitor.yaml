@@ -1,0 +1,19 @@
+# metrics-server serves /metrics on its HTTPS port with a self-signed certificate
+# and delegated authorization, so the scrape presents the collector's service
+# account token (granted `get /metrics` by
+# opentelemetry-collector-daemonset's metrics-reader ClusterRole).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: metrics-server
+spec:
+  selector:
+    matchLabels:
+      k8s-app: metrics-server
+  endpoints:
+    - port: https
+      scheme: https
+      interval: 60s
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      tlsConfig:
+        insecureSkipVerify: true
