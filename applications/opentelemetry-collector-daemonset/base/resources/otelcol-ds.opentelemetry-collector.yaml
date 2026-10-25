@@ -11,7 +11,7 @@ spec:
   # hostNetwork pods default to the node's resolver; this lets them resolve
   # cluster Service names such as the netdata-otel exporter endpoint.
   dnsPolicy: ClusterFirstWithHostNet
-  image: otel/opentelemetry-collector-k8s:0.157.0
+  image: otel/opentelemetry-collector-k8s:0.163.2
   serviceAccount: opentelemetry-collector
   resources:
     requests:
@@ -189,3 +189,18 @@ spec:
           receivers: [otlp]
           processors: [k8sattributes, resource/node]
           exporters: [otlp_grpc/netdata]
+      # Self-metrics pushed straight to netdata-otel, bypassing the pipelines
+      # above so they still arrive when a processor or exporter is backing up.
+      telemetry:
+        metrics:
+          level: normal
+          readers:
+            - periodic:
+                interval: 30000
+                exporter:
+                  otlp:
+                    protocol: grpc
+                    endpoint: http://netdata-otel.netdata.svc.cluster.local:4317
+        resource:
+          k8s.node.name: ${env:K8S_NODE_NAME}
+          host.name: ${env:K8S_NODE_NAME}
