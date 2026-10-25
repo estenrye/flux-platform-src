@@ -11,8 +11,12 @@ helmCharts:
     includeCRDs: true
     valuesFile: values.yaml
 
-# resources:
-#   - resources/network-policy.yaml
+# Egress and scrape ingress for flux-state-metrics come from the namespace-wide
+# allow-egress and allow-scraping policies in applications/flux/base, so
+# resources/network-policy.yaml is not included. resources/pod-monitor.yaml
+# duplicates the flux-system PodMonitor that applications/flux/base ships.
+resources:
+  - resources/service-monitor.yaml
 
 patches:
   - target:
