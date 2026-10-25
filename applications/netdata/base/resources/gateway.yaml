@@ -1,7 +1,12 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: netdata
+  # Not "netdata": Calico 3.33's bundled Envoy Gateway deploys the proxy into the
+  # Gateway's own namespace and creates a ServiceAccount named after the Gateway,
+  # which collided with the netdata chart's ServiceAccount netdata/netdata
+  # ("already exists and is not owned by this Gateway"), leaving the Gateway
+  # with no address.
+  name: netdata-gateway
   namespace: netdata
   annotations:
     # cert-manager's Gateway API shim (config.enableGatewayAPI is on) creates

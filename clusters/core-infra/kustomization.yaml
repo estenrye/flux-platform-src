@@ -36,7 +36,7 @@ patches:
 - path: patches/netdata.gateway.hostname.yaml
   target:
     kind: Gateway
-    name: netdata
+    name: netdata-gateway
     namespace: netdata
 - path: patches/netdata.httproute.hostname.yaml
   target:

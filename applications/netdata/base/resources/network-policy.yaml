@@ -35,15 +35,13 @@ spec:
       ports:
         - protocol: TCP
           port: 19999
-    # The Gateway's Envoy proxy pods serve the UI.
+    # The Gateway's Envoy proxy pods serve the UI. Calico 3.33's Envoy Gateway
+    # runs them in the Gateway's own namespace (this one), so no namespaceSelector.
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: tigera-gateway
-          podSelector:
+        - podSelector:
             matchLabels:
               app.kubernetes.io/name: envoy
-              gateway.envoyproxy.io/owning-gateway-name: netdata
+              gateway.envoyproxy.io/owning-gateway-name: netdata-gateway
               gateway.envoyproxy.io/owning-gateway-namespace: netdata
       ports:
         - protocol: TCP
