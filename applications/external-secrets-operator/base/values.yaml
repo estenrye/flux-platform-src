@@ -289,7 +289,7 @@ serviceMonitor:
   # - failIfMissing
   # - alwaysRender
   # @schema
-  renderMode: alwaysRender   # @schema enum: [skipIfMissing, failIfMissing, alwaysRender]
+  renderMode: skipIfMissing   # @schema enum: [skipIfMissing, failIfMissing, alwaysRender]
 
   # -- namespace where you want to install ServiceMonitors
   namespace: ""
