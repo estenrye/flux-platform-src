@@ -80,24 +80,30 @@ verify_downloader() {
     return 0
 }
 
-# Download from file from URL
+# Download from file from URL, retrying transient failures (e.g. curl error 92, HTTP/2 stream reset)
 download() {
     [[ $# -eq 2 ]] || fatal 'download needs exactly 2 arguments'
 
-    case $DOWNLOADER in
-        curl)
-            curl -u user:$GITHUB_TOKEN -o "$1" -sfL "$2"
-            ;;
-        wget)
-            wget --auth-no-challenge --user=user --password=$GITHUB_TOKEN -qO "$1" "$2"
-            ;;
-        *)
-            fatal "Incorrect executable '${DOWNLOADER}'"
-            ;;
-    esac
+    local attempt rc
+    for attempt in 1 2 3; do
+        rc=0
+        case $DOWNLOADER in
+            curl)
+                curl -u user:$GITHUB_TOKEN -o "$1" -sfL "$2" || rc=$?
+                ;;
+            wget)
+                wget --auth-no-challenge --user=user --password=$GITHUB_TOKEN -qO "$1" "$2" || rc=$?
+                ;;
+            *)
+                fatal "Incorrect executable '${DOWNLOADER}'"
+                ;;
+        esac
+        [[ ${rc} -eq 0 ]] && return 0
+        warn "Download attempt ${attempt} failed (exit ${rc}), retrying"
+        sleep 2
+    done
 
-    # Abort if download command failed
-    [[ $? -eq 0 ]] || fatal 'Download failed'
+    fatal 'Download failed'
 }
 
 # calicoctl must match the Calico version the cluster runs: a newer client can
