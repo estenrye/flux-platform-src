@@ -159,7 +159,7 @@ httpRoute:
   # -- Hostnames for the HTTPRoute
   # @section -- General settings
   hostnames:
-    - netdata.rye.ninja
+    - netdata.k8s.local
   # -- Optional explicit HTTPRoute rules. If empty, a default PathPrefix `/` rule is generated
   # @section -- General settings
   rules: []
@@ -1340,4 +1340,3 @@ otel-collector:
       containerPort: 8888
       servicePort: 8888
       protocol: TCP
-

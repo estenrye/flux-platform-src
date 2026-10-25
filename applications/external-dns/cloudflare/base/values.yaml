@@ -45,7 +45,7 @@ env:
         name: dns-credentials
         key: zone_id
         optional: false
-        
+
 resources:
   requests:
     cpu: 200m
