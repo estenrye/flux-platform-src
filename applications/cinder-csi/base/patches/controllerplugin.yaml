@@ -27,6 +27,14 @@ spec:
       containers:
         - name: csi-attacher
           imagePullPolicy: Always
+          args:
+            - --csi-address=$(ADDRESS)
+            - --timeout=3m
+            - --leader-election=true
+            - --default-fstype=ext4
+            - --http-endpoint=:9810
+          ports:
+            - {name: metrics-attach, containerPort: 9810, protocol: TCP}
           resources:
             requests: {cpu: 10m, memory: 32Mi}
             limits: {cpu: 200m, memory: 128Mi}
@@ -49,6 +57,9 @@ spec:
             - --feature-gates=Topology=false
             - --extra-create-metadata
             - --leader-election=true
+            - --http-endpoint=:9811
+          ports:
+            - {name: metrics-prov, containerPort: 9811, protocol: TCP}
           resources:
             requests: {cpu: 10m, memory: 32Mi}
             limits: {cpu: 200m, memory: 128Mi}
@@ -63,6 +74,14 @@ spec:
               type: RuntimeDefault
         - name: csi-snapshotter
           imagePullPolicy: Always
+          args:
+            - --csi-address=$(ADDRESS)
+            - --timeout=3m
+            - --extra-create-metadata
+            - --leader-election=true
+            - --http-endpoint=:9812
+          ports:
+            - {name: metrics-snap, containerPort: 9812, protocol: TCP}
           resources:
             requests: {cpu: 10m, memory: 32Mi}
             limits: {cpu: 200m, memory: 128Mi}
@@ -77,6 +96,14 @@ spec:
               type: RuntimeDefault
         - name: csi-resizer
           imagePullPolicy: Always
+          args:
+            - --csi-address=$(ADDRESS)
+            - --timeout=3m
+            - --handle-volume-inuse-error=false
+            - --leader-election=true
+            - --http-endpoint=:9813
+          ports:
+            - {name: metrics-resize, containerPort: 9813, protocol: TCP}
           resources:
             requests: {cpu: 10m, memory: 32Mi}
             limits: {cpu: 200m, memory: 128Mi}
