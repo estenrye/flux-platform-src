@@ -35,6 +35,8 @@ resources:
 - ../../applications/netdata/base
 - ../../applications/opentelemetry-collector-daemonset/base
 - ../../applications/openstack-cloud-controller-manager-otel/base
+- ../../applications/reloader/base
+- ../../applications/flux-monitoring/base
 
 patches:
 - path: patches/netdata.gateway.hostname.yaml
