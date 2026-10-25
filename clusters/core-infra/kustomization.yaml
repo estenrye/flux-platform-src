@@ -25,6 +25,7 @@ resources:
 - ../../applications/cert-manager/base
 - ../../applications/cert-manager-approver-policy/base
 - ../../applications/cert-manager-spiffe-issuer/base
+- ../../applications/cert-manager-spiffe-csi-driver/base
 - ../../applications/cert-manager-trust-manager/base
 - ../../applications/vertical-pod-autoscaler/v1.8
 - ../../applications/cert-manager-acme/base
@@ -56,3 +57,13 @@ patches:
     kind: DaemonSet
     name: openstack-cloud-controller-manager
     namespace: kube-system
+- path: patches/spiffe-csi.trust-domain.deployment.yaml
+  target:
+    kind: Deployment
+    name: cert-manager-csi-driver-spiffe-approver
+    namespace: cert-manager
+- path: patches/spiffe-csi.trust-domain.daemonset.yaml
+  target:
+    kind: DaemonSet
+    name: cert-manager-csi-driver-spiffe-driver
+    namespace: cert-manager

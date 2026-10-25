@@ -1,0 +1,9 @@
+# ADR-16: see spiffe-csi.trust-domain.deployment.yaml.
+# Index-sensitive: the driver is containers/2 (containers/0 is the node
+# registrar, containers/1 the liveness probe), --trust-domain is args/6.
+- op: test
+  path: /spec/template/spec/containers/2/args/6
+  value: --trust-domain=cluster.local
+- op: replace
+  path: /spec/template/spec/containers/2/args/6
+  value: --trust-domain=core-infra.rye.ninja

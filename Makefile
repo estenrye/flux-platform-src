@@ -5,6 +5,7 @@ render-deps:
 	mkdir -p .venv/bin
 	.bin/install-adr.sh
 	.bin/install-kustomize.sh
+	.bin/install-yq.sh
 
 lint-deps:
 	mkdir -p .venv/bin
@@ -34,14 +35,33 @@ lint-kube-linter: lint-deps
 	.venv/bin/kube-linter lint --config .kube-linter/config.yaml .render
 
 # ADR-16 drift guard: Spot silently ran with the csi-driver-spiffe default
-# trust domain (cluster.local) for weeks — M0 audit finding. Fail the lint
-# if any non-Spot cluster render carries it (Spot keeps it until decommission).
-lint-trust-domain:
-	@BAD=$$(grep -rl -- '--trust-domain=cluster.local\|trust-domain: cluster.local' .render/*/clusters/* 2>/dev/null | grep -v '/clusters/crossplane/' || true); \
-	if [ -n "$$BAD" ]; then echo "ADR-16 VIOLATION: trust domain cluster.local rendered outside Spot:"; echo "$$BAD"; exit 1; fi; \
-	echo "trust-domain guard: OK"
+# trust domain (cluster.local) for weeks (M0 audit finding). Renders each
+# cluster and asserts exactly one --trust-domain arg per container, never
+# cluster.local.
+lint-spiffe-trust-domain: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/lint-spiffe-trust-domain.sh $(dir $(wildcard clusters/*/kustomization.yaml))
 
-lint: lint-deps render lint-checkov lint-kube-linter lint-trust-domain
+test-lint-spiffe-trust-domain: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-spiffe-trust-domain.sh
+
+# Netdata's base ships the placeholder hostname netdata.k8s.local on both the
+# Gateway listener and the HTTPRoute; every cluster including netdata must
+# patch both. Silent no-op patches would otherwise leave the placeholder live.
+lint-netdata-hostname: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/lint-netdata-hostname.sh $(dir $(wildcard clusters/*/kustomization.yaml))
+
+test-lint-netdata-hostname: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-netdata-hostname.sh
+
+# external-dns on the TXT registry without --txt-owner-id uses the owner
+# "default", so clusters sharing a DNS zone delete each other's records.
+lint-external-dns-owner-id: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/lint-external-dns-owner-id.sh $(dir $(wildcard clusters/*/kustomization.yaml))
+
+test-lint-external-dns-owner-id: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-external-dns-owner-id.sh
+
+lint: lint-deps render lint-checkov lint-kube-linter lint-spiffe-trust-domain lint-netdata-hostname lint-external-dns-owner-id
 
 flux-reconcile-source:
 	flux reconcile source git flux-platform-rendered -n flux-system

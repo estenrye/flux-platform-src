@@ -1,0 +1,10 @@
+# ADR-16: every cluster needs a unique SPIFFE trust domain; the base's
+# cluster.local default is prohibited for shared trust anchors. Must match
+# spiffe-csi.trust-domain.daemonset.yaml or the approver denies every request.
+# Index-sensitive: approver is containers/0, --trust-domain is args/3.
+- op: test
+  path: /spec/template/spec/containers/0/args/3
+  value: --trust-domain=cluster.local
+- op: replace
+  path: /spec/template/spec/containers/0/args/3
+  value: --trust-domain=core-infra.rye.ninja
