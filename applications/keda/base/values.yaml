@@ -1,0 +1,117 @@
+asciiArt: false
+
+# Cluster-critical for autoscaling but not for the cluster itself; may be
+# preempted by datastores (applications/priority-classes).
+priorityClassName: platform
+
+# The images run as 65532:65532 (distroless nonroot); set explicitly because the
+# chart only sets runAsNonRoot, and a high numeric UID keeps checkov satisfied
+# (CKV_K8S_40). The chart's other container defaults (read-only root filesystem,
+# no capabilities, RuntimeDefault seccomp) are kept.
+securityContext:
+  operator: &uid
+    runAsUser: 65532
+    runAsGroup: 65532
+  metricServer: *uid
+  webhooks: *uid
+
+# Written in resources/network-policy.yaml; the chart's rules cannot admit the
+# API server.
+networkPolicy:
+  enabled: false
+
+# Two replicas of each component, spread across nodes. The operator runs
+# active/standby by leader election; the metrics server and the webhook are
+# active/active.
+podDisruptionBudget:
+  operator:
+    maxUnavailable: 1
+  metricServer:
+    maxUnavailable: 1
+  webhooks:
+    maxUnavailable: 1
+
+upgradeStrategy:
+  operator: &rolling
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  metricsApiServer: *rolling
+  webhooks: *rolling
+
+# The kinds KEDA may scale. The chart default is every kind with a scale
+# subresource ("*"), which is a wildcard ClusterRole. Add an entry here before
+# creating a ScaledObject for any other kind (an Argo Rollout, an
+# OpenTelemetryCollector, ...); without it the operator is denied.
+rbac:
+  scaledRefKinds:
+    - apiGroup: apps
+      kind: Deployment
+    - apiGroup: apps
+      kind: StatefulSet
+
+operator:
+  replicaCount: 2
+  affinity: &spread
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                    - keda-operator
+                    - keda-operator-metrics-apiserver
+                    - keda-admission-webhooks
+
+metricsServer:
+  replicaCount: 2
+  affinity: *spread
+
+webhooks:
+  replicaCount: 2
+  affinity: *spread
+
+resources:
+  operator:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  metricServer:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  webhooks:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# Scraped by the OpenTelemetry collector's target allocator
+# (applications/opentelemetry-collector-daemonset), which selects every
+# PodMonitor and ServiceMonitor.
+prometheus:
+  operator:
+    enabled: true
+    podMonitor:
+      enabled: true
+  metricServer:
+    enabled: true
+    podMonitor:
+      enabled: true
+  webhooks:
+    enabled: true
+    serviceMonitor:
+      enabled: true

@@ -1,0 +1,8 @@
+# Annotation targets: the checks flag the bindings, not the roles.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: keda
+  annotations:
+    ignore-check.kube-linter.io/access-to-secrets: "The operator reads Secrets cluster-wide to resolve TriggerAuthentication secretTargetRef values."
+    ignore-check.kube-linter.io/access-to-create-pods: "The operator creates Jobs to run ScaledJobs."
