@@ -1,0 +1,10 @@
+# The UniFi gateway on VLAN 1179, the OpenStack-managed peering VLAN. Its
+# OPENSTACK peer-group (providers/kvm/unifi-frr.conf) accepts dynamic neighbors
+# from fd97:45c2:b3a1:1179::/64, so no per-node entry is needed on its side.
+apiVersion: projectcalico.org/v3
+kind: BGPPeer
+metadata:
+  name: gateway
+spec:
+  peerIP: fd97:45c2:b3a1:1179::1
+  asNumber: 64512

@@ -13,6 +13,10 @@ resources:
 - resources/flux.source.git.yaml
 - resources/flux.kustomization.yaml
 - ../../applications/calico/base
+- resources/calico.bgp-configuration.yaml
+- resources/calico.bgp-peer.gateway.yaml
+- resources/calico.ippool.lb-internal-routed.yaml
+- resources/calico.ippool.lb-ingress-routed.yaml
 - ../../applications/openstack-cloud-controller-manager/base
 - ../../applications/spegel/base
 - ../../applications/cinder-csi/base

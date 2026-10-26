@@ -1,0 +1,15 @@
+# LAN-internal LoadBalancer VIPs (site-stable ULA; never leaves the site -- the
+# gateway's outbound BGP filters enforce this). Routed, not on-link. Selected by
+# the projectcalico.org/ipv6pools annotation on the internal EnvoyProxy
+# Services (applications/calico/base). A /112 inside the gateway's accepted
+# CALICO-VIPS-IN block fd97:45c2:b3a1:f00::/64.
+apiVersion: projectcalico.org/v3
+kind: IPPool
+metadata:
+  name: lb-internal-routed
+spec:
+  cidr: fd97:45c2:b3a1:f00::1:0/112
+  allowedUses:
+    - LoadBalancer
+  disabled: false
+  nodeSelector: all()
