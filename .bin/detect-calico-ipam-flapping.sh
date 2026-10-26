@@ -61,7 +61,13 @@ else
   info "Reading IPAM blocks and Services on ${CLUSTER_NAME} ..."
   BLOCKS_JSON="${TMP_DIR}/blocks.json"
   SERVICES_JSON="${TMP_DIR}/services.json"
-  kubectl get ipamblocks.crd.projectcalico.org -o json > "${BLOCKS_JSON}"
+  # Calico 3.33 installs projectcalico.org/v3 as native CRDs and no longer
+  # creates the crd.projectcalico.org group; clusters upgraded in place keep it.
+  if kubectl get crd ipamblocks.crd.projectcalico.org >/dev/null 2>&1; then
+    kubectl get ipamblocks.crd.projectcalico.org -o json > "${BLOCKS_JSON}"
+  else
+    kubectl get ipamblocks.projectcalico.org -o json > "${BLOCKS_JSON}"
+  fi
   kubectl get svc -A -o json > "${SERVICES_JSON}"
 fi
 
