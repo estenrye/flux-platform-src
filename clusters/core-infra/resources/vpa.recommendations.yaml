@@ -241,6 +241,48 @@ spec:
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
+  name: keda-admission-webhooks
+  namespace: keda
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: keda-admission-webhooks
+  updatePolicy:
+    updateMode: "Off"
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: keda-operator
+  namespace: keda
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: keda-operator
+  updatePolicy:
+    updateMode: "Off"
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: keda-operator-metrics-apiserver
+  namespace: keda
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: keda-operator-metrics-apiserver
+  updatePolicy:
+    updateMode: "Off"
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
   name: csi-cinder-nodeplugin
   namespace: kube-system
 spec:

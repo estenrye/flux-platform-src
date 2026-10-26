@@ -40,6 +40,7 @@ resources:
 - ../../applications/opentelemetry-collector-daemonset/base
 - ../../applications/openstack-cloud-controller-manager-otel/base
 - ../../applications/reloader/base
+- ../../applications/keda/base
 - ../../applications/flux-monitoring/base
 - resources/vpa.recommendations.yaml
 
