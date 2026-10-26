@@ -1,0 +1,118 @@
+# A long-running Deployment that re-evaluates every deschedulingInterval, rather
+# than the chart's default CronJob every two minutes: the work is cheap, and a
+# Deployment shows up in the usual health checks and metrics.
+kind: Deployment
+deschedulingInterval: 15m
+replicas: 1
+
+# Preemptible by datastores; the cluster runs fine without it
+# (applications/priority-classes).
+priorityClassName: platform
+
+# The chart asks for 500m CPU / 256Mi as a request, which is far more than a
+# controller that wakes every 15 minutes uses.
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+# The image defaults to UID 1000; set a high numeric UID (checkov CKV_K8S_40).
+securityContext:
+  runAsUser: 65532
+  runAsGroup: 65532
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
+
+# Metrics on 10258 over HTTPS with a self-signed certificate, scraped by the
+# OpenTelemetry collector's target allocator
+# (applications/opentelemetry-collector-daemonset).
+service:
+  enabled: true
+serviceMonitor:
+  enabled: true
+  insecureSkipVerify: true
+
+# To see what a policy change would do without evicting anything, add
+# `dry-run: true` here and read `kubectl -n descheduler logs deploy/descheduler`
+# (look for "Total number of evictions" and "Node has been classified").
+# Validated that way against this cluster before the first deploy: no evictions,
+# every node under the 60% targets.
+cmdOptions:
+  v: 3
+
+# Deliberately conservative: a few evictions per cycle, nothing that is alone,
+# nothing stateful, nothing that cannot land elsewhere.
+deschedulerPolicy:
+  maxNoOfPodsToEvictPerNode: 2
+  maxNoOfPodsToEvictPerNamespace: 2
+  maxNoOfPodsToEvictTotal: 4
+  profiles:
+    - name: default
+      pluginConfig:
+        - name: DefaultEvictor
+          args:
+            # Only evict a pod if some node can actually take it (resources,
+            # taints, affinity), so an eviction is never just a restart.
+            nodeFit: true
+            # Never evict the only replica: netdata-parent, netdata-otel and the
+            # other singletons would drop service for the length of a restart.
+            minReplicas: 2
+            # Leave freshly rolled pods alone; a rollout is not an imbalance.
+            minPodAge: 10m
+            podProtections:
+              # Local-storage, system-critical, DaemonSet and failed bare pods
+              # stay protected (the defaults). Also protect pods that use a PVC:
+              # the Cinder volumes are RWO, and the move is a detach and attach.
+              extraEnabled:
+                - PodsWithPVC
+        - name: RemoveDuplicates
+          args:
+            namespaces: &infra
+              exclude:
+                - kube-system
+                - calico-system
+                - tigera-operator
+                - flux-system
+        - name: RemovePodsViolatingTopologySpreadConstraint
+          args:
+            namespaces: *infra
+        - name: RemovePodsViolatingNodeAffinity
+          args:
+            namespaces: *infra
+            nodeAffinityType:
+              - requiredDuringSchedulingIgnoredDuringExecution
+        - name: RemovePodsViolatingNodeTaints
+          args:
+            namespaces: *infra
+        - name: RemovePodsViolatingInterPodAntiAffinity
+          args:
+            namespaces: *infra
+        # Requests-based: the same measure the scheduler uses. A node counts as
+        # underutilized only below all of these, overutilized above any target.
+        # With a fresh worker, this is what moves pods onto it.
+        - name: LowNodeUtilization
+          args:
+            thresholds:
+              cpu: 30
+              memory: 30
+              pods: 20
+            targetThresholds:
+              cpu: 60
+              memory: 60
+              pods: 50
+            evictableNamespaces: *infra
+      plugins:
+        balance:
+          enabled:
+            - RemoveDuplicates
+            - RemovePodsViolatingTopologySpreadConstraint
+            - LowNodeUtilization
+        deschedule:
+          enabled:
+            - RemovePodsViolatingNodeTaints
+            - RemovePodsViolatingNodeAffinity
+            - RemovePodsViolatingInterPodAntiAffinity

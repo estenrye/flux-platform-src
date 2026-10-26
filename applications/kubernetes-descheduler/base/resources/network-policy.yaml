@@ -1,0 +1,36 @@
+# The chart ships no NetworkPolicy. Port-only rules, as in
+# applications/external-secrets-operator/base: the kubelet probes /healthz and
+# the metrics scraper reaches the same port, and neither is a pod that a selector
+# could name.
+#
+# Egress is the API server only (lists nodes and pods, creates evictions). Calico
+# evaluates egress after DNAT, so that is the real apiserver port, 6443 on Talos,
+# not the Service's 443 (docs/memory/calico-networkpolicy-dnat.md).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: descheduler
+  namespace: descheduler
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: descheduler
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # /healthz probe and Prometheus metrics, both HTTPS.
+    - ports:
+        - protocol: TCP
+          port: 10258
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        # API server targetPort.
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
