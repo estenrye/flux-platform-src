@@ -28,6 +28,12 @@ patches:
       name: keda-admission-webhooks
     path: patches/probe-port.yaml
   - target:
+      kind: PodMonitor
+    path: patches/monitor-namespace.yaml
+  - target:
+      kind: ServiceMonitor
+    path: patches/monitor-namespace.yaml
+  - target:
       kind: PodDisruptionBudget
     path: patches/pod-disruption-budget.yaml
   - target:
