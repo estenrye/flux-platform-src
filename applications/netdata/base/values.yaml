@@ -247,12 +247,13 @@ parent:
   # -- Resources for the parent deployment
   # @section -- Parent
   resources:
+    # VPA (updateMode Off) target is 511m / 1.62Gi, upper bound 2.13Gi.
     requests:
-      cpu: 250m
-      memory: 1Gi
+      cpu: 500m
+      memory: 1792Mi
     limits:
       cpu: 2
-      memory: 2Gi
+      memory: 3Gi
     # limits:
     #  cpu: 4
     #  memory: 4096Mi
@@ -477,8 +478,8 @@ child:
   # @section -- Child
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 400m
+      memory: 576Mi
     limits:
       cpu: 1
       memory: 1Gi
@@ -703,8 +704,8 @@ k8sState:
   # @section -- K8s State
   resources:
     requests:
-      cpu: 50m
-      memory: 128Mi
+      cpu: 250m
+      memory: 288Mi
     limits:
       cpu: 500m
       memory: 512Mi
@@ -942,11 +943,11 @@ netdataOpentelemetry:
   resources:
     # Baseline for the VPA (resources/vpa.yaml), which scales from this ratio.
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 125m
+      memory: 768Mi
     limits:
       cpu: "1"
-      memory: 512Mi
+      memory: 1536Mi
 
   livenessProbe:
     # -- Number of seconds after the container has started before liveness probes are initiated

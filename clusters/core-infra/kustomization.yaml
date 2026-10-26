@@ -37,6 +37,7 @@ resources:
 - ../../applications/openstack-cloud-controller-manager-otel/base
 - ../../applications/reloader/base
 - ../../applications/flux-monitoring/base
+- resources/vpa.recommendations.yaml
 
 patches:
 - path: patches/netdata.gateway.hostname.yaml
