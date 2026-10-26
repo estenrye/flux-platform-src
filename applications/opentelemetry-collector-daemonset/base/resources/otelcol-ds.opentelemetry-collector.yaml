@@ -86,14 +86,12 @@ spec:
                 enabled: false
               system.cpu.utilization:
                 enabled: true
-          load:
-            metrics:
-              system.cpu.load_average.15m:
-                enabled: true
-              system.cpu.load_average.1m:
-                enabled: true
-              system.cpu.load_average.5m:
-                enabled: true
+          # system.cpu.load_average.{1m,5m,15m} are all enabled by default
+          # (loadscraper metadata.yaml), so they are not listed. Listing them
+          # made every render flip: kustomize re-sorts a map of these three
+          # keys inconsistently from run to run, whatever order they are written
+          # in. If a collector upgrade changes those defaults, set them here.
+          load: {}
           memory: {}
           network:
             # Calico adds a cali* veth per pod plus several unused tunnel and
