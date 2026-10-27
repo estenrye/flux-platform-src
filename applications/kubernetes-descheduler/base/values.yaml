@@ -40,16 +40,24 @@ serviceMonitor:
 # `dry-run: true` here and read `kubectl -n descheduler logs deploy/descheduler`
 # (look for "Total number of evictions" and "Node has been classified").
 #
-# First live cycle on core-infra: three workers were over the 60% CPU target, the
-# only underutilized nodes were the tainted control planes, so nodeFit rejected
-# every candidate and nothing was evicted. LowNodeUtilization acts only once a
-# node a worker pod can run on drops below the 30% thresholds.
+# First live cycle on core-infra, before the control planes were excluded below:
+# three workers were over the 60% CPU target, the only underutilized nodes were
+# the tainted control planes, so nodeFit rejected every candidate and nothing was
+# evicted. LowNodeUtilization acts only once a worker drops below the 30%
+# thresholds.
 cmdOptions:
   v: 3
 
 # Deliberately conservative: a few evictions per cycle, nothing that is alone,
 # nothing stateful, nothing that cannot land elsewhere.
 deschedulerPolicy:
+  # Leave the control planes out of every plugin's view. The policy-level
+  # nodeSelector builds the node list handed to all Deschedule and Balance
+  # plugins (descheduler.go runProfiles); the README describes it as applying only
+  # to the eviction filter, which is wrong for v0.37. Without it the tainted
+  # control planes count as underutilized, which LowNodeUtilization can never
+  # use: no worker pod tolerates the taint, so nodeFit rejects every candidate.
+  nodeSelector: "!node-role.kubernetes.io/control-plane"
   maxNoOfPodsToEvictPerNode: 2
   maxNoOfPodsToEvictPerNamespace: 2
   maxNoOfPodsToEvictTotal: 4
