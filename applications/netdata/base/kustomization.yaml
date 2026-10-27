@@ -35,4 +35,4 @@ images:
   - name: netdata/netdata
     digest: sha256:3d00de3756e1e9150c6121080934168ab5f2ceffce6d494573316c09c18adf83
   - name: alpine
-    digest: sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8
+    digest: sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
