@@ -1,0 +1,288 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  annotations:
+    config.k8s.io/owning-inventory: talos-bootstrap-manifests-inventory
+  name: custom-proxy-config
+  namespace: envoy-gateway-system
+spec:
+  ipFamily: IPv6
+  logging:
+    level:
+      default: warn
+  mergeGateways: true
+  # Traces go to the otelcol-ds collector's OTLP receiver (cross-namespace
+  # backendRef allowed by the ReferenceGrant in
+  # opentelemetry-collector-daemonset). The collector's exporter decides where
+  # they end up, so this stays independent of netdata.
+  telemetry:
+    # Replaces Envoy Gateway's default access log. JSON on stdout so the
+    # collector's pod-log pipeline ingests it; trace_id joins a request to its
+    # trace.
+    accessLog:
+      settings:
+        - format:
+            type: JSON
+            json:
+              start_time: "%START_TIME%"
+              method: "%REQ(:METHOD)%"
+              path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              protocol: "%PROTOCOL%"
+              response_code: "%RESPONSE_CODE%"
+              response_flags: "%RESPONSE_FLAGS%"
+              bytes_received: "%BYTES_RECEIVED%"
+              bytes_sent: "%BYTES_SENT%"
+              duration_ms: "%DURATION%"
+              upstream_host: "%UPSTREAM_HOST%"
+              authority: "%REQ(:AUTHORITY)%"
+              x_forwarded_for: "%REQ(X-FORWARDED-FOR)%"
+              user_agent: "%REQ(USER-AGENT)%"
+              request_id: "%REQ(X-REQUEST-ID)%"
+              trace_id: "%TRACE_ID%"
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout
+    tracing:
+      # Percent of requests sampled.
+      samplingRate: 10
+      provider:
+        type: OpenTelemetry
+        backendRefs:
+          - name: otelcol-ds-collector
+            namespace: opentelemetry-collector
+            port: 4317
+  provider:
+    kubernetes:
+      envoyDeployment:
+        pod:
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchLabels:
+                    gateway.envoyproxy.io/owning-gatewayclass: merged-eg
+                topologyKey: kubernetes.io/hostname
+          tolerations:
+          - effect: NoSchedule
+            key: node-role.kubernetes.io/control-plane
+            operator: Exists
+        replicas: 2
+        strategy:
+          rollingUpdate:
+            maxSurge: 0
+            maxUnavailable: 1
+          type: RollingUpdate
+      envoyService:
+        annotations:
+          projectcalico.org/ipv6pools: '["lb-ingress-routed"]'
+        externalTrafficPolicy: Cluster
+        # Claimed by Calico's LB IPAM only; a class makes OCCM ignore the Service
+        # instead of also creating an Octavia load balancer for it.
+        loadBalancerClass: calico
+        type: LoadBalancer
+    type: Kubernetes
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  annotations:
+    config.k8s.io/owning-inventory: talos-bootstrap-manifests-inventory
+  name: external-dedicated-proxy-config
+  namespace: envoy-gateway-system
+spec:
+  ipFamily: IPv6
+  logging:
+    level:
+      default: warn
+  mergeGateways: false
+  # Traces go to the otelcol-ds collector's OTLP receiver (cross-namespace
+  # backendRef allowed by the ReferenceGrant in
+  # opentelemetry-collector-daemonset). The collector's exporter decides where
+  # they end up, so this stays independent of netdata.
+  telemetry:
+    # Replaces Envoy Gateway's default access log. JSON on stdout so the
+    # collector's pod-log pipeline ingests it; trace_id joins a request to its
+    # trace.
+    accessLog:
+      settings:
+        - format:
+            type: JSON
+            json:
+              start_time: "%START_TIME%"
+              method: "%REQ(:METHOD)%"
+              path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              protocol: "%PROTOCOL%"
+              response_code: "%RESPONSE_CODE%"
+              response_flags: "%RESPONSE_FLAGS%"
+              bytes_received: "%BYTES_RECEIVED%"
+              bytes_sent: "%BYTES_SENT%"
+              duration_ms: "%DURATION%"
+              upstream_host: "%UPSTREAM_HOST%"
+              authority: "%REQ(:AUTHORITY)%"
+              x_forwarded_for: "%REQ(X-FORWARDED-FOR)%"
+              user_agent: "%REQ(USER-AGENT)%"
+              request_id: "%REQ(X-REQUEST-ID)%"
+              trace_id: "%TRACE_ID%"
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout
+    tracing:
+      # Percent of requests sampled.
+      samplingRate: 10
+      provider:
+        type: OpenTelemetry
+        backendRefs:
+          - name: otelcol-ds-collector
+            namespace: opentelemetry-collector
+            port: 4317
+  provider:
+    kubernetes:
+      envoyDeployment:
+        replicas: 2
+      envoyService:
+        annotations:
+          projectcalico.org/ipv6pools: '["lb-ingress-routed"]'
+        externalTrafficPolicy: Cluster
+        # Claimed by Calico's LB IPAM only; a class makes OCCM ignore the Service
+        # instead of also creating an Octavia load balancer for it.
+        loadBalancerClass: calico
+        type: LoadBalancer
+    type: Kubernetes
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  annotations:
+    config.k8s.io/owning-inventory: talos-bootstrap-manifests-inventory
+  name: internal-dedicated-proxy-config
+  namespace: envoy-gateway-system
+spec:
+  ipFamily: IPv6
+  logging:
+    level:
+      default: warn
+  mergeGateways: false
+  # Traces go to the otelcol-ds collector's OTLP receiver
+  # (cross-namespace backendRef allowed by the ReferenceGrant in
+  # opentelemetry-collector-daemonset). The collector's exporter decides where
+  # they end up, so this stays independent of netdata.
+  telemetry:
+    # Replaces Envoy Gateway's default access log. JSON on stdout so the
+    # collector's pod-log pipeline ingests it; trace_id joins a request to its
+    # trace.
+    accessLog:
+      settings:
+        - format:
+            type: JSON
+            json:
+              start_time: "%START_TIME%"
+              method: "%REQ(:METHOD)%"
+              path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              protocol: "%PROTOCOL%"
+              response_code: "%RESPONSE_CODE%"
+              response_flags: "%RESPONSE_FLAGS%"
+              bytes_received: "%BYTES_RECEIVED%"
+              bytes_sent: "%BYTES_SENT%"
+              duration_ms: "%DURATION%"
+              upstream_host: "%UPSTREAM_HOST%"
+              authority: "%REQ(:AUTHORITY)%"
+              x_forwarded_for: "%REQ(X-FORWARDED-FOR)%"
+              user_agent: "%REQ(USER-AGENT)%"
+              request_id: "%REQ(X-REQUEST-ID)%"
+              trace_id: "%TRACE_ID%"
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout
+    tracing:
+      # Percent of requests sampled.
+      samplingRate: 10
+      provider:
+        type: OpenTelemetry
+        backendRefs:
+          - name: otelcol-ds-collector
+            namespace: opentelemetry-collector
+            port: 4317
+  provider:
+    kubernetes:
+      envoyDeployment:
+        replicas: 2
+      envoyService:
+        annotations:
+          projectcalico.org/ipv6pools: '["lb-internal-routed"]'
+        externalTrafficPolicy: Cluster
+        # Claimed by Calico's LB IPAM only; a class makes OCCM ignore the Service
+        # instead of also creating an Octavia load balancer for it.
+        loadBalancerClass: calico
+        type: LoadBalancer
+    type: Kubernetes
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  annotations:
+    config.k8s.io/owning-inventory: talos-bootstrap-manifests-inventory
+  name: internal-proxy-config
+  namespace: envoy-gateway-system
+spec:
+  ipFamily: IPv6
+  logging:
+    level:
+      default: warn
+  mergeGateways: true
+  # Traces go to the otelcol-ds collector's OTLP receiver (cross-namespace
+  # backendRef allowed by the ReferenceGrant in
+  # opentelemetry-collector-daemonset). The collector's exporter decides where
+  # they end up, so this stays independent of netdata.
+  telemetry:
+    # Replaces Envoy Gateway's default access log. JSON on stdout so the
+    # collector's pod-log pipeline ingests it; trace_id joins a request to its
+    # trace.
+    accessLog:
+      settings:
+        - format:
+            type: JSON
+            json:
+              start_time: "%START_TIME%"
+              method: "%REQ(:METHOD)%"
+              path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              protocol: "%PROTOCOL%"
+              response_code: "%RESPONSE_CODE%"
+              response_flags: "%RESPONSE_FLAGS%"
+              bytes_received: "%BYTES_RECEIVED%"
+              bytes_sent: "%BYTES_SENT%"
+              duration_ms: "%DURATION%"
+              upstream_host: "%UPSTREAM_HOST%"
+              authority: "%REQ(:AUTHORITY)%"
+              x_forwarded_for: "%REQ(X-FORWARDED-FOR)%"
+              user_agent: "%REQ(USER-AGENT)%"
+              request_id: "%REQ(X-REQUEST-ID)%"
+              trace_id: "%TRACE_ID%"
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout
+    tracing:
+      # Percent of requests sampled.
+      samplingRate: 10
+      provider:
+        type: OpenTelemetry
+        backendRefs:
+          - name: otelcol-ds-collector
+            namespace: opentelemetry-collector
+            port: 4317
+  provider:
+    kubernetes:
+      envoyDeployment:
+        replicas: 2
+      envoyService:
+        annotations:
+          projectcalico.org/ipv6pools: '["lb-internal-routed"]'
+        externalTrafficPolicy: Cluster
+        # Claimed by Calico's LB IPAM only; a class makes OCCM ignore the Service
+        # instead of also creating an Octavia load balancer for it.
+        loadBalancerClass: calico
+        type: LoadBalancer
+    type: Kubernetes

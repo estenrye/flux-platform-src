@@ -1,0 +1,6 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: certificates:kubelet-serving-cert-approver
+  annotations:
+    checkov.io/skip1: "CKV_K8S_156=Approving kubelet serving CertificateSigningRequests is the sole purpose of this controller; the permission is scoped to the kubernetes.io/kubelet-serving signer."

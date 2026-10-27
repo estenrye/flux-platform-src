@@ -1,0 +1,41 @@
+# Talos paths (https://spegel.dev/docs/getting-started/#talos). The chart's
+# default registry config path, /etc/containerd/certs.d, cannot be created on
+# Talos (read-only /etc/containerd); Talos reads mirror config from
+# /etc/cri/conf.d/hosts. Kept identical to files/spegel-values.yaml in
+# tofu-pcd-talos-cluster, which bootstraps Spegel before Flux takes over. The
+# matching containerd setting (discard_unpacked_layers = false) is the
+# CRICustomizationConfig in that module's talos.tf.
+spegel:
+  containerdSock: /run/containerd/containerd.sock
+  containerdContentPath: /var/lib/containerd/io.containerd.content.v1.content
+  containerdRegistryConfigPath: /etc/cri/conf.d/hosts
+
+# Spegel hardening. The registry must run as root to reach the containerd
+# socket and write the host's containerd registry config, but everything else
+# is locked down.
+securityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 128Mi
+livenessProbe:
+  enabled: true
+priorityClassName: platform-critical
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+serviceMonitor:
+  enabled: true
+  interval: 60s

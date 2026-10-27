@@ -45,7 +45,7 @@ env:
         name: dns-credentials
         key: zone_id
         optional: false
-        
+
 resources:
   requests:
     cpu: 200m
@@ -59,20 +59,7 @@ podDisruptionBudget:
   minAvailable: 1
   unhealthyPodEvictionPolicy: AlwaysAllow
 
-tolerations:
-- key: "system-critical"
-  operator: "Exists"
-  effect: "NoSchedule"
-
 affinity:
-  nodeAffinity:
-    requiredDuringSchedulingIgnoredDuringExecution:
-      nodeSelectorTerms:
-        - matchExpressions:
-            - key: role
-              operator: In
-              values:
-              - system-critical
   podAntiAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:
       - podAffinityTerm:

@@ -296,7 +296,7 @@ app:
           # using label selectors.
           prometheusInstance: default
           # The interval that the Prometheus will scrape for metrics.
-          interval: 10s
+          interval: 60s
           # The timeout on each metric probe request.
           scrapeTimeout: 5s
           # Additional labels to give the ServiceMonitor resource.

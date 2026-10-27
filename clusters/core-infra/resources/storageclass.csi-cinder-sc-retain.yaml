@@ -1,0 +1,17 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: csi-cinder-sc-retain
+  annotations:
+    # StorageClass parameters are immutable. The Talos bootstrap created this
+    # class with availability: pcd-ce-lab (the Nova zone), which Cinder rejects;
+    # force makes Flux delete and recreate it with the Cinder zone below.
+    kustomize.toolkit.fluxcd.io/force: enabled
+provisioner: cinder.csi.openstack.org
+parameters:
+  # Cinder's volume availability zone (openstack availability zone list --volume),
+  # not the Nova compute zone the nodes are labelled with.
+  availability: nova
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: Immediate

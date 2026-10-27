@@ -1,0 +1,32 @@
+# cert-manager-approver-policy is cluster-wide and the built-in approver is
+# disabled, so the admission controller's serving Certificate sits
+# WaitingForApproval forever unless a CertificateRequestPolicy matches it.
+# Mirrors applications/opentelemetry-operator's certificate-request-policy.yaml.
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: vertical-pod-autoscaler-webhook-policy
+spec:
+  allowed:
+    dnsNames:
+      required: true
+      values:
+        - vpa-webhook.kube-system.svc
+        - vpa-webhook.kube-system.svc.cluster.local
+    subject:
+      organizationalUnits:
+        values:
+          - vertical-pod-autoscaler
+    isCA: false
+    usages:
+      - digital signature
+      - key encipherment
+      - server auth
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: Issuer
+      name: vertical-pod-autoscaler-selfsigned-issuer
+    namespace:
+      matchNames:
+        - kube-system

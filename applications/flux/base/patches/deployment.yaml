@@ -18,17 +18,6 @@
   path: /spec/template/spec/affinity
   value: {}
 - op: add
-  path: /spec/template/spec/affinity/nodeAffinity
-  value:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 1
-        preference:
-          matchExpressions:
-            - key: servers.ngpc.rxt.io/type
-              operator: In
-              values:
-                - ondemand
-- op: add
   path: /spec/template/spec/affinity/podAntiAffinity
   value:
     preferredDuringSchedulingIgnoredDuringExecution:
@@ -50,3 +39,6 @@
 - op: add
   path: /metadata/annotations/checkov.io~1skip1
   value: "CKV_K8S_38=Flux controllers require the service account token to reconcile Flux resources and manage cluster state."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+  value: "No zone or role topology to express node affinity against."

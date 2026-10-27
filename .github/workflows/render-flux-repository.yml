@@ -32,6 +32,8 @@ jobs:
 
       - name: Install render deps
         run: make render-deps
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Render manifests
         run: make render-manifests
@@ -43,6 +45,24 @@ jobs:
 
       - name: Lint with kube-linter
         run: make lint-kube-linter
+
+      - name: Test SPIFFE trust-domain lint
+        run: make test-lint-spiffe-trust-domain
+
+      - name: Lint SPIFFE trust domain
+        run: make lint-spiffe-trust-domain
+
+      - name: Test netdata hostname lint
+        run: make test-lint-netdata-hostname
+
+      - name: Lint netdata hostnames
+        run: make lint-netdata-hostname
+
+      - name: Test external-dns owner id lint
+        run: make test-lint-external-dns-owner-id
+
+      - name: Lint external-dns owner ids
+        run: make lint-external-dns-owner-id
 
       - name: Stage rendered manifests for upload
         run: cp -r .render/flux-platform-rendered/ /tmp/rendered-manifests/

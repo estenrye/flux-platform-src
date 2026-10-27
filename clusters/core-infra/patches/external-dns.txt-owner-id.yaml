@@ -1,0 +1,8 @@
+# Distinct from the controlplane cluster's external-dns, which also runs
+# policy: sync against this Cloudflare zone under the default owner ID
+# ("default"). Sharing an owner made each cluster delete the other's records
+# every sync (confirmed 2026-10-24: controlplane deleted
+# core-infra.netdata.rye.ninja every ~2 minutes).
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --txt-owner-id=core-infra

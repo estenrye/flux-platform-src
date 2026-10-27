@@ -1,0 +1,29 @@
+# Calico's BGP settings for core-infra. Managed here, not only by tofu's Talos
+# inline manifests (tofu-pcd-talos-cluster, calico.tf): Talos only creates
+# objects, it does not update ones that already exist, and calico-node creates
+# `default` first (with AS 64512, the gateway's own AS), so the tofu copy never
+# took effect and the gateway rejected every session with "Bad peer AS".
+# Flux applies server-side and takes ownership of these fields.
+#
+# Keep asNumber and serviceLoadBalancerIPs in step with var.calico_bgp in
+# tofu-pcd-talos-cluster/variables.tf.
+apiVersion: projectcalico.org/v3
+kind: BGPConfiguration
+metadata:
+  name: default
+spec:
+  # core-infra's own AS. ASNs are allocated by hand in sequence: gateway 64512,
+  # controlplane 64513, observability 64514, xkc-lifecycle-test 64515 (see
+  # clusters/controlplane/crossplane-resources/crossplane.environment-config.kvm-network.yaml).
+  # The gateway's OPENSTACK peer-group (providers/kvm/unifi-frr.conf) accepts
+  # any AS except its own, so this must not be 64512.
+  asNumber: 64516
+  # Carries pod routes between nodes: the pod pool has no encapsulation, and the
+  # gateway announces nothing back to this peer group (DENY-ALL).
+  nodeToNodeMeshEnabled: true
+  logSeverityScreen: Info
+  # Advertised to the gateway, which accepts only these /112 blocks
+  # (CALICO-VIPS-IN). Must match the lb-* pools in this directory.
+  serviceLoadBalancerIPs:
+    - cidr: fd97:45c2:b3a1:f00::1:0/112
+    - cidr: 2607:3640:1064:27f::1:0/112

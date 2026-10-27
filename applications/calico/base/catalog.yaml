@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: calico-controlplane
+  description: |-
+    Calico CNI for the IPv6-only controlplane cluster: operator install,
+    BGP peering with the UniFi gateway (AS 64512 <-> 64513), and native
+    LoadBalancer IPAM advertising the ULA-internal and GUA-ingress VIP pools.
+  tags:
+    - networking
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

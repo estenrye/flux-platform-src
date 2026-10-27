@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keda
+  annotations:
+    checkov.io/skip1: "CKV_K8S_38=KEDA's controllers use the service account token to reach the Kubernetes API: the operator to watch ScaledObjects and scale targets, the metrics server to serve external.metrics.k8s.io, the webhook to read its certificates."
+    ignore-check.kube-linter.io/minimum-three-replicas: "Two replicas per component. The operator is active/standby by leader election and the metrics server and webhook are active/active; a third replica adds nothing, and the webhook fails open."
+    ignore-check.kube-linter.io/no-node-affinity: "Replicas are spread across nodes with a preferred pod anti-affinity; there is no node to prefer."
+spec:
+  template:
+    spec:
+      restartPolicy: Always

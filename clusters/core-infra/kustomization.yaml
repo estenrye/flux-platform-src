@@ -12,3 +12,67 @@ resources:
 - resources/flux.ssh-key-secret.yaml
 - resources/flux.source.git.yaml
 - resources/flux.kustomization.yaml
+- ../../applications/calico/base
+- resources/calico.bgp-configuration.yaml
+- resources/calico.bgp-peer.gateway.yaml
+- resources/calico.ippool.lb-internal-routed.yaml
+- resources/calico.ippool.lb-ingress-routed.yaml
+- ../../applications/openstack-cloud-controller-manager/base
+- ../../applications/spegel/base
+- ../../applications/cinder-csi/base
+- resources/storageclass.csi-cinder-sc-delete.yaml
+- resources/storageclass.csi-cinder-sc-retain.yaml
+- ../../applications/external-csi-snapshotter/base
+- ../../applications/kubelet-serving-cert-approver/base
+- ../../applications/metrics-server/base
+- ../../applications/opentelemetry-operator/base
+- ../../applications/cert-manager/base
+- ../../applications/cert-manager-approver-policy/base
+- ../../applications/cert-manager-spiffe-issuer/base
+- ../../applications/cert-manager-spiffe-csi-driver/base
+- ../../applications/cert-manager-trust-manager/base
+- ../../applications/vertical-pod-autoscaler/v1.8
+- ../../applications/cert-manager-acme/base
+- ../../applications/external-dns/cloudflare/base
+- resources/eso.external-secret.cloudflare-api-token.yaml
+- resources/eso.external-secret.cloudflare-dns.yaml
+- ../../applications/netdata/base
+- ../../applications/opentelemetry-collector-daemonset/base
+- ../../applications/openstack-cloud-controller-manager-otel/base
+- ../../applications/reloader/base
+- ../../applications/keda/base
+- ../../applications/kubernetes-descheduler/base
+- ../../applications/flux-monitoring/base
+- resources/vpa.recommendations.yaml
+
+patches:
+- path: patches/netdata.gateway.hostname.yaml
+  target:
+    kind: Gateway
+    name: netdata-gateway
+    namespace: netdata
+- path: patches/netdata.httproute.hostname.yaml
+  target:
+    kind: HTTPRoute
+    name: netdata
+    namespace: netdata
+- path: patches/external-dns.txt-owner-id.yaml
+  target:
+    kind: Deployment
+    name: external-dns
+    namespace: external-dns
+- path: patches/openstack-ccm.otel-sidecar.yaml
+  target:
+    kind: DaemonSet
+    name: openstack-cloud-controller-manager
+    namespace: kube-system
+- path: patches/spiffe-csi.trust-domain.deployment.yaml
+  target:
+    kind: Deployment
+    name: cert-manager-csi-driver-spiffe-approver
+    namespace: cert-manager
+- path: patches/spiffe-csi.trust-domain.daemonset.yaml
+  target:
+    kind: DaemonSet
+    name: cert-manager-csi-driver-spiffe-driver
+    namespace: cert-manager

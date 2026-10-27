@@ -1,0 +1,39 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: kubernetes-descheduler
+  description: |-
+    Evicts pods that the scheduler would place differently today (node taints and
+    affinity violations, duplicate replicas on one node, unbalanced node
+    utilization) so they are rescheduled. Runs with a conservative policy: it
+    never evicts a lone replica or a pod with a PVC.
+  tags:
+    - scheduling
+    - operators
+    - platform
+    - infrastructure
+  links:
+    - url: https://github.com/kubernetes-sigs/descheduler/blob/master/charts/descheduler/README.md
+      title: Descheduler Helm chart README
+      icon: docs
+      type: documentation
+    - url: https://oneuptime.com/blog/post/2026-01-30-kubernetes-descheduler/view
+      title: "How to Implement Kubernetes Descheduler (OneUptime, 2026-01-30; v1alpha2 policy, but its sample policy configures RemovePodsViolatingNodeTaints without enabling it)"
+      icon: docs
+      type: article
+    - url: https://hwchiu.medium.com/exploring-kubernetes-descheduler-0b69903ff109
+      title: Exploring Kubernetes Descheduler (Medium)
+      icon: docs
+      type: article
+    - url: https://blog.devops.dev/kubernetes-descheduler-the-secret-weapon-for-optimized-workloads-1efa4b95a5a2
+      title: "Kubernetes Descheduler: The Secret Weapon for Optimized Workloads (DevOps.dev)"
+      icon: docs
+      type: article
+    - url: https://akomljen.com/meet-a-kubernetes-descheduler/
+      title: "Meet a Kubernetes Descheduler (2018; historical, uses the removed v1alpha1 policy format)"
+      icon: docs
+      type: article
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: descheduler
+  annotations:
+    checkov.io/skip1: "CKV_K8S_38=The descheduler uses its service account token to list nodes and pods, read PodDisruptionBudgets and create evictions through the Kubernetes API."
+    ignore-check.kube-linter.io/minimum-three-replicas: "One replica by design: it wakes every deschedulingInterval and does nothing between cycles, so there is no availability to protect. Several replicas would need leader election, otherwise they would evict in parallel."
+    ignore-check.kube-linter.io/no-node-affinity: "It may run on any node; it only talks to the Kubernetes API."
+spec:
+  # Stop the old instance before starting the new one. A surge would run two
+  # descheduler loops at once, each applying its own eviction limits.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  template:
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: descheduler
+          # The chart only defines a liveness probe; same endpoint.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 10258
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3

@@ -1,0 +1,55 @@
+# Injected into the cloud controller manager pods by the
+# sidecar.opentelemetry.io/inject annotation (see clusters/*/patches). The CCM
+# binds its secure port to 127.0.0.1 and runs on the host network, so the sidecar
+# scrapes it over loopback and hands the metrics to the node-local DaemonSet
+# collector, which is also hostNetwork and listens for OTLP on :4317.
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: ccm-sidecar
+spec:
+  mode: sidecar
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
+  # The service account token volume that Kubernetes mounts automatically is not
+  # added to containers injected by a webhook, so project our own.
+  volumes:
+    - name: ccm-metrics-token
+      projected:
+        sources:
+          - serviceAccountToken:
+              path: token
+              expirationSeconds: 3600
+  volumeMounts:
+    - name: ccm-metrics-token
+      mountPath: /var/run/ccm-metrics
+      readOnly: true
+  config:
+    receivers:
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: openstack-cloud-controller-manager
+              scrape_interval: 60s
+              scheme: https
+              # The CCM serves a self-signed certificate on loopback.
+              tls_config:
+                insecure_skip_verify: true
+              authorization:
+                credentials_file: /var/run/ccm-metrics/token
+              static_configs:
+                - targets: ["127.0.0.1:10258"]
+    exporters:
+      otlp_grpc/node:
+        endpoint: "127.0.0.1:4317"
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        metrics:
+          receivers: [prometheus]
+          exporters: [otlp_grpc/node]

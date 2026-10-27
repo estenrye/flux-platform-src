@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opentelemetry-collector
+  labels:
+    # The collector DaemonSet uses hostNetwork (to reach the node-local Netdata
+    # agent on ::1) and the operator adds hostPorts; Talos enforces the baseline
+    # Pod Security Standard by default, which forbids both.
+    pod-security.kubernetes.io/enforce: privileged

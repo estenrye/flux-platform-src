@@ -1,0 +1,30 @@
+- op: add
+  path: /metadata/annotations
+  value:
+    checkov.io/skip1: "CKV_K8S_38=VPA components use their service account tokens to read workloads and metrics and to evict or mutate pods."
+    checkov.io/skip2: "CKV_K8S_43=Images are pinned by digest in the release overlay."
+    ignore-check.kube-linter.io/minimum-three-replicas: "The recommender and updater are single-instance by design; the admission controller webhook fails open, so a brief outage only pauses recommendations."
+    ignore-check.kube-linter.io/no-node-affinity: "No zone or role topology to express node affinity against."
+    ignore-check.kube-linter.io/non-isolated-pod: "NetworkPolicies are defined in resources/networkpolicy.yaml."
+- op: add
+  path: /spec/template/spec/priorityClassName
+  value: platform-critical
+- op: add
+  path: /spec/template/spec/securityContext/seccompProfile
+  value:
+    type: RuntimeDefault
+- op: add
+  path: /spec/template/spec/containers/0/securityContext
+  value:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+- op: add
+  path: /spec/strategy
+  value:
+    type: RollingUpdate
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: Always

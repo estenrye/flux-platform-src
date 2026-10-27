@@ -1,0 +1,58 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: keda
+
+resources:
+  - resources/namespace.yaml
+  - resources/network-policy.yaml
+
+helmCharts:
+  - name: keda
+    repo: https://kedacore.github.io/charts
+    version: 2.21.0
+    releaseName: keda
+    namespace: keda
+    includeCRDs: true
+    valuesFile: values.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+  - target:
+      kind: Deployment
+      name: keda-operator
+    path: patches/probe-port.yaml
+  - target:
+      kind: Deployment
+      name: keda-admission-webhooks
+    path: patches/probe-port.yaml
+  - target:
+      kind: PodMonitor
+    path: patches/monitor-namespace.yaml
+  - target:
+      kind: ServiceMonitor
+    path: patches/monitor-namespace.yaml
+  - target:
+      kind: PodDisruptionBudget
+    path: patches/pod-disruption-budget.yaml
+  - target:
+      kind: ClusterRole
+      name: keda-operator-minimal-cluster-role
+    path: patches/webhook-cluster-role.yaml
+  - target:
+      kind: ClusterRoleBinding
+      name: keda-operator
+    path: patches/rbac.yaml
+  - target:
+      kind: RoleBinding
+      name: keda-operator-certs
+    path: patches/role-binding.yaml
+
+images:
+  - name: ghcr.io/kedacore/keda
+    digest: sha256:81fe6547ce8d1cc29273f887b76507e9b853e5bc1f875ec23fe60061a38ed809
+  - name: ghcr.io/kedacore/keda-metrics-apiserver
+    digest: sha256:255375037fe592732eeb554743aae360c2da88cf0b9b1258d0a987ef885f0881
+  - name: ghcr.io/kedacore/keda-admission-webhooks
+    digest: sha256:e1969628cca6123e32eea13c47c75817091af2657fa68d9d0d58a8620d1b75b1

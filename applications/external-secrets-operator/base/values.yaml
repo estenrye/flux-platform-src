@@ -274,7 +274,7 @@ resources:
 
 serviceMonitor:
   # -- Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics
-  enabled: false
+  enabled: true
 
   # -- How should we react to missing CRD "`monitoring.coreos.com/v1/ServiceMonitor`"
   #
@@ -298,7 +298,7 @@ serviceMonitor:
   additionalLabels: {}
 
   # --  Interval to scrape metrics
-  interval: 30s
+  interval: 60s
 
   # -- Timeout if metrics can't be retrieved in given time interval
   scrapeTimeout: 25s
@@ -340,7 +340,7 @@ metrics:
 
   service:
     # -- Enable if you use another monitoring tool than Prometheus to scrape the metrics
-    enabled: false
+    enabled: true
 
     # -- Metrics service port to scrape
     port: 8080
@@ -605,7 +605,7 @@ webhook:
 
     service:
       # -- Enable if you use another monitoring tool than Prometheus to scrape the metrics
-      enabled: false
+      enabled: true
 
       # -- Metrics service port to scrape
       port: 8080
@@ -792,7 +792,7 @@ certController:
 
     service:
       # -- Enable if you use another monitoring tool than Prometheus to scrape the metrics
-      enabled: false
+      enabled: true
 
       # -- Metrics service port to scrape
       port: 8080

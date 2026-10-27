@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: kube-system
+
+resources:
+ - "https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/v1.36.0/manifests/controller-manager/cloud-controller-manager-roles.yaml"
+ - "https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/v1.36.0/manifests/controller-manager/cloud-controller-manager-role-bindings.yaml"
+ - "https://raw.githubusercontent.com/kubernetes/cloud-provider-openstack/v1.36.0/manifests/controller-manager/openstack-cloud-controller-manager-ds.yaml"
+
+patches:
+  - target:
+      kind: DaemonSet
+      name: openstack-cloud-controller-manager
+    path: patches/daemonset.yaml
+  - target:
+      kind: ClusterRole
+      name: "system:cloud-(controller-manager|node-controller)"
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          checkov.io/skip1: "CKV_K8S_49=Upstream RBAC for the cloud controller manager requires full verbs on nodes and persistentvolumes."
+          ignore-check.kube-linter.io/wildcard-in-rules: "Upstream RBAC for the cloud controller manager requires full verbs on nodes and persistentvolumes."
+  - target:
+      kind: ClusterRoleBinding
+      name: "system:cloud-controller-manager"
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          ignore-check.kube-linter.io/access-to-secrets: "The cloud controller manager reads secrets to load OpenStack credentials and cloud configuration."

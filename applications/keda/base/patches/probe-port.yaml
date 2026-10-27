@@ -1,0 +1,7 @@
+# The chart probes /healthz and /readyz on 8081 without declaring the port.
+- op: add
+  path: /spec/template/spec/containers/0/ports/-
+  value:
+    name: health
+    containerPort: 8081
+    protocol: TCP

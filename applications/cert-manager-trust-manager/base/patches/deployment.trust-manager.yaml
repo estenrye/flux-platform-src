@@ -23,3 +23,6 @@
 - op: add
   path: /spec/template/spec/initContainers/0/securityContext/runAsUser
   value: 65532
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+  value: "Single-site homelab cluster; no zone or role topology to express node affinity against. Pod anti-affinity already spreads replicas."

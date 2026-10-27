@@ -1,0 +1,6 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: keda
+  annotations:
+    ignore-check.kube-linter.io/access-to-secrets: "The operator manages the Secret that holds its self-generated webhook and metrics certificates."

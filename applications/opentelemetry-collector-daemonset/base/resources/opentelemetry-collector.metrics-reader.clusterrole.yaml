@@ -1,0 +1,9 @@
+# Lets the collector's service account scrape /metrics endpoints that sit behind
+# delegated authorization (e.g. metrics-server).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: opentelemetry-collector-metrics-reader
+rules:
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]

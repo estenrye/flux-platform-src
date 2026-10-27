@@ -200,3 +200,8 @@ patches:
       kind: TLSRoute
       name: step-ca
       namespace: step-ca
+  - path: patches/external-dns.cloudflare.txt-owner-id.yaml
+    target:
+      kind: Deployment
+      name: external-dns-cloudflare
+      namespace: external-dns

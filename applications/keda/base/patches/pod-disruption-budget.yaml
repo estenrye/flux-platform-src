@@ -1,0 +1,8 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: keda
+spec:
+  # Let a node drain evict a pod that is not Ready; otherwise a crash-looping
+  # replica would block the drain.
+  unhealthyPodEvictionPolicy: AlwaysAllow

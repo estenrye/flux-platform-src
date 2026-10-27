@@ -1,0 +1,14 @@
+# Distinct from core-infra's external-dns, which also runs policy: sync
+# against Cloudflare zones under the TXT registry. Without an owner ID the
+# default owner ("default") is shared, and each cluster deletes the other's
+# records every sync (confirmed 2026-10-24: controlplane deleted
+# core-infra.netdata.rye.ninja every ~2 minutes). Paired with
+# clusters/core-infra/patches/external-dns.txt-owner-id.yaml; enforced by
+# .bin/lint-external-dns-owner-id.sh.
+#
+# Existing TXT records written under the old "default" owner are not claimed
+# by this owner ID: external-dns will leave them alone (no update, no delete)
+# until their owner value is rewritten or they are removed.
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --txt-owner-id=controlplane

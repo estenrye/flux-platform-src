@@ -1,0 +1,14 @@
+# Ingress (GUA) LoadBalancer VIPs. Routed, not on-link. A /112 inside the
+# gateway's accepted CALICO-VIPS-IN block 2607:3640:1064:27f::/64; this block is
+# derived from the TFiber PD, so update it on ISP re-delegation
+# (docs/runbooks/gua-prefix-renumber.md).
+apiVersion: projectcalico.org/v3
+kind: IPPool
+metadata:
+  name: lb-ingress-routed
+spec:
+  cidr: 2607:3640:1064:27f::1:0/112
+  allowedUses:
+    - LoadBalancer
+  disabled: false
+  nodeSelector: all()

@@ -1,0 +1,31 @@
+# Version-independent parts of the vertical-pod-autoscaler application. This is
+# a Component so its patches apply to the upstream Deployments that each
+# release overlay (v1.6, v1.7, v1.8) pulls in; build an overlay, not this.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+resources:
+  - resources/issuer.yaml
+  - resources/certificate.yaml
+  - resources/certificate-request-policy.yaml
+  - resources/certificate-request-policy-rbac.yaml
+  - resources/networkpolicy.yaml
+  - resources/pod-monitor.yaml
+
+patches:
+  - target:
+      kind: Deployment
+      name: vpa-.*
+    path: patches/deployment.yaml
+  - target:
+      kind: Deployment
+      name: vpa-admission-controller
+    path: patches/admission-controller.yaml
+  - target:
+      kind: ClusterRole
+      name: system:vpa-target-reader
+    path: patches/cluster-role-target-reader.yaml
+  - target:
+      kind: ClusterRole
+      name: system:vpa-admission-controller
+    path: patches/cluster-role-admission-controller.yaml

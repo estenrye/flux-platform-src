@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: descheduler
+  labels:
+    # Non-root, read-only root filesystem, no capabilities, RuntimeDefault seccomp.
+    pod-security.kubernetes.io/enforce: restricted

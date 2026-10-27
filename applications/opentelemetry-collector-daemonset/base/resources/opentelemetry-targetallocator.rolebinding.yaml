@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: opentelemetry-targetallocator
+  annotations:
+    ignore-check.kube-linter.io/access-to-secrets: The target allocator watches Secret metadata in its own namespace, which holds no secrets.
+    checkov.io/skip1: CKV2_K8S_5=The target allocator watches Secret metadata in its own namespace, which holds no secrets.
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: opentelemetry-targetallocator
+subjects:
+  - kind: ServiceAccount
+    name: opentelemetry-targetallocator
+    namespace: opentelemetry-collector

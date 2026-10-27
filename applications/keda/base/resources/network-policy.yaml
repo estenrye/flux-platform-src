@@ -1,0 +1,106 @@
+# Written here instead of using the chart's networkPolicy: its rules admit
+# ingress only from pods (namespaceSelector: {}), but the API server reaches the
+# webhook and the metrics APIService from a node address, not from a pod, and
+# its egress rule for the API server also selects pods only. Port-only rules,
+# as in applications/external-secrets-operator/base.
+#
+# Calico evaluates egress after DNAT, so the API server is reached on its real
+# port, 6443 on Talos, not the Service's 443 (docs/memory/calico-networkpolicy-dnat.md).
+#
+# The operator is deliberately not egress-restricted: it connects to whatever
+# systems the ScaledObjects name (Prometheus, queues, cloud APIs), which cannot
+# be listed here.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keda-operator
+  namespace: keda
+spec:
+  podSelector:
+    matchLabels:
+      app: keda-operator
+  policyTypes:
+    - Ingress
+  ingress:
+    # gRPC to the metrics API server.
+    - ports:
+        - protocol: TCP
+          port: 9666
+    # Prometheus metrics.
+    - ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keda-operator-metrics-apiserver
+  namespace: keda
+spec:
+  podSelector:
+    matchLabels:
+      app: keda-operator-metrics-apiserver
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # The external.metrics.k8s.io APIService, called by the API server.
+    - ports:
+        - protocol: TCP
+          port: 6443
+    # Prometheus metrics.
+    - ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        # API server targetPort.
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    # Metrics are fetched from the operator over gRPC.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: keda-operator
+      ports:
+        - protocol: TCP
+          port: 9666
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keda-admission-webhooks
+  namespace: keda
+spec:
+  podSelector:
+    matchLabels:
+      app: keda-admission-webhooks
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # The validating webhook, called by the API server.
+    - ports:
+        - protocol: TCP
+          port: 9443
+    # Prometheus metrics.
+    - ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        # API server targetPort.
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: keda
+  description: |-
+    Kubernetes Event-driven Autoscaling. Scales workloads on events and external
+    metrics (ScaledObject, ScaledJob) and serves the external.metrics.k8s.io API.
+  tags:
+    - autoscaling
+    - operators
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

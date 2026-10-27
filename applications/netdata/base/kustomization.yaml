@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: netdata
+
+helmCharts:
+  - name: netdata
+    repo: https://netdata.github.io/helmchart/
+    version: 3.7.176
+    releaseName: netdata
+    namespace: netdata
+    includeCRDs: true
+    valuesFile: values.yaml
+
+resources:
+  - resources/namespace.yaml
+  - resources/gateway.yaml
+  - resources/eso.external-secret.claim.yaml
+  - resources/eso.uuid-generator.stream-key.yaml
+  - resources/eso.external-secret.stream-conf.yaml
+  - resources/network-policy.yaml
+  - resources/vpa.yaml
+
+patches:
+  - path: patches/daemonset.child.yaml
+  - path: patches/deployment.parent.yaml
+  - path: patches/deployment.k8s-state.yaml
+  - path: patches/deployment.otel.yaml
+  - path: patches/clusterrolebinding.yaml
+
+images:
+  # v2.12.2 fixes the remote code execution flaw in v2.12.1
+  # (https://status.netdata.cloud/incidents/d17pqkt1s8rr). The chart still
+  # ships v2.12.1, so the digest is pinned here. Drop this override and bump
+  # the chart once a release with appVersion >= v2.12.2 is published.
+  - name: netdata/netdata
+    digest: sha256:3d00de3756e1e9150c6121080934168ab5f2ceffce6d494573316c09c18adf83
+  - name: alpine
+    digest: sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8

@@ -5,6 +5,7 @@ render-deps:
 	mkdir -p .venv/bin
 	.bin/install-adr.sh
 	.bin/install-kustomize.sh
+	.bin/install-yq.sh
 
 lint-deps:
 	mkdir -p .venv/bin
@@ -34,14 +35,33 @@ lint-kube-linter: lint-deps
 	.venv/bin/kube-linter lint --config .kube-linter/config.yaml .render
 
 # ADR-16 drift guard: Spot silently ran with the csi-driver-spiffe default
-# trust domain (cluster.local) for weeks — M0 audit finding. Fail the lint
-# if any non-Spot cluster render carries it (Spot keeps it until decommission).
-lint-trust-domain:
-	@BAD=$$(grep -rl -- '--trust-domain=cluster.local\|trust-domain: cluster.local' .render/*/clusters/* 2>/dev/null | grep -v '/clusters/crossplane/' || true); \
-	if [ -n "$$BAD" ]; then echo "ADR-16 VIOLATION: trust domain cluster.local rendered outside Spot:"; echo "$$BAD"; exit 1; fi; \
-	echo "trust-domain guard: OK"
+# trust domain (cluster.local) for weeks (M0 audit finding). Renders each
+# cluster and asserts exactly one --trust-domain arg per container, never
+# cluster.local.
+lint-spiffe-trust-domain: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/lint-spiffe-trust-domain.sh $(dir $(wildcard clusters/*/kustomization.yaml))
 
-lint: lint-deps render lint-checkov lint-kube-linter lint-trust-domain
+test-lint-spiffe-trust-domain: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-spiffe-trust-domain.sh
+
+# Netdata's base ships the placeholder hostname netdata.k8s.local on both the
+# Gateway listener and the HTTPRoute; every cluster including netdata must
+# patch both. Silent no-op patches would otherwise leave the placeholder live.
+lint-netdata-hostname: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/lint-netdata-hostname.sh $(dir $(wildcard clusters/*/kustomization.yaml))
+
+test-lint-netdata-hostname: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-netdata-hostname.sh
+
+# external-dns on the TXT registry without --txt-owner-id uses the owner
+# "default", so clusters sharing a DNS zone delete each other's records.
+lint-external-dns-owner-id: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/lint-external-dns-owner-id.sh $(dir $(wildcard clusters/*/kustomization.yaml))
+
+test-lint-external-dns-owner-id: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-external-dns-owner-id.sh
+
+lint: lint-deps render lint-checkov lint-kube-linter lint-spiffe-trust-domain lint-netdata-hostname lint-external-dns-owner-id
 
 flux-reconcile-source:
 	flux reconcile source git flux-platform-rendered -n flux-system
@@ -167,6 +187,30 @@ rotate-cluster-service-account-token:
 
 rotate-cluster-sops-key:
 	CLUSTER=$(CLUSTER) .bin/rotate-cluster-sops-key.sh
+
+install-calicoctl:
+	mkdir -p .venv/bin
+	.bin/install-calicoctl.sh
+
+# Detect leaked Calico LoadBalancer IPAM allocations that make an address flap.
+# Usage: CLUSTER=core-infra make detect-calico-ipam-flapping
+#        add WATCH=330 to also watch Services/Gateways for address changes.
+detect-calico-ipam-flapping:
+	CLUSTER=$(CLUSTER) .bin/detect-calico-ipam-flapping.sh $(if $(WATCH),--watch $(WATCH))
+
+# Reproduce the Calico LoadBalancer stale-handle bug on a throwaway Service and
+# report whether the running Calico version has it (docs/research/calico-bgp-iam-flap-ipv6.md).
+# Briefly force-restarts calico-kube-controllers. Takes about 6 minutes.
+# Usage: CLUSTER=core-infra make reproduce-calico-lb-stale-handle
+reproduce-calico-lb-stale-handle: install-calicoctl
+	CLUSTER=$(CLUSTER) .bin/reproduce-calico-lb-stale-handle.sh
+
+# Release a leaked Calico LoadBalancer IPAM allocation (see the script header).
+# Usage: CLUSTER=core-infra IP=<address> make release-calico-ipam-allocation
+#        add DRY_RUN=true to preview without releasing.
+release-calico-ipam-allocation: install-calicoctl
+	@test -n "$(IP)" || { echo "Usage: CLUSTER=<cluster> IP=<address> [DRY_RUN=true] make release-calico-ipam-allocation" >&2; exit 1; }
+	CLUSTER=$(CLUSTER) .bin/release-calico-ipam-allocation.sh $(IP) $(if $(filter true,$(DRY_RUN)),--dry-run)
 
 rotate-github-app-credentials:
 	.bin/rotate-github-app-credentials.sh

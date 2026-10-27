@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: csi-cinder-controllerplugin
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: csi-cinder-controllerplugin
+  podMetricsEndpoints:
+    - port: metrics-attach
+      interval: 60s
+    - port: metrics-prov
+      interval: 60s
+    - port: metrics-snap
+      interval: 60s
+    - port: metrics-resize
+      interval: 60s

@@ -372,17 +372,10 @@ affinity:
               - key: "app.kubernetes.io/name"
                 operator: In
                 values:
-                  - reloader
+                  - opentelemetry-operator
           topologyKey: "kubernetes.io/hostname"
-  nodeAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 1
-        preference:
-          matchExpressions:
-            - key: servers.ngpc.rxt.io/type
-              operator: In
-              values:
-                - ondemandtolerations: []
+
+tolerations: []
 
 nodeSelector:
   kubernetes.io/os: linux

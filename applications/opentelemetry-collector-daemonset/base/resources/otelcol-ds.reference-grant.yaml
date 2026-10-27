@@ -1,0 +1,20 @@
+# Lets the Envoy Gateway proxy config send traces to the collector's OTLP
+# receiver across namespaces. Calico 3.33 copies the EnvoyProxy resources from
+# envoy-gateway-system into calico-system and points the GatewayClasses at the
+# copies, so the grant must cover both.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: envoyproxy-tracing
+spec:
+  from:
+    - group: gateway.envoyproxy.io
+      kind: EnvoyProxy
+      namespace: envoy-gateway-system
+    - group: gateway.envoyproxy.io
+      kind: EnvoyProxy
+      namespace: calico-system
+  to:
+    - group: ""
+      kind: Service
+      name: otelcol-ds-collector

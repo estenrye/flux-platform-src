@@ -1,0 +1,22 @@
+# Metrics for the Flux controllers (reconcile duration/errors, workqueue depth).
+# The opentelemetry-collector target allocator picks this up.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: flux-system
+  namespace: flux-system
+spec:
+  selector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - helm-controller
+          - image-automation-controller
+          - image-reflector-controller
+          - kustomize-controller
+          - notification-controller
+          - source-controller
+  podMetricsEndpoints:
+    - port: http-prom
+      interval: 60s
