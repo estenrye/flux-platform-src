@@ -39,8 +39,11 @@ serviceMonitor:
 # To see what a policy change would do without evicting anything, add
 # `dry-run: true` here and read `kubectl -n descheduler logs deploy/descheduler`
 # (look for "Total number of evictions" and "Node has been classified").
-# Validated that way against this cluster before the first deploy: no evictions,
-# every node under the 60% targets.
+#
+# First live cycle on core-infra: three workers were over the 60% CPU target, the
+# only underutilized nodes were the tainted control planes, so nodeFit rejected
+# every candidate and nothing was evicted. LowNodeUtilization acts only once a
+# node a worker pod can run on drops below the 30% thresholds.
 cmdOptions:
   v: 3
 
