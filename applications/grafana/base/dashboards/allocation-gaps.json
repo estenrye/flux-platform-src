@@ -1,0 +1,409 @@
+{
+  "uid": "core-infra-allocation-gaps",
+  "title": "Resource efficiency: allocation gaps",
+  "description": "Containers with no request or limit, with suggested values from observed usage.",
+  "tags": [
+    "core-infra",
+    "generated",
+    "efficiency"
+  ],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "5m",
+  "templating": {
+    "list": [
+      {
+        "name": "ns",
+        "label": "Namespace",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "victoria-metrics"
+        },
+        "query": {
+          "query": "label_values(container_cpu_usage_seconds_total, namespace)",
+          "refId": "ns"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "window",
+        "label": "History",
+        "type": "custom",
+        "query": "1h,6h,1d,3d,7d,14d",
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "selected": true,
+          "text": "7d",
+          "value": "7d"
+        },
+        "options": [
+          {
+            "text": "1h",
+            "value": "1h",
+            "selected": false
+          },
+          {
+            "text": "6h",
+            "value": "6h",
+            "selected": false
+          },
+          {
+            "text": "1d",
+            "value": "1d",
+            "selected": false
+          },
+          {
+            "text": "3d",
+            "value": "3d",
+            "selected": false
+          },
+          {
+            "text": "7d",
+            "value": "7d",
+            "selected": true
+          },
+          {
+            "text": "14d",
+            "value": "14d",
+            "selected": false
+          }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Containers with no CPU request",
+      "description": "Containers that run without this setting. Suggested = observed usage over the History window plus headroom.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Usage (p95/peak)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Suggested"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "(quantile_over_time(0.95, (max by (namespace, workload, container) (label_replace(label_replace(rate(container_cpu_usage_seconds_total{namespace=~\"$ns\"}[5m]), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))[$window:5m])) unless on(namespace, workload, container) (max by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(k8s_container_cpu_request{k8s_namespace_name=~\"$ns\"}, \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))",
+          "format": "table",
+          "instant": true,
+          "refId": "A",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "((quantile_over_time(0.95, (max by (namespace, workload, container) (label_replace(label_replace(rate(container_cpu_usage_seconds_total{namespace=~\"$ns\"}[5m]), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))[$window:5m])) unless on(namespace, workload, container) (max by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(k8s_container_cpu_request{k8s_namespace_name=~\"$ns\"}, \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))) * 1.15",
+          "format": "table",
+          "instant": true,
+          "refId": "B",
+          "legendFormat": ""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "namespace": "Namespace",
+              "workload": "Workload",
+              "container": "Container",
+              "Value #A": "Usage (p95/peak)",
+              "Value #B": "Suggested"
+            },
+            "indexByName": {
+              "Namespace": 0,
+              "Workload": 1,
+              "Container": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Containers with no memory request",
+      "description": "Containers that run without this setting. Suggested = observed usage over the History window plus headroom.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Usage (p95/peak)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Suggested"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "(max_over_time((max by (namespace, workload, container) (label_replace(label_replace(container_memory_working_set_bytes{namespace=~\"$ns\"}, \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))[$window:5m])) unless on(namespace, workload, container) (max by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(k8s_container_memory_request_bytes{k8s_namespace_name=~\"$ns\"}, \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))",
+          "format": "table",
+          "instant": true,
+          "refId": "A",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "((max_over_time((max by (namespace, workload, container) (label_replace(label_replace(container_memory_working_set_bytes{namespace=~\"$ns\"}, \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))[$window:5m])) unless on(namespace, workload, container) (max by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(k8s_container_memory_request_bytes{k8s_namespace_name=~\"$ns\"}, \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))) * 1.1",
+          "format": "table",
+          "instant": true,
+          "refId": "B",
+          "legendFormat": ""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "namespace": "Namespace",
+              "workload": "Workload",
+              "container": "Container",
+              "Value #A": "Usage (p95/peak)",
+              "Value #B": "Suggested"
+            },
+            "indexByName": {
+              "Namespace": 0,
+              "Workload": 1,
+              "Container": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Containers with no memory limit",
+      "description": "Containers that run without this setting. Suggested = observed usage over the History window plus headroom.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Usage (p95/peak)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Suggested"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "(max_over_time((max by (namespace, workload, container) (label_replace(label_replace(container_memory_working_set_bytes{namespace=~\"$ns\"}, \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))[$window:5m])) unless on(namespace, workload, container) (max by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(k8s_container_memory_limit_bytes{k8s_namespace_name=~\"$ns\"}, \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))",
+          "format": "table",
+          "instant": true,
+          "refId": "A",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "((max_over_time((max by (namespace, workload, container) (label_replace(label_replace(container_memory_working_set_bytes{namespace=~\"$ns\"}, \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))[$window:5m])) unless on(namespace, workload, container) (max by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(k8s_container_memory_limit_bytes{k8s_namespace_name=~\"$ns\"}, \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))) * 1.25",
+          "format": "table",
+          "instant": true,
+          "refId": "B",
+          "legendFormat": ""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "namespace": "Namespace",
+              "workload": "Workload",
+              "container": "Container",
+              "Value #A": "Usage (p95/peak)",
+              "Value #B": "Suggested"
+            },
+            "indexByName": {
+              "Namespace": 0,
+              "Workload": 1,
+              "Container": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "text",
+      "title": "Where to set them",
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Not every gap is fixed in an app manifest. **Calico** workloads (calico-node, typha, kube-controllers, whisker, goldmane) are managed by the tigera-operator: set resources on the `Installation` / component resources. **Envoy gateway proxies** take them from the `EnvoyProxy` resource. **Control-plane static pods** (kube-apiserver, scheduler, controller-manager) come from the Talos machine config. Suggestions need several days of history to be meaningful; a CPU limit is deliberately not suggested."
+      }
+    }
+  ]
+}

@@ -314,6 +314,306 @@ def dashboard(uid, title, panels, svc_regex=None):
     }
 
 
+# ── Resource-efficiency dashboards ──────────────────────────────────────────
+# Sources: cAdvisor series (container_*; labels namespace/pod/container) from
+# the kubelet-cadvisor job, requests/limits from the otelcol-cluster
+# k8s_cluster receiver (k8s_container_*; labels k8s_namespace_name,
+# k8s_pod_name, k8s_container_name) and the vpa-monitoring exporter
+# (kube_customresource_vpa_*). Everything is joined on (namespace, workload,
+# container); the workload is the pod name with its controller suffix removed
+# (ReplicaSet hash, DaemonSet suffix or StatefulSet ordinal). Values are the
+# busiest replica ("max by") so they compare directly with per-pod requests.
+POD_SUFFIX = r"-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+"
+WORKLOAD_RE = r"^(.+?)(" + POD_SUFFIX + r")$"
+BY = "namespace, workload, container"
+
+
+def wl(expr, pod="pod"):
+    """Add a workload label: the pod name, minus its controller suffix when it has one."""
+    return (
+        f'label_replace(label_replace({expr}, "workload", "$1", "{pod}", "(.+)"), '
+        f'"workload", "$1", "{pod}", "{WORKLOAD_RE}")'
+    )
+
+
+def kside(expr):
+    """Rename the k8s_cluster receiver's labels to the cAdvisor names."""
+    return (
+        'label_replace(label_replace(label_replace('
+        f'{expr}, "namespace", "$1", "k8s_namespace_name", "(.+)"), '
+        '"pod", "$1", "k8s_pod_name", "(.+)"), '
+        '"container", "$1", "k8s_container_name", "(.+)")'
+    )
+
+
+def per_pod_max(expr):
+    return f"max by ({BY}) ({wl(expr)})"
+
+
+NS = 'namespace=~"$ns"'
+KNS = 'k8s_namespace_name=~"$ns"'
+CPU_USE = per_pod_max(f"rate(container_cpu_usage_seconds_total{{{NS}}}[5m])")
+CPU_P95 = f"quantile_over_time(0.95, ({CPU_USE})[$window:5m])"
+MEM_PEAK = f"max_over_time(({per_pod_max(f'container_memory_working_set_bytes{{{NS}}}')})[$window:5m])"
+CPU_REQ = per_pod_max(kside(f"k8s_container_cpu_request{{{KNS}}}"))
+CPU_LIM = per_pod_max(kside(f"k8s_container_cpu_limit{{{KNS}}}"))
+MEM_REQ = per_pod_max(kside(f"k8s_container_memory_request_bytes{{{KNS}}}"))
+MEM_LIM = per_pod_max(kside(f"k8s_container_memory_limit_bytes{{{KNS}}}"))
+
+
+def vpa(metric):
+    return (
+        f"max by ({BY}) (label_replace(label_replace({metric}{{exported_namespace=~\"$ns\"}}, "
+        '"namespace", "$1", "exported_namespace", "(.+)"), "workload", "$1", "target_name", "(.+)"))'
+    )
+
+
+THROTTLE = (
+    f"sum by ({BY}) ({wl(f'increase(container_cpu_cfs_throttled_periods_total{{{NS}}}[$window])')})"
+    f" / sum by ({BY}) ({wl(f'increase(container_cpu_cfs_periods_total{{{NS}}}[$window])')})"
+)
+OOMS = f"sum by ({BY}) ({wl(f'increase(container_oom_events_total{{{NS}}}[$window])')})"
+RESTARTS = f"sum by ({BY}) ({wl(kside(f'increase(k8s_container_restarts{{{KNS}}}[$window])'))})"
+
+
+def ratio(a, b):
+    return f"({a}) / on({BY}) ({b})"
+
+
+def table(idx, title, queries, y, w=24, h=12, overrides=None, description=""):
+    """Instant-query table; queries = [(column name, expr, unit)], merged on the label columns."""
+    refs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    rename = {"namespace": "Namespace", "workload": "Workload", "container": "Container"}
+    ov = []
+    for i, (col, _, unit) in enumerate(queries):
+        rename[f"Value #{refs[i]}"] = col
+        ov.append({"matcher": {"id": "byName", "options": col}, "properties": [{"id": "unit", "value": unit}]})
+    return {
+        "id": idx,
+        "type": "table",
+        "title": title,
+        "description": description,
+        "datasource": DS,
+        "gridPos": {"h": h, "w": w, "x": 0, "y": y},
+        "fieldConfig": {"defaults": {}, "overrides": ov + (overrides or [])},
+        "options": {"showHeader": True, "footer": {"show": False}},
+        "targets": [
+            {"datasource": DS, "expr": e, "format": "table", "instant": True, "refId": refs[i], "legendFormat": ""}
+            for i, (_, e, _) in enumerate(queries)
+        ],
+        "transformations": [
+            {"id": "merge", "options": {}},
+            {
+                "id": "organize",
+                "options": {
+                    "excludeByName": {"Time": True},
+                    "renameByName": rename,
+                    "indexByName": {"Namespace": 0, "Workload": 1, "Container": 2},
+                },
+            },
+        ],
+    }
+
+
+def color_scale(col, steps, invert=False):
+    """Colour a column by thresholds; steps = [(value, colour)] with the first value None."""
+    return {
+        "matcher": {"id": "byName", "options": col},
+        "properties": [
+            {"id": "custom.cellOptions", "value": {"type": "color-background"}},
+            {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": c, "value": v} for v, c in steps]}},
+        ],
+    }
+
+
+def variables(extra=None):
+    ns = {
+        "name": "ns", "label": "Namespace", "type": "query", "datasource": DS,
+        "query": {"query": "label_values(container_cpu_usage_seconds_total, namespace)", "refId": "ns"},
+        "refresh": 2, "includeAll": True, "multi": True, "allValue": ".*",
+        "current": {"selected": True, "text": "All", "value": "$__all"},
+    }
+    window = {
+        "name": "window", "label": "History", "type": "custom",
+        "query": "1h,6h,1d,3d,7d,14d", "multi": False, "includeAll": False,
+        "current": {"selected": True, "text": "7d", "value": "7d"},
+        "options": [{"text": v, "value": v, "selected": v == "7d"} for v in "1h 6h 1d 3d 7d 14d".split()],
+    }
+    return [ns, window] + (extra or [])
+
+
+def raw_dashboard(uid, title, panels, templating, description=""):
+    return {
+        "uid": uid, "title": title, "description": description,
+        "tags": ["core-infra", "generated", "efficiency"], "schemaVersion": 39, "version": 1, "editable": False,
+        "time": {"from": "now-6h", "to": "now"}, "refresh": "5m",
+        "templating": {"list": templating}, "panels": panels,
+    }
+
+
+def ts(idx, title, targets, unit, x, y, w=12, h=8, stack=False):
+    """Time series with several (legend, expr) targets."""
+    refs = "ABCDEFGH"
+    return {
+        "id": idx, "type": "timeseries", "title": title, "datasource": DS,
+        "gridPos": {"h": h, "w": w, "x": x, "y": y},
+        "fieldConfig": {"defaults": {"unit": unit}, "overrides": []},
+        "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+        "targets": [
+            {"datasource": DS, "expr": e, "legendFormat": leg, "refId": refs[i]} for i, (leg, e) in enumerate(targets)
+        ],
+    }
+
+
+def efficiency_dashboards():
+    util_ok = [(None, "red"), (0.2, "yellow"), (0.5, "green")]
+    throttle = [(None, "green"), (0.05, "yellow"), (0.25, "red")]
+    # 1. Allocation efficiency: one row per container
+    main_table = table(
+        3,
+        "Allocation vs usage per container (busiest replica)",
+        [
+            ("CPU request", CPU_REQ, "short"),
+            ("CPU p95 usage", CPU_P95, "short"),
+            ("CPU used / request", ratio(CPU_P95, CPU_REQ), "percentunit"),
+            ("CPU limit", CPU_LIM, "short"),
+            ("CPU throttled", THROTTLE, "percentunit"),
+            ("Mem request", MEM_REQ, "bytes"),
+            ("Mem peak", MEM_PEAK, "bytes"),
+            ("Mem peak / request", ratio(MEM_PEAK, MEM_REQ), "percentunit"),
+            ("Mem limit", MEM_LIM, "bytes"),
+            ("OOM kills", OOMS, "short"),
+            ("Restarts", RESTARTS, "short"),
+            ("VPA CPU target", vpa("kube_customresource_vpa_containerrecommendations_target_cpu_cores"), "short"),
+            ("VPA mem target", vpa("kube_customresource_vpa_containerrecommendations_target_memory_bytes"), "bytes"),
+        ],
+        y=8,
+        h=18,
+        overrides=[
+            color_scale("CPU used / request", util_ok),
+            color_scale("Mem peak / request", util_ok),
+            color_scale("CPU throttled", throttle),
+        ],
+        description=(
+            "One row per workload container, comparing the busiest replica's usage over the History window with "
+            "its request/limit and the VPA target. Low 'used / request' means over-allocated; throttling, OOM kills "
+            "or restarts mean trimming is NOT safe. Rows with no request/limit appear in the Allocation gaps dashboard."
+        ),
+    )
+    top = [
+        ts(1, "Cluster CPU: allocatable vs requested vs used", [
+            ("allocatable", 'sum(k8s_node_allocatable_cpu)'),
+            ("requested", f'sum(sum by ({BY}) ({wl(kside("k8s_container_cpu_request"))}))'),
+            ("used", 'sum(rate(container_cpu_usage_seconds_total{container!=""}[5m]))'),
+        ], "short", 0, 0),
+        ts(2, "Cluster memory: allocatable vs requested vs used", [
+            ("allocatable", 'sum(k8s_node_allocatable_memory_bytes)'),
+            ("requested", f'sum(sum by ({BY}) ({wl(kside("k8s_container_memory_request_bytes"))}))'),
+            ("used (working set)", 'sum(container_memory_working_set_bytes{container!=""})'),
+        ], "bytes", 12, 0),
+    ]
+    efficiency = raw_dashboard(
+        "core-infra-resource-efficiency", "Resource efficiency: allocation vs usage", top + [main_table], variables(),
+        "Requests, limits, usage, throttling and VPA targets for every container.",
+    )
+
+    # 2. Gaps: containers with no request / limit, with a suggested value
+    def gap(idx, title, have, missing_ref, suggestion, unit, y):
+        return table(
+            idx, title,
+            [("Usage (p95/peak)", have, unit), ("Suggested", suggestion, unit)],
+            y=y, h=9,
+            description="Containers that run without this setting. Suggested = observed usage over the History window plus headroom.",
+        )
+
+    gaps = [
+        gap(1, "Containers with no CPU request",
+            f"({CPU_P95}) unless on({BY}) ({CPU_REQ})", "", f"(({CPU_P95}) unless on({BY}) ({CPU_REQ})) * 1.15", "short", 4),
+        gap(2, "Containers with no memory request",
+            f"({MEM_PEAK}) unless on({BY}) ({MEM_REQ})", "", f"(({MEM_PEAK}) unless on({BY}) ({MEM_REQ})) * 1.1", "bytes", 13),
+        gap(3, "Containers with no memory limit",
+            f"({MEM_PEAK}) unless on({BY}) ({MEM_LIM})", "", f"(({MEM_PEAK}) unless on({BY}) ({MEM_LIM})) * 1.25", "bytes", 22),
+        {
+            "id": 4, "type": "text", "title": "Where to set them", "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0},
+            "options": {"mode": "markdown", "content": (
+                "Not every gap is fixed in an app manifest. **Calico** workloads (calico-node, typha, kube-controllers, "
+                "whisker, goldmane) are managed by the tigera-operator: set resources on the `Installation` / component "
+                "resources. **Envoy gateway proxies** take them from the `EnvoyProxy` resource. **Control-plane static pods** "
+                "(kube-apiserver, scheduler, controller-manager) come from the Talos machine config. Suggestions need "
+                "several days of history to be meaningful; a CPU limit is deliberately not suggested."
+            )},
+        },
+    ]
+    gaps_dash = raw_dashboard(
+        "core-infra-allocation-gaps", "Resource efficiency: allocation gaps", gaps, variables(),
+        "Containers with no request or limit, with suggested values from observed usage.",
+    )
+
+    # 3. Trim safety for one workload: allocation vs usage next to the golden signals
+    wvar = {
+        "name": "workload", "label": "Workload", "type": "query", "datasource": DS,
+        "query": {"query": 'label_values(container_memory_working_set_bytes{namespace=~"$ns"}, pod)', "refId": "workload"},
+        "regex": "/^(.+?)(?:" + POD_SUFFIX + ")?$/", "refresh": 2, "includeAll": False, "multi": False,
+        "current": {"selected": True, "text": "grafana", "value": "grafana"},
+    }
+    P = f'pod=~"$workload({POD_SUFFIX})?"'
+    KP = f'k8s_pod_name=~"$workload({POD_SUFFIX})?"'
+    use_cpu = f'max(rate(container_cpu_usage_seconds_total{{{NS}, {P}, container!=""}}[5m]))'
+    use_mem = f'max(container_memory_working_set_bytes{{{NS}, {P}, container!=""}})'
+    cpu_total = f'sum(rate(container_cpu_usage_seconds_total{{{NS}, {P}, container!=""}}[5m]))'
+    mem_total = f'sum(container_memory_working_set_bytes{{{NS}, {P}, container!=""}})'
+    work = f'sum(rate(controller_runtime_reconcile_total{{{NS}, {P}}}[5m]))'
+    safety = [
+        ts(1, "CPU per replica: usage vs request, limit, VPA", [
+            ("usage (busiest replica)", use_cpu),
+            ("request", f'max(k8s_container_cpu_request{{{KNS}, {KP}}})'),
+            ("limit", f'max(k8s_container_cpu_limit{{{KNS}, {KP}}})'),
+            ("VPA target", f'max(kube_customresource_vpa_containerrecommendations_target_cpu_cores{{exported_namespace=~"$ns", target_name="$workload"}})'),
+        ], "short", 0, 0),
+        ts(2, "Memory per replica: working set vs request, limit, VPA", [
+            ("working set (busiest replica)", use_mem),
+            ("request", f'max(k8s_container_memory_request_bytes{{{KNS}, {KP}}})'),
+            ("limit", f'max(k8s_container_memory_limit_bytes{{{KNS}, {KP}}})'),
+            ("VPA target", f'max(kube_customresource_vpa_containerrecommendations_target_memory_bytes{{exported_namespace=~"$ns", target_name="$workload"}})'),
+        ], "bytes", 12, 0),
+        ts(3, "CPU throttling (share of periods throttled)", [
+            ("throttled", f'sum(rate(container_cpu_cfs_throttled_periods_total{{{NS}, {P}}}[5m])) / sum(rate(container_cpu_cfs_periods_total{{{NS}, {P}}}[5m]))'),
+        ], "percentunit", 0, 8),
+        ts(4, "OOM kills and restarts (per hour)", [
+            ("OOM kills", f'sum(increase(container_oom_events_total{{{NS}, {P}}}[1h]))'),
+            ("restarts", f'sum(increase(k8s_container_restarts{{{KNS}, {KP}}}[1h]))'),
+        ], "short", 12, 8),
+        ts(5, "Work: reconciles/s and error share (controller-runtime apps)", [
+            ("reconciles/s", work),
+            ("errors/s", f'sum(rate(controller_runtime_reconcile_errors_total{{{NS}, {P}}}[5m]))'),
+        ], "ops", 0, 16),
+        ts(6, "Latency and queue: reconcile p95, workqueue depth", [
+            ("reconcile p95 (s)", f'histogram_quantile(0.95, sum by (le) (rate(controller_runtime_reconcile_time_seconds_bucket{{{NS}, {P}}}[5m])))'),
+            ("workqueue depth", f'sum(workqueue_depth{{{NS}, {P}}})'),
+        ], "short", 12, 16),
+        ts(7, "Work per CPU core (reconciles per core-second)", [
+            ("reconciles / core-s", f"{work} / {cpu_total}"),
+        ], "short", 0, 24),
+        ts(8, "Work per GiB of memory (reconciles/s per GiB working set)", [
+            ("reconciles/s per GiB", f"{work} / ({mem_total} / 1073741824)"),
+        ], "short", 12, 24),
+        ts(9, "HTTP traffic (Envoy gateway proxies): requests/s and 5xx/s", [
+            ("requests/s", f'sum(rate(envoy_http_downstream_rq_total{{{NS}, {P}}}[5m]))'),
+            ("5xx/s", f'sum(rate(envoy_http_downstream_rq_total{{{NS}, {P}, envoy_response_code_class="5"}}[5m]))'),
+        ], "reqps", 0, 32),
+    ]
+    safety_dash = raw_dashboard(
+        "core-infra-trim-safety", "Resource efficiency: trim safety for a workload", safety, variables([wvar]),
+        "Allocation next to the golden signals: before lowering a request, check there is no throttling, OOM, "
+        "restart, error or latency regression and that usage sits well below the request.",
+    )
+    return {
+        "resource-efficiency": efficiency,
+        "allocation-gaps": gaps_dash,
+        "trim-safety": safety_dash,
+    }
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.json"):
@@ -328,6 +628,9 @@ def main():
     d = dashboard("core-infra-nodes", NODES[0], NODES[1])
     (OUT / "nodes.json").write_text(json.dumps(d, indent=2) + "\n")
     files.append("nodes.json")
+    for slug, d in efficiency_dashboards().items():
+        (OUT / f"{slug}.json").write_text(json.dumps(d, indent=2) + "\n")
+        files.append(f"{slug}.json")
 
     lines = [
         "generatorOptions:",
