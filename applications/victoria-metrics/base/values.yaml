@@ -10,6 +10,8 @@ server:
     envflag.enable: true
     envflag.prefix: VM_
     loggerFormat: json
+    # VictoriaMetrics listens on IPv4 only by default; the pod network is IPv6.
+    enableTCP6: true
     # Keep Prometheus-style metric names (dots -> underscores, unit/type
     # suffixes) so community dashboards written for Prometheus work.
     opentelemetry.usePrometheusNaming: true
