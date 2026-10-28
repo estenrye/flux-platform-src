@@ -24,13 +24,13 @@
           "uid": "victoria-metrics"
         },
         "query": {
-          "query": "label_values({service_name=~\"otelcol-k8s\"}, service_name)",
+          "query": "label_values({service_name=~\"otelcol-k8s|otelcol-cluster\"}, service_name)",
           "refId": "svc"
         },
         "refresh": 2,
         "includeAll": true,
         "multi": true,
-        "allValue": "otelcol-k8s",
+        "allValue": "otelcol-k8s|otelcol-cluster",
         "current": {
           "selected": true,
           "text": "All",

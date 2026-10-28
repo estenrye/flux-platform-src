@@ -163,7 +163,7 @@ APPS = {
     ),
     "opentelemetry-collector": (
         "OpenTelemetry collectors (otelcol-ds) and target allocator",
-        "otelcol-k8s",
+        "otelcol-k8s|otelcol-cluster",
         [
             ("Metric points accepted/s", 'sum by (receiver) (rate(otelcol_receiver_accepted_metric_points_total{service_name=~"$svc"}[5m]))', "ops"),
             ("Metric points refused/s", 'sum by (receiver) (rate(otelcol_receiver_refused_metric_points_total{service_name=~"$svc"}[5m]))', "ops"),
