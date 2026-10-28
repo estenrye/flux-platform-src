@@ -24,13 +24,13 @@
           "uid": "victoria-metrics"
         },
         "query": {
-          "query": "label_values({service_name=~\"otelcol-k8s|otelcol-ds-targetallocator\"}, service_name)",
+          "query": "label_values({service_name=~\"otelcol-k8s\"}, service_name)",
           "refId": "svc"
         },
         "refresh": 2,
         "includeAll": true,
         "multi": true,
-        "allValue": "otelcol-k8s|otelcol-ds-targetallocator",
+        "allValue": "otelcol-k8s",
         "current": {
           "selected": true,
           "text": "All",
@@ -403,7 +403,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "max by (collector_name) (opentelemetry_allocator_targets_per_collector{service_name=~\"$svc\"})",
+          "expr": "max by (collector_name) (opentelemetry_allocator_targets_per_collector{service=\"otelcol-ds-targetallocator\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -444,7 +444,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum(opentelemetry_allocator_targets_unassigned{service_name=~\"$svc\"})",
+          "expr": "sum(opentelemetry_allocator_targets_unassigned{service=\"otelcol-ds-targetallocator\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -485,7 +485,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "max(opentelemetry_allocator_collectors_discovered{service_name=~\"$svc\"})",
+          "expr": "max(opentelemetry_allocator_collectors_discovered{service=\"otelcol-ds-targetallocator\"})",
           "legendFormat": "",
           "refId": "A"
         }
