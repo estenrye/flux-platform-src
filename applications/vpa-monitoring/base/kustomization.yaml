@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: vpa-monitoring
+
+# kube-state-metrics in custom-resource mode exporting the
+# VerticalPodAutoscaler recommendations, so Grafana can compare what each
+# container is allocated, what it uses, and what the VPA recommends.
+helmCharts:
+  - name: kube-state-metrics
+    repo: oci://ghcr.io/prometheus-community/charts
+    version: 7.2.2
+    releaseName: vpa-state-metrics
+    namespace: vpa-monitoring
+    valuesFile: values.yaml
+
+resources:
+  - resources/namespace.yaml
+  - resources/network-policy.yaml
+  - resources/service-monitor.yaml
+  - resources/vpa.yaml
+
+patches:
+  - target:
+      kind: Deployment
+    path: patches/deployment.yaml
+
+images:
+  - name: registry.k8s.io/kube-state-metrics/kube-state-metrics
+    digest: sha256:1545919b72e3ae035454fc054131e8d0f14b42ef6fc5b2ad5c751cafa6b2130e

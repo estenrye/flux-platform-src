@@ -1,0 +1,51 @@
+# Cluster-state metrics that no node-local source has: per-container resource
+# requests and limits, restarts, pod phase and workload replica counts. The
+# k8s_cluster receiver watches the API server and must run as a single
+# replica, so it is not part of the otelcol-ds DaemonSet. Metrics go to
+# VictoriaMetrics only.
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: otelcol-cluster
+  annotations:
+    ignore-check.kube-linter.io/sorted-keys: kube-linter walks spec.config as an unordered map, so the reported key order changes between runs even though the keys in this file are already sorted.
+spec:
+  mode: deployment
+  replicas: 1
+  image: otel/opentelemetry-collector-k8s:0.163.2
+  serviceAccount: opentelemetry-collector-cluster
+  resources:
+    requests:
+      cpu: 20m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  config:
+    receivers:
+      k8s_cluster:
+        auth_type: serviceAccount
+        collection_interval: 60s
+        node_conditions_to_report: [Ready, MemoryPressure, DiskPressure, PIDPressure, NetworkUnavailable]
+        allocatable_types_to_report: [cpu, memory, pods]
+    exporters:
+      otlphttp/victoria-metrics:
+        endpoint: "http://victoria-metrics.victoria-metrics.svc.cluster.local:8428/opentelemetry"
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        metrics:
+          receivers: [k8s_cluster]
+          exporters: [otlphttp/victoria-metrics]
+      telemetry:
+        metrics:
+          level: normal
+          readers:
+            - periodic:
+                interval: 30000
+                exporter:
+                  otlp:
+                    protocol: http/protobuf
+                    endpoint: http://victoria-metrics.victoria-metrics.svc.cluster.local:8428/opentelemetry/v1/metrics
+        resource:
+          service.name: otelcol-cluster

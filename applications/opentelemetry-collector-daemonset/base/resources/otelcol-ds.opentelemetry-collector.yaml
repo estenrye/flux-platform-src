@@ -118,7 +118,33 @@ spec:
       # resources); the operator injects the http_sd config into this receiver.
       prometheus:
         config:
-          scrape_configs: []
+          scrape_configs:
+            # Per-container usage and CPU/memory saturation from each node's
+            # kubelet. Node-role discovery runs in the target allocator, which
+            # (per-node strategy) hands each collector only its own node's
+            # target. Only the series needed to judge resource allocation are
+            # kept: the full endpoint is ~3.8k series per node.
+            - job_name: kubelet-cadvisor
+              scheme: https
+              metrics_path: /metrics/cadvisor
+              scrape_interval: 60s
+              authorization:
+                credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              tls_config:
+                ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              kubernetes_sd_configs:
+                - role: node
+              metric_relabel_configs:
+                - source_labels: [__name__]
+                  regex: container_(cpu_usage_seconds_total|memory_working_set_bytes|memory_rss|cpu_cfs_periods_total|cpu_cfs_throttled_periods_total|cpu_cfs_throttled_seconds_total|oom_events_total)
+                  action: keep
+                # Drop the pod-level cgroup rollups and pause containers
+                # (empty container label); per-container series are what matter.
+                - source_labels: [container]
+                  regex: .+
+                  action: keep
+                - regex: (id|name|image)
+                  action: labeldrop
     processors:
       # Tag every metric with the node it came from; without this the three
       # collectors' series are indistinguishable and merge into one chart.

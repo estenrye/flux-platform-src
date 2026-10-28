@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: opentelemetry-collector-cluster
+  description: |-
+    This component provides a single-replica OpenTelemetry Collector that
+    reports cluster state (container requests and limits, restarts, pod
+    phase, workload replicas) to VictoriaMetrics.
+  tags:
+    - monitoring
+    - opentelemetry
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

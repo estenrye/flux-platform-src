@@ -1,5 +1,6 @@
 # Lets the collector's service account scrape /metrics endpoints that sit behind
-# delegated authorization (e.g. metrics-server).
+# delegated authorization (e.g. metrics-server), and each node's kubelet
+# (/metrics/cadvisor is authorized as the nodes/metrics subresource).
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -7,3 +8,6 @@ metadata:
 rules:
   - nonResourceURLs: ["/metrics"]
     verbs: ["get"]
+  - apiGroups: [""]
+    resources: [nodes/metrics]
+    verbs: [get]

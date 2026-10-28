@@ -1,0 +1,36 @@
+# The only client is the hostNetwork otelcol-ds DaemonSet, whose scrapes arrive
+# from node IPs that no pod selector can match, so the source is an ipBlock.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vpa-state-metrics
+  namespace: vpa-monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: vpa-state-metrics
+      app.kubernetes.io/instance: vpa-state-metrics
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: fd97:45c2:b3a1:1179::/64
+        - ipBlock:
+            cidr: fd54:616c:6f73::/64
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        # apiserver targetPort -- Calico evaluates egress post-DNAT
+        # (docs/memory/calico-networkpolicy-dnat.md); Talos serves 6443.
+        - protocol: TCP
+          port: 6443
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
