@@ -16,21 +16,21 @@
   "templating": {
     "list": [
       {
-        "name": "job",
-        "label": "Job",
+        "name": "svc",
+        "label": "Service",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "victoria-metrics"
         },
         "query": {
-          "query": "label_values(descheduler_pods_evicted_total, job)",
-          "refId": "job"
+          "query": "label_values({service_name=~\"descheduler\"}, service_name)",
+          "refId": "svc"
         },
         "refresh": 2,
         "includeAll": true,
         "multi": true,
-        "allValue": ".*",
+        "allValue": "descheduler",
         "current": {
           "selected": true,
           "text": "All",
@@ -43,7 +43,7 @@
     {
       "id": 1,
       "type": "timeseries",
-      "title": "Pods evicted/s by strategy",
+      "title": "Loop duration p95",
       "datasource": {
         "type": "prometheus",
         "uid": "victoria-metrics"
@@ -56,7 +56,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "ops"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -75,7 +75,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (strategy, result) (rate(descheduler_pods_evicted_total{job=~\"$job\"}[15m]))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(descheduler_loop_duration_seconds_bucket{service_name=~\"$svc\"}[15m])))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -84,7 +84,7 @@
     {
       "id": 2,
       "type": "timeseries",
-      "title": "Pods evicted by namespace",
+      "title": "Strategy duration p95",
       "datasource": {
         "type": "prometheus",
         "uid": "victoria-metrics"
@@ -94,6 +94,47 @@
         "w": 12,
         "x": 12,
         "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, strategy) (rate(descheduler_strategy_duration_seconds_bucket{service_name=~\"$svc\"}[15m])))",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Loops/hour",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -116,14 +157,14 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (namespace) (descheduler_pods_evicted_total{job=~\"$job\"})",
+          "expr": "sum(increase(descheduler_loop_duration_seconds_count{service_name=~\"$svc\"}[1h]))",
           "legendFormat": "",
           "refId": "A"
         }
       ]
     },
     {
-      "id": 3,
+      "id": 4,
       "type": "timeseries",
       "title": "CPU (cores)",
       "datasource": {
@@ -133,7 +174,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 8
       },
       "fieldConfig": {
@@ -157,14 +198,14 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (rate(process_cpu_seconds_total{job=~\"$job\"}[5m]))",
+          "expr": "sum by (service_name, service_instance_id) (rate(process_cpu_seconds_total{service_name=~\"$svc\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
       ]
     },
     {
-      "id": 4,
+      "id": 5,
       "type": "timeseries",
       "title": "Resident memory",
       "datasource": {
@@ -174,8 +215,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 8
+        "x": 0,
+        "y": 16
       },
       "fieldConfig": {
         "defaults": {
@@ -198,48 +239,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (process_resident_memory_bytes{job=~\"$job\"})",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 5,
-      "type": "timeseries",
-      "title": "Goroutines",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "victoria-metrics"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "victoria-metrics"
-          },
-          "expr": "sum by (job, instance) (go_goroutines{job=~\"$job\"})",
+          "expr": "sum by (service_name, service_instance_id) (process_resident_memory_bytes{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -248,7 +248,7 @@
     {
       "id": 6,
       "type": "timeseries",
-      "title": "Open file descriptors",
+      "title": "Goroutines",
       "datasource": {
         "type": "prometheus",
         "uid": "victoria-metrics"
@@ -280,7 +280,48 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (process_open_fds{job=~\"$job\"})",
+          "expr": "sum by (service_name, service_instance_id) (go_goroutines{service_name=~\"$svc\"})",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Open file descriptors",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "sum by (service_name, service_instance_id) (process_open_fds{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }

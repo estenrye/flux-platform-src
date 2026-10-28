@@ -16,21 +16,21 @@
   "templating": {
     "list": [
       {
-        "name": "job",
-        "label": "Job",
+        "name": "svc",
+        "label": "Service",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "victoria-metrics"
         },
         "query": {
-          "query": "label_values(envoy_http_downstream_rq_total, job)",
-          "refId": "job"
+          "query": "label_values({service_name=~\"calico-system/envoy-proxy\"}, service_name)",
+          "refId": "svc"
         },
         "refresh": 2,
         "includeAll": true,
         "multi": true,
-        "allValue": ".*",
+        "allValue": "calico-system/envoy-proxy",
         "current": {
           "selected": true,
           "text": "All",
@@ -75,7 +75,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (envoy_http_conn_manager_prefix, job) (rate(envoy_http_downstream_rq_total{job=~\"$job\"}[5m]))",
+          "expr": "sum by (envoy_http_conn_manager_prefix, service_name) (rate(envoy_http_downstream_rq_total{service_name=~\"$svc\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -116,7 +116,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (envoy_http_conn_manager_prefix) (rate(envoy_http_downstream_rq_xx{envoy_response_code_class=\"5\", job=~\"$job\"}[5m]))",
+          "expr": "sum by (envoy_http_conn_manager_prefix) (rate(envoy_http_downstream_rq_total{envoy_response_code_class=\"5\", service_name=~\"$svc\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -157,7 +157,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, envoy_cluster_name) (rate(envoy_cluster_upstream_rq_time_bucket{job=~\"$job\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, envoy_cluster_name) (rate(envoy_cluster_upstream_rq_time_bucket{service_name=~\"$svc\"}[5m])))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -198,7 +198,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job) (envoy_http_downstream_cx_active{job=~\"$job\"})",
+          "expr": "sum by (service_name) (envoy_http_downstream_cx_active{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -239,7 +239,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (rate(process_cpu_seconds_total{job=~\"$job\"}[5m]))",
+          "expr": "sum by (service_name, service_instance_id) (rate(process_cpu_seconds_total{service_name=~\"$svc\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -280,7 +280,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (process_resident_memory_bytes{job=~\"$job\"})",
+          "expr": "sum by (service_name, service_instance_id) (process_resident_memory_bytes{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -321,7 +321,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (go_goroutines{job=~\"$job\"})",
+          "expr": "sum by (service_name, service_instance_id) (go_goroutines{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -362,7 +362,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (process_open_fds{job=~\"$job\"})",
+          "expr": "sum by (service_name, service_instance_id) (process_open_fds{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }

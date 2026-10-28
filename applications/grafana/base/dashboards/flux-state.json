@@ -16,21 +16,21 @@
   "templating": {
     "list": [
       {
-        "name": "job",
-        "label": "Job",
+        "name": "svc",
+        "label": "Service",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "victoria-metrics"
         },
         "query": {
-          "query": "label_values(gotk_resource_info, job)",
-          "refId": "job"
+          "query": "label_values({service_name=~\"flux-state-metrics-kube-state-metrics\"}, service_name)",
+          "refId": "svc"
         },
         "refresh": 2,
         "includeAll": true,
         "multi": true,
-        "allValue": ".*",
+        "allValue": "flux-state-metrics-kube-state-metrics",
         "current": {
           "selected": true,
           "text": "All",
@@ -198,7 +198,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (rate(process_cpu_seconds_total{job=~\"$job\"}[5m]))",
+          "expr": "sum by (service_name, service_instance_id) (rate(process_cpu_seconds_total{service_name=~\"$svc\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -239,7 +239,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (process_resident_memory_bytes{job=~\"$job\"})",
+          "expr": "sum by (service_name, service_instance_id) (process_resident_memory_bytes{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -280,7 +280,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (go_goroutines{job=~\"$job\"})",
+          "expr": "sum by (service_name, service_instance_id) (go_goroutines{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -321,7 +321,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (process_open_fds{job=~\"$job\"})",
+          "expr": "sum by (service_name, service_instance_id) (process_open_fds{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }

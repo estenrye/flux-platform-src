@@ -16,21 +16,21 @@
   "templating": {
     "list": [
       {
-        "name": "job",
-        "label": "Job",
+        "name": "svc",
+        "label": "Service",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "victoria-metrics"
         },
         "query": {
-          "query": "label_values(keda_scaler_active, job)",
-          "refId": "job"
+          "query": "label_values({service_name=~\"keda-admission-webhooks|keda/keda-operator|keda/keda-operator-metrics-apiserver\"}, service_name)",
+          "refId": "svc"
         },
         "refresh": 2,
         "includeAll": true,
         "multi": true,
-        "allValue": ".*",
+        "allValue": "keda-admission-webhooks|keda/keda-operator|keda/keda-operator-metrics-apiserver",
         "current": {
           "selected": true,
           "text": "All",
@@ -75,7 +75,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (scaledObject, scaler) (keda_scaler_active{job=~\"$job\"})",
+          "expr": "sum by (scaledObject, scaler) (keda_scaler_active{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -116,7 +116,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (scaledObject, scaler) (rate(keda_scaler_errors_total{job=~\"$job\"}[5m]))",
+          "expr": "sum by (scaledObject) (rate(keda_scaled_object_errors_total{service_name=~\"$svc\"}[5m])) + sum by (scaledObject) (rate(keda_scaler_detail_errors_total{service_name=~\"$svc\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -157,7 +157,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (scaledObject, metric) (keda_scaler_metrics_value{job=~\"$job\"})",
+          "expr": "sum by (scaledObject, metric) (keda_scaler_metrics_value{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -198,7 +198,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (controller, result) (rate(controller_runtime_reconcile_total{job=~\"$job\"}[5m]))",
+          "expr": "sum by (controller, result) (rate(controller_runtime_reconcile_total{service_name=~\"$svc\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -239,7 +239,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (controller) (rate(controller_runtime_reconcile_errors_total{job=~\"$job\"}[5m]))",
+          "expr": "sum by (controller) (rate(controller_runtime_reconcile_errors_total{service_name=~\"$svc\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -280,7 +280,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "histogram_quantile(0.95, sum by (le, controller) (rate(controller_runtime_reconcile_time_seconds_bucket{job=~\"$job\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le, controller) (rate(controller_runtime_reconcile_time_seconds_bucket{service_name=~\"$svc\"}[5m])))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -321,7 +321,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (name) (workqueue_depth{job=~\"$job\"})",
+          "expr": "sum by (name) (workqueue_depth{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -362,7 +362,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (rate(process_cpu_seconds_total{job=~\"$job\"}[5m]))",
+          "expr": "sum by (service_name, service_instance_id) (rate(process_cpu_seconds_total{service_name=~\"$svc\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -403,7 +403,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (process_resident_memory_bytes{job=~\"$job\"})",
+          "expr": "sum by (service_name, service_instance_id) (process_resident_memory_bytes{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -444,7 +444,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (go_goroutines{job=~\"$job\"})",
+          "expr": "sum by (service_name, service_instance_id) (go_goroutines{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -485,7 +485,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (process_open_fds{job=~\"$job\"})",
+          "expr": "sum by (service_name, service_instance_id) (process_open_fds{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }

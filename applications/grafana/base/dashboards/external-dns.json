@@ -16,21 +16,21 @@
   "templating": {
     "list": [
       {
-        "name": "job",
-        "label": "Job",
+        "name": "svc",
+        "label": "Service",
         "type": "query",
         "datasource": {
           "type": "prometheus",
           "uid": "victoria-metrics"
         },
         "query": {
-          "query": "label_values(external_dns_registry_endpoints_total, job)",
-          "refId": "job"
+          "query": "label_values({service_name=~\"external-dns\"}, service_name)",
+          "refId": "svc"
         },
         "refresh": 2,
         "includeAll": true,
         "multi": true,
-        "allValue": ".*",
+        "allValue": "external-dns",
         "current": {
           "selected": true,
           "text": "All",
@@ -75,7 +75,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job) (external_dns_registry_endpoints_total{job=~\"$job\"})",
+          "expr": "sum by (service_name) (external_dns_registry_endpoints_total{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -116,7 +116,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job) (external_dns_source_endpoints_total{job=~\"$job\"})",
+          "expr": "sum by (service_name) (external_dns_source_endpoints_total{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -157,7 +157,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "time() - external_dns_controller_last_sync_timestamp_seconds{job=~\"$job\"}",
+          "expr": "time() - external_dns_controller_last_sync_timestamp_seconds{service_name=~\"$svc\"}",
           "legendFormat": "",
           "refId": "A"
         }
@@ -198,7 +198,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (record_type) (external_dns_controller_verified_records{job=~\"$job\"})",
+          "expr": "sum by (record_type) (external_dns_controller_verified_records{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -239,7 +239,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job) (rate(external_dns_registry_errors_total{job=~\"$job\"}[5m]) + rate(external_dns_source_errors_total{job=~\"$job\"}[5m]))",
+          "expr": "sum by (service_name) (rate(external_dns_registry_errors_total{service_name=~\"$svc\"}[5m]) + rate(external_dns_source_errors_total{service_name=~\"$svc\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -280,7 +280,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (rate(process_cpu_seconds_total{job=~\"$job\"}[5m]))",
+          "expr": "sum by (service_name, service_instance_id) (rate(process_cpu_seconds_total{service_name=~\"$svc\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -321,7 +321,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (process_resident_memory_bytes{job=~\"$job\"})",
+          "expr": "sum by (service_name, service_instance_id) (process_resident_memory_bytes{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -362,7 +362,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (go_goroutines{job=~\"$job\"})",
+          "expr": "sum by (service_name, service_instance_id) (go_goroutines{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -403,7 +403,7 @@
             "type": "prometheus",
             "uid": "victoria-metrics"
           },
-          "expr": "sum by (job, instance) (process_open_fds{job=~\"$job\"})",
+          "expr": "sum by (service_name, service_instance_id) (process_open_fds{service_name=~\"$svc\"})",
           "legendFormat": "",
           "refId": "A"
         }
