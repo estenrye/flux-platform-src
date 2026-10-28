@@ -1,0 +1,126 @@
+annotations:
+  ignore-check.kube-linter.io/no-node-affinity: No zone or role topology to express node affinity against.
+  ignore-check.kube-linter.io/restart-policy: Deployments always use restartPolicy Always.
+  ignore-check.kube-linter.io/minimum-three-replicas: "A single replica is enough: the exporter is stateless and a missed scrape only leaves a gap in a recommendation series."
+prometheusScrape: false
+collectors: []
+podLabels:
+  app: vpa-state-metrics
+extraArgs:
+  - --custom-resource-state-only=true
+resources:
+  requests:
+    memory: "64Mi"
+    cpu: "10m"
+  limits:
+    memory: "128Mi"
+    cpu: "200m"
+# Egress and ingress are in resources/network-policy.yaml.
+networkPolicy:
+  enabled: false
+kubeRBACProxy:
+  enabled: false
+rbac:
+  extraRules:
+    - apiGroups:
+        - autoscaling.k8s.io
+      resources:
+        - verticalpodautoscalers
+      verbs: ["list", "watch"]
+customResourceState:
+  enabled: true
+  config:
+    spec:
+      resources:
+        - groupVersionKind:
+            group: autoscaling.k8s.io
+            version: v1
+            kind: VerticalPodAutoscaler
+          metricNamePrefix: kube_customresource_vpa
+          labelsFromPath:
+            verticalpodautoscaler: [metadata, name]
+            exported_namespace: [metadata, namespace]
+            target_kind: [spec, targetRef, kind]
+            target_name: [spec, targetRef, name]
+          metrics:
+            - name: info
+              help: "VerticalPodAutoscaler target workload and update mode."
+              each:
+                type: Info
+                info:
+                  labelsFromPath:
+                    update_mode: [spec, updatePolicy, updateMode]
+            # One metric per bound and resource; the container is a label.
+            # Quantities such as 25m or 262144k are parsed to cores / bytes.
+            - name: containerrecommendations_target_cpu_cores
+              help: "VPA recommended CPU request (cores) per container."
+              each:
+                type: Gauge
+                gauge:
+                  path: [status, recommendation, containerRecommendations]
+                  valueFrom: [target, cpu]
+                  labelsFromPath:
+                    container: [containerName]
+            - name: containerrecommendations_target_memory_bytes
+              help: "VPA recommended memory request (bytes) per container."
+              each:
+                type: Gauge
+                gauge:
+                  path: [status, recommendation, containerRecommendations]
+                  valueFrom: [target, memory]
+                  labelsFromPath:
+                    container: [containerName]
+            - name: containerrecommendations_lowerbound_cpu_cores
+              help: "VPA lower-bound CPU recommendation (cores) per container."
+              each:
+                type: Gauge
+                gauge:
+                  path: [status, recommendation, containerRecommendations]
+                  valueFrom: [lowerBound, cpu]
+                  labelsFromPath:
+                    container: [containerName]
+            - name: containerrecommendations_lowerbound_memory_bytes
+              help: "VPA lower-bound memory recommendation (bytes) per container."
+              each:
+                type: Gauge
+                gauge:
+                  path: [status, recommendation, containerRecommendations]
+                  valueFrom: [lowerBound, memory]
+                  labelsFromPath:
+                    container: [containerName]
+            - name: containerrecommendations_upperbound_cpu_cores
+              help: "VPA upper-bound CPU recommendation (cores) per container."
+              each:
+                type: Gauge
+                gauge:
+                  path: [status, recommendation, containerRecommendations]
+                  valueFrom: [upperBound, cpu]
+                  labelsFromPath:
+                    container: [containerName]
+            - name: containerrecommendations_upperbound_memory_bytes
+              help: "VPA upper-bound memory recommendation (bytes) per container."
+              each:
+                type: Gauge
+                gauge:
+                  path: [status, recommendation, containerRecommendations]
+                  valueFrom: [upperBound, memory]
+                  labelsFromPath:
+                    container: [containerName]
+            - name: containerrecommendations_uncappedtarget_cpu_cores
+              help: "VPA CPU target (cores) before min/max policy caps, per container."
+              each:
+                type: Gauge
+                gauge:
+                  path: [status, recommendation, containerRecommendations]
+                  valueFrom: [uncappedTarget, cpu]
+                  labelsFromPath:
+                    container: [containerName]
+            - name: containerrecommendations_uncappedtarget_memory_bytes
+              help: "VPA memory target (bytes) before min/max policy caps, per container."
+              each:
+                type: Gauge
+                gauge:
+                  path: [status, recommendation, containerRecommendations]
+                  valueFrom: [uncappedTarget, memory]
+                  labelsFromPath:
+                    container: [containerName]

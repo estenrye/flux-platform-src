@@ -1,0 +1,13 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: otelcol-cluster
+spec:
+  # The operator owns the Deployment, and VPA rejects targets with a parent
+  # controller (ConfigUnsupported), so target the CR via its scale subresource.
+  targetRef:
+    apiVersion: opentelemetry.io/v1beta1
+    kind: OpenTelemetryCollector
+    name: otelcol-cluster
+  updatePolicy:
+    updateMode: "Off"

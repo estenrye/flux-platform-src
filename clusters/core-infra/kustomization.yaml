@@ -41,11 +41,13 @@ resources:
 - ../../applications/grafana/base
 - resources/grafana.client-traffic-policy.yaml
 - ../../applications/opentelemetry-collector-daemonset/base
+- ../../applications/opentelemetry-collector-cluster/base
 - ../../applications/openstack-cloud-controller-manager-otel/base
 - ../../applications/reloader/base
 - ../../applications/keda/base
 - ../../applications/kubernetes-descheduler/base
 - ../../applications/flux-monitoring/base
+- ../../applications/vpa-monitoring/base
 - resources/vpa.recommendations.yaml
 
 patches:
