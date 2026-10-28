@@ -1,0 +1,20 @@
+# The target allocator serves its own metrics (opentelemetry_allocator_*:
+# targets per collector, unassigned targets, allocation time) on the same port
+# as its HTTP API. The collectors' own metrics are pushed from the collector
+# config instead (see otelcol-ds.opentelemetry-collector.yaml).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: otelcol-ds-targetallocator
+  namespace: opentelemetry-collector
+  annotations:
+    ignore-check.kube-linter.io/dangling-servicemonitor: The otelcol-ds-targetallocator Service is created at runtime by the opentelemetry-operator, so it is not in the static rendered manifests.
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: opentelemetry-targetallocator
+      app.kubernetes.io/name: otelcol-ds-targetallocator
+  endpoints:
+    - port: targetallocation
+      path: /metrics
+      interval: 60s

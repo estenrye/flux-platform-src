@@ -289,7 +289,10 @@ serviceMonitor:
   # - failIfMissing
   # - alwaysRender
   # @schema
-  renderMode: skipIfMissing   # @schema enum: [skipIfMissing, failIfMissing, alwaysRender]
+  # alwaysRender: `helm template` (kustomize helmCharts) cannot see the cluster's
+  # CRDs, so skipIfMissing silently rendered no ServiceMonitors. The
+  # prometheus-operator CRDs are installed before this application.
+  renderMode: alwaysRender   # @schema enum: [skipIfMissing, failIfMissing, alwaysRender]
 
   # -- namespace where you want to install ServiceMonitors
   namespace: ""

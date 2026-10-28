@@ -1,0 +1,6 @@
+# Kustomize's namespace transformer does not stamp a namespace onto the
+# prometheus-operator kinds (it does not treat them as namespaced), and the chart
+# renders none, so Flux rejects them with "namespace not specified".
+- op: add
+  path: /metadata/namespace
+  value: victoria-metrics
