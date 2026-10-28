@@ -1,0 +1,13 @@
+# The operator image is pinned to v0.162.0 by digest (Renovate bumped it
+# independently of the chart), and that version watches Gateway API HTTPRoutes.
+# Chart 0.109.0's ClusterRole does not allow it, so the operator's cache never
+# synced, no leader was elected and it reconciled nothing. Read access is
+# enough to start; the create/update/delete verbs upstream also grants are only
+# needed if a collector sets spec.ingress.type: gateway, which none does.
+# Drop this patch when the chart is bumped to one that ships the rule (>= 0.127).
+- op: add
+  path: /rules/-
+  value:
+    apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["httproutes"]
+    verbs: ["get", "list", "watch"]
