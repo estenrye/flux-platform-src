@@ -17,6 +17,9 @@ resources:
 
 patches:
   - path: patches/statefulset.yaml
+  - target:
+      kind: ServiceMonitor
+    path: patches/monitor-namespace.yaml
 
 images:
   - name: victoriametrics/victoria-metrics

@@ -193,7 +193,7 @@ spec:
           receivers: [otlp]
           processors: [k8sattributes, resource/node]
           exporters: [otlp_grpc/netdata]
-      # Self-metrics pushed straight to netdata-otel, bypassing the pipelines
+      # Self-metrics pushed straight to netdata-otel and VictoriaMetrics, bypassing the pipelines
       # above so they still arrive when a processor or exporter is backing up.
       telemetry:
         metrics:
@@ -205,6 +205,15 @@ spec:
                   otlp:
                     protocol: grpc
                     endpoint: http://netdata-otel.netdata.svc.cluster.local:4317
+            # Same self-metrics to VictoriaMetrics for Grafana. The collector's
+            # Prometheus pull endpoint (:8888) is not served when readers are
+            # configured, so push; OTLP/HTTP endpoints are the full signal URL.
+            - periodic:
+                interval: 30000
+                exporter:
+                  otlp:
+                    protocol: http/protobuf
+                    endpoint: http://victoria-metrics.victoria-metrics.svc.cluster.local:8428/opentelemetry/v1/metrics
         resource:
           k8s.node.name: ${env:K8S_NODE_NAME}
           host.name: ${env:K8S_NODE_NAME}

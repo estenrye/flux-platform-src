@@ -39,7 +39,8 @@ CONTROLLER_RUNTIME = [
     ("Workqueue depth", 'sum by (name) (workqueue_depth{service_name=~"$svc"})', "short"),
 ]
 
-# slug -> (title, service_name regex, [(panel title, expr, unit)], include controller-runtime row)
+# slug -> (title, service_name regex, [(panel title, expr, unit)], include
+# controller-runtime row[, include process/Go row (default True)])
 APPS = {
     "flux": (
         "Flux controllers",
@@ -127,6 +128,69 @@ APPS = {
             ("Loop duration p95", 'histogram_quantile(0.95, sum by (le) (rate(descheduler_loop_duration_seconds_bucket{service_name=~"$svc"}[15m])))', "s"),
             ("Strategy duration p95", 'histogram_quantile(0.95, sum by (le, strategy) (rate(descheduler_strategy_duration_seconds_bucket{service_name=~"$svc"}[15m])))', "s"),
             ("Loops/hour", 'sum(increase(descheduler_loop_duration_seconds_count{service_name=~"$svc"}[1h]))', "short"),
+        ],
+        False,
+    ),
+    "calico": (
+        "Calico (Felix, Typha, kube-controllers)",
+        "calico-node-metrics|calico-typha-metrics|calico-kube-controllers-metrics",
+        [
+            ("Active local endpoints", 'sum by (service_instance_id) (felix_active_local_endpoints{service_name=~"$svc"})', "short"),
+            ("Active local policies", 'sum by (service_instance_id) (felix_active_local_policies{service_name=~"$svc"})', "short"),
+            ("Cluster hosts / workload endpoints", 'max(felix_cluster_num_hosts{service_name=~"$svc"}) or max(felix_cluster_num_workload_endpoints{service_name=~"$svc"})', "short"),
+            ("Dataplane apply time p99", 'max by (service_instance_id) (felix_int_dataplane_apply_time_seconds{quantile="0.99", service_name=~"$svc"})', "s"),
+            ("Dataplane failures/s", 'sum by (service_instance_id) (rate(felix_int_dataplane_failures_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("iptables/ipset errors/s", 'sum by (service_instance_id) (rate(felix_iptables_restore_errors_total{service_name=~"$svc"}[5m]) + rate(felix_ipset_errors_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Calc graph updates/s", 'sum by (service_instance_id) (rate(felix_calc_graph_updates_processed_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Typha connections", 'sum by (service_instance_id) (typha_connections_active{service_name=~"$svc"})', "short"),
+            ("Typha updates/s", 'sum by (service_instance_id) (rate(typha_updates_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Typha ping latency p99", 'max by (service_instance_id) (typha_ping_latency{quantile="0.99", service_name=~"$svc"})', "s"),
+        ],
+        False,
+    ),
+    "external-secrets": (
+        "external-secrets",
+        "external-secrets.*",
+        [
+            ("ExternalSecrets ready", 'sum by (name, namespace) (externalsecret_status_condition{type="Ready", status="True", service_name=~"$svc"})', "short"),
+            ("ExternalSecrets not ready", 'sum by (name, namespace) (externalsecret_status_condition{type="Ready", status="False", service_name=~"$svc"})', "short"),
+            ("Sync calls/s", 'sum by (name) (rate(externalsecret_sync_calls_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Sync errors/s", 'sum by (name) (rate(externalsecret_sync_calls_error_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Provider API calls/s", 'sum by (provider, call, status) (rate(externalsecret_provider_api_calls_count_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("ClusterSecretStores ready", 'sum by (name) (clustersecretstore_status_condition{type="Ready", status="True", service_name=~"$svc"})', "short"),
+        ],
+        True,
+    ),
+    "opentelemetry-collector": (
+        "OpenTelemetry collectors (otelcol-ds) and target allocator",
+        "otelcol-k8s|otelcol-ds-targetallocator",
+        [
+            ("Metric points accepted/s", 'sum by (receiver) (rate(otelcol_receiver_accepted_metric_points_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Metric points refused/s", 'sum by (receiver) (rate(otelcol_receiver_refused_metric_points_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Metric points sent/s", 'sum by (exporter) (rate(otelcol_exporter_sent_metric_points_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Metric points send failures/s", 'sum by (exporter) (rate(otelcol_exporter_send_failed_metric_points_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Log records sent/s", 'sum by (exporter) (rate(otelcol_exporter_sent_log_records_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Exporter queue size", 'sum by (exporter) (otelcol_exporter_queue_size{service_name=~"$svc"})', "short"),
+            ("Collector memory RSS by node", 'sum by (k8s_node_name) (otelcol_process_memory_rss_bytes{service_name=~"$svc"})', "bytes"),
+            ("Collector CPU (cores) by node", 'sum by (k8s_node_name) (rate(otelcol_process_cpu_seconds_total{service_name=~"$svc"}[5m]))', "short"),
+            ("Target allocator: targets per collector", 'max by (collector_name) (opentelemetry_allocator_targets_per_collector{service_name=~"$svc"})', "short"),
+            ("Target allocator: unassigned targets", 'sum(opentelemetry_allocator_targets_unassigned{service_name=~"$svc"})', "short"),
+            ("Target allocator: collectors discovered", 'max(opentelemetry_allocator_collectors_discovered{service_name=~"$svc"})', "short"),
+        ],
+        False,
+        False,
+    ),
+    "victoria-metrics": (
+        "VictoriaMetrics",
+        "victoria-metrics",
+        [
+            ("Rows inserted/s by protocol", 'sum by (type) (rate(vm_rows_inserted_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Active time series", 'sum(vm_cache_entries{type="storage/hour_metric_ids", service_name=~"$svc"})', "short"),
+            ("Data size on disk", 'sum by (type) (vm_data_size_bytes{service_name=~"$svc"})', "bytes"),
+            ("Free disk space", 'min(vm_free_disk_space_bytes{service_name=~"$svc"})', "bytes"),
+            ("HTTP requests/s by path", 'sum by (path) (rate(vm_http_requests_total{service_name=~"$svc"}[5m]))', "reqps"),
+            ("HTTP request errors/s", 'sum by (path) (rate(vm_http_request_errors_total{service_name=~"$svc"}[5m]))', "reqps"),
+            ("Slow inserts / ignored rows", 'sum(rate(vm_slow_row_inserts_total{service_name=~"$svc"}[5m]))', "ops"),
         ],
         False,
     ),
@@ -255,8 +319,9 @@ def main():
     for old in OUT.glob("*.json"):
         old.unlink()
     files = []
-    for slug, (title, svc_regex, panels, ctrl) in APPS.items():
-        allp = list(panels) + (CONTROLLER_RUNTIME if ctrl else []) + COMMON
+    for slug, (title, svc_regex, panels, ctrl, *rest) in APPS.items():
+        common = rest[0] if rest else True
+        allp = list(panels) + (CONTROLLER_RUNTIME if ctrl else []) + (COMMON if common else [])
         d = dashboard(f"core-infra-{slug}", title, allp, svc_regex)
         (OUT / f"{slug}.json").write_text(json.dumps(d, indent=2) + "\n")
         files.append(f"{slug}.json")

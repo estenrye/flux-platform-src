@@ -16,4 +16,5 @@ resources:
   - resources/opentelemetry-targetallocator.clusterrolebinding.yaml
   - resources/opentelemetry-targetallocator.role.yaml
   - resources/opentelemetry-targetallocator.rolebinding.yaml
+  - resources/opentelemetry-targetallocator.service-monitor.yaml
   - resources/otelcol-ds.vpa.yaml

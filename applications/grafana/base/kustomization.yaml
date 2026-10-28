@@ -36,6 +36,9 @@ generatorOptions:
     grafana_dashboard: "1"
 
 configMapGenerator:
+  - name: grafana-dashboard-calico
+    files:
+      - dashboards/calico.json
   - name: grafana-dashboard-cert-manager-approver-policy
     files:
       - dashboards/cert-manager-approver-policy.json
@@ -60,6 +63,9 @@ configMapGenerator:
   - name: grafana-dashboard-external-dns
     files:
       - dashboards/external-dns.json
+  - name: grafana-dashboard-external-secrets
+    files:
+      - dashboards/external-secrets.json
   - name: grafana-dashboard-flux-state
     files:
       - dashboards/flux-state.json
@@ -78,6 +84,9 @@ configMapGenerator:
   - name: grafana-dashboard-nodes
     files:
       - dashboards/nodes.json
+  - name: grafana-dashboard-opentelemetry-collector
+    files:
+      - dashboards/opentelemetry-collector.json
   - name: grafana-dashboard-opentelemetry-operator
     files:
       - dashboards/opentelemetry-operator.json
@@ -90,4 +99,7 @@ configMapGenerator:
   - name: grafana-dashboard-vertical-pod-autoscaler
     files:
       - dashboards/vertical-pod-autoscaler.json
+  - name: grafana-dashboard-victoria-metrics
+    files:
+      - dashboards/victoria-metrics.json
 # END generated dashboards

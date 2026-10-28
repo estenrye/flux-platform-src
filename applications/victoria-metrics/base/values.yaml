@@ -15,6 +15,8 @@ server:
     # Keep Prometheus-style metric names (dots -> underscores, unit/type
     # suffixes) so community dashboards written for Prometheus work.
     opentelemetry.usePrometheusNaming: true
+  serviceMonitor:
+    enabled: true
   persistentVolume:
     enabled: true
     size: 20Gi

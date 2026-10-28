@@ -1,0 +1,61 @@
+# Felix (calico-node), Typha and kube-controllers metrics. calico-node and Typha
+# run on the host network and declare no container ports, so a PodMonitor's
+# portNumber matches nothing (the otel target allocator never produced a job
+# for the old PodMonitors). Headless Services give endpoint-based discovery,
+# which does not depend on declared container ports.
+# The Installation is bootstrapped by tofu (pcd-ce-deploy/tofu-pcd-talos-cluster
+# calico.tf), which sets nodeMetricsPort / typhaMetricsPort to 9091 / 9093 --
+# keep them in sync. kube-controllers serves metrics on 9094 by default.
+apiVersion: v1
+kind: Service
+metadata:
+  name: calico-node-metrics
+  namespace: calico-system
+  labels:
+    k8s-app: calico-node-metrics
+  annotations:
+    ignore-check.kube-linter.io/dangling-service: The calico-node DaemonSet is created at runtime by the tigera-operator, so it is not in the static rendered manifests.
+spec:
+  clusterIP: None
+  selector:
+    k8s-app: calico-node
+  ports:
+    - name: metrics
+      port: 9091
+      targetPort: 9091
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: calico-typha-metrics
+  namespace: calico-system
+  labels:
+    k8s-app: calico-typha-metrics
+  annotations:
+    ignore-check.kube-linter.io/dangling-service: The calico-typha Deployment is created at runtime by the tigera-operator, so it is not in the static rendered manifests.
+spec:
+  clusterIP: None
+  selector:
+    k8s-app: calico-typha
+  ports:
+    - name: metrics
+      port: 9093
+      targetPort: 9093
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: calico-kube-controllers-metrics
+  namespace: calico-system
+  labels:
+    k8s-app: calico-kube-controllers-metrics
+  annotations:
+    ignore-check.kube-linter.io/dangling-service: The calico-kube-controllers Deployment is created at runtime by the tigera-operator, so it is not in the static rendered manifests.
+spec:
+  clusterIP: None
+  selector:
+    k8s-app: calico-kube-controllers
+  ports:
+    - name: metrics
+      port: 9094
+      targetPort: 9094

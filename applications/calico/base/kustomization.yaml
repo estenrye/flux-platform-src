@@ -20,7 +20,8 @@ resources:
   - resources/gateway-api.yaml
   - resources/envoy-proxy-config.yaml
   - resources/envoy-proxy.pod-monitor.yaml
-  - resources/node.pod-monitor.yaml
+  - resources/metrics-services.yaml
+  - resources/metrics-service-monitors.yaml
 
 patches:
   # The chart's pre-delete helm hook renders as a plain Job under kustomize;

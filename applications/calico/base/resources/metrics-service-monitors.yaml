@@ -1,0 +1,38 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: calico-node
+  namespace: calico-system
+spec:
+  selector:
+    matchLabels:
+      k8s-app: calico-node-metrics
+  endpoints:
+    - port: metrics
+      interval: 60s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: calico-typha
+  namespace: calico-system
+spec:
+  selector:
+    matchLabels:
+      k8s-app: calico-typha-metrics
+  endpoints:
+    - port: metrics
+      interval: 60s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: calico-kube-controllers
+  namespace: calico-system
+spec:
+  selector:
+    matchLabels:
+      k8s-app: calico-kube-controllers-metrics
+  endpoints:
+    - port: metrics
+      interval: 60s
