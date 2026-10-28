@@ -2,10 +2,6 @@ priorityClassName: platform
 
 replicas: 1
 
-# Plugin downloads need egress 443 to grafana.com (see network-policy.yaml).
-plugins:
-  - netdatacloud-netdata-datasource
-
 # Per-cluster values (root_url, client_id) come from the grafana-site
 # ConfigMap as GF_* environment variables, which override grafana.ini. Each
 # cluster patches that ConfigMap instead of replicating this config.
@@ -51,11 +47,6 @@ datasources:
         jsonData:
           timeInterval: 30s
           httpMethod: POST
-      - name: Netdata
-        uid: netdata
-        type: netdatacloud-netdata-datasource
-        access: proxy
-        url: http://netdata.netdata.svc.cluster.local:19999
 
 # Namespaced Role (not ClusterRole): the sidecar only watches this namespace.
 # The chart's own Role also grants Secrets access, which the ConfigMap-only
