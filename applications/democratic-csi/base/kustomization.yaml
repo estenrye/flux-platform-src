@@ -51,7 +51,7 @@ images:
     digest: sha256:2a58ec528b8b78d73cc901d857595656da15b4a90c2a40fe42bd0c5f7b34180a
   # node.cleanup initContainer: not covered by the driver.image tag override above.
   - name: docker.io/busybox
-    digest: sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+    digest: sha256:a46257e06c82ad85242d0d38077d0a52d9896389ca60a1a59d3463db586e5fa4
 
 patches:
   # ── NFS controller Deployment ──────────────────────────────────────────────
