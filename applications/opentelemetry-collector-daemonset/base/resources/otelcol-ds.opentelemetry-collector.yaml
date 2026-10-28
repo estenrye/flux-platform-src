@@ -16,9 +16,9 @@ spec:
   resources:
     requests:
       cpu: 20m
-      memory: 64Mi
+      memory: 96Mi
     limits:
-      memory: 128Mi
+      memory: 256Mi
   # Control-plane nodes are tainted NoSchedule; tolerate only that taint so the
   # collector also covers them.
   tolerations:
@@ -145,6 +145,127 @@ spec:
                   action: keep
                 - regex: (id|name|image)
                   action: labeldrop
+            # The kubelet's own metrics (same discovery, auth and TLS as the cAdvisor
+            # job above): PVC usage, pod start latency, PLEG, container runtime
+            # errors, evictions and image pulls. Allowlist only; histograms keep
+            # count/sum plus a +Inf bucket so the collector accepts them.
+            - job_name: kubelet
+              scheme: https
+              metrics_path: /metrics
+              scrape_interval: 60s
+              authorization:
+                credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              tls_config:
+                ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              kubernetes_sd_configs:
+                - role: node
+              metric_relabel_configs:
+                - source_labels: [__name__, le]
+                  regex: '(kubelet_volume_stats_(available_bytes|capacity_bytes|used_bytes|inodes_free|inodes)|kubelet_(pod_start_duration|pod_start_sli_duration|pleg_relist_duration|pleg_relist_interval|runtime_operations_duration|image_pull_duration)_seconds_(count|sum)|kubelet_runtime_operations_(total|errors_total)|kubelet_(running_pods|running_containers|evictions|started_pods_errors_total|started_containers_errors_total)|kubelet_certificate_manager_server_ttl_seconds);|kubelet_(pod_start_duration|pod_start_sli_duration|pleg_relist_duration|pleg_relist_interval|runtime_operations_duration|image_pull_duration)_seconds_bucket;\+Inf'
+                  action: keep
+            # Control-plane components, scraped by the collector on the same node. An
+            # unfiltered API server exposes ~94k series, so only the golden signals
+            # (traffic, errors, latency via a few SLI buckets, saturation, etcd client,
+            # KMS) are kept. The serving certificate is verified against the cluster CA
+            # (server name "kubernetes").
+            - job_name: kube-apiserver
+              scheme: https
+              metrics_path: /metrics
+              scrape_interval: 60s
+              authorization:
+                credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              tls_config:
+                ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                server_name: kubernetes
+              kubernetes_sd_configs:
+                - role: node
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_node_labelpresent_node_role_kubernetes_io_control_plane]
+                  regex: "true"
+                  action: keep
+                # The collector is hostNetwork, so the node's loopback reaches
+                # the control-plane component running on the same node.
+                - target_label: __address__
+                  replacement: "127.0.0.1:6443"
+                - source_labels: [__meta_kubernetes_node_name]
+                  target_label: instance
+              metric_relabel_configs:
+                - source_labels: [__name__, le]
+                  regex: '(apiserver_request_total|apiserver_request_sli_duration_seconds_(count|sum)|apiserver_current_inflight_requests|apiserver_flowcontrol_(current_executing_requests|current_inqueue_requests|rejected_requests_total|request_wait_duration_seconds_(count|sum))|apiserver_storage_size_bytes|etcd_request_duration_seconds_(count|sum)|etcd_request_errors_total|apiserver_client_certificate_expiration_seconds_(count|sum)|apiserver_tls_handshake_errors_total|apiserver_admission_webhook_request_total|apiserver_envelope_encryption_(dek_cache_fill_percent|dek_source_cache_size|key_id_hash_last_timestamp_seconds|key_id_hash_total|kms_operations_latency_seconds_(count|sum))|apiserver_storage_envelope_transformation_cache_misses_total|process_(resident_memory_bytes|cpu_seconds_total|open_fds)|go_goroutines);|apiserver_request_sli_duration_seconds_bucket;(0\.1|0\.4|1|5|\+Inf)|(etcd_request_duration_seconds|apiserver_flowcontrol_request_wait_duration_seconds|apiserver_client_certificate_expiration_seconds)_bucket;\+Inf|apiserver_envelope_encryption_kms_operations_latency_seconds_bucket;(0\.0128|0\.1024|0\.8192|\+Inf)'
+                  action: keep
+            # The scheduler and controller-manager bind 127.0.0.1 only and serve a
+            # self-signed certificate, so verification is skipped; the connection never
+            # leaves the node's loopback. Auth is the service account token.
+            - job_name: kube-scheduler
+              scheme: https
+              metrics_path: /metrics
+              scrape_interval: 60s
+              authorization:
+                credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              tls_config:
+                insecure_skip_verify: true
+              kubernetes_sd_configs:
+                - role: node
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_node_labelpresent_node_role_kubernetes_io_control_plane]
+                  regex: "true"
+                  action: keep
+                # The collector is hostNetwork, so the node's loopback reaches
+                # the control-plane component running on the same node.
+                - target_label: __address__
+                  replacement: "127.0.0.1:10259"
+                - source_labels: [__meta_kubernetes_node_name]
+                  target_label: instance
+              metric_relabel_configs:
+                - source_labels: [__name__, le]
+                  regex: '(scheduler_(schedule_attempts_total|pending_pods|unschedulable_pods|preemption_attempts_total|preemption_victims_(count|sum)|queue_incoming_pods_total|scheduling_attempt_duration_seconds_(count|sum)|pod_scheduling_sli_duration_seconds_(count|sum)|pod_scheduling_attempts_(count|sum))|leader_election_master_status|process_(resident_memory_bytes|cpu_seconds_total)|go_goroutines);|scheduler_(scheduling_attempt_duration_seconds|pod_scheduling_sli_duration_seconds|pod_scheduling_attempts|preemption_victims)_bucket;\+Inf'
+                  action: keep
+            - job_name: kube-controller-manager
+              scheme: https
+              metrics_path: /metrics
+              scrape_interval: 60s
+              authorization:
+                credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              tls_config:
+                insecure_skip_verify: true
+              kubernetes_sd_configs:
+                - role: node
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_node_labelpresent_node_role_kubernetes_io_control_plane]
+                  regex: "true"
+                  action: keep
+                # The collector is hostNetwork, so the node's loopback reaches
+                # the control-plane component running on the same node.
+                - target_label: __address__
+                  replacement: "127.0.0.1:10257"
+                - source_labels: [__meta_kubernetes_node_name]
+                  target_label: instance
+              metric_relabel_configs:
+                - source_labels: [__name__, le]
+                  regex: '(workqueue_(depth|adds_total|retries_total|queue_duration_seconds_(count|sum)|work_duration_seconds_(count|sum)|unfinished_work_seconds|longest_running_processor_seconds)|node_collector_(evictions_total|unhealthy_nodes_in_zone|zone_health|zone_size)|leader_election_master_status|garbagecollector_controller_resources_sync_error_total|process_(resident_memory_bytes|cpu_seconds_total)|go_goroutines);|workqueue_(queue|work)_duration_seconds_bucket;\+Inf'
+                  action: keep
+            # Talos etcd metrics (plain HTTP, no auth). If the port is closed the job
+            # reports up=0 and the apiserver's own etcd_request_* series remain.
+            - job_name: etcd
+              scheme: http
+              metrics_path: /metrics
+              scrape_interval: 60s
+              kubernetes_sd_configs:
+                - role: node
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_node_labelpresent_node_role_kubernetes_io_control_plane]
+                  regex: "true"
+                  action: keep
+                # The collector is hostNetwork, so the node's loopback reaches
+                # the control-plane component running on the same node.
+                - target_label: __address__
+                  replacement: "127.0.0.1:2381"
+                - source_labels: [__meta_kubernetes_node_name]
+                  target_label: instance
+              metric_relabel_configs:
+                - source_labels: [__name__, le]
+                  regex: '(etcd_server_(has_leader|is_leader|leader_changes_seen_total|proposals_(failed|pending|committed|applied)_total|slow_apply_total|slow_read_indexes_total|quota_backend_bytes|heartbeat_send_failures_total|health_failures)|etcd_mvcc_db_total_size_(in_bytes|in_use_in_bytes)|etcd_network_(peer_sent_failures_total|active_peers)|etcd_disk_(wal_fsync_duration_seconds|backend_commit_duration_seconds)_(count|sum)|etcd_network_peer_round_trip_time_seconds_(count|sum)|process_(resident_memory_bytes|cpu_seconds_total|open_fds)|go_goroutines);|etcd_disk_(wal_fsync_duration_seconds|backend_commit_duration_seconds)_bucket;(0\.004|0\.008|0\.016|0\.064|0\.256|\+Inf)|etcd_network_peer_round_trip_time_seconds_bucket;\+Inf'
+                  action: keep
     processors:
       # Tag every metric with the node it came from; without this the three
       # collectors' series are indistinguishable and merge into one chart.

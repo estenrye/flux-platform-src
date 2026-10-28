@@ -48,6 +48,7 @@ resources:
 - ../../applications/kubernetes-descheduler/base
 - ../../applications/flux-monitoring/base
 - ../../applications/vpa-monitoring/base
+- ../../applications/control-plane-monitoring/base
 - resources/vpa.recommendations.yaml
 
 patches:
