@@ -16,12 +16,14 @@ kind: ServiceMonitor
 metadata:
   name: calico-typha
   namespace: calico-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-servicemonitor: The calico-typha-metrics Service is created at runtime by the tigera-operator, so it is not in the static rendered manifests.
 spec:
   selector:
     matchLabels:
       k8s-app: calico-typha-metrics
   endpoints:
-    - port: metrics
+    - port: calico-typha-metrics
       interval: 60s
 ---
 apiVersion: monitoring.coreos.com/v1
@@ -29,10 +31,12 @@ kind: ServiceMonitor
 metadata:
   name: calico-kube-controllers
   namespace: calico-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-servicemonitor: The calico-kube-controllers-metrics Service is created at runtime by the tigera-operator, so it is not in the static rendered manifests.
 spec:
   selector:
     matchLabels:
-      k8s-app: calico-kube-controllers-metrics
+      k8s-app: calico-kube-controllers
   endpoints:
-    - port: metrics
+    - port: metrics-port
       interval: 60s
