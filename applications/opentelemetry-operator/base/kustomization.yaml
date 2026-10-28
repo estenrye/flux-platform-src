@@ -19,10 +19,6 @@ patches:
       kind: Deployment
     path: patches/deployment.yaml
   - target:
-      kind: ClusterRole
-      name: opentelemetry-operator-manager
-    path: patches/clusterrole-httproutes.yaml
-  - target:
       kind: ClusterRoleBinding
     path: patches/clusterRoleBinding.yaml
   - target:
