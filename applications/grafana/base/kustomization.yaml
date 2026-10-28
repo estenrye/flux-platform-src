@@ -1,0 +1,105 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: grafana
+
+helmCharts:
+  - name: grafana
+    repo: https://grafana.github.io/helm-charts
+    version: 10.5.15
+    releaseName: grafana
+    namespace: grafana
+    valuesFile: values.yaml
+
+resources:
+  - resources/namespace.yaml
+  - resources/gateway.yaml
+  - resources/site-configmap.yaml
+  - resources/eso.password-generator.admin.yaml
+  - resources/eso.external-secret.admin.yaml
+  - resources/network-policy.yaml
+  - resources/vpa.yaml
+  - resources/role.yaml
+
+patches:
+  - path: patches/deployment.yaml
+
+images:
+  - name: docker.io/grafana/grafana
+    digest: sha256:2175aaa91c96733d86d31cf270d5310b278654b03f5718c59de12a865380a31f
+  - name: quay.io/kiwigrid/k8s-sidecar
+    digest: sha256:a6b3f707f883108376514489a94d6629109a327b2978e1d826cd104c4ca436df
+
+# BEGIN generated dashboards (.bin/generate-grafana-dashboards.py)
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    grafana_dashboard: "1"
+
+configMapGenerator:
+  - name: grafana-dashboard-calico
+    files:
+      - dashboards/calico.json
+  - name: grafana-dashboard-cert-manager-approver-policy
+    files:
+      - dashboards/cert-manager-approver-policy.json
+  - name: grafana-dashboard-cert-manager-spiffe
+    files:
+      - dashboards/cert-manager-spiffe.json
+  - name: grafana-dashboard-cert-manager-trust-manager
+    files:
+      - dashboards/cert-manager-trust-manager.json
+  - name: grafana-dashboard-cert-manager
+    files:
+      - dashboards/cert-manager.json
+  - name: grafana-dashboard-cinder-csi
+    files:
+      - dashboards/cinder-csi.json
+  - name: grafana-dashboard-descheduler
+    files:
+      - dashboards/descheduler.json
+  - name: grafana-dashboard-envoy-gateway-proxy
+    files:
+      - dashboards/envoy-gateway-proxy.json
+  - name: grafana-dashboard-external-dns
+    files:
+      - dashboards/external-dns.json
+  - name: grafana-dashboard-external-secrets
+    files:
+      - dashboards/external-secrets.json
+  - name: grafana-dashboard-flux-state
+    files:
+      - dashboards/flux-state.json
+  - name: grafana-dashboard-flux
+    files:
+      - dashboards/flux.json
+  - name: grafana-dashboard-keda
+    files:
+      - dashboards/keda.json
+  - name: grafana-dashboard-kubelet-serving-cert-approver
+    files:
+      - dashboards/kubelet-serving-cert-approver.json
+  - name: grafana-dashboard-metrics-server
+    files:
+      - dashboards/metrics-server.json
+  - name: grafana-dashboard-nodes
+    files:
+      - dashboards/nodes.json
+  - name: grafana-dashboard-openstack-ccm
+    files:
+      - dashboards/openstack-ccm.json
+  - name: grafana-dashboard-opentelemetry-collector
+    files:
+      - dashboards/opentelemetry-collector.json
+  - name: grafana-dashboard-opentelemetry-operator
+    files:
+      - dashboards/opentelemetry-operator.json
+  - name: grafana-dashboard-reloader
+    files:
+      - dashboards/reloader.json
+  - name: grafana-dashboard-spegel
+    files:
+      - dashboards/spegel.json
+  - name: grafana-dashboard-vertical-pod-autoscaler
+    files:
+      - dashboards/vertical-pod-autoscaler.json
+# END generated dashboards

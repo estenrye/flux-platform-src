@@ -1,0 +1,38 @@
+# The server accepts remote-write/OTLP from the hostNetwork otelcol-ds
+# DaemonSet (traffic arrives from node IPs that no pod selector can match, so
+# the source is an ipBlock) and queries from Grafana.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: victoria-metrics-server
+  namespace: victoria-metrics
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The Grafana pods live in another namespace and are not part of this application's rendered manifests."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics-single
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: fd97:45c2:b3a1:1179::/64
+        - ipBlock:
+            cidr: fd54:616c:6f73::/64
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: grafana
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+      ports:
+        - protocol: TCP
+          port: 8428
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

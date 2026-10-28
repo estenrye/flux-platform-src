@@ -1,0 +1,30 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  # Not "grafana": Calico 3.33's bundled Envoy Gateway deploys the proxy into
+  # the Gateway's own namespace and creates a ServiceAccount named after the
+  # Gateway, which would collide with the chart's ServiceAccount grafana/grafana
+  # (docs/memory/calico-33-gateway-namespace-mode.md).
+  name: grafana-gateway
+  namespace: grafana
+  annotations:
+    # cert-manager's Gateway API shim creates the Certificate for the https
+    # listener's certificateRef.
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  gatewayClassName: external-dedicated
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: grafana.k8s.local
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: grafana-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
+        kinds:
+          - kind: HTTPRoute

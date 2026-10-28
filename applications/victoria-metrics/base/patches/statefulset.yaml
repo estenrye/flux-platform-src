@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: victoria-metrics
+  namespace: victoria-metrics
+  annotations:
+    ignore-check.kube-linter.io/no-node-affinity: No zone or role topology to express node affinity against.
+    ignore-check.kube-linter.io/minimum-three-replicas: 'The single-node server is a stateful singleton: it owns an RWO volume, so it cannot be scaled out.'
+    ignore-check.kube-linter.io/no-rolling-update-strategy: 'The server owns an RWO volume that two pods cannot mount at once; a rolling update would deadlock.'
+    ignore-check.kube-linter.io/restart-policy: StatefulSets always use restartPolicy Always.
+    checkov.io/skip1: CKV_K8S_11=Memory limits are set and the VPA recommends CPU; CPU limits only add throttling.
+    checkov.io/skip2: CKV_K8S_15=Images are pinned by digest, so the pull policy cannot pick up a different image.
+    checkov.io/skip3: CKV_K8S_38=The chart mounts the service account token; the server does not use it but the chart offers no switch to disable it.

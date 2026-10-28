@@ -58,6 +58,12 @@ jobs:
       - name: Lint netdata hostnames
         run: make lint-netdata-hostname
 
+      - name: Test grafana placeholders lint
+        run: make test-lint-grafana-placeholders
+
+      - name: Lint grafana placeholders
+        run: make lint-grafana-placeholders
+
       - name: Test external-dns owner id lint
         run: make test-lint-external-dns-owner-id
 

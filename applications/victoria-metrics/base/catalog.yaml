@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: victoria-metrics
+  description: |-
+    This component provides a single-node VictoriaMetrics time series database, the PromQL store behind Grafana.
+  tags:
+    - monitoring
+    - victoria-metrics
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
