@@ -1,13 +1,14 @@
 # The server accepts remote-write/OTLP from the hostNetwork otelcol-ds
 # DaemonSet (traffic arrives from node IPs that no pod selector can match, so
-# the source is an ipBlock) and queries from Grafana.
+# the source is an ipBlock), from the otelcol-cluster Deployment (a regular
+# pod, so selected by label) and queries from Grafana.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: victoria-metrics-server
   namespace: victoria-metrics
   annotations:
-    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The Grafana pods live in another namespace and are not part of this application's rendered manifests."
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The Grafana and otelcol-cluster pods live in other namespaces (the latter is created at runtime by the opentelemetry-operator) and are not part of this application's rendered manifests."
 spec:
   podSelector:
     matchLabels:
@@ -27,6 +28,12 @@ spec:
           podSelector:
             matchLabels:
               app.kubernetes.io/name: grafana
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: opentelemetry-collector
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: opentelemetry-collector.otelcol-cluster
       ports:
         - protocol: TCP
           port: 8428
