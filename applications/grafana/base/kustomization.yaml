@@ -25,7 +25,7 @@ patches:
 
 images:
   - name: docker.io/grafana/grafana
-    digest: sha256:2175aaa91c96733d86d31cf270d5310b278654b03f5718c59de12a865380a31f
+    digest: sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
   - name: quay.io/kiwigrid/k8s-sidecar
     digest: sha256:a6b3f707f883108376514489a94d6629109a327b2978e1d826cd104c4ca436df
 
