@@ -8,46 +8,9 @@
     name: healthz
     protocol: TCP
 - op: add
-  path: /spec/template/spec/containers/1/args/-
-  # 8081 is the manager's own health-probe port (same pod network namespace),
-  # so kube-rbac-proxy's endpoints must listen elsewhere.
-  value: --proxy-endpoints-port=8082
-- op: add
-  path: /spec/template/spec/containers/1/ports/-
-  value:
-    containerPort: 8082
-    name: proxy-healthz
-    protocol: TCP
-- op: add
-  path: /spec/template/spec/containers/1/livenessProbe
-  value:
-    httpGet:
-      path: /healthz
-      port: 8082
-      # The proxy serves its endpoints over TLS (self-signed).
-      scheme: HTTPS
-    initialDelaySeconds: 15
-    periodSeconds: 20
-- op: add
-  path: /spec/template/spec/containers/1/readinessProbe
-  value:
-    httpGet:
-      path: /healthz
-      port: 8082
-      # The proxy serves its endpoints over TLS (self-signed).
-      scheme: HTTPS
-    initialDelaySeconds: 5
-    periodSeconds: 10
-- op: add
   path: /spec/strategy
   value:
     type: RollingUpdate
     rollingUpdate:
       maxSurge: 1
       maxUnavailable: 1
-- op: add
-  path: /metadata/annotations/checkov.io~1skip1
-  value: "CKV_K8S_38=opentelemetry-operator requires the service account token to manage OpenTelemetryCollector and Instrumentation resources."
-- op: add
-  path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
-  value: "No zone or role topology to express node affinity against."
