@@ -5,7 +5,7 @@ namespace: opentelemetry-operator-system
 helmCharts:
   - name: opentelemetry-operator
     repo: https://open-telemetry.github.io/opentelemetry-helm-charts
-    version: 0.109.0
+    version: 0.127.1
     releaseName: opentelemetry-operator
     namespace: opentelemetry-operator-system
     includeCRDs: true
@@ -18,10 +18,6 @@ patches:
   - target:
       kind: Deployment
     path: patches/deployment.yaml
-  - target:
-      kind: ClusterRole
-      name: opentelemetry-operator-manager
-    path: patches/clusterrole-httproutes.yaml
   - target:
       kind: ClusterRoleBinding
     path: patches/clusterRoleBinding.yaml
@@ -36,7 +32,11 @@ resources:
   - resources/certificate-request-policy-rbac.yaml
 
 images:
+  # newTag and digest together: Renovate then tracks this image by tag (and
+  # refreshes the digest of that tag) instead of following the digest of
+  # `latest`, and kustomize resolves the image by digest. Keep newTag equal to
+  # the chart's appVersion; renovate.json updates the chart and this image in
+  # one PR.
   - name: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator
+    newTag: 0.162.0
     digest: sha256:771d341d89b2c0a31580293c0a9e09598e2c425b6cf342d31b91da16c2b952d9
-  - name: quay.io/brancz/kube-rbac-proxy
-    digest: sha256:147cb28fea35473b2cf8697892d375bbe0aec237c5740b0368719b4c0d71b290

@@ -2,5 +2,17 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "description": "The OpenTelemetry operator image and its Helm chart must move together: the chart's RBAC and flags track the operator version, and the image used to be bumped alone (digest of latest, #40), leaving a v0.162 operator running with chart-0.109 permissions. Renovate groups them into one PR; minimumReleaseAge gives the chart time to catch up with a new image release. The image entry in applications/opentelemetry-operator/base/kustomization.yaml carries newTag so it is tracked by version, not by the digest of latest.",
+      "matchManagers": ["kustomize"],
+      "matchPackageNames": [
+        "opentelemetry-operator",
+        "ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator"
+      ],
+      "groupName": "opentelemetry-operator (chart and image)",
+      "minimumReleaseAge": "3 days"
+    }
   ]
 }
