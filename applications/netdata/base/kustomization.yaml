@@ -5,7 +5,7 @@ namespace: netdata
 helmCharts:
   - name: netdata
     repo: https://netdata.github.io/helmchart/
-    version: 3.7.176
+    version: 3.7.177
     releaseName: netdata
     namespace: netdata
     includeCRDs: true
