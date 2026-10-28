@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Monitors for Kubernetes components that Talos deploys outside this repo.
+# kube-apiserver, kube-scheduler, kube-controller-manager and etcd are scraped
+# by the otelcol-ds collectors on the control-plane nodes (see the scrape jobs
+# in applications/opentelemetry-collector-daemonset); CoreDNS has a Service.
+resources:
+  - resources/coredns.service-monitor.yaml

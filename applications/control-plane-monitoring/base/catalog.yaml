@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: control-plane-monitoring
+  description: |-
+    This component provides monitoring for Kubernetes components that Talos
+    deploys outside this repository (CoreDNS).
+  tags:
+    - monitoring
+    - kubernetes
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

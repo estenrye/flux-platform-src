@@ -1,0 +1,17 @@
+# CoreDNS is deployed by Talos; its kube-dns Service already exposes the
+# metrics port (9153). ~225 series per pod, so no allowlist.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: coredns
+  namespace: kube-system
+  annotations:
+    ignore-check.kube-linter.io/dangling-servicemonitor: The kube-dns Service is deployed by Talos, so it is not in the static rendered manifests.
+spec:
+  selector:
+    matchLabels:
+      k8s-app: kube-dns
+  endpoints:
+    - port: metrics
+      interval: 60s
+      path: /metrics
