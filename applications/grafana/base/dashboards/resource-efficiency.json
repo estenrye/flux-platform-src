@@ -1,0 +1,676 @@
+{
+  "uid": "core-infra-resource-efficiency",
+  "title": "Resource efficiency: allocation vs usage",
+  "description": "Requests, limits, usage, throttling and VPA targets for every container.",
+  "tags": [
+    "core-infra",
+    "generated",
+    "efficiency"
+  ],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "5m",
+  "templating": {
+    "list": [
+      {
+        "name": "ns",
+        "label": "Namespace",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "victoria-metrics"
+        },
+        "query": {
+          "query": "label_values(container_cpu_usage_seconds_total, namespace)",
+          "refId": "ns"
+        },
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "window",
+        "label": "History",
+        "type": "custom",
+        "query": "1h,6h,1d,3d,7d,14d",
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "selected": true,
+          "text": "7d",
+          "value": "7d"
+        },
+        "options": [
+          {
+            "text": "1h",
+            "value": "1h",
+            "selected": false
+          },
+          {
+            "text": "6h",
+            "value": "6h",
+            "selected": false
+          },
+          {
+            "text": "1d",
+            "value": "1d",
+            "selected": false
+          },
+          {
+            "text": "3d",
+            "value": "3d",
+            "selected": false
+          },
+          {
+            "text": "7d",
+            "value": "7d",
+            "selected": true
+          },
+          {
+            "text": "14d",
+            "value": "14d",
+            "selected": false
+          }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Cluster CPU: allocatable vs requested vs used",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "sum(k8s_node_allocatable_cpu)",
+          "legendFormat": "allocatable",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "sum(sum by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(k8s_container_cpu_request, \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))",
+          "legendFormat": "requested",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "sum(rate(container_cpu_usage_seconds_total{container!=\"\"}[5m]))",
+          "legendFormat": "used",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Cluster memory: allocatable vs requested vs used",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "sum(k8s_node_allocatable_memory_bytes)",
+          "legendFormat": "allocatable",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "sum(sum by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(k8s_container_memory_request_bytes, \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))",
+          "legendFormat": "requested",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "sum(container_memory_working_set_bytes{container!=\"\"})",
+          "legendFormat": "used (working set)",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Allocation vs usage per container (busiest replica)",
+      "description": "One row per workload container, comparing the busiest replica's usage over the History window with its request/limit and the VPA target. Low 'used / request' means over-allocated; throttling, OOM kills or restarts mean trimming is NOT safe. Rows with no request/limit appear in the Allocation gaps dashboard.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "victoria-metrics"
+      },
+      "gridPos": {
+        "h": 18,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU request"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU p95 usage"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU used / request"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU limit"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU throttled"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Mem request"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Mem peak"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Mem peak / request"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Mem limit"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "OOM kills"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Restarts"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "VPA CPU target"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "VPA mem target"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU used / request"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.2
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.5
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Mem peak / request"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.2
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.5
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU throttled"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.05
+                    },
+                    {
+                      "color": "red",
+                      "value": 0.25
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "max by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(k8s_container_cpu_request{k8s_namespace_name=~\"$ns\"}, \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\"))",
+          "format": "table",
+          "instant": true,
+          "refId": "A",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "quantile_over_time(0.95, (max by (namespace, workload, container) (label_replace(label_replace(rate(container_cpu_usage_seconds_total{namespace=~\"$ns\"}[5m]), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))[$window:5m])",
+          "format": "table",
+          "instant": true,
+          "refId": "B",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "(quantile_over_time(0.95, (max by (namespace, workload, container) (label_replace(label_replace(rate(container_cpu_usage_seconds_total{namespace=~\"$ns\"}[5m]), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))[$window:5m])) / on(namespace, workload, container) (max by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(k8s_container_cpu_request{k8s_namespace_name=~\"$ns\"}, \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))",
+          "format": "table",
+          "instant": true,
+          "refId": "C",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "max by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(k8s_container_cpu_limit{k8s_namespace_name=~\"$ns\"}, \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\"))",
+          "format": "table",
+          "instant": true,
+          "refId": "D",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "sum by (namespace, workload, container) (label_replace(label_replace(increase(container_cpu_cfs_throttled_periods_total{namespace=~\"$ns\"}[$window]), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")) / sum by (namespace, workload, container) (label_replace(label_replace(increase(container_cpu_cfs_periods_total{namespace=~\"$ns\"}[$window]), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\"))",
+          "format": "table",
+          "instant": true,
+          "refId": "E",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "max by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(k8s_container_memory_request_bytes{k8s_namespace_name=~\"$ns\"}, \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\"))",
+          "format": "table",
+          "instant": true,
+          "refId": "F",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "max_over_time((max by (namespace, workload, container) (label_replace(label_replace(container_memory_working_set_bytes{namespace=~\"$ns\"}, \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))[$window:5m])",
+          "format": "table",
+          "instant": true,
+          "refId": "G",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "(max_over_time((max by (namespace, workload, container) (label_replace(label_replace(container_memory_working_set_bytes{namespace=~\"$ns\"}, \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))[$window:5m])) / on(namespace, workload, container) (max by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(k8s_container_memory_request_bytes{k8s_namespace_name=~\"$ns\"}, \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\")))",
+          "format": "table",
+          "instant": true,
+          "refId": "H",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "max by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(k8s_container_memory_limit_bytes{k8s_namespace_name=~\"$ns\"}, \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\"))",
+          "format": "table",
+          "instant": true,
+          "refId": "I",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "sum by (namespace, workload, container) (label_replace(label_replace(increase(container_oom_events_total{namespace=~\"$ns\"}[$window]), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\"))",
+          "format": "table",
+          "instant": true,
+          "refId": "J",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "sum by (namespace, workload, container) (label_replace(label_replace(label_replace(label_replace(label_replace(increase(k8s_container_restarts{k8s_namespace_name=~\"$ns\"}[$window]), \"namespace\", \"$1\", \"k8s_namespace_name\", \"(.+)\"), \"pod\", \"$1\", \"k8s_pod_name\", \"(.+)\"), \"container\", \"$1\", \"k8s_container_name\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"(.+)\"), \"workload\", \"$1\", \"pod\", \"^(.+?)(-[a-z0-9]{8,10}-[a-z0-9]{5}|-[a-z0-9]{5}|-[0-9]+)$\"))",
+          "format": "table",
+          "instant": true,
+          "refId": "K",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "max by (namespace, workload, container) (label_replace(label_replace(kube_customresource_vpa_containerrecommendations_target_cpu_cores{exported_namespace=~\"$ns\"}, \"namespace\", \"$1\", \"exported_namespace\", \"(.+)\"), \"workload\", \"$1\", \"target_name\", \"(.+)\"))",
+          "format": "table",
+          "instant": true,
+          "refId": "L",
+          "legendFormat": ""
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "victoria-metrics"
+          },
+          "expr": "max by (namespace, workload, container) (label_replace(label_replace(kube_customresource_vpa_containerrecommendations_target_memory_bytes{exported_namespace=~\"$ns\"}, \"namespace\", \"$1\", \"exported_namespace\", \"(.+)\"), \"workload\", \"$1\", \"target_name\", \"(.+)\"))",
+          "format": "table",
+          "instant": true,
+          "refId": "M",
+          "legendFormat": ""
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "namespace": "Namespace",
+              "workload": "Workload",
+              "container": "Container",
+              "Value #A": "CPU request",
+              "Value #B": "CPU p95 usage",
+              "Value #C": "CPU used / request",
+              "Value #D": "CPU limit",
+              "Value #E": "CPU throttled",
+              "Value #F": "Mem request",
+              "Value #G": "Mem peak",
+              "Value #H": "Mem peak / request",
+              "Value #I": "Mem limit",
+              "Value #J": "OOM kills",
+              "Value #K": "Restarts",
+              "Value #L": "VPA CPU target",
+              "Value #M": "VPA mem target"
+            },
+            "indexByName": {
+              "Namespace": 0,
+              "Workload": 1,
+              "Container": 2
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

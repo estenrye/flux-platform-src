@@ -36,6 +36,9 @@ generatorOptions:
     grafana_dashboard: "1"
 
 configMapGenerator:
+  - name: grafana-dashboard-allocation-gaps
+    files:
+      - dashboards/allocation-gaps.json
   - name: grafana-dashboard-calico
     files:
       - dashboards/calico.json
@@ -93,9 +96,15 @@ configMapGenerator:
   - name: grafana-dashboard-reloader
     files:
       - dashboards/reloader.json
+  - name: grafana-dashboard-resource-efficiency
+    files:
+      - dashboards/resource-efficiency.json
   - name: grafana-dashboard-spegel
     files:
       - dashboards/spegel.json
+  - name: grafana-dashboard-trim-safety
+    files:
+      - dashboards/trim-safety.json
   - name: grafana-dashboard-vertical-pod-autoscaler
     files:
       - dashboards/vertical-pod-autoscaler.json
