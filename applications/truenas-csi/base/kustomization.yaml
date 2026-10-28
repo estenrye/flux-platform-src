@@ -58,7 +58,7 @@ images:
   # Upstream manifest ships :latest for the driver; pinned to the v1.1.1
   # release digest. Sidecar digests match the tags in the v1.1.1 manifest.
   - name: ghcr.io/truenas/truenas-csi
-    digest: sha256:5696fe979b1c83fb03363bdd47fa21e19fe745daa6171082a9c476a1f26d8420
+    digest: sha256:f388c67bee73b935fece1f290d199e17b0c3249da79e07a17c87c940f04952d5
   - name: registry.k8s.io/sig-storage/csi-provisioner
     digest: sha256:d992c36d4ddd6dfa37c81b487e5a673920e1360e2977eb779051df8da1c5787d
   - name: registry.k8s.io/sig-storage/csi-attacher
