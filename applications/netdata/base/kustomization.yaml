@@ -33,6 +33,6 @@ images:
   # ships v2.12.1, so the digest is pinned here. Drop this override and bump
   # the chart once a release with appVersion >= v2.12.2 is published.
   - name: netdata/netdata
-    digest: sha256:3d00de3756e1e9150c6121080934168ab5f2ceffce6d494573316c09c18adf83
+    digest: sha256:99811c857c182e4ff75c5f58884cfc5a3ef7b125b890b1ba15781e465a10f23c
   - name: alpine
     digest: sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
