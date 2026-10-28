@@ -1,0 +1,14 @@
+# Recommendations only; copy them into values.yaml by hand. The server is a
+# stateful singleton, so an eviction drops ingest until it restarts.
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: victoria-metrics
+  namespace: victoria-metrics
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: victoria-metrics
+  updatePolicy:
+    updateMode: "Off"

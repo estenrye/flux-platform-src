@@ -1,0 +1,12 @@
+# Per-cluster Grafana settings, injected as environment variables (they
+# override grafana.ini). The values below are placeholders: every cluster
+# including grafana must patch both (see clusters/core-infra/patches/grafana.*)
+# and .bin/lint-grafana-placeholders.sh fails the build if one is left.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-site
+  namespace: grafana
+data:
+  GF_SERVER_ROOT_URL: https://grafana.k8s.local
+  GF_AUTH_GENERIC_OAUTH_CLIENT_ID: JUMPCLOUD_OIDC_PKCE_CLIENT_ID

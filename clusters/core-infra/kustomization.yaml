@@ -37,6 +37,9 @@ resources:
 - resources/eso.external-secret.cloudflare-api-token.yaml
 - resources/eso.external-secret.cloudflare-dns.yaml
 - ../../applications/netdata/base
+- ../../applications/victoria-metrics/base
+- ../../applications/grafana/base
+- resources/grafana.client-traffic-policy.yaml
 - ../../applications/opentelemetry-collector-daemonset/base
 - ../../applications/openstack-cloud-controller-manager-otel/base
 - ../../applications/reloader/base
@@ -56,6 +59,21 @@ patches:
     kind: HTTPRoute
     name: netdata
     namespace: netdata
+- path: patches/grafana.gateway.hostname.yaml
+  target:
+    kind: Gateway
+    name: grafana-gateway
+    namespace: grafana
+- path: patches/grafana.httproute.hostname.yaml
+  target:
+    kind: HTTPRoute
+    name: grafana
+    namespace: grafana
+- path: patches/grafana.site.configmap.yaml
+  target:
+    kind: ConfigMap
+    name: grafana-site
+    namespace: grafana
 - path: patches/external-dns.txt-owner-id.yaml
   target:
     kind: Deployment

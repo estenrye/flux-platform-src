@@ -1,0 +1,13 @@
+# Recommendations only; copy them into values.yaml by hand.
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: grafana
+  namespace: grafana
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: grafana
+  updatePolicy:
+    updateMode: "Off"

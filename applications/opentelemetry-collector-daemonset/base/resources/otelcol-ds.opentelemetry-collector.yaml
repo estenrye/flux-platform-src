@@ -173,12 +173,18 @@ spec:
         endpoint: "netdata-otel.netdata.svc.cluster.local:4317"
         tls:
           insecure: true
+      # PromQL store behind Grafana. OTLP/HTTP appends /v1/metrics, giving
+      # VictoriaMetrics' /opentelemetry/v1/metrics ingest path.
+      otlphttp/victoria-metrics:
+        endpoint: "http://victoria-metrics.victoria-metrics.svc.cluster.local:8428/opentelemetry"
+        tls:
+          insecure: true
     service:
       pipelines:
         metrics:
           receivers: [hostmetrics, prometheus, otlp]
           processors: [resource/node]
-          exporters: [otlp_grpc/netdata]
+          exporters: [otlp_grpc/netdata, otlphttp/victoria-metrics]
         logs:
           receivers: [filelog/pods]
           processors: [k8sattributes, resource/node, transform/service]

@@ -53,6 +53,15 @@ lint-netdata-hostname: render-deps
 test-lint-netdata-hostname: render-deps
 	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-netdata-hostname.sh
 
+# Grafana's base ships placeholders for the hostname (Gateway, HTTPRoute,
+# GF_SERVER_ROOT_URL) and the JumpCloud client id; every cluster including
+# grafana must patch them.
+lint-grafana-placeholders: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/lint-grafana-placeholders.sh $(dir $(wildcard clusters/*/kustomization.yaml))
+
+test-lint-grafana-placeholders: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-grafana-placeholders.sh
+
 # external-dns on the TXT registry without --txt-owner-id uses the owner
 # "default", so clusters sharing a DNS zone delete each other's records.
 lint-external-dns-owner-id: render-deps
@@ -61,7 +70,7 @@ lint-external-dns-owner-id: render-deps
 test-lint-external-dns-owner-id: render-deps
 	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-external-dns-owner-id.sh
 
-lint: lint-deps render lint-checkov lint-kube-linter lint-spiffe-trust-domain lint-netdata-hostname lint-external-dns-owner-id
+lint: lint-deps render lint-checkov lint-kube-linter lint-spiffe-trust-domain lint-netdata-hostname lint-grafana-placeholders lint-external-dns-owner-id
 
 flux-reconcile-source:
 	flux reconcile source git flux-platform-rendered -n flux-system

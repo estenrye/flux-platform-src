@@ -1,0 +1,22 @@
+# grafana-gateway uses an external Gateway class, so inbound W3C trace context
+# from the internet must not reach Envoy's tracer: an external client could
+# otherwise force the trace ID and sampling decision. This has to be the
+# early-header field; an HTTPRoute filter runs after Envoy has already adopted
+# the incoming context
+# (docs/memory/external-gateway-header-sanitization-deferred.md).
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: grafana-gateway-sanitize-trace-headers
+  namespace: grafana
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: grafana-gateway
+  headers:
+    earlyRequestHeaders:
+      remove:
+        - traceparent
+        - tracestate
+        - baggage

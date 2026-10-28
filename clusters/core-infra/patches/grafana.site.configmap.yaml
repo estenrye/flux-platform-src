@@ -1,0 +1,6 @@
+- op: replace
+  path: /data/GF_SERVER_ROOT_URL
+  value: https://core-infra.grafana.rye.ninja
+- op: replace
+  path: /data/GF_AUTH_GENERIC_OAUTH_CLIENT_ID
+  value: a478b0ef-6f4b-4db8-b296-f62633031e6e

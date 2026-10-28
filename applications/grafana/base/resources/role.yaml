@@ -1,0 +1,11 @@
+# The dashboard sidecar lists and watches ConfigMaps labelled grafana_dashboard
+# in this namespace (sidecar.dashboards.resource: configmap).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: grafana-sidecar
+  namespace: grafana
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "watch", "list"]

@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: grafana
+  annotations:
+    ignore-check.kube-linter.io/no-node-affinity: No zone or role topology to express node affinity against.
+    ignore-check.kube-linter.io/minimum-three-replicas: Dashboards are provisioned from ConfigMaps and state is in emptyDir; a single replica restarts quickly and nothing else depends on it.
+    ignore-check.kube-linter.io/no-read-only-root-fs: Grafana writes plugins, its database and caches under /var/lib/grafana and /tmp; the chart does not offer a read-only root filesystem.
+    ignore-check.kube-linter.io/env-value-from: The admin credentials come from the grafana-admin Secret synced by ESO; the chart and the dashboard sidecar read them via secretKeyRef.
+    ignore-check.kube-linter.io/read-secret-from-env-var: The chart passes the admin user and password to Grafana and the dashboard sidecar as environment variables sourced from the grafana-admin Secret.
+    ignore-check.kube-linter.io/no-liveness-probe: The dashboard sidecar container exposes no health endpoint; the grafana container has a liveness probe.
+    ignore-check.kube-linter.io/no-readiness-probe: The dashboard sidecar container exposes no health endpoint; the grafana container has a readiness probe.
+    ignore-check.kube-linter.io/restart-policy: Deployments always use restartPolicy Always.
+    checkov.io/skip1: CKV_K8S_8=The dashboard sidecar container exposes no health endpoint; the grafana container has a liveness probe.
+    checkov.io/skip2: CKV_K8S_9=The dashboard sidecar container exposes no health endpoint; the grafana container has a readiness probe.
+    checkov.io/skip3: CKV_K8S_11=Memory limits are set and the VPA recommends CPU; CPU limits only add throttling.
+    checkov.io/skip4: CKV_K8S_15=Images are pinned by digest, so the pull policy cannot pick up a different image.
+    checkov.io/skip5: CKV_K8S_22=Grafana writes plugins, its database and caches inside the container; the chart does not offer a read-only root filesystem.
+    checkov.io/skip6: CKV_K8S_35=The chart passes the admin credentials to Grafana and the dashboard sidecar as environment variables sourced from the grafana-admin Secret synced by ESO.
+    checkov.io/skip7: CKV_K8S_38=The dashboard sidecar calls the Kubernetes API with the service account token.
+    checkov.io/skip8: CKV_K8S_40=The grafana image runs as UID 472, set by the chart's securityContext.
