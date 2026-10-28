@@ -25,7 +25,7 @@ spec:
         - protocol: TCP
           port: 3000
   egress:
-    # JumpCloud (OIDC) and grafana.com (plugin download); apiserver for the
+    # JumpCloud (OIDC); apiserver for the
     # dashboard sidecar -- Calico evaluates egress post-DNAT
     # (docs/memory/calico-networkpolicy-dnat.md); Talos serves 6443.
     - ports:
@@ -44,14 +44,3 @@ spec:
       ports:
         - protocol: TCP
           port: 8428
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: netdata
-          podSelector:
-            matchLabels:
-              app: netdata
-              role: parent
-      ports:
-        - protocol: TCP
-          port: 19999
