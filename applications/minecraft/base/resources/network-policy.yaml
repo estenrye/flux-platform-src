@@ -6,8 +6,12 @@ metadata:
     ignore-check.kube-linter.io/dangling-networkpolicy: "The server pods come from the per-instance Helm chart in each overlay; the standalone base render has none to select."
     ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The Gateway's Envoy proxy pods are created at runtime by the Envoy Gateway controller; they are not in the static rendered manifests."
 spec:
-  # One instance per namespace, so select every pod (server + backup sidecar).
-  podSelector: {}
+  # Server pod only (server + backup sidecar). Not podSelector: {} -- that would
+  # also select the Gateways' Envoy proxy pods in this namespace and cut off
+  # their xDS connection to envoy-gateway-system.
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: minecraft
   policyTypes:
     - Ingress
     - Egress
