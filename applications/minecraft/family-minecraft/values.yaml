@@ -11,4 +11,4 @@ minecraftServer:
   type: "PAPER"
   whitelist: esten_rye,flower_ada_bread,DracoIam,ryeMCguest01
   ops: esten_rye,flower_ada_bread,DracoIam,ryeMCguest01
-  downloadWorldUrl: https://s3.us-east-1.wasabisys.com/minecraft-backups/family-minecraft/world-20241110-065511.tgz
+  downloadWorldUrl: https://s3.us-east-1.wasabisys.com/minecraft-backups/family-minecraft/world-20261029-032512.tar.gz
