@@ -69,7 +69,7 @@ initContainersImage:
   repository: alpine
   # -- Init containers' image tag
   # @section -- General settings
-  tag: "3.22"
+  tag: "3.24"
   # -- Init containers' image pull policy
   # @section -- General settings
   pullPolicy: Always

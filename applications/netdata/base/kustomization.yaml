@@ -28,11 +28,19 @@ patches:
   - path: patches/clusterrolebinding.yaml
 
 images:
-  # v2.12.2 fixes the remote code execution flaw in v2.12.1
-  # (https://status.netdata.cloud/incidents/d17pqkt1s8rr). The chart still
-  # ships v2.12.1, so the digest is pinned here. Drop this override and bump
-  # the chart once a release with appVersion >= v2.12.2 is published.
+  # Digest-pinned for reproducibility (ADR-13). v2.12.2 fixes the remote code
+  # execution flaw in v2.12.1 (https://status.netdata.cloud/incidents/d17pqkt1s8rr)
+  # and is what chart 3.7.177 (appVersion v2.12.2) ships, so this is no longer an
+  # override of an older chart default.
+  #
+  # Do not pin the digest of `latest`: on Docker Hub `latest` and `edge` are the
+  # nightly build. Renovate did that on 2026-10-28 (#224) and the whole fleet ran
+  # v2.12.0-307-nightly until this was restored.
   - name: netdata/netdata
-    digest: sha256:99811c857c182e4ff75c5f58884cfc5a3ef7b125b890b1ba15781e465a10f23c
+    newTag: v2.12.2
+    digest: sha256:3d00de3756e1e9150c6121080934168ab5f2ceffce6d494573316c09c18adf83
+  # Init container. alpine 3.24, the build that was already running; the chart
+  # default is 3.22 (values.yaml says 3.24 to match).
   - name: alpine
+    newTag: "3.24"
     digest: sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
