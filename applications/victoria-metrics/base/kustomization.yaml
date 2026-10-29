@@ -23,4 +23,5 @@ patches:
 
 images:
   - name: victoriametrics/victoria-metrics
+    newTag: v1.155.0
     digest: sha256:f60dc268b54ecf87f6e09d740c2b732838aa9193090cc741417c9f6386a130df
