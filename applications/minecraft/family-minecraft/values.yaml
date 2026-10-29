@@ -1,10 +1,17 @@
+# CPU requests are sized to what core-infra's workers have free (~0.8-1.0 CPU
+# each); the limits below still let the server burst.
 resources:
   requests:
     memory: 1024Mi
-    cpu: 2000m
+    cpu: 750m
   limits:
     memory: 2048Mi
     cpu: 4000m
+
+mcbackup:
+  resources:
+    requests:
+      cpu: 100m
 
 minecraftServer:
   version: 1.21.3
