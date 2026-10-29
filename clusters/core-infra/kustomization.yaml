@@ -50,9 +50,9 @@ resources:
 # four it deployed). Other overlays under applications/minecraft/ are
 # committed but not wired: arrendelle-winter-dev, bakery, mermaid-cove,
 # pokehaan-craft.
-- ../../applications/minecraft/arrendelle-winter
-- ../../applications/minecraft/mermaid-cove-dev
-- ../../applications/minecraft/baked-goods
+# - ../../applications/minecraft/arrendelle-winter
+# - ../../applications/minecraft/mermaid-cove-dev
+# - ../../applications/minecraft/baked-goods
 - ../../applications/minecraft/family-minecraft
 - ../../applications/flux-monitoring/base
 - ../../applications/vpa-monitoring/base
