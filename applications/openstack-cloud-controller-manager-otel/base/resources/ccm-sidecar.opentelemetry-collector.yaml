@@ -53,3 +53,17 @@ spec:
         metrics:
           receivers: [prometheus]
           exporters: [otlp_grpc/node]
+      # The sidecar shares the CCM pod's host network, so the operator declares the
+      # collector's self-metrics port (8888 unless configured) as a hostPort. The
+      # otelcol-ds DaemonSet collector declares 8888 too, and with both on a
+      # control-plane node the scheduler leaves whichever pod is created second
+      # Pending ("didn't have free ports"). Moving this one to 8889 lets the two
+      # share a node. The operator reads the port from a pull reader.
+      telemetry:
+        metrics:
+          readers:
+            - pull:
+                exporter:
+                  prometheus:
+                    host: 127.0.0.1
+                    port: 8889
