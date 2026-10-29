@@ -44,4 +44,5 @@ patches:
 
 images:
   - name: xpkg.crossplane.io/crossplane/crossplane
+    newTag: v2.2.0
     digest: sha256:bd54cb812893ee28b8c4d8a486c89c06c9b1df11dc6ffa1b405e53a996fed128

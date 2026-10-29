@@ -56,4 +56,5 @@ patches:
 
 images:
   - name: quay.io/tigera/operator
+    newTag: v1.42.3
     digest: sha256:4f32a054d5da52731f5f633816ac29cd98ffe97f69903cc04ec5ac60c86e6a02

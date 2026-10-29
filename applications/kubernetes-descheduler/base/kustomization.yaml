@@ -23,4 +23,5 @@ patches:
 
 images:
   - name: registry.k8s.io/descheduler/descheduler
+    newTag: v0.37.0
     digest: sha256:88deef34ff5c85cb69676d7073dd641bd5c35b156bc1ef4a35ca8fbf9644da98
