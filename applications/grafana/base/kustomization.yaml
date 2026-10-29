@@ -65,12 +65,18 @@ configMapGenerator:
   - name: grafana-dashboard-cinder-csi
     files:
       - dashboards/cinder-csi.json
+  - name: grafana-dashboard-coredns
+    files:
+      - dashboards/coredns.json
   - name: grafana-dashboard-descheduler
     files:
       - dashboards/descheduler.json
   - name: grafana-dashboard-envoy-gateway-proxy
     files:
       - dashboards/envoy-gateway-proxy.json
+  - name: grafana-dashboard-etcd
+    files:
+      - dashboards/etcd.json
   - name: grafana-dashboard-external-dns
     files:
       - dashboards/external-dns.json
@@ -86,9 +92,21 @@ configMapGenerator:
   - name: grafana-dashboard-keda
     files:
       - dashboards/keda.json
+  - name: grafana-dashboard-kube-apiserver
+    files:
+      - dashboards/kube-apiserver.json
+  - name: grafana-dashboard-kube-controller-manager
+    files:
+      - dashboards/kube-controller-manager.json
+  - name: grafana-dashboard-kube-scheduler
+    files:
+      - dashboards/kube-scheduler.json
   - name: grafana-dashboard-kubelet-serving-cert-approver
     files:
       - dashboards/kubelet-serving-cert-approver.json
+  - name: grafana-dashboard-kubelet
+    files:
+      - dashboards/kubelet.json
   - name: grafana-dashboard-metrics-server
     files:
       - dashboards/metrics-server.json

@@ -32,6 +32,8 @@ COMMON = [
     ("Open file descriptors", 'sum by (service_name, service_instance_id) (process_open_fds{service_name=~"$svc"})', "short"),
 ]
 
+COMMON_NO_FDS = [c for c in COMMON if "process_open_fds" not in c[1]]
+
 CONTROLLER_RUNTIME = [
     ("Reconciles/s by result", 'sum by (controller, result) (rate(controller_runtime_reconcile_total{service_name=~"$svc"}[5m]))', "ops"),
     ("Reconcile errors/s", 'sum by (controller) (rate(controller_runtime_reconcile_errors_total{service_name=~"$svc"}[5m]))', "ops"),
@@ -192,6 +194,131 @@ APPS = {
             ("HTTP request errors/s", 'sum by (path) (rate(vm_http_request_errors_total{service_name=~"$svc"}[5m]))', "reqps"),
             ("Slow inserts / ignored rows", 'sum(rate(vm_slow_row_inserts_total{service_name=~"$svc"}[5m]))', "ops"),
         ],
+        False,
+    ),
+    # ── Kubernetes control plane, CoreDNS and kubelets (scraped by otelcol-ds) ──
+    "kube-apiserver": (
+        "Kubernetes API server",
+        "kube-apiserver",
+        [
+            ("Requests/s by verb", 'sum by (verb) (rate(apiserver_request_total{service_name=~"$svc"}[5m]))', "reqps"),
+            ("Server errors (5xx) per second by code", 'sum by (code) (rate(apiserver_request_total{service_name=~"$svc", code=~"5.."}[5m]))', "reqps"),
+            ("5xx share of requests", 'sum(rate(apiserver_request_total{service_name=~"$svc", code=~"5.."}[5m])) / sum(rate(apiserver_request_total{service_name=~"$svc"}[5m]))', "percentunit"),
+            ("Client errors (4xx excl. 404/409) per second", 'sum by (code) (rate(apiserver_request_total{service_name=~"$svc", code=~"4..", code!~"404|409"}[5m]))', "reqps"),
+            # The collector keeps only the 0.1/0.4/1/5 SLI buckets (and drops ones identical to the previous),
+            # so quantiles are approximate; "within 400ms" is exact.
+            ("Request latency p99, excl. WATCH/CONNECT (approximate)", 'histogram_quantile(0.99, sum by (le) (rate(apiserver_request_sli_duration_seconds_bucket{service_name=~"$svc", verb!~"WATCH|CONNECT"}[5m])))', "s"),
+            ("Share of requests served within 400ms", 'sum(rate(apiserver_request_sli_duration_seconds_bucket{service_name=~"$svc", verb!~"WATCH|CONNECT", le="0.4"}[5m])) / sum(rate(apiserver_request_sli_duration_seconds_count{service_name=~"$svc", verb!~"WATCH|CONNECT"}[5m]))', "percentunit"),
+            ("Average latency by verb (excl. WATCH/CONNECT)", 'sum by (verb) (rate(apiserver_request_sli_duration_seconds_sum{service_name=~"$svc", verb!~"WATCH|CONNECT"}[5m])) / sum by (verb) (rate(apiserver_request_sli_duration_seconds_count{service_name=~"$svc", verb!~"WATCH|CONNECT"}[5m]))', "s"),
+            ("In-flight requests", 'sum by (request_kind, k8s_node_name) (apiserver_current_inflight_requests{service_name=~"$svc"})', "short"),
+            ("Flow control: executing requests by priority level", 'sum by (priority_level) (apiserver_flowcontrol_current_executing_requests{service_name=~"$svc"})', "short"),
+            ("Flow control: queued requests by priority level", 'sum by (priority_level) (apiserver_flowcontrol_current_inqueue_requests{service_name=~"$svc"})', "short"),
+            ("Flow control: average queue wait", 'sum by (priority_level) (rate(apiserver_flowcontrol_request_wait_duration_seconds_sum{service_name=~"$svc"}[5m])) / sum by (priority_level) (rate(apiserver_flowcontrol_request_wait_duration_seconds_count{service_name=~"$svc"}[5m]))', "s"),
+            ("etcd requests/s by operation (API server client)", 'sum by (operation) (rate(etcd_request_duration_seconds_count{service_name=~"$svc"}[5m]))', "ops"),
+            ("etcd request average latency by operation", 'sum by (operation) (rate(etcd_request_duration_seconds_sum{service_name=~"$svc"}[5m])) / sum by (operation) (rate(etcd_request_duration_seconds_count{service_name=~"$svc"}[5m]))', "s"),
+            ("etcd request errors/s", 'sum by (operation) (rate(etcd_request_errors_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Storage size (etcd database as seen by the API server)", 'max(apiserver_storage_size_bytes{service_name=~"$svc"})', "bytes"),
+            ("Admission webhook requests/s by name and result", 'sum by (name, rejected) (rate(apiserver_admission_webhook_request_total{service_name=~"$svc"}[5m]))', "reqps"),
+            ("KMS plugin operations/s (Barbican)", 'sum by (method_name, grpc_status_code) (rate(apiserver_envelope_encryption_kms_operations_latency_seconds_count{service_name=~"$svc"}[5m]))', "ops"),
+            ("KMS plugin average latency", 'sum by (method_name) (rate(apiserver_envelope_encryption_kms_operations_latency_seconds_sum{service_name=~"$svc"}[5m])) / sum by (method_name) (rate(apiserver_envelope_encryption_kms_operations_latency_seconds_count{service_name=~"$svc"}[5m]))', "s"),
+            ("Secret decryption key cache fill", 'max by (k8s_node_name) (apiserver_envelope_encryption_dek_cache_fill_percent{service_name=~"$svc"})', "percent"),
+            ("TLS handshake errors/s", 'sum by (k8s_node_name) (rate(apiserver_tls_handshake_errors_total{service_name=~"$svc"}[5m]))', "ops"),
+        ],
+        False,
+    ),
+    "etcd": (
+        "etcd",
+        "etcd",
+        [
+            ("Members with a leader (want all)", 'min(etcd_server_has_leader{service_name=~"$svc"})', "short"),
+            ("Leader (1 = this member leads)", 'etcd_server_is_leader{service_name=~"$svc"}', "short"),
+            ("Leader changes in the last hour", 'sum(increase(etcd_server_leader_changes_seen_total{service_name=~"$svc"}[1h]))', "short"),
+            ("Database size vs in use", 'etcd_mvcc_db_total_size_in_bytes{service_name=~"$svc"}', "bytes"),
+            ("Database size as share of the backend quota", 'etcd_mvcc_db_total_size_in_bytes{service_name=~"$svc"} / etcd_server_quota_backend_bytes{service_name=~"$svc"}', "percentunit"),
+            ("Database bytes in use", 'etcd_mvcc_db_total_size_in_use_in_bytes{service_name=~"$svc"}', "bytes"),
+            ("WAL fsync p99 (disk latency; want < 10ms; approximate, bucketed)", 'histogram_quantile(0.99, sum by (le) (rate(etcd_disk_wal_fsync_duration_seconds_bucket{service_name=~"$svc"}[5m])))', "s"),
+            ("Backend commit p99 (want < 25ms; approximate, bucketed)", 'histogram_quantile(0.99, sum by (le) (rate(etcd_disk_backend_commit_duration_seconds_bucket{service_name=~"$svc"}[5m])))', "s"),
+            ("Proposals committed/s", 'sum by (k8s_node_name) (rate(etcd_server_proposals_committed_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Proposals failed/s (want 0)", 'sum by (k8s_node_name) (rate(etcd_server_proposals_failed_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Slow applies and slow read indexes per second", 'sum(rate(etcd_server_slow_apply_total{service_name=~"$svc"}[5m])) + sum(rate(etcd_server_slow_read_indexes_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Peer round-trip time (average)", 'sum by (k8s_node_name) (rate(etcd_network_peer_round_trip_time_seconds_sum{service_name=~"$svc"}[5m])) / sum by (k8s_node_name) (rate(etcd_network_peer_round_trip_time_seconds_count{service_name=~"$svc"}[5m]))', "s"),
+            ("Active peers", 'etcd_network_active_peers{service_name=~"$svc"}', "short"),
+            ("Heartbeat send failures and health failures (increase over 1h)", 'sum(increase(etcd_server_heartbeat_send_failures_total{service_name=~"$svc"}[1h])) + sum(increase(etcd_server_health_failures_total{service_name=~"$svc"}[1h]))', "short"),
+        ],
+        False,
+    ),
+    "kube-scheduler": (
+        "Kubernetes scheduler",
+        "kube-scheduler",
+        [
+            ("Pending pods by queue", 'sum by (queue) (scheduler_pending_pods{service_name=~"$svc"})', "short"),
+            ("Unschedulable pods", 'sum(scheduler_unschedulable_pods{service_name=~"$svc"})', "short"),
+            ("Scheduling attempts/s by result", 'sum by (result) (rate(scheduler_schedule_attempts_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Scheduling attempt duration (average)", 'sum(rate(scheduler_scheduling_attempt_duration_seconds_sum{service_name=~"$svc"}[5m])) / sum(rate(scheduler_scheduling_attempt_duration_seconds_count{service_name=~"$svc"}[5m]))', "s"),
+            ("Time from queue to scheduled (SLI, average)", 'sum(rate(scheduler_pod_scheduling_sli_duration_seconds_sum{service_name=~"$svc"}[15m])) / sum(rate(scheduler_pod_scheduling_sli_duration_seconds_count{service_name=~"$svc"}[15m]))', "s"),
+            ("Attempts needed per pod (average)", 'sum(rate(scheduler_pod_scheduling_attempts_sum{service_name=~"$svc"}[15m])) / sum(rate(scheduler_pod_scheduling_attempts_count{service_name=~"$svc"}[15m]))', "short"),
+            ("Pods entering the queue per second by event", 'sum by (event) (rate(scheduler_queue_incoming_pods_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Preemption attempts per hour", 'sum(increase(scheduler_preemption_attempts_total{service_name=~"$svc"}[1h]))', "short"),
+            ("Leader (1 = this scheduler leads)", 'max by (k8s_node_name) (leader_election_master_status{service_name=~"$svc"})', "short"),
+        ],
+        False,
+        COMMON_NO_FDS,
+    ),
+    "kube-controller-manager": (
+        "Kubernetes controller-manager",
+        "kube-controller-manager",
+        [
+            ("Workqueue depth, deepest 10 controllers", 'topk(10, sum by (name) (workqueue_depth{service_name=~"$svc"}))', "short"),
+            ("Items added per second, busiest 10 controllers", 'topk(10, sum by (name) (rate(workqueue_adds_total{service_name=~"$svc"}[5m])))', "ops"),
+            ("Retries per second, top 10 controllers", 'topk(10, sum by (name) (rate(workqueue_retries_total{service_name=~"$svc"}[5m])))', "ops"),
+            ("Time items wait in the queue, slowest 10 (average)", 'topk(10, sum by (name) (rate(workqueue_queue_duration_seconds_sum{service_name=~"$svc"}[5m])) / sum by (name) (rate(workqueue_queue_duration_seconds_count{service_name=~"$svc"}[5m])))', "s"),
+            ("Time spent per item, slowest 10 (average)", 'topk(10, sum by (name) (rate(workqueue_work_duration_seconds_sum{service_name=~"$svc"}[5m])) / sum by (name) (rate(workqueue_work_duration_seconds_count{service_name=~"$svc"}[5m])))', "s"),
+            ("Longest running processor, top 10", 'topk(10, max by (name) (workqueue_longest_running_processor_seconds{service_name=~"$svc"}))', "s"),
+            ("Unfinished work, top 10", 'topk(10, sum by (name) (workqueue_unfinished_work_seconds{service_name=~"$svc"}))', "s"),
+            ("Node lifecycle: evictions per hour by zone", 'sum by (zone) (increase(node_collector_evictions_total{service_name=~"$svc"}[1h]))', "short"),
+            ("Node lifecycle: unhealthy nodes by zone", 'max by (zone) (node_collector_unhealthy_nodes_in_zone{service_name=~"$svc"})', "short"),
+            ("Garbage collector sync errors per hour", 'sum(increase(garbagecollector_controller_resources_sync_error_total{service_name=~"$svc"}[1h]))', "short"),
+            ("Leader (1 = this controller-manager leads)", 'max by (k8s_node_name) (leader_election_master_status{service_name=~"$svc"})', "short"),
+        ],
+        False,
+        COMMON_NO_FDS,
+    ),
+    "coredns": (
+        "CoreDNS",
+        "kube-dns",
+        [
+            ("Queries/s by type", 'sum by (type) (rate(coredns_dns_requests_total{service_name=~"$svc"}[5m]))', "reqps"),
+            ("Responses/s by rcode", 'sum by (rcode) (rate(coredns_dns_responses_total{service_name=~"$svc"}[5m]))', "reqps"),
+            ("SERVFAIL share of responses", 'sum(rate(coredns_dns_responses_total{service_name=~"$svc", rcode="SERVFAIL"}[5m])) / sum(rate(coredns_dns_responses_total{service_name=~"$svc"}[5m]))', "percentunit"),
+            ("Request latency p99", 'histogram_quantile(0.99, sum by (le) (rate(coredns_dns_request_duration_seconds_bucket{service_name=~"$svc"}[5m])))', "s"),
+            ("Request latency (average)", 'sum(rate(coredns_dns_request_duration_seconds_sum{service_name=~"$svc"}[5m])) / sum(rate(coredns_dns_request_duration_seconds_count{service_name=~"$svc"}[5m]))', "s"),
+            ("Cache hit ratio", 'sum(rate(coredns_cache_hits_total{service_name=~"$svc"}[5m])) / sum(rate(coredns_cache_requests_total{service_name=~"$svc"}[5m]))', "percentunit"),
+            ("Cache entries", 'sum by (type) (coredns_cache_entries{service_name=~"$svc"})', "short"),
+            ("Upstream forwarding: broken health checks per hour", 'sum(increase(coredns_forward_healthcheck_broken_total{service_name=~"$svc"}[1h]))', "short"),
+            ("Kubernetes DNS programming latency p99 (time for Service changes to reach DNS)", 'histogram_quantile(0.99, sum by (le) (rate(coredns_kubernetes_dns_programming_duration_seconds_bucket{service_name=~"$svc"}[15m])))', "s"),
+        ],
+        False,
+    ),
+    "kubelet": (
+        "Kubelet (per node)",
+        "kubelet",
+        [
+            ("Running pods per node", 'sum by (k8s_node_name) (kubelet_running_pods{service_name=~"$svc"})', "short"),
+            ("Running containers per node", 'sum by (k8s_node_name) (kubelet_running_containers{service_name=~"$svc"})', "short"),
+            ("Pod start latency (average, SLI)", 'sum by (k8s_node_name) (rate(kubelet_pod_start_sli_duration_seconds_sum{service_name=~"$svc"}[15m])) / sum by (k8s_node_name) (rate(kubelet_pod_start_sli_duration_seconds_count{service_name=~"$svc"}[15m]))', "s"),
+            ("PLEG relist duration (average; high = node trouble)", 'sum by (k8s_node_name) (rate(kubelet_pleg_relist_duration_seconds_sum{service_name=~"$svc"}[5m])) / sum by (k8s_node_name) (rate(kubelet_pleg_relist_duration_seconds_count{service_name=~"$svc"}[5m]))', "s"),
+            ("PLEG relist interval (average; expected ~1s)", 'sum by (k8s_node_name) (rate(kubelet_pleg_relist_interval_seconds_sum{service_name=~"$svc"}[5m])) / sum by (k8s_node_name) (rate(kubelet_pleg_relist_interval_seconds_count{service_name=~"$svc"}[5m]))', "s"),
+            ("Container runtime operation errors/s", 'sum by (operation_type) (rate(kubelet_runtime_operations_errors_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Container runtime operations/s", 'sum by (operation_type) (rate(kubelet_runtime_operations_total{service_name=~"$svc"}[5m]))', "ops"),
+            ("Container runtime operation latency (average)", 'sum by (operation_type) (rate(kubelet_runtime_operations_duration_seconds_sum{service_name=~"$svc"}[5m])) / sum by (operation_type) (rate(kubelet_runtime_operations_duration_seconds_count{service_name=~"$svc"}[5m]))', "s"),
+            ("Image pull duration (average)", 'sum by (k8s_node_name) (rate(kubelet_image_pull_duration_seconds_sum{service_name=~"$svc"}[15m])) / sum by (k8s_node_name) (rate(kubelet_image_pull_duration_seconds_count{service_name=~"$svc"}[15m]))', "s"),
+            ("Pod and container start errors per hour", 'sum(increase(kubelet_started_pods_errors_total{service_name=~"$svc"}[1h])) + sum(increase(kubelet_started_containers_errors_total{service_name=~"$svc"}[1h]))', "short"),
+            ("Persistent volume usage", 'max by (namespace, persistentvolumeclaim) (kubelet_volume_stats_used_bytes{service_name=~"$svc"} / kubelet_volume_stats_capacity_bytes{service_name=~"$svc"})', "percentunit"),
+            ("Persistent volume free space", 'min by (namespace, persistentvolumeclaim) (kubelet_volume_stats_available_bytes{service_name=~"$svc"})', "bytes"),
+            ("Persistent volume free inodes", 'min by (namespace, persistentvolumeclaim) (kubelet_volume_stats_inodes_free{service_name=~"$svc"} / kubelet_volume_stats_inodes{service_name=~"$svc"})', "percentunit"),
+            ("Kubelet serving certificate: days until expiry", 'min by (k8s_node_name) (kubelet_certificate_manager_server_ttl_seconds{service_name=~"$svc"}) / 86400', "d"),
+        ],
+        False,
         False,
     ),
     "envoy-gateway-proxy": (
@@ -621,7 +748,7 @@ def main():
     files = []
     for slug, (title, svc_regex, panels, ctrl, *rest) in APPS.items():
         common = rest[0] if rest else True
-        allp = list(panels) + (CONTROLLER_RUNTIME if ctrl else []) + (COMMON if common else [])
+        allp = list(panels) + (CONTROLLER_RUNTIME if ctrl else []) + (COMMON if common is True else (common or []))
         d = dashboard(f"core-infra-{slug}", title, allp, svc_regex)
         (OUT / f"{slug}.json").write_text(json.dumps(d, indent=2) + "\n")
         files.append(f"{slug}.json")
