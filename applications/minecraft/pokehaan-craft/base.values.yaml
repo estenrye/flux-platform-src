@@ -222,9 +222,11 @@ minecraftServer:
   modUrls: []
   pluginUrls: []
   # A list of Spigot resources/plugins IDs to download.
-  spigetResources:
-    # Simple Minimap - https://www.spigotmc.org/resources/simpleminimap.108225/
-    - 108225
+  # Simple Minimap (https://www.spigotmc.org/resources/simpleminimap.108225/,
+  # id 108225) was dropped 2026-10-29: api.spiget.org returns 404 for it, which
+  # fails the whole startup. Re-add it here once Spiget indexes it again, or
+  # via pluginUrls with a direct jar URL.
+  spigetResources: []
   # Additional service specs to be defined
   extraServiceSpec: {}
   # A list of Modrinth project slugs with optional version after colon
