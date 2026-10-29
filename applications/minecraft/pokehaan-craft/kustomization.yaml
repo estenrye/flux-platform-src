@@ -1,0 +1,53 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: pokehaan-craft
+
+resources:
+  - namespace.yaml
+  - ../base
+  - eso.external-secret.curse-forge-api-key.yaml
+
+components:
+  - ../hardening
+
+# base.values.yaml is generated from ../base/values.yaml by
+# .bin/sync-minecraft-values.sh; values.yaml holds this instance's overrides
+# and wins because it is applied last.
+helmCharts:
+  - name: minecraft
+    repo: https://itzg.github.io/minecraft-server-charts/
+    version: 5.3.1
+    releaseName: pokehaan-craft
+    namespace: pokehaan-craft
+    valuesFile: base.values.yaml
+    additionalValuesFiles:
+      - values.yaml
+
+patches:
+  - target:
+      kind: Gateway
+      name: map-gateway
+    patch: |-
+      - op: replace
+        path: /spec/listeners/0/hostname
+        value: map.pokehaan-craft.minecraft.rye.ninja
+  - target:
+      kind: HTTPRoute
+      name: map
+    patch: |-
+      - op: replace
+        path: /spec/hostnames/0
+        value: map.pokehaan-craft.minecraft.rye.ninja
+      - op: replace
+        path: /spec/rules/0/backendRefs/0/name
+        value: pokehaan-craft-minecraft-map
+  - target:
+      kind: TCPRoute
+      name: game
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/external-dns.alpha.kubernetes.io~1hostname
+        value: pokehaan-craft.minecraft.rye.ninja
+      - op: replace
+        path: /spec/rules/0/backendRefs/0/name
+        value: pokehaan-craft-minecraft

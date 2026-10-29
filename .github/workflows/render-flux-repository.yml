@@ -52,6 +52,9 @@ jobs:
       - name: Lint SPIFFE trust domain
         run: make lint-spiffe-trust-domain
 
+      - name: Lint minecraft shared values
+        run: make lint-minecraft-values
+
       - name: Test netdata hostname lint
         run: make test-lint-netdata-hostname
 

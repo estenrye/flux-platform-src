@@ -1,0 +1,80 @@
+# BlueMap web UI. Hostname is a placeholder; every overlay patches it
+# (see <instance>/kustomization.yaml and .bin/lint-minecraft-hostname.sh).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  # Not named after the Helm release: Calico 3.33 creates a ServiceAccount
+  # named after the Gateway in its namespace (docs/memory/calico-33-gateway-namespace-mode.md).
+  name: map-gateway
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  gatewayClassName: external-dedicated
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: minecraft.k8s.local
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: map-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
+        kinds:
+          - kind: HTTPRoute
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: map
+spec:
+  hostnames:
+    - minecraft.k8s.local
+  parentRefs:
+    - name: map-gateway
+      sectionName: https
+  rules:
+    - backendRefs:
+        # Placeholder; patched per overlay to the chart's map Service.
+        - name: minecraft-map
+          port: 8100
+---
+# Game traffic. The server Service is ClusterIP; players reach it through this
+# dedicated Gateway's TCP listener. The listener port must equal
+# minecraftServer.servicePort (base/values.yaml).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: game-gateway
+spec:
+  gatewayClassName: external-dedicated
+  listeners:
+    - name: minecraft
+      protocol: TCP
+      port: 25565
+      allowedRoutes:
+        namespaces:
+          from: Same
+        kinds:
+          - kind: TCPRoute
+---
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: game
+  annotations:
+    # TCPRoute has no hostnames field; external-dns (gateway-tcproute source)
+    # publishes the record from this annotation. Patched per overlay.
+    external-dns.alpha.kubernetes.io/hostname: minecraft.k8s.local
+spec:
+  parentRefs:
+    - name: game-gateway
+      sectionName: minecraft
+  rules:
+    - backendRefs:
+        # Placeholder; patched per overlay to the chart's server Service.
+        - name: minecraft
+          port: 25565

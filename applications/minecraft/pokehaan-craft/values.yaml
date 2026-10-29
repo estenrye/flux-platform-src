@@ -1,0 +1,80 @@
+resources:
+  requests:
+    memory: 4096Mi
+    cpu: 10000m
+  limits:
+    memory: 7168Mi
+    cpu: 15000m
+image:
+  repository: itzg/minecraft-server
+  tag: java8
+  pullPolicy: IfNotPresent
+  pullSecret: ""
+
+livenessProbe:
+  command:
+    - mc-health
+  initialDelaySeconds: 600
+  periodSeconds: 5
+  failureThreshold: 20
+  successThreshold: 1
+  timeoutSeconds: 1
+readinessProbe:
+  command:
+    - mc-health
+  initialDelaySeconds: 600
+  periodSeconds: 5
+  failureThreshold: 20
+  successThreshold: 1
+  timeoutSeconds: 1
+
+initContainers:
+  - name: download-mods
+    image: busybox
+    command:
+      - 'sh'
+      - '-c'
+      - |
+          id $(whoami) \
+          && echo "pod starting up"\
+          && mkdir -p /data/mods \
+          && echo "/data/mods directory created" \
+          && wget https://cdn.modrinth.com/data/59ZceYlU/versions/Ro92Bd6N/Pixelmon-1.16.5-9.1.10-universal.jar -O /data/mods/Pixelmon-1.16.5-9.1.10-universal.jar \
+          && echo "Pixelmon downloaded" \
+          && wget https://s3.us-west-1.wasabisys.com/minecraft-rye-ninja/mods/PokeballReveal-1.16.5-1.0.0.jar -O /data/mods/PokeballReveal-1.16.5-1.0.0.jar \
+          && echo "PokeballReveal-1.16.5-1.0.0.jar downloaded" \
+          && wget https://s3.us-west-1.wasabisys.com/minecraft-rye-ninja/mods/DisableMobReplacement-1.0.0-ExceptVillagers.jar -O /data/mods/DisableMobReplacement-1.0.0-ExceptVillagers.jar \
+          && echo "DisableMobReplacement-1.0.0-ExceptVillagers.jar downloaded"
+    volumeMounts:
+      - name: datadir
+        mountPath: /data
+    securityContext:
+      runAsGroup: 1001
+      runAsNonRoot: true
+      runAsUser: 1001
+mcbackup:
+  enabled: false
+
+minecraftServer:
+  version: 1.16.5
+  type: "AUTO_CURSEFORGE"
+  forgeVersion: 14.23.5.2860
+  memory: 4096M
+  jvmXXOpts: "-Xmx4096M"
+  spawnAnimals: true
+  # Determines if monsters will be spawned.
+  spawnMonsters: true
+  # Determines if villagers will be spawned.
+  spawnNPCs: true
+  # Sets the area that non-ops can not edit (0 to disable)
+  spawnProtection: 2
+  # Max view distance (in chunks).
+  viewDistance: 10
+
+  autoCurseForge:
+    apiKey:
+      existingSecret: "curse-forge-api-key"
+      secretKey: credential
+    slug: pokehaan-craft-2
+  modrinth:
+    projects: []

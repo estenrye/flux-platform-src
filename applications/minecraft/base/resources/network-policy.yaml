@@ -1,0 +1,52 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minecraft
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The Gateway's Envoy proxy pods are created at runtime by the Envoy Gateway controller; they are not in the static rendered manifests."
+spec:
+  # One instance per namespace, so select every pod (server + backup sidecar).
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Players, via the game Gateway's Envoy proxy.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              gateway.envoyproxy.io/owning-gateway-name: game-gateway
+      ports:
+        - protocol: TCP
+          port: 25565
+    # BlueMap, from the Gateway's Envoy proxy (runs in this namespace under
+    # Calico 3.33, so no namespaceSelector).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              gateway.envoyproxy.io/owning-gateway-name: map-gateway
+      ports:
+        - protocol: TCP
+          port: 8100
+    # Prometheus exporter, scraped from victoria-metrics.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: victoria-metrics
+      ports:
+        - protocol: TCP
+          port: 9100
+  egress:
+    # DNS; HTTPS/HTTP for Mojang, Modrinth, CurseForge, Spiget, Wasabi (world
+    # download + rclone backups) and the init container's mod downloads.
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
