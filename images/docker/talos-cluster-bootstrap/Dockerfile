@@ -9,7 +9,7 @@
 # openbao-helm app v2.6.1 per docs/memory/m3-step-tracker.md) and verified
 # against each project's own published checksum file at build time -- no
 # hardcoded hash is trusted blindly.
-FROM alpine:3.22 AS fetch
+FROM alpine:3.24 AS fetch
 RUN apk add --no-cache curl
 WORKDIR /out
 
@@ -60,7 +60,7 @@ RUN curl -fsSL -O "https://github.com/openbao/openbao/releases/download/v${OPENB
  && chmod +x bao \
  && rm "openbao_${OPENBAO_VERSION}_linux_amd64.tar.gz" checksums.txt
 
-FROM alpine:3.22
+FROM alpine:3.24
 RUN apk add --no-cache bash curl ca-certificates
 COPY --from=fetch /out/talosctl /out/kubectl /out/jq /out/yq /out/bao /usr/local/bin/
 COPY bootstrap.sh /usr/local/bin/bootstrap.sh
