@@ -46,6 +46,14 @@ resources:
 - ../../applications/reloader/base
 - ../../applications/keda/base
 - ../../applications/kubernetes-descheduler/base
+# Minecraft instances migrated from the cd-homelab ArgoCD ApplicationSet (the
+# four it deployed). Other overlays under applications/minecraft/ are
+# committed but not wired: arrendelle-winter-dev, bakery, mermaid-cove,
+# pokehaan-craft.
+- ../../applications/minecraft/arrendelle-winter
+- ../../applications/minecraft/mermaid-cove-dev
+- ../../applications/minecraft/baked-goods
+- ../../applications/minecraft/family-minecraft
 - ../../applications/flux-monitoring/base
 - ../../applications/vpa-monitoring/base
 - ../../applications/control-plane-monitoring/base

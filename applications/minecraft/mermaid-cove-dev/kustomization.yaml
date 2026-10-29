@@ -1,0 +1,52 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: mermaid-cove-dev
+
+resources:
+  - namespace.yaml
+  - ../base
+
+components:
+  - ../../../components/minecraft-hardening
+
+# base.values.yaml is generated from ../base/values.yaml by
+# .bin/sync-minecraft-values.sh; values.yaml holds this instance's overrides
+# and wins because it is applied last.
+helmCharts:
+  - name: minecraft
+    repo: https://itzg.github.io/minecraft-server-charts/
+    version: 5.3.1
+    releaseName: mermaid-cove-dev
+    namespace: mermaid-cove-dev
+    valuesFile: base.values.yaml
+    additionalValuesFiles:
+      - values.yaml
+
+patches:
+  - target:
+      kind: Gateway
+      name: map-gateway
+    patch: |-
+      - op: replace
+        path: /spec/listeners/0/hostname
+        value: map.mermaid-cove-dev.minecraft.rye.ninja
+  - target:
+      kind: HTTPRoute
+      name: map
+    patch: |-
+      - op: replace
+        path: /spec/hostnames/0
+        value: map.mermaid-cove-dev.minecraft.rye.ninja
+      - op: replace
+        path: /spec/rules/0/backendRefs/0/name
+        value: mermaid-cove-dev-minecraft-map
+  - target:
+      kind: TCPRoute
+      name: game
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/external-dns.alpha.kubernetes.io~1hostname
+        value: mermaid-cove-dev.minecraft.rye.ninja
+      - op: replace
+        path: /spec/rules/0/backendRefs/0/name
+        value: mermaid-cove-dev-minecraft

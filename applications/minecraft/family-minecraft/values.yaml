@@ -1,0 +1,14 @@
+resources:
+  requests:
+    memory: 1024Mi
+    cpu: 2000m
+  limits:
+    memory: 2048Mi
+    cpu: 4000m
+
+minecraftServer:
+  version: 1.21.3
+  type: "PAPER"
+  whitelist: esten_rye,flower_ada_bread,DracoIam,ryeMCguest01
+  ops: esten_rye,flower_ada_bread,DracoIam,ryeMCguest01
+  downloadWorldUrl: https://s3.us-east-1.wasabisys.com/minecraft-backups/family-minecraft/world-20241110-065511.tgz

@@ -1,0 +1,50 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+# ADR-13 exemptions shared by every minecraft instance. The itzg chart's
+# Deployment is a single-replica stateful game server; these findings are
+# inherent to it or to the chart's templates, which cannot be changed from
+# values. Included by each <instance>/kustomization.yaml via `components:`
+
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: ignored
+        annotations:
+          ignore-check.kube-linter.io/default-service-account: "The server does not call the API server; the service account token is not mounted."
+          ignore-check.kube-linter.io/env-value-from: "rcon-password and the CurseForge key come from ExternalSecrets in the same namespace; they are not static resources in the render."
+          ignore-check.kube-linter.io/read-secret-from-env-var: "itzg/minecraft-server and mc-backup read RCON_PASSWORD and CF_API_KEY from env only."
+          ignore-check.kube-linter.io/latest-tag: "itzg/minecraft-server is intentionally tracked on latest (chart image.tag); busybox init containers are chart-defined."
+          ignore-check.kube-linter.io/minimum-three-replicas: "Minecraft is not horizontally scalable; replicaCount must stay 1."
+          ignore-check.kube-linter.io/no-rolling-update-strategy: "Single RWO data volume and a world that must not be opened by two servers; strategy must be Recreate."
+          ignore-check.kube-linter.io/no-node-affinity: "No topology requirement beyond the PVC."
+          ignore-check.kube-linter.io/no-liveness-probe: "The mc-backup sidecar is a loop with no endpoint to probe; the server container has mc-health probes."
+          ignore-check.kube-linter.io/no-readiness-probe: "The mc-backup sidecar is a loop with no endpoint to probe; the server container has mc-health probes."
+          ignore-check.kube-linter.io/no-read-only-root-fs: "The chart-defined busybox init container (rclone config copy) sets no securityContext."
+          ignore-check.kube-linter.io/restart-policy: "Deployment pods default to Always."
+          ignore-check.kube-linter.io/unset-cpu-requirements: "Chart-defined init container has no resources."
+          ignore-check.kube-linter.io/unset-memory-requirements: "Chart-defined init container has no resources."
+          checkov.io/skip01: "CKV_K8S_10=Chart-defined init container has no resources."
+          checkov.io/skip02: "CKV_K8S_11=Chart-defined init container has no resources."
+          checkov.io/skip03: "CKV_K8S_12=Chart-defined init container has no resources."
+          checkov.io/skip04: "CKV_K8S_13=Chart-defined init container has no resources."
+          checkov.io/skip05: "CKV_K8S_14=itzg/minecraft-server tracks latest; busybox init containers are chart-defined."
+          checkov.io/skip06: "CKV_K8S_43=itzg/minecraft-server tracks latest; digest pinning is a follow-up."
+          checkov.io/skip07: "CKV_K8S_15=IfNotPresent is intended; the tag is latest by choice."
+          checkov.io/skip08: "CKV_K8S_35=itzg images read RCON_PASSWORD and CF_API_KEY from env only."
+          checkov.io/skip09: "CKV_K8S_22=Chart-defined busybox init container sets no securityContext."
+          checkov.io/skip10: "CKV_K8S_20=Chart-defined busybox init container sets no securityContext."
+          checkov.io/skip11: "CKV_K8S_28=Chart-defined busybox init container sets no securityContext."
+          checkov.io/skip12: "CKV_K8S_30=Chart-defined busybox init container sets no securityContext."
+          checkov.io/skip13: "CKV_K8S_37=Chart-defined busybox init container sets no securityContext."
+          checkov.io/skip14: "CKV_K8S_40=Chart-defined busybox init container sets no securityContext."
+          checkov.io/skip15: "CKV_K8S_8=The mc-backup sidecar has no endpoint to probe."
+          checkov.io/skip16: "CKV_K8S_9=The mc-backup sidecar has no endpoint to probe."
+      spec:
+        template:
+          spec:
+            automountServiceAccountToken: false

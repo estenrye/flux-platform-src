@@ -51,3 +51,4 @@
 - [Calico 3.33 Gateway Namespace Mode](calico-33-gateway-namespace-mode.md) — bundled Envoy Gateway now deploys proxies in the Gateway's namespace named after it; a name collision left the netdata Gateway addressless and external-dns deleted its record; selectors/ReferenceGrant/PodMonitor changes
 - [Calico Operator Digest Pin](calico-operator-digest-pin.md) — calico/base pins the tigera-operator image by digest; bump chart and digest together (quay API lookup) or Calico is not actually upgraded
 - [Calico LB Stale-Handle Bug](calico-lb-stale-handle-bug.md) — kube-controllers applies a stale IPAM handle to a recreated same-name Service (flip, then 1-2 s clears); present in 3.32.1/3.32.2/3.33.0; detect/release/repro make targets and the restart workaround
+- [Minecraft backupOnTerminate Deferred](minecraft-backup-on-terminate-deferred.md) — chart 5.x final-backup-on-stop option is left off; needs a measured terminationGracePeriodSeconds before enabling

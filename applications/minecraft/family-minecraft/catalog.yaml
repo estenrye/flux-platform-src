@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: minecraft-family-minecraft
+  description: |-
+    Minecraft game server instance "family-minecraft" (itzg/minecraft chart): own namespace,
+    Helm release, map Gateway and game TCPRoute. Inherits shared manifests from
+    the minecraft base.
+  tags:
+    - games
+    - workloads
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

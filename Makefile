@@ -70,7 +70,13 @@ lint-external-dns-owner-id: render-deps
 test-lint-external-dns-owner-id: render-deps
 	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-external-dns-owner-id.sh
 
-lint: lint-deps render lint-checkov lint-kube-linter lint-spiffe-trust-domain lint-netdata-hostname lint-grafana-placeholders lint-external-dns-owner-id
+# Kustomize can't share a Helm values file across overlays, so
+# applications/minecraft/<instance>/base.values.yaml is generated from
+# applications/minecraft/base/values.yaml; fail if a copy is stale.
+lint-minecraft-values:
+	.bin/sync-minecraft-values.sh --check
+
+lint: lint-deps render lint-minecraft-values lint-checkov lint-kube-linter lint-spiffe-trust-domain lint-netdata-hostname lint-grafana-placeholders lint-external-dns-owner-id
 
 flux-reconcile-source:
 	flux reconcile source git flux-platform-rendered -n flux-system

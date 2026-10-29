@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Namespace-agnostic shared manifests. Each <instance> overlay includes this
+# directory and sets the namespace. The Helm chart itself is inflated per
+# instance (distinct releaseName), not here.
+resources:
+  - resources/eso.external-secret.rcon-password.yaml
+  - resources/eso.external-secret.minecraft-backup-s3-credentials.yaml
+  - resources/gateway.yaml
+  - resources/network-policy.yaml
