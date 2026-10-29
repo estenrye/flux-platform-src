@@ -49,4 +49,5 @@ images:
   # `docker buildx imagetools inspect docker.io/estenrye/pdns4-shim:0.2`
   # is what produced the digest below.
   - name: docker.io/estenrye/pdns4-shim
+    newTag: "0.2"
     digest: sha256:748ee21d00a95e2f7b0c04eaba0a8ec036dd0aa9bf19d6ef59aa0f2f3e302cfb

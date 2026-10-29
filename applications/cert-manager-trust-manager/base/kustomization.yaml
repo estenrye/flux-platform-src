@@ -28,6 +28,8 @@ patches:
 
 images:
   - name: quay.io/jetstack/trust-manager
+    newTag: v0.22.0
     digest: sha256:16f8ad469b944f1b060d5fc2d391672d76ac0b11717d4af27f7dc0e7cf145066
   - name: quay.io/jetstack/trust-pkg-debian-bookworm
+    newTag: 20230311-deb12u1.5
     digest: sha256:3d75dbefafa1d32a262078eadcab0c2e58621c3ac7ef2ea070bc83f9dc234cb6

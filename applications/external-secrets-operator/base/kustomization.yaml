@@ -37,4 +37,5 @@ patches:
 
 images:
   - name: ghcr.io/external-secrets/external-secrets
+    newTag: v2.4.1
     digest: sha256:9440a40b394791a5e93f3f7e1b33399ecbdc0e38273de1d69ed83fe12936fc09
