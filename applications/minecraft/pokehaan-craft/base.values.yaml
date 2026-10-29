@@ -328,7 +328,12 @@ minecraftServer:
 ## Additional minecraft container environment variables
 ## Values can be either variable values or `valueFrom` yaml
 ##
-extraEnv: {}
+# core-infra pods are IPv6-only (DNS64/NAT64 reaches IPv4-only hosts such as
+# Wasabi). Java prefers a host's A record, which has no route from the pod
+# (NoRouteToHostException on fill.papermc.io), so prefer IPv6 in every JVM,
+# including mc-image-helper, which does the Paper/Mojang/world downloads.
+extraEnv:
+  JAVA_TOOL_OPTIONS: -Djava.net.preferIPv6Addresses=true
 # some_variable: some value
 # another_variable:
 #   valueFrom:
