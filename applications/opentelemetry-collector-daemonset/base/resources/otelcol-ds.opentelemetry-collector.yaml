@@ -264,7 +264,7 @@ spec:
                   target_label: instance
               metric_relabel_configs:
                 - source_labels: [__name__, le]
-                  regex: '(etcd_server_(has_leader|is_leader|leader_changes_seen_total|proposals_(failed|pending|committed|applied)_total|slow_apply_total|slow_read_indexes_total|quota_backend_bytes|heartbeat_send_failures_total|health_failures)|etcd_mvcc_db_total_size_(in_bytes|in_use_in_bytes)|etcd_network_(peer_sent_failures_total|active_peers)|etcd_disk_(wal_fsync_duration_seconds|backend_commit_duration_seconds)_(count|sum)|etcd_network_peer_round_trip_time_seconds_(count|sum)|process_(resident_memory_bytes|cpu_seconds_total|open_fds)|go_goroutines);|etcd_disk_(wal_fsync_duration_seconds|backend_commit_duration_seconds)_bucket;(0\.004|0\.008|0\.016|0\.064|0\.256|\+Inf)|etcd_network_peer_round_trip_time_seconds_bucket;\+Inf'
+                  regex: '(etcd_server_(has_leader|is_leader|leader_changes_seen_total|proposals_(failed|pending|committed|applied)_total|slow_apply_total|slow_read_indexes_total|quota_backend_bytes|heartbeat_send_failures_total|health_failures)|etcd_mvcc_db_total_size_(in_bytes|in_use_in_bytes)|etcd_network_(peer_sent_failures_total|active_peers)|etcd_disk_(wal_fsync_duration_seconds|backend_commit_duration_seconds)_(count|sum)|etcd_network_peer_round_trip_time_seconds_(count|sum)|process_(resident_memory_bytes|cpu_seconds_total|open_fds)|go_goroutines);|etcd_disk_(wal_fsync_duration_seconds|backend_commit_duration_seconds)_bucket;(0\.004|0\.008|0\.016|0\.032|0\.064|0\.256|\+Inf)|etcd_network_peer_round_trip_time_seconds_bucket;\+Inf'
                   action: keep
     processors:
       # Tag every metric with the node it came from; without this the three
