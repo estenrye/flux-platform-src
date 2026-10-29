@@ -42,11 +42,15 @@ readinessProbe:
   failureThreshold: 20
   successThreshold: 1
   timeoutSeconds: 1
+# First start downloads Paper, mods/plugins and the world, then remaps the
+# server jar; on core-infra's CPU-constrained workers that exceeds the ~130 s
+# the liveness probe allows, so the kubelet killed the server mid-start. The
+# startup probe holds liveness/readiness off for up to 15 min (90 x 10 s).
 startupProbe:
   command:
     - mc-health
-  enabled: false
-  failureThreshold: 30
+  enabled: true
+  failureThreshold: 90
   periodSeconds: 10
 # initContainers:
 #   - name: do-something
