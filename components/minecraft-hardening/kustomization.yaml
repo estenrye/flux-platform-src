@@ -5,7 +5,7 @@ kind: Component
 # Deployment is a single-replica stateful game server; these findings are
 # inherent to it or to the chart's templates, which cannot be changed from
 # values. Included by each <instance>/kustomization.yaml via `components:`
-# (a values/patch file outside the overlay root would be rejected).
+
 patches:
   - target:
       kind: Deployment

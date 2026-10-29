@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: minecraft
+  description: |-
+    Shared manifests for the minecraft game servers (ExternalSecrets, Gateways,
+    NetworkPolicy) and the shared chart values. Migrated from the cd-homelab
+    ArgoCD ApplicationSet; each world is a sibling overlay directory.
+  tags:
+    - games
+    - workloads
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

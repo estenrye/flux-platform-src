@@ -8,7 +8,7 @@ resources:
   - eso.external-secret.curse-forge-api-key.yaml
 
 components:
-  - ../hardening
+  - ../../../components/minecraft-hardening
 
 # base.values.yaml is generated from ../base/values.yaml by
 # .bin/sync-minecraft-values.sh; values.yaml holds this instance's overrides
