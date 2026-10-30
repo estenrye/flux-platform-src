@@ -65,6 +65,9 @@ configMapGenerator:
   - name: grafana-dashboard-cinder-csi
     files:
       - dashboards/cinder-csi.json
+  - name: grafana-dashboard-cnpg
+    files:
+      - dashboards/cnpg.json
   - name: grafana-dashboard-coredns
     files:
       - dashboards/coredns.json
