@@ -109,3 +109,8 @@ patches:
     kind: DaemonSet
     name: cert-manager-csi-driver-spiffe-driver
     namespace: cert-manager
+- path: patches/seaweedfs-db-barman.yaml
+  target:
+    kind: ObjectStore
+    name: seaweedfs-db-barman
+    namespace: seaweedfs

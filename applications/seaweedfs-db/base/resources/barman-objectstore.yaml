@@ -6,8 +6,8 @@ metadata:
 spec:
   configuration:
     destinationPath: s3://seaweedfs-db-barman/
-    # TODO: replace CF_ACCOUNT_ID with the Cloudflare account id; it is the
-    # "endpoint" field of the cloudflare-r2-seaweedfs-db-barman 1Password item.
+    # Placeholder; clusters/core-infra/patches/seaweedfs-db-barman.yaml sets the
+    # real account endpoint.
     endpointURL: https://CF_ACCOUNT_ID.r2.cloudflarestorage.com
     s3Credentials:
       accessKeyId:
