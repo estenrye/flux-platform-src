@@ -299,9 +299,22 @@ minecraftServer:
     # The version type is used to determine the newest version to use from each project. The allowed values are: release, beta, alpha
     allowedVersionType: release
   extraPorts:
-    # TickScope's :9101 is not listed here: the chart only emits a container
-    # port for entries with an enabled Service, and the PodMonitor addresses
-    # the port by number instead.
+    # TickScope Prometheus endpoint. The PodMonitor selects this by port name,
+    # which needs a declared container port; the chart only emits one for
+    # entries with an enabled Service (a small ClusterIP Service nothing else uses).
+    - name: metrics
+      containerPort: 9101
+      protocol: TCP
+      service:
+        enabled: true
+        embedded: false
+        annotations: {}
+        type: ClusterIP
+        loadBalancerIP: ""
+        loadBalancerSourceRanges: []
+        port: 9101
+      ingress:
+        enabled: false
     # BlueMap web UI. Exposed through the per-instance Gateway/HTTPRoute in
     # base/resources, not the chart's nginx Ingress.
     - name: map
