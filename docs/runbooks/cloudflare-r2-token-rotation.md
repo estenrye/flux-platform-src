@@ -39,6 +39,23 @@ The script:
 4. Re-encrypts the SOPS Secret at `clusters/${CLUSTER}/secrets/cloudflare-r2-${BUCKET_NAME}.sops.yaml`
 5. Deletes the old Cloudflare token
 
+### Buckets provisioned without a SOPS Secret
+
+If the bucket was provisioned with `SOPS_ENCRYPT=false` (credentials only in
+1Password, consumed through an ExternalSecret), rotate with the same flag. Step
+4 is skipped and there is nothing to commit:
+
+```bash
+CLUSTER=core-infra \
+BUCKET_NAME=seaweedfs-db-barman \
+CF_API_TOKEN=<your-admin-token> \
+SOPS_ENCRYPT=false \
+make rotate-cloudflare-r2-token
+```
+
+Without the flag the script exits before creating anything if the SOPS file is
+missing.
+
 ## After rotation
 
 ```bash
