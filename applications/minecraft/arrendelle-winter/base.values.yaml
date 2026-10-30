@@ -65,7 +65,41 @@ initContainers: []
 #       - name: nfs
 #         mountPath: /mnt/volume
 #         readOnly: true
-sidecarContainers: []
+# Outside-in health check: pings the server's status port like a player would
+# and exports up/down, latency and player counts. Complements TickScope, which
+# reports from inside the server. localhost resolves to ::1 on these IPv6-only
+# pods; the server listens dual-stack.
+sidecarContainers:
+  - name: mc-monitor
+    image: itzg/mc-monitor:1.18.3
+    imagePullPolicy: IfNotPresent
+    args:
+      - export-for-prometheus
+    env:
+      - name: EXPORT_SERVERS
+        value: localhost:25565
+      - name: EXPORT_PORT
+        value: "8080"
+    ports:
+      - name: mcmonitor
+        containerPort: 8080
+        protocol: TCP
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1001
+      runAsGroup: 1001
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
 # extraVolumes:
 #   - volumeMounts:
 #       - name: nfs
@@ -79,7 +113,19 @@ sidecarContainers: []
 #           - port=2049
 #           - hard
 #           - vers=4
-extraVolumes: []
+# TickScope's config.yml (bind-address) from a ConfigMap. The image syncs
+# COPY_CONFIG_SRC to COPY_CONFIG_DEST on every start (see extraEnv below).
+# Mounted outside /config so it does not sit above the mc-backup sidecar's own
+# /config/rclone mount.
+extraVolumes:
+  - volumeMounts:
+      - name: tickscope-config
+        mountPath: /tickscope-config
+        readOnly: true
+    volumes:
+      - name: tickscope-config
+        configMap:
+          name: tickscope-config
 # ref: https://hub.docker.com/r/itzg/minecraft-server/
 image:
   repository: itzg/minecraft-server
@@ -238,26 +284,20 @@ minecraftServer:
       - swbUV1cr
       # https://modrinth.com/plugin/commandapi
       - ExxvCi0y
-      # https://modrinth.com/plugin/unifiedmetrics
-      # - p1ewR5kV
+      # https://modrinth.com/plugin/tickscope -- Prometheus exporter on :9101
+      # (config: base/resources/tickscope.configmap.yaml). Pinned: 2.0 renamed
+      # metrics, and the dashboard in .bin/generate-grafana-dashboards.py uses
+      # the 2.x names.
+      - A0ZakExK:2.0.1
+      # UnifiedMetrics (p1ewR5kV) was dropped: unmaintained, tops out at 1.19.4.
     # Which Modrinth dependencies to download: none, required, optional
     downloadDependencies: none
     # The version type is used to determine the newest version to use from each project. The allowed values are: release, beta, alpha
     allowedVersionType: release
   extraPorts:
-    - name: prometheus
-      containerPort: 9100
-      protocol: TCP
-      service:
-        enabled: true
-        embedded: false
-        annotations: {}
-        type: ClusterIP
-        loadBalancerIP: ""
-        loadBalancerSourceRanges: []
-        port: 9100
-      ingress:
-        enabled: false
+    # TickScope's :9101 is not listed here: the chart only emits a container
+    # port for entries with an enabled Service, and the PodMonitor addresses
+    # the port by number instead.
     # BlueMap web UI. Exposed through the per-instance Gateway/HTTPRoute in
     # base/resources, not the chart's nginx Ingress.
     - name: map
@@ -336,6 +376,11 @@ minecraftServer:
 # including mc-image-helper, which does the Paper/Mojang/world downloads.
 extraEnv:
   JAVA_TOOL_OPTIONS: -Djava.net.preferIPv6Addresses=true
+  # Copy the mounted TickScope config into its plugin dir. Skip-newer is turned
+  # off so a config change in git always wins over the file the plugin wrote.
+  COPY_CONFIG_SRC: /tickscope-config
+  COPY_CONFIG_DEST: /data/plugins/TickScope
+  SYNC_SKIP_NEWER_IN_DESTINATION: "false"
 # some_variable: some value
 # another_variable:
 #   valueFrom:

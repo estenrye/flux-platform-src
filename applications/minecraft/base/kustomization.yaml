@@ -9,3 +9,5 @@ resources:
   - resources/eso.external-secret.minecraft-backup-s3-credentials.yaml
   - resources/gateway.yaml
   - resources/network-policy.yaml
+  - resources/tickscope.configmap.yaml
+  - resources/podmonitor.yaml

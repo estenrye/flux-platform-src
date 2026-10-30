@@ -35,14 +35,20 @@ spec:
       ports:
         - protocol: TCP
           port: 8100
-    # Prometheus exporter, scraped from victoria-metrics.
+    # TickScope (9101) and mc-monitor (8080), scraped by the per-node
+    # OpenTelemetry collector (target allocator, PodMonitor in this directory).
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: victoria-metrics
+              kubernetes.io/metadata.name: opentelemetry-collector
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: otelcol-ds-collector
       ports:
         - protocol: TCP
-          port: 9100
+          port: 9101
+        - protocol: TCP
+          port: 8080
   egress:
     # DNS; HTTPS/HTTP for Mojang, Modrinth, CurseForge, Spiget, Wasabi (world
     # download + rclone backups) and the init container's mod downloads.

@@ -110,6 +110,9 @@ configMapGenerator:
   - name: grafana-dashboard-metrics-server
     files:
       - dashboards/metrics-server.json
+  - name: grafana-dashboard-minecraft
+    files:
+      - dashboards/minecraft.json
   - name: grafana-dashboard-nodes
     files:
       - dashboards/nodes.json

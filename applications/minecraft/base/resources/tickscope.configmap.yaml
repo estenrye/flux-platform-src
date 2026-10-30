@@ -1,0 +1,25 @@
+# TickScope (Paper Prometheus exporter) config. Synced into
+# /data/plugins/TickScope/ on every start by the itzg image (COPY_CONFIG_*
+# in base/values.yaml). Only bind-address differs from the defaults: the
+# default is loopback, which the PodMonitor cannot reach. The pod is the only
+# thing listening on this port inside its namespace, and the NetworkPolicy
+# restricts 9101 to the OpenTelemetry collector, so no auth-token is set.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tickscope-config
+data:
+  config.yml: |
+    server-id: paper
+    bind-address: "0.0.0.0"
+    port: 9101
+    path: /metrics
+    auth-token: ""
+    collection-interval-ticks: 100
+    per-world: true
+    exclude-worlds: []
+    entity-types:
+      enabled: true
+      interval-ticks: 600
+      chunks-per-tick: 32
+      allowlist: []

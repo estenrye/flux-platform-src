@@ -741,6 +741,101 @@ def efficiency_dashboards():
     }
 
 
+# ── Minecraft servers ───────────────────────────────────────────────────────
+# Two exporters share the namespace/minecraft job (applications/minecraft/base/
+# resources/podmonitor.yaml): TickScope inside the server (mc_*; Paper 1.21,
+# metric names from TickScope 2.x) and the mc-monitor status-ping sidecar
+# (minecraft_status_*, outside-in). One namespace per instance, so the
+# `instance` variable is the namespace label. Container CPU/memory come from
+# cAdvisor (same series as the efficiency dashboards).
+MC = 'namespace=~"$instance"'
+MC_CONTAINER = f'{MC}, container!=""'
+
+
+def stat(idx, title, expr, unit, x, y, w=4, h=4, steps=None, mappings=None, decimals=None):
+    defaults = {
+        "unit": unit,
+        "color": {"mode": "thresholds"},
+        "thresholds": {"mode": "absolute", "steps": steps or [{"color": "green", "value": None}]},
+    }
+    if mappings:
+        defaults["mappings"] = mappings
+    if decimals is not None:
+        defaults["decimals"] = decimals
+    return {
+        "id": idx, "type": "stat", "title": title, "datasource": DS,
+        "gridPos": {"h": h, "w": w, "x": x, "y": y},
+        "fieldConfig": {"defaults": defaults, "overrides": []},
+        "options": {
+            "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": False},
+            "colorMode": "background", "graphMode": "none", "textMode": "auto",
+        },
+        "targets": [{"datasource": DS, "expr": expr, "refId": "A"}],
+    }
+
+
+def minecraft_dashboard():
+    inst = {
+        "name": "instance", "label": "Instance", "type": "query", "datasource": DS,
+        "query": {"query": "label_values(mc_players_online, namespace)", "refId": "instance"},
+        "refresh": 2, "includeAll": True, "multi": True, "allValue": ".*",
+        "current": {"selected": True, "text": "All", "value": "$__all"},
+    }
+    ok_bad = [{"color": "red", "value": None}, {"color": "green", "value": 1}]
+    tps = [{"color": "red", "value": None}, {"color": "orange", "value": 15}, {"color": "green", "value": 19}]
+    mspt = [{"color": "green", "value": None}, {"color": "orange", "value": 0.04}, {"color": "red", "value": 0.05}]
+    up_map = [{"type": "value", "options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}}}]
+    panels = [
+        # Row 1: at-a-glance (y=0)
+        stat(1, "Status ping", f'min(minecraft_status_healthy{{{MC}}})', "none", 0, 0, steps=ok_bad, mappings=up_map),
+        stat(2, "Players online", f'sum(mc_players_online{{{MC}}})', "short", 4, 0),
+        stat(3, "TPS (1m, worst)", f'min(mc_tps{{{MC}, window="1m"}})', "short", 8, 0, steps=tps, decimals=1),
+        stat(4, "Tick time p95 (worst)", f'max(mc_tick_duration_seconds{{{MC}, statistic="p95"}})', "s", 12, 0, steps=mspt, decimals=3),
+        stat(5, "Heap used", f'max(mc_jvm_memory_used_bytes{{{MC}, area="heap"}} / mc_jvm_memory_max_bytes{{{MC}, area="heap"}})', "percentunit", 16, 0,
+             steps=[{"color": "green", "value": None}, {"color": "orange", "value": 0.8}, {"color": "red", "value": 0.92}]),
+        stat(6, "Uptime", f'min(mc_uptime_seconds{{{MC}}})', "s", 20, 0),
+        # Players and status (y=4)
+        ts(7, "Players online vs max", [("online {{namespace}}", f'sum by (namespace) (mc_players_online{{{MC}}})'),
+                                        ("max {{namespace}}", f'max by (namespace) (mc_players_max{{{MC}}})')], "short", 0, 4),
+        ts(8, "Status ping latency", [("{{namespace}}", f'max by (namespace) (minecraft_status_response_time_seconds{{{MC}}})')], "s", 12, 4),
+        # Tick health (y=12)
+        ts(9, "TPS", [("{{namespace}} {{window}}", f'min by (namespace, window) (mc_tps{{{MC}}})')], "short", 0, 12),
+        ts(10, "Tick duration", [("{{namespace}} {{statistic}}", f'max by (namespace, statistic) (mc_tick_duration_seconds{{{MC}, statistic=~"p50|p95|p99|max"}})')], "s", 12, 12),
+        # Worlds (y=20)
+        ts(11, "Entities by world", [("{{namespace}} {{world}}", f'sum by (namespace, world) (mc_world_entities{{{MC}}})'),
+                                     ("tile {{namespace}} {{world}}", f'sum by (namespace, world) (mc_world_tile_entities{{{MC}}})')], "short", 0, 20),
+        ts(12, "Loaded chunks and players by world", [("chunks {{namespace}} {{world}}", f'sum by (namespace, world) (mc_world_chunks{{{MC}}})'),
+                                                      ("players {{namespace}} {{world}}", f'sum by (namespace, world) (mc_world_players{{{MC}}})')], "short", 12, 20),
+        ts(13, "Top 10 entity types", [("{{type}}", f'topk(10, sum by (type) (mc_world_entities_by_type{{{MC}}}))')], "short", 0, 28),
+        ts(14, "Player events/min", [("{{namespace}} {{event}}", f'sum by (namespace, event) (rate(mc_events_total{{{MC}}}[5m])) * 60')], "short", 12, 28),
+        # JVM and process (y=36)
+        ts(15, "JVM memory", [("heap used {{namespace}}", f'sum by (namespace) (mc_jvm_memory_used_bytes{{{MC}, area="heap"}})'),
+                              ("heap committed {{namespace}}", f'sum by (namespace) (mc_jvm_memory_committed_bytes{{{MC}, area="heap"}})'),
+                              ("heap max {{namespace}}", f'max by (namespace) (mc_jvm_memory_max_bytes{{{MC}, area="heap"}})'),
+                              ("non-heap used {{namespace}}", f'sum by (namespace) (mc_jvm_memory_used_bytes{{{MC}, area="nonheap"}})')], "bytes", 0, 36),
+        ts(16, "GC time and collections", [("time/s {{namespace}} {{gc}}", f'sum by (namespace, gc) (rate(mc_jvm_gc_seconds_total{{{MC}}}[5m]))'),
+                                           ("collections/s {{namespace}} {{gc}}", f'sum by (namespace, gc) (rate(mc_jvm_gc_collections_total{{{MC}}}[5m]))')], "short", 12, 36),
+        ts(17, "Server process CPU (cores) and load", [("process cores {{namespace}}", f'sum by (namespace) (rate(mc_process_cpu_seconds_total{{{MC}}}[5m]))'),
+                                                       ("process load ratio {{namespace}}", f'max by (namespace) (mc_process_cpu_load_ratio{{{MC}}})')], "short", 0, 44),
+        ts(18, "JVM threads", [("current {{namespace}}", f'sum by (namespace) (mc_jvm_threads_current{{{MC}}})'),
+                               ("daemon {{namespace}}", f'sum by (namespace) (mc_jvm_threads_daemon{{{MC}}})')], "short", 12, 44),
+        # Container (y=52)
+        ts(19, "Container CPU (cores)", [("{{namespace}} {{container}}", f'sum by (namespace, container) (rate(container_cpu_usage_seconds_total{{{MC_CONTAINER}}}[5m]))'),
+                                         ("throttled {{namespace}} {{container}}", f'sum by (namespace, container) (rate(container_cpu_cfs_throttled_seconds_total{{{MC_CONTAINER}}}[5m]))')], "short", 0, 52),
+        ts(20, "Container memory (working set)", [("{{namespace}} {{container}}", f'max by (namespace, container) (container_memory_working_set_bytes{{{MC_CONTAINER}}})')], "bytes", 12, 52),
+        # Exporter health (y=60)
+        ts(21, "Player ping (ms)", [("{{namespace}} {{statistic}}", f'max by (namespace, statistic) (mc_player_ping_seconds{{{MC}}}) * 1000')], "ms", 0, 60),
+        ts(22, "TickScope collection health", [("seconds since last success {{namespace}}", f'time() - max by (namespace) (mc_collection_last_success_timestamp_seconds{{{MC}}})'),
+                                                ("failures/s {{namespace}}", f'sum by (namespace) (rate(mc_collection_failures_total{{{MC}}}[5m]))'),
+                                                ("collection duration {{namespace}}", f'max by (namespace) (mc_collection_duration_seconds{{{MC}}})')], "short", 12, 60),
+    ]
+    d = raw_dashboard("core-infra-minecraft", "Minecraft servers", panels, [inst],
+                      "Per-instance Minecraft health: TickScope (inside the server) plus mc-monitor status pings.")
+    d["tags"] = ["core-infra", "generated", "minecraft"]
+    d["refresh"] = "1m"
+    return d
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.json"):
@@ -755,6 +850,8 @@ def main():
     d = dashboard("core-infra-nodes", NODES[0], NODES[1])
     (OUT / "nodes.json").write_text(json.dumps(d, indent=2) + "\n")
     files.append("nodes.json")
+    (OUT / "minecraft.json").write_text(json.dumps(minecraft_dashboard(), indent=2) + "\n")
+    files.append("minecraft.json")
     for slug, d in efficiency_dashboards().items():
         (OUT / f"{slug}.json").write_text(json.dumps(d, indent=2) + "\n")
         files.append(f"{slug}.json")
