@@ -1,0 +1,28 @@
+# Scraped by the opentelemetry-collector target allocator, which selects every
+# PodMonitor (podMonitorSelector: {}), into VictoriaMetrics. Two exporters
+# share the job (namespace/minecraft): TickScope inside the server (:9101) and
+# the mc-monitor status-ping sidecar (:8080).
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: minecraft
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: minecraft
+  podMetricsEndpoints:
+    - portNumber: 9101
+      path: /metrics
+      interval: 30s
+    - port: mcmonitor
+      path: /metrics
+      interval: 30s
+      metricRelabelings:
+        # mc-monitor labels every series with server_port, which collides with
+        # the server.port resource attribute the collector adds for the scrape
+        # target (server_port=8080). Keep the game port as mc_port.
+        - action: replace
+          sourceLabels: [server_port]
+          targetLabel: mc_port
+        - action: labeldrop
+          regex: server_port
