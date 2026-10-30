@@ -836,6 +836,78 @@ def minecraft_dashboard():
     return d
 
 
+# ── CloudNativePG ───────────────────────────────────────────────────────────
+# Operator metrics come from the chart PodMonitor (applications/cnpg/base,
+# monitoring.podMonitorEnabled); instance metrics (cnpg_*) come from each
+# Cluster's own PodMonitor (spec.monitoring.enablePodMonitor). The `cluster`
+# variable is the pod's cnpg.io/cluster label as exposed by the target allocator.
+CNPG_OP = 'namespace="cnpg-system"'
+CNPG = 'namespace=~"$namespace", pod=~"$cluster-[0-9]+"'
+
+
+def cnpg_dashboard():
+    ns = {
+        "name": "namespace", "label": "Namespace", "type": "query", "datasource": DS,
+        "query": {"query": "label_values(cnpg_collector_up, namespace)", "refId": "namespace"},
+        "refresh": 2, "includeAll": True, "multi": True, "allValue": ".*",
+        "current": {"selected": True, "text": "All", "value": "$__all"},
+    }
+    cl = {
+        "name": "cluster", "label": "Cluster", "type": "query", "datasource": DS,
+        "query": {"query": 'label_values(cnpg_collector_up{namespace=~"$namespace"}, cluster)', "refId": "cluster"},
+        "refresh": 2, "includeAll": True, "multi": True, "allValue": ".*",
+        "current": {"selected": True, "text": "All", "value": "$__all"},
+    }
+    ok_bad = [{"color": "red", "value": None}, {"color": "green", "value": 1}]
+    up_map = [{"type": "value", "options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}}}]
+    C = 'namespace=~"$namespace", cluster=~"$cluster"'
+    panels = [
+        # At a glance (y=0)
+        stat(1, "Operator up", f'min(up{{{CNPG_OP}, job=~".*cloudnative-pg.*"}})', "none", 0, 0, steps=ok_bad, mappings=up_map),
+        stat(2, "Instances up", f'sum(cnpg_collector_up{{{C}}})', "short", 4, 0),
+        stat(3, "Instances down", f'count(cnpg_collector_up{{{C}}} == 0) or vector(0)', "short", 8, 0,
+             steps=[{"color": "green", "value": None}, {"color": "red", "value": 1}]),
+        stat(4, "Max replication lag", f'max(cnpg_pg_replication_lag{{{C}}})', "s", 12, 0, decimals=1,
+             steps=[{"color": "green", "value": None}, {"color": "orange", "value": 5}, {"color": "red", "value": 30}]),
+        stat(5, "Connections used", f'max(sum by (pod) (cnpg_backends_total{{{C}}}) / max by (pod) (cnpg_pg_settings_setting{{{C}, name="max_connections"}}))', "percentunit", 16, 0,
+             steps=[{"color": "green", "value": None}, {"color": "orange", "value": 0.8}, {"color": "red", "value": 0.95}]),
+        stat(6, "Operator reconcile errors (1h)", f'sum(increase(controller_runtime_reconcile_errors_total{{{CNPG_OP}}}[1h]))', "short", 20, 0,
+             steps=[{"color": "green", "value": None}, {"color": "red", "value": 1}]),
+        # Operator (y=4)
+        ts(7, "Operator reconciles/s", [("{{controller}} {{result}}", f'sum by (controller, result) (rate(controller_runtime_reconcile_total{{{CNPG_OP}}}[5m]))')], "ops", 0, 4),
+        ts(8, "Operator reconcile duration p95", [("{{controller}}", f'histogram_quantile(0.95, sum by (le, controller) (rate(controller_runtime_reconcile_time_seconds_bucket{{{CNPG_OP}}}[5m])))')], "s", 12, 4),
+        ts(9, "Operator work queue depth", [("{{name}}", f'max by (name) (workqueue_depth{{{CNPG_OP}}})')], "short", 0, 12),
+        ts(10, "Operator CPU and memory", [("CPU cores", f'sum(rate(container_cpu_usage_seconds_total{{{CNPG_OP}, container!=""}}[5m]))'),
+                                           ("memory GiB", f'sum(container_memory_working_set_bytes{{{CNPG_OP}, container!=""}}) / 2^30')], "short", 12, 12),
+        # Instances (y=20)
+        ts(11, "Instance up", [("{{namespace}} {{pod}}", f'cnpg_collector_up{{{C}}}')], "none", 0, 20),
+        ts(12, "Replication lag", [("{{namespace}} {{pod}}", f'cnpg_pg_replication_lag{{{C}}}')], "s", 12, 20),
+        ts(13, "Connections", [("{{namespace}} {{pod}} {{state}}", f'sum by (namespace, pod, state) (cnpg_backends_total{{{C}}})'),
+                               ("max {{namespace}} {{pod}}", f'max by (namespace, pod) (cnpg_pg_settings_setting{{{C}, name="max_connections"}})')], "short", 0, 28),
+        ts(14, "Longest transaction", [("{{namespace}} {{pod}}", f'max by (namespace, pod) (cnpg_backends_max_tx_duration_seconds{{{C}}})')], "s", 12, 28),
+        ts(15, "Database size", [("{{namespace}} {{datname}}", f'max by (namespace, datname) (cnpg_pg_database_size_bytes{{{C}}})')], "bytes", 0, 36),
+        ts(16, "Transactions/s", [("commit {{namespace}} {{datname}}", f'sum by (namespace, datname) (rate(cnpg_pg_stat_database_xact_commit{{{C}}}[5m]))'),
+                                  ("rollback {{namespace}} {{datname}}", f'sum by (namespace, datname) (rate(cnpg_pg_stat_database_xact_rollback{{{C}}}[5m]))')], "ops", 12, 36),
+        # WAL and backups (y=44)
+        ts(17, "WAL archiving", [("archived/s {{namespace}} {{pod}}", f'sum by (namespace, pod) (rate(cnpg_pg_stat_archiver_archived_count{{{C}}}[5m]))'),
+                                 ("failed/s {{namespace}} {{pod}}", f'sum by (namespace, pod) (rate(cnpg_pg_stat_archiver_failed_count{{{C}}}[5m]))')], "ops", 0, 44),
+        ts(18, "Seconds since last archived WAL", [("{{namespace}} {{pod}}", f'time() - max by (namespace, pod) (cnpg_pg_stat_archiver_last_archived_time{{{C}}})')], "s", 12, 44),
+        ts(19, "Last base backup age", [("{{namespace}} {{cluster}}", f'time() - max by (namespace, cluster) (cnpg_collector_last_available_backup_timestamp{{{C}}})')], "s", 0, 52),
+        ts(20, "Collector health", [("scrape errors {{namespace}} {{pod}}", f'max by (namespace, pod) (cnpg_collector_last_collection_error{{{C}}})'),
+                                    ("collection duration {{namespace}} {{pod}}", f'max by (namespace, pod) (cnpg_collector_collection_duration_seconds{{{C}}})')], "short", 12, 52),
+        # Containers (y=60)
+        ts(21, "Postgres container CPU (cores)", [("{{namespace}} {{pod}}", f'sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{{{CNPG}, container="postgres"}}[5m]))'),
+                                                  ("throttled {{namespace}} {{pod}}", f'sum by (namespace, pod) (rate(container_cpu_cfs_throttled_seconds_total{{{CNPG}, container="postgres"}}[5m]))')], "short", 0, 60),
+        ts(22, "Postgres container memory (working set)", [("{{namespace}} {{pod}}", f'max by (namespace, pod) (container_memory_working_set_bytes{{{CNPG}, container="postgres"}})')], "bytes", 12, 60),
+        ts(23, "Data volume used", [("{{namespace}} {{persistentvolumeclaim}}", f'max by (namespace, persistentvolumeclaim) (kubelet_volume_stats_used_bytes{{namespace=~"$namespace", persistentvolumeclaim=~"$cluster-[0-9]+"}} / kubelet_volume_stats_capacity_bytes{{namespace=~"$namespace", persistentvolumeclaim=~"$cluster-[0-9]+"}})')], "percentunit", 0, 68),
+    ]
+    d = raw_dashboard("core-infra-cnpg", "CloudNativePG", panels, [ns, cl],
+                      "CloudNativePG operator and PostgreSQL cluster health: reconciliation, replication, connections, WAL archiving and backups.")
+    d["tags"] = ["core-infra", "generated", "cnpg"]
+    d["refresh"] = "1m"
+    return d
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.json"):
@@ -852,6 +924,8 @@ def main():
     files.append("nodes.json")
     (OUT / "minecraft.json").write_text(json.dumps(minecraft_dashboard(), indent=2) + "\n")
     files.append("minecraft.json")
+    (OUT / "cnpg.json").write_text(json.dumps(cnpg_dashboard(), indent=2) + "\n")
+    files.append("cnpg.json")
     for slug, d in efficiency_dashboards().items():
         (OUT / f"{slug}.json").write_text(json.dumps(d, indent=2) + "\n")
         files.append(f"{slug}.json")
