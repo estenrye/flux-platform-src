@@ -45,6 +45,7 @@ resources:
 - ../../applications/openstack-cloud-controller-manager-otel/base
 - ../../applications/reloader/base
 - ../../applications/keda/base
+- ../../applications/cnpg/base
 - ../../applications/kubernetes-descheduler/base
 # Minecraft instances migrated from the cd-homelab ArgoCD ApplicationSet (the
 # four it deployed). Other overlays under applications/minecraft/ are
