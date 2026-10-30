@@ -246,7 +246,7 @@ provision-democratic-csi:
 	CLUSTER=$(CLUSTER) NFS_SERVER_ULA=$(NFS_SERVER_ULA) .bin/provision-democratic-csi.sh
 
 provision-cloudflare-r2-bucket:
-	CLUSTER=$(CLUSTER) BUCKET_NAME=$(BUCKET_NAME) SECRET_NS=$(SECRET_NS) CF_API_TOKEN=$(CF_API_TOKEN) .bin/provision-cloudflare-r2-bucket.sh
+	CLUSTER=$(CLUSTER) BUCKET_NAME=$(BUCKET_NAME) SECRET_NS=$(SECRET_NS) CF_API_TOKEN=$(CF_API_TOKEN) SOPS_ENCRYPT=$(SOPS_ENCRYPT) .bin/provision-cloudflare-r2-bucket.sh
 
 rotate-cloudflare-r2-token:
 	CLUSTER=$(CLUSTER) BUCKET_NAME=$(BUCKET_NAME) CF_API_TOKEN=$(CF_API_TOKEN) .bin/rotate-cloudflare-r2-token.sh
