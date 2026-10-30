@@ -73,6 +73,12 @@ jobs:
       - name: Lint external-dns owner ids
         run: make lint-external-dns-owner-id
 
+      - name: Test seaweedfs-db barman endpoint lint
+        run: make test-lint-seaweedfs-db-barman-endpoint
+
+      - name: Lint seaweedfs-db barman endpoint
+        run: make lint-seaweedfs-db-barman-endpoint
+
       - name: Stage rendered manifests for upload
         run: cp -r .render/flux-platform-rendered/ /tmp/rendered-manifests/
 

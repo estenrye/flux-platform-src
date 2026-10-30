@@ -70,13 +70,22 @@ lint-external-dns-owner-id: render-deps
 test-lint-external-dns-owner-id: render-deps
 	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-external-dns-owner-id.sh
 
+# seaweedfs-db's base ships the placeholder R2 endpoint
+# https://CF_ACCOUNT_ID.r2.cloudflarestorage.com on its barman ObjectStore;
+# every cluster including seaweedfs-db must patch in the real account endpoint.
+lint-seaweedfs-db-barman-endpoint: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/lint-seaweedfs-db-barman-endpoint.sh $(dir $(wildcard clusters/*/kustomization.yaml))
+
+test-lint-seaweedfs-db-barman-endpoint: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-seaweedfs-db-barman-endpoint.sh
+
 # Kustomize can't share a Helm values file across overlays, so
 # applications/minecraft/<instance>/base.values.yaml is generated from
 # applications/minecraft/base/values.yaml; fail if a copy is stale.
 lint-minecraft-values:
 	.bin/sync-minecraft-values.sh --check
 
-lint: lint-deps render lint-minecraft-values lint-checkov lint-kube-linter lint-spiffe-trust-domain lint-netdata-hostname lint-grafana-placeholders lint-external-dns-owner-id
+lint: lint-deps render lint-minecraft-values lint-checkov lint-kube-linter lint-spiffe-trust-domain lint-netdata-hostname lint-grafana-placeholders lint-external-dns-owner-id lint-seaweedfs-db-barman-endpoint
 
 flux-reconcile-source:
 	flux reconcile source git flux-platform-rendered -n flux-system
