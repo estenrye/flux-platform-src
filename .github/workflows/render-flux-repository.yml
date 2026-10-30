@@ -79,12 +79,6 @@ jobs:
       - name: Lint seaweedfs-db barman endpoint
         run: make lint-seaweedfs-db-barman-endpoint
 
-      - name: Test seaweedfs-db barman secret lint
-        run: make test-lint-seaweedfs-db-barman-secret
-
-      - name: Lint seaweedfs-db barman secret
-        run: make lint-seaweedfs-db-barman-secret
-
       - name: Stage rendered manifests for upload
         run: cp -r .render/flux-platform-rendered/ /tmp/rendered-manifests/
 

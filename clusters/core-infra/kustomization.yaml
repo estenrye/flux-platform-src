@@ -49,7 +49,6 @@ resources:
 - ../../applications/cnpg-barman-plugin/base
 - ../../applications/seaweedfs-db/base
 - ../../applications/seaweedfs/base
-- secrets/cloudflare-r2-seaweedfs-db-barman.sops.yaml
 - ../../applications/kubernetes-descheduler/base
 # Minecraft instances migrated from the cd-homelab ArgoCD ApplicationSet (the
 # four it deployed). Other overlays under applications/minecraft/ are

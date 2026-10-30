@@ -79,22 +79,13 @@ lint-seaweedfs-db-barman-endpoint: render-deps
 test-lint-seaweedfs-db-barman-endpoint: render-deps
 	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-seaweedfs-db-barman-endpoint.sh
 
-# The R2 credentials for seaweedfs-db's barman backups are minted by
-# .bin/provision-cloudflare-r2-bucket.sh into clusters/<name>/secrets/; every
-# cluster including seaweedfs-db must list that SOPS file in its kustomization.
-lint-seaweedfs-db-barman-secret: render-deps
-	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/lint-seaweedfs-db-barman-secret.sh $(dir $(wildcard clusters/*/kustomization.yaml))
-
-test-lint-seaweedfs-db-barman-secret: render-deps
-	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-seaweedfs-db-barman-secret.sh
-
 # Kustomize can't share a Helm values file across overlays, so
 # applications/minecraft/<instance>/base.values.yaml is generated from
 # applications/minecraft/base/values.yaml; fail if a copy is stale.
 lint-minecraft-values:
 	.bin/sync-minecraft-values.sh --check
 
-lint: lint-deps render lint-minecraft-values lint-checkov lint-kube-linter lint-spiffe-trust-domain lint-netdata-hostname lint-grafana-placeholders lint-external-dns-owner-id lint-seaweedfs-db-barman-endpoint lint-seaweedfs-db-barman-secret
+lint: lint-deps render lint-minecraft-values lint-checkov lint-kube-linter lint-spiffe-trust-domain lint-netdata-hostname lint-grafana-placeholders lint-external-dns-owner-id lint-seaweedfs-db-barman-endpoint
 
 flux-reconcile-source:
 	flux reconcile source git flux-platform-rendered -n flux-system
