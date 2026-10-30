@@ -1,0 +1,184 @@
+# SeaweedFS (chart 4.51.0): S3 with versioning + Object Lock, filer metadata
+# in the CNPG cluster seaweedfs-db (applications/seaweedfs-db).
+#
+# Topology: 3 masters (raft), 3 volume servers, 2 filers with embedded S3.
+# Volume data replication 001 = one extra copy on another server in the same
+# rack, so every needle lives on two volume servers.
+global:
+  seaweedfs:
+    # Chart-owned monitoring flag wires a push gateway; metrics are scraped by
+    # resources/podmonitor.yaml instead.
+    monitoring:
+      enabled: false
+    enableReplication: true
+    replicationPlacement: "001"
+    # Writable scratch for containers running with a read-only root filesystem.
+    tmpDir:
+      sizeLimit: 1Gi
+
+master:
+  replicas: 3
+  # Raft needs a stable bootstrap; defaultReplication is overridden by
+  # global.seaweedfs.replicationPlacement above.
+  volumeSizeLimitMB: 1000
+  data:
+    type: persistentVolumeClaim
+    size: 5Gi
+    storageClass: csi-cinder-sc-retain
+  # Container logs go to stdout; no host path.
+  logs:
+    type: emptyDir
+  priorityClassName: datastore
+  podSecurityContext:
+    enabled: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    enabled: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 512Mi
+
+volume:
+  replicas: 3
+  dataDirs:
+    - name: data
+      type: persistentVolumeClaim
+      size: 100Gi
+      storageClass: csi-cinder-sc-retain
+      # 0 auto-configures from free disk space.
+      maxVolumes: 0
+  priorityClassName: datastore
+  podSecurityContext:
+    enabled: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    enabled: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 2
+      memory: 2Gi
+
+filer:
+  replicas: 2
+  data:
+    type: emptyDir
+  logs:
+    type: emptyDir
+  priorityClassName: datastore
+  podSecurityContext:
+    enabled: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    enabled: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 2
+      memory: 2Gi
+
+  extraEnvironmentVars:
+    # Metadata lives in Postgres, not the local leveldb2.
+    WEED_LEVELDB2_ENABLED: "false"
+    WEED_MYSQL_ENABLED: "false"
+    WEED_POSTGRES2_ENABLED: "true"
+    WEED_POSTGRES2_HOSTNAME: seaweedfs-db-rw.seaweedfs.svc.cluster.local
+    WEED_POSTGRES2_PORT: "5432"
+    WEED_POSTGRES2_DATABASE: seaweedfs
+    WEED_POSTGRES2_SSLMODE: require
+    WEED_POSTGRES2_CONNECTION_MAX_IDLE: "5"
+    WEED_POSTGRES2_CONNECTION_MAX_OPEN: "50"
+    WEED_POSTGRES2_CONNECTION_MAX_LIFETIME_SECONDS: "600"
+    WEED_FILER_OPTIONS_RECURSIVE_DELETE: "false"
+    WEED_FILER_BUCKETS_FOLDER: "/buckets"
+
+  # CNPG-generated Secret for the seaweedfs owner role.
+  secretExtraEnvironmentVars:
+    WEED_POSTGRES2_USERNAME:
+      secretKeyRef:
+        name: seaweedfs-db-app
+        key: username
+    WEED_POSTGRES2_PASSWORD:
+      secretKeyRef:
+        name: seaweedfs-db-app
+        key: password
+
+  s3:
+    enabled: true
+    enableAuth: true
+    # Identities (incl. the actions needed for versioning and object-lock
+    # APIs) come from resources/eso.external-secret.s3-config.yaml; the chart's
+    # own generated secret uses Helm lookup, which is not stable across
+    # `helm template` renders.
+    existingConfigSecret: seaweedfs-s3-config
+
+    createBucketsHook:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
+
+    # Object Lock is irreversible and forces versioning; it can only be set at
+    # bucket creation. Placeholder buckets -- rename to suit.
+    createBuckets:
+      - name: versioned
+        versioning: Enabled
+      - name: locked
+        objectLock: true
+        versioning: Enabled

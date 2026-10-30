@@ -1,0 +1,79 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: seaweedfs-db
+  namespace: seaweedfs
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "CNPG creates PostgreSQL pods dynamically; the cnpg.io/cluster label is valid but pods do not exist in the static rendered manifest."
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "CNPG creates PostgreSQL pods dynamically; the cnpg.io/cluster label is valid but pods do not exist in the static rendered manifest."
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: seaweedfs-db
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # SeaweedFS filer pods (chart label app.kubernetes.io/component: filer).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: seaweedfs
+              app.kubernetes.io/component: filer
+      ports:
+        - protocol: TCP
+          port: 5432
+    # CNPG operator polls instance status on 8000; without this rule the
+    # cluster reports a misleading "Instance Status Extraction Error".
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cloudnative-pg
+      ports:
+        - protocol: TCP
+          port: 8000
+    # Metrics scrape from the OpenTelemetry collector daemonset (PodMonitor).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: opentelemetry-collector
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: otelcol-ds-collector
+      ports:
+        - protocol: TCP
+          port: 9187
+    # Replication between peer instances.
+    - from:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: seaweedfs-db
+      ports:
+        - protocol: TCP
+          port: 5432
+  egress:
+    # apiserver targetPort — Calico evaluates egress post-DNAT
+    # (docs/memory/calico-networkpolicy-dnat.md). Talos serves 6443.
+    - ports:
+        - protocol: TCP
+          port: 6443
+    # streaming replication to peer instances (pod port, same rule)
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: seaweedfs-db
+      ports:
+        - protocol: TCP
+          port: 5432
+    # barman WAL archiving / base backups to Cloudflare R2 (S3 over HTTPS)
+    - ports:
+        - protocol: TCP
+          port: 443
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

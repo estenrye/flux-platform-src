@@ -1,0 +1,88 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: seaweedfs
+  namespace: seaweedfs
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The CNPG instance pods (cnpg.io/cluster=seaweedfs-db) are created at runtime by the CNPG operator; they are not in the static rendered manifests."
+spec:
+  # All chart pods: master, volume, filer and the bucket-creation hook Job.
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # S3 API (embedded in the filer). Open to every namespace like Garage's
+    # S3 port; clients authenticate with the identities in seaweedfs-s3-config.
+    # Tighten to specific consumer namespaces once they exist.
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8333
+    # Intra-release traffic: master raft/HTTP (9333/19333), volume (8080/18080),
+    # filer (8888/18888). Pod ports, not service ports (Calico evaluates
+    # post-DNAT; docs/memory/calico-networkpolicy-dnat.md).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: seaweedfs
+      ports:
+        - protocol: TCP
+          port: 9333
+        - protocol: TCP
+          port: 19333
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 18080
+        - protocol: TCP
+          port: 8888
+        - protocol: TCP
+          port: 18888
+    # Metrics, scraped by the per-node OpenTelemetry collector (PodMonitor).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: opentelemetry-collector
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: otelcol-ds-collector
+      ports:
+        - protocol: TCP
+          port: 9327
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: seaweedfs
+      ports:
+        - protocol: TCP
+          port: 9333
+        - protocol: TCP
+          port: 19333
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 18080
+        - protocol: TCP
+          port: 8888
+        - protocol: TCP
+          port: 18888
+        - protocol: TCP
+          port: 8333
+    # Filer metadata store.
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: seaweedfs-db
+      ports:
+        - protocol: TCP
+          port: 5432
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

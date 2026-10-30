@@ -46,6 +46,9 @@ resources:
 - ../../applications/reloader/base
 - ../../applications/keda/base
 - ../../applications/cnpg/base
+- ../../applications/cnpg-barman-plugin/base
+- ../../applications/seaweedfs-db/base
+- ../../applications/seaweedfs/base
 - ../../applications/kubernetes-descheduler/base
 # Minecraft instances migrated from the cd-homelab ArgoCD ApplicationSet (the
 # four it deployed). Other overlays under applications/minecraft/ are
