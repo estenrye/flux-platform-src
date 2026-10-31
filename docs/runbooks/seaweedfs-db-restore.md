@@ -229,14 +229,24 @@ sidecar in the Cinder controller), so those six PVCs can be snapshotted.
   SeaweedFS at all.
 - A class with `force-create: "true"` snapshots an attached volume. A new
   volume restored from that snapshot returned the file written before it.
-- `type: backup` (a Cinder backup instead of a snapshot) went to `error` on this
-  OpenStack; the cause was not investigated. Do not rely on it.
+- `type: backup` (a Cinder backup instead of a snapshot) does not work: this
+  OpenStack has no `cinder-backup` service, and the backup went to `error` with
+  `fail_reason: Service not found for creating backup.` Backups also cannot be
+  deleted afterwards (the API returns HTTP 500), so do not try it again until
+  that service exists.
+- **Deleting a snapshot of an attached volume failed.** The snapshot I had just
+  restored from went to `error_deleting` on this TrueNAS NFS backend and stayed
+  there. After the volume was detached from its VM, the same delete (once the
+  state was reset by an OpenStack admin) succeeded. A failed backup attempt was
+  in flight on that volume at the same time, so the exact cause is not isolated.
 
 Prerequisite: the classes `csi-cinder-snapclass-retain-inuse` (audit snapshots;
 the snapshot survives deleting the `VolumeSnapshot`) and
 `csi-cinder-snapclass-delete-inuse` (drills) come from `pcd-ce-deploy`
 (`variables.tf`, `cinder_volume_snapshot_classes`) and exist only after that is
-applied. Check first:
+applied. As of writing they are committed there but not applied; the plan is
+three in-place control-plane machine-config updates, and a Talos
+`apply-config --dry-run` reports that it applies without a reboot. Check first:
 
 ```sh
 kubectl get volumesnapshotclass csi-cinder-snapclass-retain-inuse csi-cinder-snapclass-delete-inuse \
@@ -346,14 +356,28 @@ kubectl -n seaweedfs delete pvc drill-volume-0
 
 The `retain` class keeps the Cinder snapshot after the `VolumeSnapshot` is
 deleted, so a set must be retired deliberately and its capacity is not freed
-by Kubernetes. Record each snapshot's Cinder id **before** deleting anything:
+by Kubernetes. **Expect the Cinder delete to be the fragile step:** on this
+backend, deleting a snapshot of a volume that is still attached went to
+`error_deleting` (see above). Retire a set at a time when the volume servers can
+be stopped and their volumes detached, and check each delete finished.
+
+Record each snapshot's Cinder id **before** deleting anything:
 
 ```sh
 kubectl get volumesnapshotcontent -o json | jq -r --arg s "audit-$SET" \
   '.items[] | select(.spec.volumeSnapshotRef.name | startswith($s)) | "\(.metadata.name) \(.status.snapshotHandle)"'
 kubectl -n seaweedfs delete volumesnapshot -l rye.ninja/snapshot-set=$SET
 kubectl delete volumesnapshotcontent <names from above>
-# then delete those Cinder snapshot ids in OpenStack (needs OpenStack credentials)
+```
+
+Then delete those Cinder snapshot ids in OpenStack, which needs admin access:
+`ssh ubuntu@pcd.rye.ninja`, `sudo -i`, `source /root/openstackrc`.
+
+```sh
+openstack volume snapshot delete <cinder-snapshot-id>
+openstack volume snapshot show <cinder-snapshot-id> -c status -f value   # must disappear; error_deleting means it failed
+# only if it is stuck in error_deleting and the volume is detached:
+openstack volume snapshot set --state error <cinder-snapshot-id> && openstack volume snapshot delete <cinder-snapshot-id>
 ```
 
 ### Real restore of volume data (not drilled)
@@ -392,7 +416,9 @@ drill above. Take the filers down first, then the volume servers:
 - **Part C on SeaweedFS itself.** The snapshot and restore mechanism was proven
   on a scratch volume only. Not yet confirmed: that the two `*-inuse` classes
   exist and work once `pcd-ce-deploy` is applied; that a set can be taken on the
-  live volume servers without side effects; Cinder snapshot and volume quotas;
+  live volume servers without side effects; whether deleting a snapshot of an
+  attached SeaweedFS volume fails the way the scratch one did; Cinder snapshot
+  and volume quotas;
   that SeaweedFS starts cleanly on restored volume files (a scratch stack over
   restored PVCs and a restored database, reading an object and its retention from
   `locked`, is the real proof); and the master and replica-reconcile steps.
