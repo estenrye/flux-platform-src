@@ -384,7 +384,25 @@ diff <(kubectl -n seaweedfs exec drill-volume-0 -- sh -c 'ls -l /data | awk "{pr
 
 The same `.dat`/`.idx` files should be present. Sizes in the restored copy are
 equal to or smaller than live (later writes are not in it); a file that is
-**missing** or **larger** than live is a problem. This PVC is 100Gi: the drill
+**missing** or **larger** than live is a problem. Take the two listings within a
+few seconds of each other, and expect `lost+found` and `vol_dir.uuid` in both.
+To check the files are readable, compare like with like (regular files only; `ls`
+sizes include directories and hide dotfiles):
+
+```sh
+kubectl -n seaweedfs exec drill-volume-0 -- sh -c 'find /data -type f -exec cat {} + | wc -c'
+kubectl -n seaweedfs exec drill-volume-0 -- sh -c 'find /data -type f -exec wc -c {} + | tail -1'   # the two byte counts must match
+```
+
+**Measured, 2026-10-31** (`seaweedfs-volume-0`, 100Gi, about 0.1 MiB of data, idle;
+`csi-cinder-snapclass-delete-inuse`): the snapshot of the live, attached volume
+was ready in 16 s and the volume server was unaffected; the restored volume
+mounted after **17 min 24 s** (the NFS backend copies the provisioned size, not
+the used data, so budget for that in a real restore); the restored listing was
+identical to the live one taken 19 s earlier (38 entries, same names and sizes);
+teardown of the scratch volume took about 6 minutes. The readability check was
+not run correctly that time (my script compared against an empty listing and
+counted a directory), so treat it as unproven until the commands above are run. This PVC is 100Gi: the drill
 needs that much Cinder capacity, and the quota was not checked.
 
 Tear the drill down (the `delete` storage class frees the volume):
@@ -434,7 +452,9 @@ drill above. Take the filers down first, then the volume servers:
    the drill, `storageClassName: csi-cinder-sc-retain`, 100Gi). The StatefulSet
    adopts a PVC that already exists under its claim name.
 4. Scale the volume servers back up, wait for them to register with the masters,
-   then the filers. `flux resume kustomization flux-platform`.
+   then the filers. `flux resume kustomization flux-platform`. A restored 100Gi
+   volume took about 17 minutes to become usable in the drill, so expect the
+   volume servers to be down for at least that long.
 5. Restore the masters' PVCs the same way only if they are lost, and then **all
    three from the same set**; do not mix a restored master with live ones.
 6. Reconcile replica differences with `weed shell` (`volume.check.disk`,
@@ -457,9 +477,9 @@ drill above. Take the filers down first, then the volume servers:
 - **Part C on SeaweedFS itself.** The snapshot and restore mechanism was proven
   on a scratch volume only. Not yet confirmed: that the two `*-inuse` classes
   exist and work once `pcd-ce-deploy` is applied; that a set can be taken on the
-  live volume servers without side effects; whether snapshots of a large, busy
-  100Gi volume create and delete as cleanly as the idle 1Gi test volumes did;
-  Cinder snapshot and volume quotas;
+  live volume servers while they take writes (one idle server was snapshotted
+  without side effects); whether a busy volume snapshots and deletes as cleanly
+  as the idle ones did;
   that SeaweedFS starts cleanly on restored volume files (a scratch stack over
   restored PVCs and a restored database, reading an object and its retention from
   `locked`, is the real proof); and the master and replica-reconcile steps.
