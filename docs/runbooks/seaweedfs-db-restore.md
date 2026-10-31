@@ -12,13 +12,17 @@ Cloudflare R2 bucket `seaweedfs-db-barman`. The `ObjectStore` is
 R2 credentials come from the 1Password item `cloudflare-r2-seaweedfs-db-barman`
 through the `seaweedfs-db-barman-credentials` ExternalSecret.
 
-> **Status:** the drills below have not been run yet. Parts A and B follow the
-> patterns that were verified for `openbao-db`
+> **Status (2026-10-31):** Part D, the full-stack restore drill, ran three times
+> (the last two with the committed scripts): a restored database plus a restored
+> volume snapshot served the audit data back through S3 with matching checksums,
+> identical version ids, and COMPLIANCE retention intact and still enforced. Two
+> runs passed 13 of 13 checks; the other passed 12 of 13 (one small read failed
+> and was never diagnosed, probably a dropped port-forward; the script now
+> retries). Part B, the in-place restore under the production names, and the real
+> volume restore are **not** drilled. The "Not yet verified" section lists the
+> limits. Parts A and B follow the patterns verified for `openbao-db`
 > ([openbao-restore.md](openbao-restore.md)) and `step-ca-db`
-> ([step-ca-db-restore.md](step-ca-db-restore.md)). Part C (volume snapshots of
-> the audit data) rests on a mechanism proven only on a scratch volume. The "Not
-> yet verified" section lists what to confirm the first time. Run the drills
-> before you need a real restore.
+> ([step-ca-db-restore.md](step-ca-db-restore.md)).
 
 ## Read this first: metadata and data must agree
 
@@ -83,6 +87,8 @@ production archive.
      bootstrap:
        recovery:
          source: seaweedfs-db-source
+         database: seaweedfs
+         owner: seaweedfs
      externalClusters:
        - name: seaweedfs-db-source
          plugin:
@@ -92,10 +98,14 @@ production archive.
              serverName: seaweedfs-db
    ```
 
-   The scratch storage uses the `delete` class on purpose, so tearing it down
+   With `database` and `owner` set, CNPG created the `<cluster>-app` Secret that
+   the scratch filer reads (observed in the Part D drill). The scratch storage uses the `delete` class on purpose, so tearing it down
    frees the volume.
 
-3. **NetworkPolicy for the scratch cluster.** Production's policy selects
+3. **NetworkPolicy for the scratch cluster.** *Not needed on core-infra today:*
+   the namespace has no default-deny, and the Part D drill ran its recovery
+   cluster with no NetworkPolicy at all. Keep this step for a cluster that adds
+   default-deny. Production's policy selects
    `cnpg.io/cluster: seaweedfs-db` only, so a differently named cluster gets no
    traffic. It needs ingress 8000 from the CNPG operator (without it the cluster
    reports a misleading `Instance Status Extraction Error`) and egress to the
@@ -397,13 +407,16 @@ kubectl -n seaweedfs exec drill-volume-0 -- sh -c 'find /data -type f -exec wc -
 **Measured, 2026-10-31** (`seaweedfs-volume-0`, 100Gi, about 0.1 MiB of data, idle;
 `csi-cinder-snapclass-delete-inuse`): the snapshot of the live, attached volume
 was ready in 16 s and the volume server was unaffected; the restored volume
-mounted after **17 min 24 s** (the NFS backend copies the provisioned size, not
-the used data, so budget for that in a real restore); the restored listing was
+mounted after **17 min 24 s** in that run (in the three Part D runs the restored
+100Gi volume was bound at once and the pod using it was ready in about 20
+seconds, so the delay is not a fixed cost; the cause of the slow run was not
+found, so plan for it in a real restore); the restored listing was
 identical to the live one taken 19 s earlier (38 entries, same names and sizes);
 teardown of the scratch volume took about 6 minutes. The readability check was
 not run correctly that time (my script compared against an empty listing and
-counted a directory), so treat it as unproven until the commands above are run. This PVC is 100Gi: the drill
-needs that much Cinder capacity, and the quota was not checked.
+counted a directory), so treat it as unproven until the commands above are run.
+The restored PVC is 100Gi and counts against the 1000Gi capacity quota while it
+exists.
 
 Tear the drill down (the `delete` storage class frees the volume):
 
@@ -453,15 +466,84 @@ drill above. Take the filers down first, then the volume servers:
    adopts a PVC that already exists under its claim name.
 4. Scale the volume servers back up, wait for them to register with the masters,
    then the filers. `flux resume kustomization flux-platform`. A restored 100Gi
-   volume took about 17 minutes to become usable in the drill, so expect the
-   volume servers to be down for at least that long.
+   volume was usable within seconds in three drill runs and took about 17
+   minutes in one; plan for the slow case.
 5. Restore the masters' PVCs the same way only if they are lost, and then **all
    three from the same set**; do not mix a restored master with live ones.
 6. Reconcile replica differences with `weed shell` (`volume.check.disk`,
    `volume.fix.replication`) and verify reads, including the retention state of
    objects in `locked`.
 
-## Not yet verified (confirm in the first drill)
+## Part D: full-stack restore drill (does the audit data actually come back?)
+
+Parts A and C check the pieces. Part D restores a database **and** a volume
+snapshot into a separate, working SeaweedFS and reads audit data back through its
+S3 API. The scripts are in `.bin/seaweedfs-restore-drill/`. They need `kubectl`,
+`aws`, `jq`, `yq` and `shasum`, the `csi-cinder-snapclass-delete-inuse` class
+(see Part C), and optionally SSH access to OpenStack (`OPENSTACK_SSH`, default
+`ubuntu@pcd.rye.ninja`) so teardown can confirm the Cinder snapshot is gone.
+
+```sh
+.bin/seaweedfs-restore-drill/seed.sh       # write known audit objects to production, record where their data lives
+.bin/seaweedfs-restore-drill/restore.sh    # database backup, then volume snapshot, then restore both into a scratch stack
+.bin/seaweedfs-restore-drill/verify.sh     # read it back through the scratch S3 and compare with production
+.bin/seaweedfs-restore-drill/teardown.sh   # remove everything the drill created, by label
+```
+
+What it does:
+
+1. `seed.sh` writes two versions of one key to `versioned` and a 200,000-byte
+   object to `locked` under **COMPLIANCE retention for 24 hours**, records their
+   version ids, SHA-256s and retention, finds the chunk's volume, and chooses a
+   volume server that holds a replica of it. (One replica is enough to read the
+   object. Restoring all three servers at once was not tried: if snapshot sizes
+   count against the 1000Gi Cinder capacity quota, as Cinder does by default, a
+   full set plus its restore would not fit. That was not measured.)
+2. `restore.sh` takes the set in the safe order, database backup first and then a
+   snapshot of that volume server's PVC, and restores both: a recovery cluster
+   `drill-db` from the R2 backup (no `spec.plugins`, so it never writes to
+   production's archive) and a PVC `drill-volume` from the snapshot. It then starts
+   a scratch master (empty, no restored master PVC), volume server and filer with S3
+   (`drill-*`, distinct labels so no production Service or NetworkPolicy selects
+   them), using the same image digest, command lines and security context as
+   production. Nothing writes to the production database, volumes or masters.
+3. `verify.sh` runs 13 checks against the scratch S3: buckets, versioning and
+   Object Lock configuration; both versions present with the production version
+   ids; the locked object read back with a matching SHA-256 (its chunk was
+   confirmed to be on the restored server, and the scratch cluster has no other
+   volume server); retention mode and date
+   identical to production; and the lock still **enforced** on the restored copy
+   (delete refused, bypass-governance refused, object intact).
+4. `teardown.sh` deletes by label, so it works even if `restore.sh` stopped
+   halfway, removes the unlocked test versions from production, and checks for
+   leftovers (including Cinder snapshots).
+
+Side effects on production, which you should expect: one extra base backup in R2,
+a 100Gi Cinder snapshot while it runs, and **one 200KB COMPLIANCE object in
+`locked` per run that cannot be deleted for 24 hours** (it is tiny and expires on
+its own; delete it afterwards if you want a tidy bucket).
+
+**Measured, 2026-10-31, three runs:** database backup about 1 minute; snapshot of
+the live volume 9 to 14 seconds; recovery cluster healthy after about 7, 11.5 and
+14 minutes (it varies a lot); scratch stack up within about 30 seconds of that;
+verify about 1 minute; teardown about 1 minute twice and about 11 minutes once
+(deleting the Cinder snapshot took 7 minutes that time). Allow 15 to 20 minutes
+end to end.
+
+What Part D does **not** prove:
+
+- One volume server (of three) was restored, from an idle volume holding about
+  0.1 MiB, and it was a hot snapshot taken while SeaweedFS ran. Busy volumes,
+  large or multi-chunk objects and restoring all three servers are untested.
+- The scratch master started empty, and the volume server re-registered with it
+  without trouble, so a master PVC is not needed to **read** restored data.
+  Whether masters should be restored to resume **writes** is untested.
+- Replica reconciliation after restoring only some servers
+  (`volume.fix.replication`) was not exercised.
+- The database was recovered to the latest point in the archive, not a chosen
+  point in time, and into a new name (`drill-db`), not as `seaweedfs-db`.
+
+## Not yet verified
 
 - **Archiving after a same-name restore.** The recovered cluster would archive
   to the same server path that already holds the old timeline. If CNPG refuses
@@ -474,15 +556,11 @@ drill above. Take the filers down first, then the volume servers:
   with it when Flux resumes. `openbao-restore.md` does not address this either.
   Check what Flux reports after `flux resume` and fix the source manifest if it
   objects.
-- **Part C on SeaweedFS itself.** The snapshot and restore mechanism was proven
-  on a scratch volume only. Not yet confirmed: that the two `*-inuse` classes
-  exist and work once `pcd-ce-deploy` is applied; that a set can be taken on the
-  live volume servers while they take writes (one idle server was snapshotted
-  without side effects); whether a busy volume snapshots and deletes as cleanly
-  as the idle ones did;
-  that SeaweedFS starts cleanly on restored volume files (a scratch stack over
-  restored PVCs and a restored database, reading an object and its retention from
-  `locked`, is the real proof); and the master and replica-reconcile steps.
+- **Part C under load.** Snapshots of idle live volume servers worked and
+  restored to a working SeaweedFS (Part D). Not yet confirmed: snapshots while
+  the volume servers take writes, whether a busy volume snapshots and deletes as
+  cleanly as the idle ones did, restoring all three servers, and the master and
+  replica-reconcile steps of the real volume restore.
 - **Off-site copy.** Everything in Part C stays on the Cinder backend, so
   object data still has no off-cluster copy. Cinder backups (`type: backup`)
   errored here, and SeaweedFS's own replication to object storage was not

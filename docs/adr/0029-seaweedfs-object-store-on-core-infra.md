@@ -76,6 +76,11 @@ Garage stays where it is. This ADR does not move CNPG barman backups off it.
 - Filer metadata is in Postgres (the `filemeta` table, a table per bucket,
   and `.system`), `seaweedfs-db` runs at 3 of 3 instances, and scheduled backups to R2
   complete.
+- A full-stack restore drill passed (runbook Part D, 13 of 13 checks on two of
+  three runs): a recovery cluster from the R2 backup plus one volume server's
+  snapshot, run as a separate scratch SeaweedFS, served a locked object back
+  through S3 with a matching checksum, the production version ids, and COMPLIANCE
+  retention intact and still enforced.
 
 **Things to live with:**
 
@@ -99,9 +104,10 @@ Garage stays where it is. This ADR does not move CNPG barman backups off it.
   sender-based NetworkPolicies across nodes. Fixed in `pcd-ce-deploy` (see
   [kube-proxy-clustercidr-masquerade.md](../memory/kube-proxy-clustercidr-masquerade.md)).
 
-**Not yet done:** a `seaweedfs-db` restore drill, a filer/master failover test,
-a drilled recovery path for the volume data (snapshots are documented but only
-proven on a scratch volume), and any off-cluster copy of the object data.
+**Not yet done:** a filer/master failover test, an in-place restore under the
+production names (the drill restores into a scratch stack), restoring all three
+volume servers or the masters, drills under write load, and any off-cluster copy
+of the object data.
 
 ## Alternatives considered
 

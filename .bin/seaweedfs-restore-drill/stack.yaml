@@ -1,0 +1,97 @@
+# Scratch SeaweedFS stack for the restore drill. Single replicas, distinct drill-* names and labels (NOT
+# app.kubernetes.io/name=seaweedfs) so no production Service or NetworkPolicy selects these pods.
+# Mirrors the production command lines, image digest and security context.
+apiVersion: v1
+kind: Service
+metadata: {name: drill-master, namespace: seaweedfs, labels: {rye.ninja/purpose: seaweedfs-restore-drill}}
+spec:
+  selector: {app: drill-master}
+  ports: [{name: http, port: 9333, targetPort: 9333}, {name: grpc, port: 19333, targetPort: 19333}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: drill-master, namespace: seaweedfs, labels: {rye.ninja/purpose: seaweedfs-restore-drill}}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: drill-master}}
+  template:
+    metadata: {labels: {app: drill-master, rye.ninja/purpose: seaweedfs-restore-drill}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: weed
+          image: chrislusf/seaweedfs:4.51@sha256:f7a49e3f3972ebed5be2ed4befa4a0c68eb7bdddba6e692d42729ceb545134b8
+          command: ["/bin/sh", "-ec", "exec /usr/bin/weed -logtostderr=true -v=1 master -port=9333 -mdir=/data -ip.bind=0.0.0.0 -defaultReplication=000 -volumeSizeLimitMB=1000 -ip=${POD_IP}"]
+          env: [{name: POD_IP, valueFrom: {fieldRef: {fieldPath: status.podIP}}}]
+          ports: [{containerPort: 9333}, {containerPort: 19333}]
+          readinessProbe: {httpGet: {path: /cluster/status, port: 9333}, initialDelaySeconds: 5, periodSeconds: 5}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, runAsNonRoot: true, capabilities: {drop: [ALL]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}, {name: data, mountPath: /data}]
+      volumes: [{name: tmp, emptyDir: {}}, {name: data, emptyDir: {}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: drill-volume, namespace: seaweedfs, labels: {rye.ninja/purpose: seaweedfs-restore-drill}}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: drill-volume}}
+  template:
+    metadata: {labels: {app: drill-volume, rye.ninja/purpose: seaweedfs-restore-drill}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: weed
+          image: chrislusf/seaweedfs:4.51@sha256:f7a49e3f3972ebed5be2ed4befa4a0c68eb7bdddba6e692d42729ceb545134b8
+          command: ["/bin/sh", "-ec", "exec /usr/bin/weed -logtostderr=true -v=1 volume -port=8080 -dir /data -max 0 -ip.bind=0.0.0.0 -readMode=proxy -minFreeSpacePercent=1 -ip=${POD_IP} -master=drill-master.seaweedfs.svc.cluster.local:9333"]
+          env: [{name: POD_IP, valueFrom: {fieldRef: {fieldPath: status.podIP}}}]
+          ports: [{containerPort: 8080}, {containerPort: 18080}]
+          readinessProbe: {httpGet: {path: /status, port: 8080}, initialDelaySeconds: 5, periodSeconds: 5}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, runAsNonRoot: true, capabilities: {drop: [ALL]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}, {name: data, mountPath: /data}]
+      volumes:
+        - {name: tmp, emptyDir: {}}
+        - {name: data, persistentVolumeClaim: {claimName: drill-volume}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: drill-filer, namespace: seaweedfs, labels: {rye.ninja/purpose: seaweedfs-restore-drill}}
+spec:
+  selector: {app: drill-filer}
+  ports: [{name: http, port: 8888, targetPort: 8888}, {name: s3, port: 8333, targetPort: 8333}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: drill-filer, namespace: seaweedfs, labels: {rye.ninja/purpose: seaweedfs-restore-drill}}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: drill-filer}}
+  template:
+    metadata: {labels: {app: drill-filer, rye.ninja/purpose: seaweedfs-restore-drill}}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: weed
+          image: chrislusf/seaweedfs:4.51@sha256:f7a49e3f3972ebed5be2ed4befa4a0c68eb7bdddba6e692d42729ceb545134b8
+          command: ["/bin/sh", "-ec", "exec /usr/bin/weed -logtostderr=true -v=1 filer -port=8888 -dirListLimit=100000 -defaultReplicaPlacement=000 -ip=${POD_IP} -ip.bind=0.0.0.0 -s3 -s3.port=8333 -s3.config=/etc/sw/seaweedfs_s3_config -master=drill-master.seaweedfs.svc.cluster.local:9333"]
+          env:
+            - {name: POD_IP, valueFrom: {fieldRef: {fieldPath: status.podIP}}}
+            - {name: WEED_FILER_BUCKETS_FOLDER, value: /buckets}
+            - {name: WEED_LEVELDB2_ENABLED, value: "false"}
+            - {name: WEED_POSTGRES2_ENABLED, value: "true"}
+            - {name: WEED_POSTGRES2_HOSTNAME, value: drill-db-rw.seaweedfs.svc.cluster.local}
+            - {name: WEED_POSTGRES2_PORT, value: "5432"}
+            - {name: WEED_POSTGRES2_DATABASE, value: seaweedfs}
+            - {name: WEED_POSTGRES2_SSLMODE, value: require}
+            - {name: WEED_POSTGRES2_USERNAME, valueFrom: {secretKeyRef: {name: drill-db-app, key: username}}}
+            - {name: WEED_POSTGRES2_PASSWORD, valueFrom: {secretKeyRef: {name: drill-db-app, key: password}}}
+          ports: [{containerPort: 8888}, {containerPort: 18888}, {containerPort: 8333}]
+          readinessProbe: {httpGet: {path: /, port: 8888}, initialDelaySeconds: 10, periodSeconds: 5, failureThreshold: 60}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, runAsNonRoot: true, capabilities: {drop: [ALL]}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}, {name: data, mountPath: /data}, {name: s3config, mountPath: /etc/sw, readOnly: true}]
+      volumes:
+        - {name: tmp, emptyDir: {}}
+        - {name: data, emptyDir: {}}
+        - {name: s3config, secret: {secretName: seaweedfs-s3-config}}
