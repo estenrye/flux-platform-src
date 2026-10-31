@@ -1,0 +1,16 @@
+# Workaround for kube-proxy masquerading in-cluster service traffic on core-infra.
+# kube-proxy's clusterCIDR is fd10:244::/56 (Talos podSubnets) but pods actually
+# use the Calico pool fd00:db8:0:1100::/56, so kube-proxy treats pod-sourced
+# ClusterIP traffic as external and SNATs it to the sending node's address.
+# Cross-node connections through seaweedfs-db-rw/-r then arrive from a node IP,
+# which the pod-label rules in the base policy cannot match (filers and CNPG
+# replica joins timed out). Delete this patch once clusterCIDR is corrected.
+- op: add
+  path: /spec/ingress/-
+  value:
+    from:
+      - ipBlock:
+          cidr: fd97:45c2:b3a1:1179::/64
+    ports:
+      - protocol: TCP
+        port: 5432

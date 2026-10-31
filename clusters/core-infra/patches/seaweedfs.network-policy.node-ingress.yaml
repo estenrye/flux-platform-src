@@ -1,0 +1,14 @@
+# Workaround for kube-proxy masquerading in-cluster service traffic on core-infra;
+# see seaweedfs-db.network-policy.node-ingress.yaml. S3 clients on other nodes
+# reach the seaweedfs-s3 Service from their node's address, which the
+# namespaceSelector rule in the base policy cannot match. Delete once
+# clusterCIDR is corrected.
+- op: add
+  path: /spec/ingress/-
+  value:
+    from:
+      - ipBlock:
+          cidr: fd97:45c2:b3a1:1179::/64
+    ports:
+      - protocol: TCP
+        port: 8333
