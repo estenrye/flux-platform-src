@@ -264,7 +264,7 @@ contain all of it. Taking the data first would let metadata reference data the
 snapshots lack.
 
 ```sh
-STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+STAMP=$(date -u +%Y%m%dt%H%M%Sz)   # lowercase: it is used in Kubernetes resource names
 
 # 1. metadata: an immediate base backup, and wait for it
 kubectl -n seaweedfs apply -f - <<EOF
@@ -306,6 +306,11 @@ What a set does and does not guarantee:
 - Cinder snapshots live on the **same storage backend as the volumes**. They
   protect against deletion and corruption, not against losing the backend. They
   are not an off-site copy.
+- **Quota limits you to one set at a time.** The project's Cinder quota (checked
+  2026-10-31) allows 10 snapshots in total, and a set is 6; snapshot sizes also
+  count toward the 1000Gi capacity quota (544Gi in use then), and a set is about
+  315Gi. Retire the previous set before taking the next. Check headroom with
+  `openstack quota show --usage <project-id>` (admin access, see below).
 
 ### Optional: a quiesced (cold) set
 
