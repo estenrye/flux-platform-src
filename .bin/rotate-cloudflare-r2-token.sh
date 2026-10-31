@@ -73,22 +73,24 @@ else
 fi
 
 # ── Read old credentials from 1Password ──────────────────────────────────────
+# --reveal: recent op CLIs print a placeholder instead of the value for fields
+# stored as concealed, which would otherwise be used as the token id/account id.
 info "Reading existing credentials from 1Password..."
 OLD_TOKEN_ID=$(op item get "${OP_ITEM_NAME}" \
   --vault "${CLUSTER_NAME}" \
   --account "${OP_ACCOUNT}" \
-  --field "token-id" 2>/dev/null || true)
+  --reveal --field "token-id" 2>/dev/null || true)
 [ -n "${OLD_TOKEN_ID}" ] \
   || { error "token-id not found in 1Password item '${OP_ITEM_NAME}' — was this bucket provisioned with provision-cloudflare-r2-bucket.sh?"; exit 1; }
 
 CF_ACCOUNT_ID=$(op item get "${OP_ITEM_NAME}" \
   --vault "${CLUSTER_NAME}" \
   --account "${OP_ACCOUNT}" \
-  --field "account-id")
+  --reveal --field "account-id")
 CF_R2_ENDPOINT=$(op item get "${OP_ITEM_NAME}" \
   --vault "${CLUSTER_NAME}" \
   --account "${OP_ACCOUNT}" \
-  --field "endpoint")
+  --reveal --field "endpoint")
 
 success "Old token ID: ${OLD_TOKEN_ID}"
 info "Account ID:   ${CF_ACCOUNT_ID}"
