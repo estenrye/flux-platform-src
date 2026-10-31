@@ -326,8 +326,12 @@ kubectl -n seaweedfs scale statefulset seaweedfs-filer --replicas=0     # no mor
 # take the seaweedfs-db Backup and wait for it (as in the set above)
 kubectl -n seaweedfs scale statefulset seaweedfs-volume --replicas=0
 kubectl -n seaweedfs scale statefulset seaweedfs-master --replicas=0
-# wait until the six PVs have no VolumeAttachment (usually seconds)
-kubectl get volumeattachment -o json | jq -r '.items[] | select(.spec.source.persistentVolumeName | test("pvc-")) | .metadata.name' | wc -l   # compare with other workloads
+# wait until none of the six PVs has a VolumeAttachment (usually seconds)
+for pvc in data-seaweedfs-volume-0 data-seaweedfs-volume-1 data-seaweedfs-volume-2 \
+           data-seaweedfs-seaweedfs-master-0 data-seaweedfs-seaweedfs-master-1 data-seaweedfs-seaweedfs-master-2; do
+  pv=$(kubectl -n seaweedfs get pvc $pvc -o jsonpath='{.spec.volumeName}')
+  until [ "$(kubectl get volumeattachment -o json | jq --arg pv "$pv" '[.items[] | select(.spec.source.persistentVolumeName==$pv)] | length')" = 0 ]; do sleep 5; done
+done
 # snapshot the six PVCs with csi-cinder-snapclass-retain, as in the set above
 kubectl -n seaweedfs scale statefulset seaweedfs-master --replicas=3   # wait Ready
 kubectl -n seaweedfs scale statefulset seaweedfs-volume --replicas=3   # wait Ready
