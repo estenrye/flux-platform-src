@@ -131,6 +131,9 @@ configMapGenerator:
   - name: grafana-dashboard-resource-efficiency
     files:
       - dashboards/resource-efficiency.json
+  - name: grafana-dashboard-seaweedfs
+    files:
+      - dashboards/seaweedfs.json
   - name: grafana-dashboard-spegel
     files:
       - dashboards/spegel.json

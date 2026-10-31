@@ -57,6 +57,21 @@ patches:
         path: /spec/template/spec/automountServiceAccountToken
         value: false
 
+  # The chart's master StatefulSet runs with -metricsPort=9327 but does not declare
+  # it as a container port. The PodMonitor discovers declared container ports only,
+  # so without this the masters (leader, volume layout, under-replication) were never
+  # scraped. Adding it rolls the masters one at a time.
+  - target:
+      kind: StatefulSet
+      name: seaweedfs-master
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/ports/-
+        value:
+          name: metrics
+          containerPort: 9327
+          protocol: TCP
+
   # Linter suppressions on chart-generated workloads.
   - target:
       kind: StatefulSet

@@ -908,6 +908,91 @@ def cnpg_dashboard():
     return d
 
 
+def seaweedfs_dashboard():
+    """SeaweedFS (applications/seaweedfs): masters, volume servers, filers + embedded S3.
+
+    Every SeaweedFS process registers the full metric set, so each query is filtered to the pods of the role
+    that actually populates it (the other roles report zeros). VictoriaMetrics stores SeaweedFS counters with a
+    `_total` suffix appended (e.g. SeaweedFS_s3_uploaded_objects_total). The filer store is the CNPG cluster
+    seaweedfs-db, covered by the CloudNativePG dashboard.
+    """
+    M = 'namespace="seaweedfs", pod=~"seaweedfs-master-.*"'
+    V = 'namespace="seaweedfs", pod=~"seaweedfs-volume-.*"'
+    F = 'namespace="seaweedfs", pod=~"seaweedfs-filer-.*"'
+    ALL = 'namespace="seaweedfs", pod=~"seaweedfs-(master|volume|filer)-.*"'
+    ok_bad = [{"color": "red", "value": None}, {"color": "green", "value": 1}]
+    zero_ok = [{"color": "green", "value": None}, {"color": "red", "value": 1}]
+
+    def lat(metric, sel, by=""):
+        extra = f", {by}" if by else ""
+        return [(f"p50 {{{{{by}}}}}" if by else "p50", f'histogram_quantile(0.50, sum by (le{extra}) (rate({metric}_bucket{{{sel}}}[5m])))'),
+                (f"p95 {{{{{by}}}}}" if by else "p95", f'histogram_quantile(0.95, sum by (le{extra}) (rate({metric}_bucket{{{sel}}}[5m])))'),
+                (f"p99 {{{{{by}}}}}" if by else "p99", f'histogram_quantile(0.99, sum by (le{extra}) (rate({metric}_bucket{{{sel}}}[5m])))')]
+
+    panels = [
+        # At a glance (y=0)
+        stat(1, "Pods reporting metrics (8 expected)", 'count(SeaweedFS_build_info{namespace="seaweedfs"})', "short", 0, 0,
+             steps=[{"color": "red", "value": None}, {"color": "green", "value": 8}]),
+        stat(2, "Master leader elected", f'sum(SeaweedFS_master_is_leader{{{M}}})', "short", 4, 0,
+             steps=[{"color": "red", "value": None}, {"color": "green", "value": 1}, {"color": "red", "value": 2}]),
+        stat(3, "Under-replicated volumes", f'sum(SeaweedFS_master_under_replicated_volumes{{{M}}})', "short", 8, 0, steps=zero_ok),
+        stat(4, "Read-only / low-space volumes", f'sum(SeaweedFS_volumeServer_read_only_volumes{{{V}}})', "short", 12, 0, steps=zero_ok),
+        stat(5, "Fullest volume-server disk", f'max(SeaweedFS_volumeServer_resource{{{V}, type="used"}} / ignoring(type) SeaweedFS_volumeServer_resource{{{V}, type="all"}})', "percentunit", 16, 0,
+             steps=[{"color": "green", "value": None}, {"color": "orange", "value": 0.7}, {"color": "red", "value": 0.85}]),
+        stat(6, "S3 5xx rate (5m)", f'sum(rate(SeaweedFS_s3_request_total{{{F}, code=~"5.."}}[5m])) or vector(0)', "reqps", 20, 0,
+             steps=[{"color": "green", "value": None}, {"color": "red", "value": 0.001}], decimals=3),
+        # S3 (y=4)
+        ts(7, "S3 requests/s by operation", [("{{type}}", f'sum by (type) (rate(SeaweedFS_s3_request_total{{{F}}}[5m]))')], "reqps", 0, 4),
+        ts(8, "S3 non-2xx responses/s by code", [("{{code}} {{type}}", f'sum by (code, type) (rate(SeaweedFS_s3_request_total{{{F}, code!~"2.."}}[5m]))')], "reqps", 12, 4),
+        ts(9, "S3 request latency", lat("SeaweedFS_s3_request_seconds", F), "s", 0, 12),
+        ts(10, "S3 time to first byte p95", [("{{type}}", f'histogram_quantile(0.95, sum by (le, type) (rate(SeaweedFS_s3_time_to_first_byte_millisecond_bucket{{{F}}}[5m])))')], "ms", 12, 12),
+        ts(11, "Bucket size", [("{{bucket}}", f'max by (bucket) (SeaweedFS_s3_bucket_size_bytes{{{F}}})')], "bytes", 0, 20),
+        ts(12, "Bucket object count", [("{{bucket}}", f'max by (bucket) (SeaweedFS_s3_bucket_object_count{{{F}}})')], "short", 12, 20),
+        ts(13, "Bucket traffic", [("in {{bucket}}", f'sum by (bucket) (rate(SeaweedFS_s3_bucket_traffic_received_bytes_total{{{F}}}[5m]))'),
+                                  ("out {{bucket}}", f'sum by (bucket) (rate(SeaweedFS_s3_bucket_traffic_sent_bytes_total{{{F}}}[5m]))')], "Bps", 0, 28),
+        ts(14, "Objects uploaded / deleted per second", [("uploaded {{bucket}}", f'sum by (bucket) (rate(SeaweedFS_s3_uploaded_objects_total{{{F}}}[5m]))'),
+                                                         ("deleted {{bucket}}", f'sum by (bucket) (rate(SeaweedFS_s3_deleted_objects_total{{{F}}}[5m]))')], "ops", 12, 28),
+        # Filers and the metadata store (y=36)
+        ts(15, "Filer requests/s", [("{{type}} {{code}}", f'sum by (type, code) (rate(SeaweedFS_filer_request_total{{{F}}}[5m]))')], "reqps", 0, 36),
+        ts(16, "Filer request latency", lat("SeaweedFS_filer_request_seconds", F, "type"), "s", 12, 36),
+        ts(17, "Filer store (postgres2) operations/s", [("{{store}} {{type}}", f'sum by (store, type) (rate(SeaweedFS_filerStore_request_total{{{F}}}[5m]))')], "ops", 0, 44),
+        ts(18, "Filer store latency p95", [("{{store}} {{type}}", f'histogram_quantile(0.95, sum by (le, store, type) (rate(SeaweedFS_filerStore_request_seconds_bucket{{{F}}}[5m])))')], "s", 12, 44),
+        ts(19, "Filer in-flight requests and uploads", [("requests {{pod}}", f'max by (pod) (SeaweedFS_filer_in_flight_requests{{{F}}})'),
+                                                          ("uploads {{pod}}", f'max by (pod) (SeaweedFS_filer_in_flight_upload_count{{{F}}})')], "short", 0, 52),
+        ts(20, "S3 in-flight requests", [("{{type}}", f'sum by (type) (SeaweedFS_s3_in_flight_requests{{{F}}})')], "short", 12, 52),
+        # Volume servers (y=60)
+        ts(21, "Volumes per server", [("{{pod}}", f'sum by (pod) (SeaweedFS_volumeServer_volumes{{{V}}})'),
+                                      ("max {{pod}}", f'max by (pod) (SeaweedFS_volumeServer_max_volumes{{{V}}})')], "short", 0, 60),
+        ts(22, "Disk used per volume server", [("{{pod}}", f'max by (pod) (SeaweedFS_volumeServer_resource{{{V}, type="used"}} / ignoring(type) SeaweedFS_volumeServer_resource{{{V}, type="all"}})')], "percentunit", 12, 60),
+        ts(23, "Volume server requests/s", [("{{type}} {{code}}", f'sum by (type, code) (rate(SeaweedFS_volumeServer_request_total{{{V}}}[5m]))')], "reqps", 0, 68),
+        ts(24, "Volume server request latency", lat("SeaweedFS_volumeServer_request_seconds", V, "type"), "s", 12, 68),
+        ts(25, "Volume server failures/s", [("write failures", f'sum(rate(SeaweedFS_volumeServer_file_write_failures_total{{{V}}}[5m]))'),
+                                             ("read failures", f'sum(rate(SeaweedFS_volumeServer_file_read_failures_total{{{V}}}[5m]))'),
+                                             ("invalid needles", f'sum(rate(SeaweedFS_volumeServer_file_read_invalid_needles_total{{{V}}}[5m]))'),
+                                             ("storage I/O errors", f'sum(rate(SeaweedFS_volumeServer_storage_io_error_total{{{V}}}[5m]))')], "ops", 0, 76),
+        ts(26, "Replication operations/s and master disconnections", [("replication ops", f'sum(rate(SeaweedFS_volumeServer_replication_operations_total{{{V}}}[5m]))'),
+                                                                     ("master disconnections {{pod}}", f'sum by (pod) (increase(SeaweedFS_volumeServer_master_disconnections_total{{{V}}}[5m]))')], "ops", 12, 76),
+        # Masters (y=84)
+        ts(27, "Leader per master", [("{{pod}}", f'SeaweedFS_master_is_leader{{{M}}}')], "none", 0, 84),
+        ts(28, "Writable and crowded volume layouts", [("writable {{collection}}", f'sum by (collection) (SeaweedFS_master_volume_layout_writable{{{M}}})'),
+                                                       ("crowded {{collection}}", f'sum by (collection) (SeaweedFS_master_volume_layout_crowded{{{M}}})')], "short", 12, 84),
+        ts(29, "Under-replicated volumes and placement mismatches", [("under-replicated {{collection}}", f'sum by (collection) (SeaweedFS_master_under_replicated_volumes{{{M}}})'),
+                                                                     ("placement mismatch", f'sum(SeaweedFS_master_replica_placement_mismatch{{{M}}})')], "short", 0, 92),
+        ts(30, "Master heartbeats/s and leader changes", [("heartbeats {{type}}", f'sum by (type) (rate(SeaweedFS_master_received_heartbeats_total{{{M}}}[5m]))'),
+                                                          ("leader changes (1h)", f'sum(increase(SeaweedFS_master_leader_changes_total{{{M}}}[1h]))')], "short", 12, 92),
+        # Kubernetes resources (y=100)
+        ts(31, "CPU (cores)", [("{{pod}}", f'sum by (pod) (rate(container_cpu_usage_seconds_total{{{ALL}, container!=""}}[5m]))')], "short", 0, 100),
+        ts(32, "Memory (working set)", [("{{pod}}", f'max by (pod) (container_memory_working_set_bytes{{{ALL}, container!=""}})')], "bytes", 12, 100),
+        ts(33, "Data volume used", [("{{persistentvolumeclaim}}", 'max by (persistentvolumeclaim) (kubelet_volume_stats_used_bytes{namespace="seaweedfs", persistentvolumeclaim=~"data-seaweedfs-.*"} / kubelet_volume_stats_capacity_bytes{namespace="seaweedfs", persistentvolumeclaim=~"data-seaweedfs-.*"})')], "percentunit", 0, 108),
+        ts(34, "Container restarts (1h)", [("{{k8s_pod_name}}", 'sum by (k8s_pod_name) (increase(k8s_container_restarts{k8s_namespace_name="seaweedfs", k8s_pod_name=~"seaweedfs-(master|volume|filer)-.*"}[1h]))')], "short", 12, 108),
+    ]
+    d = raw_dashboard("core-infra-seaweedfs", "SeaweedFS", panels, [],
+                      "SeaweedFS object store: S3 traffic and latency, bucket sizes, filer metadata store (postgres2), volume servers and masters. The filer database is on the CloudNativePG dashboard.")
+    d["tags"] = ["core-infra", "generated", "seaweedfs"]
+    d["refresh"] = "1m"
+    return d
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.json"):
@@ -926,6 +1011,8 @@ def main():
     files.append("minecraft.json")
     (OUT / "cnpg.json").write_text(json.dumps(cnpg_dashboard(), indent=2) + "\n")
     files.append("cnpg.json")
+    (OUT / "seaweedfs.json").write_text(json.dumps(seaweedfs_dashboard(), indent=2) + "\n")
+    files.append("seaweedfs.json")
     for slug, d in efficiency_dashboards().items():
         (OUT / f"{slug}.json").write_text(json.dumps(d, indent=2) + "\n")
         files.append(f"{slug}.json")
