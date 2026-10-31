@@ -1,0 +1,26 @@
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: seaweedfs-db-barman
+  namespace: seaweedfs
+spec:
+  configuration:
+    destinationPath: s3://seaweedfs-db-barman/
+    # Placeholder; clusters/core-infra/patches/seaweedfs-db-barman.yaml sets the
+    # real account endpoint.
+    endpointURL: https://CF_ACCOUNT_ID.r2.cloudflarestorage.com
+    s3Credentials:
+      accessKeyId:
+        name: seaweedfs-db-barman-credentials
+        key: access-key-id
+      secretAccessKey:
+        name: seaweedfs-db-barman-credentials
+        key: secret-access-key
+      region:
+        name: seaweedfs-db-barman-credentials
+        key: region
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+  retentionPolicy: "30d"

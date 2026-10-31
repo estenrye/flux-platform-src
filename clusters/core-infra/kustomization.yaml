@@ -45,8 +45,10 @@ resources:
 - ../../applications/openstack-cloud-controller-manager-otel/base
 - ../../applications/reloader/base
 - ../../applications/keda/base
-- ../../applications/cnpg/base
 - ../../applications/kubernetes-descheduler/base
+- ../../applications/flux-monitoring/base
+- ../../applications/vpa-monitoring/base
+- ../../applications/control-plane-monitoring/base
 # Minecraft instances migrated from the cd-homelab ArgoCD ApplicationSet (the
 # four it deployed). Other overlays under applications/minecraft/ are
 # committed but not wired: arrendelle-winter-dev, bakery, mermaid-cove,
@@ -55,9 +57,13 @@ resources:
 # - ../../applications/minecraft/mermaid-cove-dev
 # - ../../applications/minecraft/baked-goods
 - ../../applications/minecraft/family-minecraft
-- ../../applications/flux-monitoring/base
-- ../../applications/vpa-monitoring/base
-- ../../applications/control-plane-monitoring/base
+# CNPG resources
+- ../../applications/cnpg/base
+- ../../applications/cnpg-barman-plugin/base
+# SeaweedFS resources
+- ../../applications/seaweedfs-db/base
+- ../../applications/seaweedfs/base
+# VPA Recommendations
 - resources/vpa.recommendations.yaml
 
 patches:
@@ -106,3 +112,8 @@ patches:
     kind: DaemonSet
     name: cert-manager-csi-driver-spiffe-driver
     namespace: cert-manager
+- path: patches/seaweedfs-db-barman.yaml
+  target:
+    kind: ObjectStore
+    name: seaweedfs-db-barman
+    namespace: seaweedfs

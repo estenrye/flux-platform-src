@@ -70,13 +70,22 @@ lint-external-dns-owner-id: render-deps
 test-lint-external-dns-owner-id: render-deps
 	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-external-dns-owner-id.sh
 
+# seaweedfs-db's base ships the placeholder R2 endpoint
+# https://CF_ACCOUNT_ID.r2.cloudflarestorage.com on its barman ObjectStore;
+# every cluster including seaweedfs-db must patch in the real account endpoint.
+lint-seaweedfs-db-barman-endpoint: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/lint-seaweedfs-db-barman-endpoint.sh $(dir $(wildcard clusters/*/kustomization.yaml))
+
+test-lint-seaweedfs-db-barman-endpoint: render-deps
+	PATH="$(CURDIR)/.venv/bin:$$PATH" .bin/test/test-lint-seaweedfs-db-barman-endpoint.sh
+
 # Kustomize can't share a Helm values file across overlays, so
 # applications/minecraft/<instance>/base.values.yaml is generated from
 # applications/minecraft/base/values.yaml; fail if a copy is stale.
 lint-minecraft-values:
 	.bin/sync-minecraft-values.sh --check
 
-lint: lint-deps render lint-minecraft-values lint-checkov lint-kube-linter lint-spiffe-trust-domain lint-netdata-hostname lint-grafana-placeholders lint-external-dns-owner-id
+lint: lint-deps render lint-minecraft-values lint-checkov lint-kube-linter lint-spiffe-trust-domain lint-netdata-hostname lint-grafana-placeholders lint-external-dns-owner-id lint-seaweedfs-db-barman-endpoint
 
 flux-reconcile-source:
 	flux reconcile source git flux-platform-rendered -n flux-system
@@ -237,7 +246,7 @@ provision-democratic-csi:
 	CLUSTER=$(CLUSTER) NFS_SERVER_ULA=$(NFS_SERVER_ULA) .bin/provision-democratic-csi.sh
 
 provision-cloudflare-r2-bucket:
-	CLUSTER=$(CLUSTER) BUCKET_NAME=$(BUCKET_NAME) SECRET_NS=$(SECRET_NS) CF_API_TOKEN=$(CF_API_TOKEN) .bin/provision-cloudflare-r2-bucket.sh
+	CLUSTER=$(CLUSTER) BUCKET_NAME=$(BUCKET_NAME) SECRET_NS=$(SECRET_NS) CF_API_TOKEN=$(CF_API_TOKEN) SOPS_ENCRYPT=$(SOPS_ENCRYPT) .bin/provision-cloudflare-r2-bucket.sh
 
 rotate-cloudflare-r2-token:
-	CLUSTER=$(CLUSTER) BUCKET_NAME=$(BUCKET_NAME) CF_API_TOKEN=$(CF_API_TOKEN) .bin/rotate-cloudflare-r2-token.sh
+	CLUSTER=$(CLUSTER) BUCKET_NAME=$(BUCKET_NAME) CF_API_TOKEN=$(CF_API_TOKEN) SOPS_ENCRYPT=$(SOPS_ENCRYPT) .bin/rotate-cloudflare-r2-token.sh

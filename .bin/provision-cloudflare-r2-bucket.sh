@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Provision a Cloudflare R2 bucket and a scoped S3 API token for it, then
-# SOPS-encrypt the credentials as a Kubernetes Secret and store them in
-# 1Password. Safe to run for multiple buckets on the same cluster; each
-# bucket gets its own Secret and 1Password item.
+# store the credentials in 1Password and (by default) SOPS-encrypt them as a
+# Kubernetes Secret. Safe to run for multiple buckets on the same cluster;
+# each bucket gets its own Secret and 1Password item.
 #
 # Usage:
 #   CLUSTER=controlplane \
@@ -21,9 +21,15 @@
 # Optional env:
 #   CF_ACCOUNT_ID  — auto-detected from the API if not set
 #   OP_ACCOUNT     — 1Password account (default: ryefamily.1password.com)
+#   SOPS_ENCRYPT   — "true" (default) or "false". When false, no SOPS Secret
+#                    is written and the sops CLI is not required; the
+#                    credentials live only in 1Password (e.g. for consumers
+#                    that read them through an ExternalSecret). Note that
+#                    rotate-cloudflare-r2-token.sh expects the SOPS Secret.
 #
 # Outputs:
 #   clusters/${CLUSTER}/secrets/cloudflare-r2-${BUCKET_NAME}.sops.yaml
+#                    (unless SOPS_ENCRYPT=false)
 #   1Password item "cloudflare-r2-${BUCKET_NAME}" in vault "${CLUSTER_NAME}"
 #
 # Cloudflare R2 API endpoints used:
@@ -37,6 +43,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 OP_ACCOUNT="${OP_ACCOUNT:-ryefamily.1password.com}"
+SOPS_ENCRYPT="${SOPS_ENCRYPT:-true}"
 
 source "${SCRIPT_DIR}/lib/prompt-color.sh"
 source "${SCRIPT_DIR}/lib/prompt-cluster.sh"
@@ -49,8 +56,15 @@ OP_ITEM_NAME="cloudflare-r2-${BUCKET_NAME}"
 SECRET_NAME="cloudflare-r2-${BUCKET_NAME}"
 SECRET_OUT="${CLUSTER_PATH}/secrets/${SECRET_NAME}.sops.yaml"
 
+case "${SOPS_ENCRYPT}" in
+  true|false) ;;
+  *) error "SOPS_ENCRYPT must be 'true' or 'false' (got '${SOPS_ENCRYPT}')"; exit 1 ;;
+esac
+
 # ── Prereqs ───────────────────────────────────────────────────────────────────
-for cmd in curl jq sops op openssl; do
+PREREQS="curl jq op openssl"
+[ "${SOPS_ENCRYPT}" = "true" ] && PREREQS="${PREREQS} sops"
+for cmd in ${PREREQS}; do
   command -v "${cmd}" >/dev/null || { error "Required command not found: ${cmd}"; exit 1; }
 done
 
@@ -58,7 +72,11 @@ info "Cluster:       ${CLUSTER_NAME}"
 info "Bucket:        ${BUCKET_NAME}"
 info "Secret:        ${SECRET_NAME} in namespace ${SECRET_NS}"
 info "1Password:     ${OP_ITEM_NAME} in vault ${CLUSTER_NAME}"
-info "Output:        ${SECRET_OUT}"
+if [ "${SOPS_ENCRYPT}" = "true" ]; then
+  info "Output:        ${SECRET_OUT}"
+else
+  info "Output:        (SOPS_ENCRYPT=false — no SOPS Secret will be written)"
+fi
 
 # ── Guard: abort if 1Password item already exists ─────────────────────────────
 EXISTING=$(op item get "${OP_ITEM_NAME}" \
@@ -192,12 +210,13 @@ op item create \
 success "1Password item '${OP_ITEM_NAME}' created in vault '${CLUSTER_NAME}'."
 
 # ── SOPS-encrypt Kubernetes Secret ────────────────────────────────────────────
-AGE_RECIPIENTS="$(grep -o 'age1[a-z0-9]*' "${CLUSTER_PATH}/.sops.yaml" | sort -u | paste -sd, -)"
-[ -n "${AGE_RECIPIENTS}" ] \
-  || { error "No age recipients found in ${CLUSTER_PATH}/.sops.yaml"; exit 1; }
-info "age recipients: ${AGE_RECIPIENTS}"
+if [ "${SOPS_ENCRYPT}" = "true" ]; then
+  AGE_RECIPIENTS="$(grep -o 'age1[a-z0-9]*' "${CLUSTER_PATH}/.sops.yaml" | sort -u | paste -sd, -)"
+  [ -n "${AGE_RECIPIENTS}" ] \
+    || { error "No age recipients found in ${CLUSTER_PATH}/.sops.yaml"; exit 1; }
+  info "age recipients: ${AGE_RECIPIENTS}"
 
-cat > "${TMP}/secret.yaml" <<EOF
+  cat > "${TMP}/secret.yaml" <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
@@ -210,17 +229,20 @@ stringData:
   bucket: ${BUCKET_NAME}
 EOF
 
-info "SOPS-encrypting Secret..."
-mkdir -p "$(dirname "${SECRET_OUT}")"
-sops --config /dev/null \
-  -e \
-  --age "${AGE_RECIPIENTS}" \
-  --encrypted-regex '^(data|stringData)$' \
-  "${TMP}/secret.yaml" > "${SECRET_OUT}"
+  info "SOPS-encrypting Secret..."
+  mkdir -p "$(dirname "${SECRET_OUT}")"
+  sops --config /dev/null \
+    -e \
+    --age "${AGE_RECIPIENTS}" \
+    --encrypted-regex '^(data|stringData)$' \
+    "${TMP}/secret.yaml" > "${SECRET_OUT}"
 
-grep -q 'ENC\[' "${SECRET_OUT}" \
-  || { rm -f "${SECRET_OUT}"; error "Encryption produced no ENC[ markers — aborting"; exit 1; }
-success "SOPS-encrypted Secret written to: ${SECRET_OUT}"
+  grep -q 'ENC\[' "${SECRET_OUT}" \
+    || { rm -f "${SECRET_OUT}"; error "Encryption produced no ENC[ markers — aborting"; exit 1; }
+  success "SOPS-encrypted Secret written to: ${SECRET_OUT}"
+else
+  warn "SOPS_ENCRYPT=false — skipping SOPS Secret; credentials are only in 1Password."
+fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
@@ -229,11 +251,21 @@ info "Bucket:        ${BUCKET_NAME}"
 info "R2 endpoint:   ${CF_R2_ENDPOINT}"
 info "Token ID:      ${TOKEN_ID}  (stored in 1Password for rotation)"
 info "1Password:     ${OP_ITEM_NAME} in vault ${CLUSTER_NAME}"
-info "Secret file:   ${SECRET_OUT}"
+if [ "${SOPS_ENCRYPT}" = "true" ]; then
+  info "Secret file:   ${SECRET_OUT}"
+fi
 echo ""
 info "Next steps:"
-info "  1. Add ${SECRET_OUT} to clusters/${CLUSTER}/kustomization.yaml (or the"
-info "     relevant sub-kustomization) and commit."
-info "  2. Reference the Secret from your CronJob/Deployment via secretKeyRef:"
-info "       access-key-id, secret-access-key, endpoint, bucket"
-info "  3. Rotation: CLUSTER=${CLUSTER} BUCKET_NAME=${BUCKET_NAME} .bin/rotate-cloudflare-r2-token.sh"
+if [ "${SOPS_ENCRYPT}" = "true" ]; then
+  info "  1. Add ${SECRET_OUT} to clusters/${CLUSTER}/kustomization.yaml (or the"
+  info "     relevant sub-kustomization) and commit."
+  info "  2. Reference the Secret from your CronJob/Deployment via secretKeyRef:"
+  info "       access-key-id, secret-access-key, endpoint, bucket"
+  info "  3. Rotation: CLUSTER=${CLUSTER} BUCKET_NAME=${BUCKET_NAME} .bin/rotate-cloudflare-r2-token.sh"
+else
+  info "  1. Create an ExternalSecret that reads item ${OP_ITEM_NAME} from the"
+  info "     1Password vault ${CLUSTER_NAME} (fields: access-key-id, secret-access-key,"
+  info "     endpoint, bucket)."
+  info "  2. Rotation: rotate-cloudflare-r2-token.sh requires the SOPS Secret, so it"
+  info "     will not work for this bucket as-is."
+fi

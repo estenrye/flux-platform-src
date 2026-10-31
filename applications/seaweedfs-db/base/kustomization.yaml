@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# CNPG cluster for the SeaweedFS filer's metadata store (postgres2). Owns the
+# seaweedfs namespace, mirroring keycloak-db/keycloak; applications/seaweedfs
+# reuses it. WAL archiving and base backups go to Cloudflare R2 through the
+# cnpg-barman-plugin (provision the bucket with
+# .bin/provision-cloudflare-r2-bucket.sh, BUCKET_NAME=seaweedfs-db-barman).
+
+resources:
+  - resources/namespace.yaml
+  - resources/network-policy.yaml
+  - resources/seaweedfs-db.cluster.yaml
+  - resources/eso.external-secret.barman-credentials.yaml
+  - resources/barman-objectstore.yaml
+  - resources/scheduled-backup.yaml

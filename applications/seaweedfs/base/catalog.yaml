@@ -1,0 +1,20 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: seaweedfs
+  description: |-
+    SeaweedFS distributed object store with an S3 API supporting bucket
+    versioning and Object Lock retention. Filer metadata is stored in the
+    seaweedfs-db CNPG cluster.
+  tags:
+    - storage
+    - s3
+    - object-store
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
+  dependsOn:
+    - component:seaweedfs-db

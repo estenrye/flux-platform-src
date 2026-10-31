@@ -1,0 +1,17 @@
+# Scraped by the opentelemetry-collector target allocator, which selects every
+# PodMonitor (podMonitorSelector: {}), into VictoriaMetrics. Master, volume and
+# filer (incl. embedded S3) all serve Prometheus metrics on 9327; the master
+# StatefulSet does not declare the port, so it is addressed by number.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: seaweedfs
+  namespace: seaweedfs
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+  podMetricsEndpoints:
+    - portNumber: 9327
+      path: /metrics
+      interval: 30s

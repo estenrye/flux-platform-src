@@ -1,0 +1,39 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: seaweedfs-db
+  namespace: seaweedfs
+spec:
+  instances: 3
+
+  # imageName pin: prevents the postgres image from floating with the
+  # operator's compiled-in default; matches the controlplane CNPG clusters.
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.3@sha256:5e30290fba3d990b08a9caea6ddb49c661ad8246cbb2688adad7e6cc78df6c3f
+
+  postgresql:
+    parameters:
+      max_connections: "200"
+
+  # CNPG generates the seaweedfs-db-app Secret (username/password/dbname/host)
+  # which the SeaweedFS filer reads for its WEED_POSTGRES2_* settings.
+  bootstrap:
+    initdb:
+      database: seaweedfs
+      owner: seaweedfs
+
+  # Retain: filer metadata maps object keys, versions and retention state to
+  # volume data, so losing it orphans every object.
+  storage:
+    size: 10Gi
+    storageClass: csi-cinder-sc-retain
+
+  primaryUpdateStrategy: unsupervised
+
+  monitoring:
+    enablePodMonitor: true
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: seaweedfs-db-barman

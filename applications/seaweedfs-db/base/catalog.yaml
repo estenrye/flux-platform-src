@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: seaweedfs-db
+  description: |-
+    Highly available PostgreSQL cluster holding SeaweedFS filer metadata,
+    managed by the CloudNativePG operator and backed up to Cloudflare R2.
+  tags:
+    - database
+    - postgresql
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
