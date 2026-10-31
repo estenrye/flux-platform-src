@@ -234,11 +234,13 @@ sidecar in the Cinder controller), so those six PVCs can be snapshotted.
   `fail_reason: Service not found for creating backup.` Backups also cannot be
   deleted afterwards (the API returns HTTP 500), so do not try it again until
   that service exists.
-- **Deleting a snapshot of an attached volume failed.** The snapshot I had just
-  restored from went to `error_deleting` on this TrueNAS NFS backend and stayed
-  there. After the volume was detached from its VM, the same delete (once the
-  state was reset by an OpenStack admin) succeeded. A failed backup attempt was
-  in flight on that volume at the same time, so the exact cause is not isolated.
+- **Snapshot deletes work, attached or detached.** One early test snapshot did
+  go to `error_deleting`, but a failed `type: backup` attempt (a snapshot stuck in
+  `backing-up`) was in flight on the same volume, and that is the likely cause. A
+  controlled retest on three idle 1Gi volumes deleted every snapshot in about 15
+  seconds: taken detached and deleted detached, taken detached and deleted after
+  the volume was re-attached, and taken attached (`force-create`) and deleted
+  attached. Large or busy volumes were not tested.
 
 Prerequisite: the classes `csi-cinder-snapclass-retain-inuse` (audit snapshots;
 the snapshot survives deleting the `VolumeSnapshot`) and
@@ -305,6 +307,37 @@ What a set does and does not guarantee:
   protect against deletion and corruption, not against losing the backend. They
   are not an off-site copy.
 
+### Optional: a quiesced (cold) set
+
+The set above is taken while SeaweedFS runs, so each volume is crash-consistent
+and the three servers are snapshotted at slightly different moments. Stopping
+the writers first gives one clean cut across the database, the masters and all
+volume servers, and needs no `force-create`, because the volumes are detached
+(the default `csi-cinder-snapclass-retain` works on detached volumes). It costs
+S3 downtime of a few minutes, so use it before risky maintenance and not as the
+routine. Stopping the pod does **not** change whether a snapshot can later be
+deleted (see "Snapshot deletes work" above); its benefit is consistency.
+
+Flux restores replica counts on every reconcile, so pause it for the window:
+
+```sh
+flux suspend kustomization flux-platform
+kubectl -n seaweedfs scale statefulset seaweedfs-filer --replicas=0     # no more S3 writes
+# take the seaweedfs-db Backup and wait for it (as in the set above)
+kubectl -n seaweedfs scale statefulset seaweedfs-volume --replicas=0
+kubectl -n seaweedfs scale statefulset seaweedfs-master --replicas=0
+# wait until the six PVs have no VolumeAttachment (usually seconds)
+kubectl get volumeattachment -o json | jq -r '.items[] | select(.spec.source.persistentVolumeName | test("pvc-")) | .metadata.name' | wc -l   # compare with other workloads
+# snapshot the six PVCs with csi-cinder-snapclass-retain, as in the set above
+kubectl -n seaweedfs scale statefulset seaweedfs-master --replicas=3   # wait Ready
+kubectl -n seaweedfs scale statefulset seaweedfs-volume --replicas=3   # wait Ready
+kubectl -n seaweedfs scale statefulset seaweedfs-filer --replicas=2
+flux resume kustomization flux-platform
+```
+
+Not drilled. Check that the volume servers re-register with the masters and that
+a read from `locked` works before calling it done.
+
 ### Drill: restore one volume server's snapshot and compare
 
 This proves a snapshot of a SeaweedFS volume restores to readable volume files.
@@ -356,10 +389,9 @@ kubectl -n seaweedfs delete pvc drill-volume-0
 
 The `retain` class keeps the Cinder snapshot after the `VolumeSnapshot` is
 deleted, so a set must be retired deliberately and its capacity is not freed
-by Kubernetes. **Expect the Cinder delete to be the fragile step:** on this
-backend, deleting a snapshot of a volume that is still attached went to
-`error_deleting` (see above). Retire a set at a time when the volume servers can
-be stopped and their volumes detached, and check each delete finished.
+by Kubernetes. Deleting a snapshot did not need the volume detached in the
+retest above, but check that each delete actually finished: an
+`error_deleting` snapshot keeps its capacity and needs an admin to clear it.
 
 Record each snapshot's Cinder id **before** deleting anything:
 
@@ -376,7 +408,7 @@ Then delete those Cinder snapshot ids in OpenStack, which needs admin access:
 ```sh
 openstack volume snapshot delete <cinder-snapshot-id>
 openstack volume snapshot show <cinder-snapshot-id> -c status -f value   # must disappear; error_deleting means it failed
-# only if it is stuck in error_deleting and the volume is detached:
+# only if it is stuck in error_deleting:
 openstack volume snapshot set --state error <cinder-snapshot-id> && openstack volume snapshot delete <cinder-snapshot-id>
 ```
 
@@ -416,9 +448,9 @@ drill above. Take the filers down first, then the volume servers:
 - **Part C on SeaweedFS itself.** The snapshot and restore mechanism was proven
   on a scratch volume only. Not yet confirmed: that the two `*-inuse` classes
   exist and work once `pcd-ce-deploy` is applied; that a set can be taken on the
-  live volume servers without side effects; whether deleting a snapshot of an
-  attached SeaweedFS volume fails the way the scratch one did; Cinder snapshot
-  and volume quotas;
+  live volume servers without side effects; whether snapshots of a large, busy
+  100Gi volume create and delete as cleanly as the idle 1Gi test volumes did;
+  Cinder snapshot and volume quotas;
   that SeaweedFS starts cleanly on restored volume files (a scratch stack over
   restored PVCs and a restored database, reading an object and its retention from
   `locked`, is the real proof); and the master and replica-reconcile steps.
