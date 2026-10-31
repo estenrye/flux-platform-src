@@ -12,12 +12,13 @@ Cloudflare R2 bucket `seaweedfs-db-barman`. The `ObjectStore` is
 R2 credentials come from the 1Password item `cloudflare-r2-seaweedfs-db-barman`
 through the `seaweedfs-db-barman-credentials` ExternalSecret.
 
-> **Status:** the drill below has not been run yet. The commands follow the
+> **Status:** the drills below have not been run yet. Parts A and B follow the
 > patterns that were verified for `openbao-db`
 > ([openbao-restore.md](openbao-restore.md)) and `step-ca-db`
-> ([step-ca-db-restore.md](step-ca-db-restore.md)); the "Not yet verified"
-> section lists what to confirm the first time. Run the drill before you need
-> the real restore.
+> ([step-ca-db-restore.md](step-ca-db-restore.md)). Part C (volume snapshots of
+> the audit data) rests on a mechanism proven only on a scratch volume. The "Not
+> yet verified" section lists what to confirm the first time. Run the drills
+> before you need a real restore.
 
 ## Read this first: metadata and data must agree
 
@@ -211,6 +212,170 @@ a PR: during an incident you want the database back before a CI cycle.
    EOF
    ```
 
+## Part C: volume data - snapshots of the audit data
+
+Parts A and B restore the **metadata**. The objects themselves (including every
+Object Lock'd version) live on the three volume servers' PVCs, and the masters'
+PVCs hold the cluster identity and volume layout. The cluster has the CSI
+external snapshotter (snapshot CRDs, `snapshot-controller`, and a `csi-snapshotter`
+sidecar in the Cinder controller), so those six PVCs can be snapshotted.
+
+**What was verified (2026-10-31, on a scratch 1Gi volume, not on SeaweedFS):**
+
+- The default classes `csi-cinder-snapclass-delete` and `-retain` have no
+  parameters, and Cinder refuses to snapshot an attached volume with them:
+  `Volume ... status must be available, but current status is: in-use`. Every
+  volume a running pod mounts is in use, so those classes cannot snapshot
+  SeaweedFS at all.
+- A class with `force-create: "true"` snapshots an attached volume. A new
+  volume restored from that snapshot returned the file written before it.
+- `type: backup` (a Cinder backup instead of a snapshot) went to `error` on this
+  OpenStack; the cause was not investigated. Do not rely on it.
+
+Prerequisite: the classes `csi-cinder-snapclass-retain-inuse` (audit snapshots;
+the snapshot survives deleting the `VolumeSnapshot`) and
+`csi-cinder-snapclass-delete-inuse` (drills) come from `pcd-ce-deploy`
+(`variables.tf`, `cinder_volume_snapshot_classes`) and exist only after that is
+applied. Check first:
+
+```sh
+kubectl get volumesnapshotclass csi-cinder-snapclass-retain-inuse csi-cinder-snapclass-delete-inuse \
+  -o custom-columns=NAME:.metadata.name,POLICY:.deletionPolicy,PARAMS:.parameters
+```
+
+### Take a coordinated snapshot set
+
+Order matters: **metadata first, then data.** The filer writes metadata only
+after the volume server has stored the data, so a database backup taken at T1
+references only data written before T1, and volume snapshots taken after T1
+contain all of it. Taking the data first would let metadata reference data the
+snapshots lack.
+
+```sh
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+
+# 1. metadata: an immediate base backup, and wait for it
+kubectl -n seaweedfs apply -f - <<EOF
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata: { name: seaweedfs-db-set-$STAMP, namespace: seaweedfs }
+spec: { cluster: { name: seaweedfs-db }, method: plugin, pluginConfiguration: { name: barman-cloud.cloudnative-pg.io } }
+EOF
+kubectl -n seaweedfs wait --for=jsonpath='{.status.phase}'=completed backup/seaweedfs-db-set-$STAMP --timeout=15m
+
+# 2. data: the three volume servers and the three masters
+for pvc in data-seaweedfs-volume-0 data-seaweedfs-volume-1 data-seaweedfs-volume-2 \
+           data-seaweedfs-seaweedfs-master-0 data-seaweedfs-seaweedfs-master-1 data-seaweedfs-seaweedfs-master-2; do
+kubectl -n seaweedfs apply -f - <<EOF
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: audit-$STAMP-${pvc#data-}
+  namespace: seaweedfs
+  labels: { rye.ninja/snapshot-set: "$STAMP", rye.ninja/purpose: seaweedfs-audit }
+spec:
+  volumeSnapshotClassName: csi-cinder-snapclass-retain-inuse
+  source: { persistentVolumeClaimName: $pvc }
+EOF
+done
+kubectl -n seaweedfs wait --for=jsonpath='{.status.readyToUse}'=true volumesnapshot -l rye.ninja/snapshot-set=$STAMP --timeout=15m
+```
+
+What a set does and does not guarantee:
+
+- The snapshots are **crash-consistent per volume**, not quiesced, and not taken
+  at one instant across the three servers. With replication `001` the two
+  copies of a volume can differ slightly; see the replica step below.
+- For the **`locked` bucket** no reference can dangle: retention forbids
+  deleting a locked version (a GOVERNANCE bypass is the exception), so data that
+  the metadata points at is still in the later snapshot. For buckets without
+  Object Lock, a delete between the backup and the snapshots can leave an entry
+  whose data is gone.
+- Cinder snapshots live on the **same storage backend as the volumes**. They
+  protect against deletion and corruption, not against losing the backend. They
+  are not an off-site copy.
+
+### Drill: restore one volume server's snapshot and compare
+
+This proves a snapshot of a SeaweedFS volume restores to readable volume files.
+It does not start SeaweedFS on them (see "Not yet verified").
+
+```sh
+SET=<the STAMP above>
+kubectl -n seaweedfs apply -f - <<EOF
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: drill-volume-0, namespace: seaweedfs }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: csi-cinder-sc-delete
+  resources: { requests: { storage: 100Gi } }
+  dataSource: { name: audit-$SET-seaweedfs-volume-0, kind: VolumeSnapshot, apiGroup: snapshot.storage.k8s.io }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: drill-volume-0, namespace: seaweedfs }
+spec:
+  securityContext: { runAsNonRoot: true, runAsUser: 10001, fsGroup: 10001, seccompProfile: { type: RuntimeDefault } }
+  containers:
+    - name: r
+      image: busybox:1.37
+      command: [sleep, "3600"]
+      volumeMounts: [{ name: d, mountPath: /data, readOnly: true }]
+      securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+  volumes: [{ name: d, persistentVolumeClaim: { claimName: drill-volume-0 } }]
+EOF
+kubectl -n seaweedfs wait --for=condition=Ready pod/drill-volume-0 --timeout=10m
+diff <(kubectl -n seaweedfs exec drill-volume-0 -- sh -c 'ls -l /data | awk "{print \$5, \$9}"') \
+     <(kubectl -n seaweedfs exec seaweedfs-volume-0 -- sh -c 'ls -l /data | awk "{print \$5, \$9}"')
+```
+
+The same `.dat`/`.idx` files should be present. Sizes in the restored copy are
+equal to or smaller than live (later writes are not in it); a file that is
+**missing** or **larger** than live is a problem. This PVC is 100Gi: the drill
+needs that much Cinder capacity, and the quota was not checked.
+
+Tear the drill down (the `delete` storage class frees the volume):
+
+```sh
+kubectl -n seaweedfs delete pod drill-volume-0
+kubectl -n seaweedfs delete pvc drill-volume-0
+```
+
+### Retiring a snapshot set
+
+The `retain` class keeps the Cinder snapshot after the `VolumeSnapshot` is
+deleted, so a set must be retired deliberately and its capacity is not freed
+by Kubernetes. Record each snapshot's Cinder id **before** deleting anything:
+
+```sh
+kubectl get volumesnapshotcontent -o json | jq -r --arg s "audit-$SET" \
+  '.items[] | select(.spec.volumeSnapshotRef.name | startswith($s)) | "\(.metadata.name) \(.status.snapshotHandle)"'
+kubectl -n seaweedfs delete volumesnapshot -l rye.ninja/snapshot-set=$SET
+kubectl delete volumesnapshotcontent <names from above>
+# then delete those Cinder snapshot ids in OpenStack (needs OpenStack credentials)
+```
+
+### Real restore of volume data (not drilled)
+
+Standard Kubernetes snapshot restore; run it only after the Part A drill and the
+drill above. Take the filers down first, then the volume servers:
+
+1. `flux suspend kustomization flux-platform`, then scale the filer and volume
+   StatefulSets to 0.
+2. Delete the damaged `data-seaweedfs-volume-N` PVCs (their PVs stay `Released`
+   under the retain class; decide deliberately what to do with them).
+3. Create PVCs with the **same names** from the snapshots (`dataSource` as in
+   the drill, `storageClassName: csi-cinder-sc-retain`, 100Gi). The StatefulSet
+   adopts a PVC that already exists under its claim name.
+4. Scale the volume servers back up, wait for them to register with the masters,
+   then the filers. `flux resume kustomization flux-platform`.
+5. Restore the masters' PVCs the same way only if they are lost, and then **all
+   three from the same set**; do not mix a restored master with live ones.
+6. Reconcile replica differences with `weed shell` (`volume.check.disk`,
+   `volume.fix.replication`) and verify reads, including the retention state of
+   objects in `locked`.
+
 ## Not yet verified (confirm in the first drill)
 
 - **Archiving after a same-name restore.** The recovered cluster would archive
@@ -224,5 +389,14 @@ a PR: during an incident you want the database back before a CI cycle.
   with it when Flux resumes. `openbao-restore.md` does not address this either.
   Check what Flux reports after `flux resume` and fix the source manifest if it
   objects.
-- **Volume data.** Nothing here restores the volume servers' data. See
-  [ADR-29](../adr/0029-seaweedfs-object-store-on-core-infra.md).
+- **Part C on SeaweedFS itself.** The snapshot and restore mechanism was proven
+  on a scratch volume only. Not yet confirmed: that the two `*-inuse` classes
+  exist and work once `pcd-ce-deploy` is applied; that a set can be taken on the
+  live volume servers without side effects; Cinder snapshot and volume quotas;
+  that SeaweedFS starts cleanly on restored volume files (a scratch stack over
+  restored PVCs and a restored database, reading an object and its retention from
+  `locked`, is the real proof); and the master and replica-reconcile steps.
+- **Off-site copy.** Everything in Part C stays on the Cinder backend, so
+  object data still has no off-cluster copy. Cinder backups (`type: backup`)
+  errored here, and SeaweedFS's own replication to object storage was not
+  evaluated.

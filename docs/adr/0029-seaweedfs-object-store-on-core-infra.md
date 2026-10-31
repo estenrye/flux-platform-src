@@ -81,7 +81,10 @@ Garage stays where it is. This ADR does not move CNPG barman backups off it.
 
 - Replication `001` keeps two copies in one site. It is not a backup of the
   object data, and Object Lock protects against deletion, not against losing
-  volumes. Object data has no off-cluster copy.
+  volumes. Object data has no off-cluster copy. CSI volume snapshots of the
+  PVCs are possible (runbook Part C) but live on the same Cinder backend, and
+  need a snapshot class with `force-create` because every SeaweedFS volume is
+  attached.
 - The metadata and the volume data must stay consistent. A database restore to
   an earlier point leaves newer objects as orphaned data and brings back
   deleted entries whose data may already be vacuumed. See the
@@ -97,7 +100,8 @@ Garage stays where it is. This ADR does not move CNPG barman backups off it.
   [kube-proxy-clustercidr-masquerade.md](../memory/kube-proxy-clustercidr-masquerade.md)).
 
 **Not yet done:** a `seaweedfs-db` restore drill, a filer/master failover test,
-and any recovery path for the volume data itself.
+a drilled recovery path for the volume data (snapshots are documented but only
+proven on a scratch volume), and any off-cluster copy of the object data.
 
 ## Alternatives considered
 
