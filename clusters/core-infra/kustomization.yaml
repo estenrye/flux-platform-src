@@ -117,13 +117,3 @@ patches:
     kind: ObjectStore
     name: seaweedfs-db-barman
     namespace: seaweedfs
-- path: patches/seaweedfs-db.network-policy.node-ingress.yaml
-  target:
-    kind: NetworkPolicy
-    name: seaweedfs-db
-    namespace: seaweedfs
-- path: patches/seaweedfs.network-policy.node-ingress.yaml
-  target:
-    kind: NetworkPolicy
-    name: seaweedfs
-    namespace: seaweedfs
