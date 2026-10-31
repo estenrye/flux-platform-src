@@ -54,9 +54,6 @@ patches:
         path: /metadata/namespace
         value: seaweedfs
       - op: add
-        path: /spec/ttlSecondsAfterFinished
-        value: 3600
-      - op: add
         path: /spec/template/spec/automountServiceAccountToken
         value: false
 
@@ -96,6 +93,7 @@ patches:
         name: seaweedfs-bucket-hook
         annotations:
           ignore-check.kube-linter.io/no-liveness-probe: "Run-to-completion Job; probes do not apply."
+          ignore-check.kube-linter.io/job-ttl-seconds-after-finished: "No TTL on purpose: with the force-recreate annotation, Flux recreates a Job that disappears, so a TTL re-ran the bucket hook hourly. The finished Job stays until its spec changes (chart bump or new bucket)."
           ignore-check.kube-linter.io/no-readiness-probe: "Run-to-completion Job; probes do not apply."
           ignore-check.kube-linter.io/restart-policy: "Run-to-completion Job; restartPolicy Never is upstream's choice and backoffLimit retries failed pods."
           ignore-check.kube-linter.io/no-node-affinity: "Single-site homelab cluster; no zone or role topology to express affinity against."
