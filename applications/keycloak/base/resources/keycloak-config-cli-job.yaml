@@ -15,6 +15,9 @@ metadata:
   name: keycloak-config-cli
   namespace: keycloak
   annotations:
+    # Jobs are immutable; let Flux delete and recreate it when the spec changes
+    # (or after a failed run), same as the seaweedfs bucket hook.
+    kustomize.toolkit.fluxcd.io/force: enabled
     ignore-check.kube-linter.io/no-node-affinity: "This cluster's nodes carry no zone/rack topology labels to express affinity against; a one-shot Job has no meaningful spread requirement regardless."
     ignore-check.kube-linter.io/no-liveness-probe: "One-shot realm-reconciliation Job; liveness probes are not meaningful for batch workloads."
     ignore-check.kube-linter.io/no-readiness-probe: "One-shot realm-reconciliation Job; readiness probes are not meaningful for batch workloads."
@@ -73,6 +76,9 @@ spec:
               value: "/config/*"
             - name: KEYCLOAK_AVAILABILITYCHECK_ENABLED
               value: "true"
+            # Default is 120s; a first start (empty DB) takes ~5 minutes here.
+            - name: KEYCLOAK_AVAILABILITYCHECK_TIMEOUT
+              value: "900s"
             # $(env:SEAWEEDFS_S3_CLIENT_SECRET) in the realm YAML keeps the
             # seaweedfs-s3 service-account client's secret out of the plain
             # ConfigMap.

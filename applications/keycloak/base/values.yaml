@@ -35,6 +35,19 @@ http:
   # versions; root path matches the Gateway/HTTPRoute wiring below.
   relativePath: "/"
 
+# First start runs Quarkus augmentation (~80s) and initialises the master realm
+# in an empty database (~3min on this cluster), so the chart's default window
+# (15s + 60x5s) kills the pod mid-bootstrap. Allow ~15 minutes.
+startupProbe: |
+  httpGet:
+    path: '{{ tpl .Values.http.relativePath $ | trimSuffix "/" }}/health'
+    port: '{{ .Values.http.internalPort }}'
+    scheme: '{{ .Values.http.internalScheme }}'
+  initialDelaySeconds: 15
+  timeoutSeconds: 1
+  failureThreshold: 180
+  periodSeconds: 5
+
 database:
   vendor: postgres
   hostname: keycloak-db-rw.keycloak.svc.cluster.local
