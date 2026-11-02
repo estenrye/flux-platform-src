@@ -9,7 +9,7 @@ data:
     enabled: true
     displayName: "RyeZone Labs"
 
-    # `keycloak-admin` gets the built-in realm-management client's
+    # `ACL_Keycloak_Administrator` gets the built-in realm-management client's
     # realm-admin composite role, granting this realm's admin console.
     # openbao-admin/openbao-operator exist here as groups only.
     #
@@ -18,7 +18,7 @@ data:
     # to an IAM role (applications/seaweedfs/base/resources/
     # eso.external-secret.iam-config.yaml).
     groups:
-      - name: keycloak-admin
+      - name: ACL_Keycloak_Administrator
         clientRoles:
           realm-management:
             - realm-admin
@@ -58,7 +58,7 @@ data:
         enabled: true
         emailVerified: true
         groups:
-          - keycloak-admin
+          - ACL_Keycloak_Administrator
           - ACL_SeaweedFS_AllBucketAdmin
         credentials:
           - type: password
