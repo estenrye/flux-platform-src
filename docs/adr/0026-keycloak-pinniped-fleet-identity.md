@@ -4,7 +4,7 @@ Date: 2026-07-25
 
 ## Status
 
-Accepted
+Superseded by [29. Keycloak on core-infra, Pinniped withdrawn](0029-keycloak-on-core-infra-pinniped-withdrawn.md)
 
 ## Context
 
