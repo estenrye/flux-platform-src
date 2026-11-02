@@ -5,3 +5,5 @@ resources:
   - resources/namespace.yaml
   - resources/network-policy.yaml
   - resources/keycloak-db.cluster.yaml
+  - resources/barman-objectstore.yaml
+  - resources/scheduled-backup.yaml

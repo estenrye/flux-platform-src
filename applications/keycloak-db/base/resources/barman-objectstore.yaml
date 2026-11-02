@@ -1,0 +1,39 @@
+# WAL archiving + base backups to the in-cluster SeaweedFS S3 gateway,
+# authenticated with the pod's projected ServiceAccount token (STS
+# AssumeRoleWithWebIdentity, role KeycloakDbBarman in
+# applications/seaweedfs/base/resources/eso.external-secret.iam-config.yaml);
+# no static keys. The token itself is projected into the postgres pods by
+# Cluster.spec.projectedVolumeTemplate (keycloak-db.cluster.yaml), which
+# CNPG mounts under /projected. VERIFY the plugin sidecar sees that mount.
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: keycloak-db-barman
+  namespace: keycloak
+spec:
+  configuration:
+    destinationPath: s3://keycloak-db-barman/
+    endpointURL: http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333
+    s3Credentials:
+      inheritFromIAMRole: true
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+  instanceSidecarConfiguration:
+    env:
+      - name: AWS_ROLE_ARN
+        value: arn:aws:iam::role/KeycloakDbBarman
+      - name: AWS_WEB_IDENTITY_TOKEN_FILE
+        value: /projected/token
+      - name: AWS_ENDPOINT_URL_STS
+        value: http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333
+      - name: AWS_REGION
+        value: us-east-1
+      # SeaweedFS is not AWS S3; newer boto3 otherwise sends unsupported
+      # checksum headers.
+      - name: AWS_REQUEST_CHECKSUM_CALCULATION
+        value: when_required
+      - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+        value: when_required
+  retentionPolicy: "30d"

@@ -6,7 +6,7 @@ metadata:
     Keycloak identity provider (codecentric/keycloakx chart, upstream
     quay.io/keycloak/keycloak image + hand-rolled keycloak-config-cli
     Job), backed by keycloak-db (CNPG). Realm ryezone-labs, exposed at
-    id.rye.ninja via Envoy Gateway HTTPS-terminate + Let's Encrypt.
+    id.rye.ninja via the Calico Envoy Gateway (HTTPS-terminate) + Let's Encrypt.
   tags:
     - identity
     - oidc

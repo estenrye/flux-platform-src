@@ -6,7 +6,8 @@ namespace: keycloak
 resources:
   - resources/network-policy.yaml
   - resources/gateway.yaml
-  - resources/certificate.yaml
+  - resources/eso.password-generators.yaml
+  - resources/eso.external-secrets.yaml
   - resources/keycloak-config-cli-configmap.yaml
   - resources/keycloak-config-cli-job.yaml
 
@@ -67,4 +68,4 @@ patches:
         value: "Single replica for M3's initial rollout (jgroups/ispn HA clustering deferred to a later milestone); replicas: 1 is the chart's own default."
       - op: add
         path: /metadata/annotations/ignore-check.kube-linter.io~1env-value-from
-        value: "keycloak-db-app (CNPG auto-generated) and keycloak-admin-credentials (SOPS-encrypted, applied at bootstrap) are not present as static resources in this render (see clusters/controlplane/secrets)."
+        value: "keycloak-db-app (CNPG auto-generated) and keycloak-admin-credentials (ESO-generated, resources/eso.external-secrets.yaml) are not present as static resources in this render."
