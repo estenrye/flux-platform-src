@@ -144,12 +144,6 @@ filer:
       readOnly: true
 
   extraEnvironmentVars:
-    # The filer fetches the apiserver's JWKS from
-    # https://kubernetes.default.svc.cluster.local for STS web-identity
-    # validation; trust the cluster CA that is mounted with the (default
-    # automounted) ServiceAccount token. Its only other outbound TLS is none:
-    # postgres2 uses sslmode=require, which does not verify the chain.
-    SSL_CERT_FILE: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
     # Metadata lives in Postgres, not the local leveldb2.
     WEED_LEVELDB2_ENABLED: "false"
     WEED_MYSQL_ENABLED: "false"

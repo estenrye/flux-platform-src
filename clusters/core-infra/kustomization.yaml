@@ -7,7 +7,6 @@ resources:
 - ../../applications/external-secrets-operator/base
 - ../../applications/flux/base
 - resources/eso.service-account-secret.yaml
-- resources/rbac.service-account-issuer-discovery-anonymous.yaml
 - resources/eso.cluster-secret-store.yaml
 - resources/flux.ssh-key-generator.yaml
 - resources/flux.ssh-key-secret.yaml

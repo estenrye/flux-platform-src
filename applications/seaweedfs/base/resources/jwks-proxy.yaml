@@ -1,0 +1,133 @@
+# Serves the kube-apiserver's public ServiceAccount signing keys without
+# authentication, for SeaweedFS's STS web-identity validation. The apiserver runs
+# with --anonymous-auth=false (Talos default), so SeaweedFS (which cannot present a
+# token when fetching a JWKS) gets 401 from /openid/v1/jwks directly. `kubectl proxy`
+# authenticates as this pod's ServiceAccount (every ServiceAccount may read the
+# issuer-discovery endpoints via system:service-account-issuer-discovery) and only
+# forwards the one allowed path. The keys are public.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jwks-proxy
+  namespace: seaweedfs
+automountServiceAccountToken: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jwks-proxy
+  namespace: seaweedfs
+  annotations:
+    ignore-check.kube-linter.io/no-node-affinity: "Single-site homelab cluster; no zone or role topology to express node affinity against."
+    ignore-check.kube-linter.io/minimum-three-replicas: "Stateless read-through proxy; two replicas is enough for the JWKS fetch."
+    checkov.io/skip01: "CKV_K8S_38=kubectl proxy needs the ServiceAccount token to authenticate to the apiserver; the ServiceAccount has no permissions beyond the default issuer-discovery role."
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: jwks-proxy
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: jwks-proxy
+    spec:
+      restartPolicy: Always
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: jwks-proxy
+      serviceAccountName: jwks-proxy
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kubectl-proxy
+          # registry.k8s.io/kubectl:v1.37.0 (matches the cluster's Kubernetes version).
+          image: registry.k8s.io/kubectl:v1.37.0@sha256:5ed410ebac5dc976cc717098994dcdb29bbbd38f6bd65f582311f5be4ba719cf
+          args:
+            - proxy
+            - --address=0.0.0.0
+            - --port=8001
+            - --accept-hosts=.*
+            - --accept-paths=^/openid/v1/jwks$
+          ports:
+            - name: http
+              containerPort: 8001
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jwks-proxy
+  namespace: seaweedfs
+spec:
+  selector:
+    app.kubernetes.io/name: jwks-proxy
+  ports:
+    - name: http
+      port: 8001
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jwks-proxy
+  namespace: seaweedfs
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: jwks-proxy
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # SeaweedFS filers (embedded S3/STS gateway) fetching the keys.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: seaweedfs
+              app.kubernetes.io/component: filer
+      ports:
+        - protocol: TCP
+          port: 8001
+  egress:
+    # apiserver targetPort -- Calico evaluates egress post-DNAT
+    # (docs/memory/calico-networkpolicy-dnat.md). Talos serves 6443.
+    - ports:
+        - protocol: TCP
+          port: 6443
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

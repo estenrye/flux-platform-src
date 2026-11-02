@@ -81,14 +81,17 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
-    # JWKS fetch for STS web-identity validation: kube-apiserver (Talos serves
-    # 6443; Calico evaluates post-DNAT, docs/memory/calico-networkpolicy-dnat.md)
-    # and Keycloak's in-cluster Service (pod port 8080) -- the issuer URL stays
-    # https://id.rye.ninja but the keys are fetched in-cluster to avoid the
-    # gateway hairpin.
-    - ports:
+    # JWKS fetch for STS web-identity validation: the in-cluster jwks-proxy
+    # (kubernetes provider) and Keycloak's in-cluster Service (pod port 8080).
+    # The Keycloak issuer URL stays https://id.rye.ninja but its keys are
+    # fetched in-cluster to avoid the gateway hairpin.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: jwks-proxy
+      ports:
         - protocol: TCP
-          port: 6443
+          port: 8001
     - to:
         - namespaceSelector:
             matchLabels:
