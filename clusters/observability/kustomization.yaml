@@ -51,9 +51,6 @@ resources:
 - ../../applications/cert-manager-trust-manager/observability
 - ../../applications/cert-manager-spiffe-issuer/observability
 - ../../applications/cert-manager-spiffe-csi-driver/observability
-# Concierge only — the Supervisor itself is controlplane-only (ADR-14).
-# Token exchange audience is observability-rye-ninja (patched from base).
-- ../../applications/pinniped-concierge/observability
 - resources/eso.service-account-secret.yaml
 - resources/eso.cluster-secret-store.yaml
 - resources/flux.ssh-key-generator.yaml
