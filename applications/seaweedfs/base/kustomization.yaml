@@ -18,6 +18,7 @@ resources:
   - resources/eso.external-secret.s3-config.yaml
   - resources/eso.password-generator.sts-signing-key.yaml
   - resources/eso.external-secret.iam-config.yaml
+  - resources/jwks-proxy.yaml
 
 helmCharts:
 - name: seaweedfs
