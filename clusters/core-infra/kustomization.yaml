@@ -7,6 +7,7 @@ resources:
 - ../../applications/external-secrets-operator/base
 - ../../applications/flux/base
 - resources/eso.service-account-secret.yaml
+- resources/rbac.service-account-issuer-discovery-anonymous.yaml
 - resources/eso.cluster-secret-store.yaml
 - resources/flux.ssh-key-generator.yaml
 - resources/flux.ssh-key-secret.yaml
@@ -63,6 +64,10 @@ resources:
 # SeaweedFS resources
 - ../../applications/seaweedfs-db/base
 - ../../applications/seaweedfs/base
+# Keycloak (id.rye.ninja); keycloak-db owns the keycloak namespace and backs up
+# to SeaweedFS, so it follows seaweedfs.
+- ../../applications/keycloak-db/base
+- ../../applications/keycloak/base
 # VPA Recommendations
 - resources/vpa.recommendations.yaml
 

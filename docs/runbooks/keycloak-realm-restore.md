@@ -1,4 +1,11 @@
-# Runbook: Keycloak realm restore (`controlplane`)
+# Runbook: Keycloak realm restore
+
+> **Outdated:** Keycloak and `keycloak-db` moved to **core-infra**
+> ([ADR 29](../adr/0029-keycloak-on-core-infra-pinniped-withdrawn.md)). Backups now
+> go to the SeaweedFS bucket `keycloak-db-barman` (Kubernetes-token auth), not
+> Garage, and there is no `controlplane` overlay or `pinniped-supervisor` client.
+> The steps below describe the old controlplane/Garage setup and need rewriting
+> once the core-infra restore has been drilled.
 
 Two independent recovery paths exist for Keycloak, and they restore
 **different things** — know which one the incident actually calls for

@@ -23,7 +23,7 @@ serviceAccount:
 args:
   - start
 
-# TLS terminates at Envoy Gateway (A5) -- Keycloak runs plain HTTP
+# TLS terminates at the Calico Envoy Gateway -- Keycloak runs plain HTTP
 # in-cluster and trusts proxy headers for its externally-visible hostname/
 # scheme, same as any standard reverse-proxied deployment.
 proxy:
@@ -63,7 +63,7 @@ httpRoute:
   enabled: true
   servicePort: 80
   parentRefs:
-    - name: keycloak
+    - name: keycloak-gateway
       sectionName: https
   hostnames:
     - id.rye.ninja

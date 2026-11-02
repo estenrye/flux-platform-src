@@ -18,10 +18,30 @@ spec:
       database: keycloak
       owner: keycloak
 
+  # imageName pin: prevents the postgres image from floating with the
+  # operator's compiled-in default.
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.3@sha256:5e30290fba3d990b08a9caea6ddb49c661ad8246cbb2688adad7e6cc78df6c3f
+
   storage:
     size: 10Gi
+    storageClass: csi-cinder-sc-retain
+
+  # ServiceAccount token for SeaweedFS STS web-identity auth; audience must
+  # match the kubernetes provider's clientId in the SeaweedFS IAM config.
+  projectedVolumeTemplate:
+    sources:
+      - serviceAccountToken:
+          audience: seaweedfs-s3
+          expirationSeconds: 3600
+          path: token
 
   primaryUpdateStrategy: unsupervised
 
   monitoring:
     enablePodMonitor: true
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: keycloak-db-barman

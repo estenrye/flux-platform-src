@@ -12,6 +12,7 @@ spec:
       cnpg.io/cluster: keycloak-db
   policyTypes:
     - Ingress
+    - Egress
   ingress:
     # M3 step 9b: Keycloak server pods connecting to Postgres. Label is a
     # placeholder matching the common Keycloak Helm chart convention
@@ -44,3 +45,46 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+    # Metrics scrape from the OpenTelemetry collector daemonset (PodMonitor).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: opentelemetry-collector
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: otelcol-ds-collector
+      ports:
+        - protocol: TCP
+          port: 9187
+  egress:
+    # apiserver targetPort -- Calico evaluates egress post-DNAT
+    # (docs/memory/calico-networkpolicy-dnat.md). Talos serves 6443.
+    - ports:
+        - protocol: TCP
+          port: 6443
+    # streaming replication to peer instances
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: keycloak-db
+      ports:
+        - protocol: TCP
+          port: 5432
+    # barman WAL archiving / base backups and STS token exchange: SeaweedFS
+    # filer-embedded S3 gateway.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: seaweedfs
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: seaweedfs
+              app.kubernetes.io/component: filer
+      ports:
+        - protocol: TCP
+          port: 8333
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

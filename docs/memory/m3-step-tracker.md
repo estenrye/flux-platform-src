@@ -8,6 +8,11 @@ metadata:
 Tracks [[m3-design]]'s 11-step execution order. Update as steps complete —
 this decays fast, keep it current rather than trusting it blindly.
 
+> **2026-11-01 update:** Keycloak (9b) and `keycloak-db` moved to core-infra and
+> Pinniped (step 10) was withdrawn; see
+> [ADR 29](../adr/0029-keycloak-on-core-infra-pinniped-withdrawn.md). The Keycloak
+> and Pinniped details below describe the original controlplane deployment.
+
 ## Status as of 2026-07-24
 
 | # | Step | Status |
