@@ -72,24 +72,8 @@ resources:
   # Same pattern, applied to step-ca-db: mirrors Garage's step-ca-db-barman
   # bucket off-site to its own dedicated Cloudflare R2 bucket.
   - ../../applications/step-ca-db-snapshots-sync/base
-  # M3 step 8: keycloak-db CNPG cluster, same pattern as step-ca-db/
-  # openbao-db (barman to Garage via the shared cnpg-barman-plugin). Owns
-  # creation of the `keycloak` namespace — the future Keycloak app (step
-  # 9b) will just reuse it, same as step-ca/openbao-db's split.
-  - ../../applications/keycloak-db/controlplane
-  # M3 step 9b: Keycloak itself (codecentric/keycloakx chart, upstream
-  # quay.io/keycloak/keycloak image + hand-rolled keycloak-config-cli
-  # Job), exposed at id.rye.ninja via Envoy Gateway HTTPS-terminate (A5) +
-  # letsencrypt-prod (step 9a). Reuses the `keycloak` namespace keycloak-db
-  # already created.
-  - ../../applications/keycloak/base
-  # M3 step 10: Pinniped Supervisor + Concierge. Supervisor terminates its
-  # own TLS (deviates from A5's literal wording -- see
-  # applications/pinniped-supervisor/base/resources/gateway.yaml for why);
-  # Concierge is entirely in-cluster (aggregated API server), no public
-  # exposure.
-  - ../../applications/pinniped-supervisor/base
-  - ../../applications/pinniped-concierge/base
+  # Keycloak (id.rye.ninja) and keycloak-db moved to core-infra; Pinniped
+  # Supervisor/Concierge are no longer deployed here.
   # M2 step 6 crossplane install (2026-07-20): four ordered Flux
   # Kustomizations (crossplane-core -> crossplane-providers ->
   # crossplane-xrds -> crossplane-resources,
@@ -169,20 +153,6 @@ resources:
   # off-site mirror (same pattern as step 7, applied to step-ca-db).
   - secrets/cloudflare-r2-step-ca-db-snapshots.sops.yaml
   - secrets/step-ca-db-snapshots-sync-credentials.sops.yaml
-  # Garage S3 access key for keycloak-db barman WAL archiving (M3 step 8).
-  - secrets/keycloak-db-barman-credentials.sops.yaml
-  # Keycloak local admin bootstrap credential (M3 step 9b); break-glass
-  # copy also stored in OpenBao at secret/platform/keycloak/local-admin.
-  - secrets/keycloak-admin-credentials.sops.yaml
-  # M3 step 10 [H] verification: temporary password for the first real
-  # user (esten), in the k8s-admin group -- Keycloak forces a reset on
-  # first login.
-  - secrets/keycloak-user-esten-credentials.sops.yaml
-  # M3 step 10: Pinniped Supervisor's OIDC client secret against Keycloak
-  # -- same generated value, encrypted twice (once per namespace that
-  # needs it).
-  - secrets/pinniped-supervisor-keycloak-client-secret.sops.yaml
-  - secrets/pinniped-supervisor-oidc-client.sops.yaml
 
 patches:
   - path: patches/envoy-proxy.ipfamily.yaml
