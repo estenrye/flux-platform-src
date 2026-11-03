@@ -4,7 +4,10 @@
 - op: replace
   path: /data/GF_AUTH_GENERIC_OAUTH_CLIENT_ID
   value: a478b0ef-6f4b-4db8-b296-f62633031e6e
-# Keycloak realm ryezone-labs, public PKCE client `grafana`.
+# Keycloak realm ryezone-labs, public PKCE client `grafana`. The browser-facing
+# auth URL is public; token and userinfo are back-channel calls, sent to the
+# in-cluster Service because the pod cannot reach id.rye.ninja through the
+# gateway (hairpin). Keycloak's fixed KC_HOSTNAME keeps the issuer unchanged.
 - op: replace
   path: /data/GF_AUTH_OKTA_CLIENT_ID
   value: grafana
@@ -13,7 +16,7 @@
   value: https://id.rye.ninja/realms/ryezone-labs/protocol/openid-connect/auth
 - op: replace
   path: /data/GF_AUTH_OKTA_TOKEN_URL
-  value: https://id.rye.ninja/realms/ryezone-labs/protocol/openid-connect/token
+  value: http://keycloak-http.keycloak.svc.cluster.local/realms/ryezone-labs/protocol/openid-connect/token
 - op: replace
   path: /data/GF_AUTH_OKTA_API_URL
-  value: https://id.rye.ninja/realms/ryezone-labs/protocol/openid-connect/userinfo
+  value: http://keycloak-http.keycloak.svc.cluster.local/realms/ryezone-labs/protocol/openid-connect/userinfo
