@@ -44,3 +44,16 @@ spec:
       ports:
         - protocol: TCP
           port: 8428
+    # Keycloak OIDC back-channel (token, userinfo) via the in-cluster Service
+    # (pod port 8080); the public id.rye.ninja route is not reachable from the
+    # pod (gateway hairpin).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: keycloak
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
