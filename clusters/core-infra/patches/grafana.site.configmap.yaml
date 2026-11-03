@@ -4,3 +4,16 @@
 - op: replace
   path: /data/GF_AUTH_GENERIC_OAUTH_CLIENT_ID
   value: a478b0ef-6f4b-4db8-b296-f62633031e6e
+# Keycloak realm ryezone-labs, public PKCE client `grafana`.
+- op: replace
+  path: /data/GF_AUTH_KEYCLOAK_CLIENT_ID
+  value: grafana
+- op: replace
+  path: /data/GF_AUTH_KEYCLOAK_AUTH_URL
+  value: https://id.rye.ninja/realms/ryezone-labs/protocol/openid-connect/auth
+- op: replace
+  path: /data/GF_AUTH_KEYCLOAK_TOKEN_URL
+  value: https://id.rye.ninja/realms/ryezone-labs/protocol/openid-connect/token
+- op: replace
+  path: /data/GF_AUTH_KEYCLOAK_API_URL
+  value: https://id.rye.ninja/realms/ryezone-labs/protocol/openid-connect/userinfo

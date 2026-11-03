@@ -11,6 +11,7 @@ set -euo pipefail
 
 HOST_PLACEHOLDER="grafana.k8s.local"
 CLIENT_PLACEHOLDER="JUMPCLOUD_OIDC_PKCE_CLIENT_ID"
+KC_CLIENT_PLACEHOLDER="KEYCLOAK_OIDC_PKCE_CLIENT_ID"
 
 [ "$#" -gt 0 ] || { echo "Usage: $0 <cluster-dir>..." >&2; exit 2; }
 
@@ -32,7 +33,14 @@ for dir in "$@"; do
         | .kind + "/" + .metadata.name + " still uses placeholder GF_SERVER_ROOT_URL"),
       (select(.kind == "ConfigMap" and .metadata.name == "grafana-site")
         | select(.data.GF_AUTH_GENERIC_OAUTH_CLIENT_ID == "'"${CLIENT_PLACEHOLDER}"'")
-        | .kind + "/" + .metadata.name + " still uses placeholder GF_AUTH_GENERIC_OAUTH_CLIENT_ID")' - | grep -v '^---$' || true)
+        | .kind + "/" + .metadata.name + " still uses placeholder GF_AUTH_GENERIC_OAUTH_CLIENT_ID"),
+      (select(.kind == "ConfigMap" and .metadata.name == "grafana-site")
+        | select(.data.GF_AUTH_KEYCLOAK_CLIENT_ID == "'"${KC_CLIENT_PLACEHOLDER}"'")
+        | .kind + "/" + .metadata.name + " still uses placeholder GF_AUTH_KEYCLOAK_CLIENT_ID"),
+      (select(.kind == "ConfigMap" and .metadata.name == "grafana-site")
+        | .data | to_entries | .[] | select(.key | test("^GF_AUTH_KEYCLOAK_.*_URL$"))
+        | select(.value | test("keycloak.k8s.local"))
+        | "ConfigMap/grafana-site still uses placeholder " + .key)' - | grep -v '^---$' || true)
 
   if [ -n "${bad}" ]; then
     while read -r line; do
