@@ -25,7 +25,7 @@ spec:
         - protocol: TCP
           port: 3000
   egress:
-    # JumpCloud (OIDC); apiserver for the
+    # JumpCloud and Keycloak (OIDC); apiserver for the
     # dashboard sidecar -- Calico evaluates egress post-DNAT
     # (docs/memory/calico-networkpolicy-dnat.md); Talos serves 6443.
     - ports:

@@ -74,6 +74,15 @@ check "client_id failure is reported" "0" "$?"
 OUT=$(run all); check "all placeholders fail" "1" "$?"
 check "all failures reported" "4" "$(echo "${OUT}" | grep -c '^FAIL')"
 
+# ── Test 7b: Keycloak client_id and URLs left at placeholder fail ─────────────
+{ gateway c.grafana.example; httproute c.grafana.example; site https://c.grafana.example abc-123; \
+  printf '  GF_AUTH_KEYCLOAK_CLIENT_ID: KEYCLOAK_OIDC_PKCE_CLIENT_ID\n  GF_AUTH_KEYCLOAK_AUTH_URL: https://keycloak.k8s.local/auth\n'; } > "${FIXTURES}/kc.yaml"
+OUT=$(run kc); check "placeholder Keycloak settings fail" "1" "$?"
+echo "${OUT}" | grep -q "GF_AUTH_KEYCLOAK_CLIENT_ID"
+check "Keycloak client_id failure is reported" "0" "$?"
+echo "${OUT}" | grep -q "GF_AUTH_KEYCLOAK_AUTH_URL"
+check "Keycloak URL failure is reported" "0" "$?"
+
 # ── Test 8: the real core-infra render is clean ───────────────────────────────
 rm "${STUB_BIN}/kustomize"
 PATH="$(echo "${PATH}" | sed "s|${STUB_BIN}:||")" "${SCRIPTS_DIR}/.bin/lint-grafana-placeholders.sh" "${SCRIPTS_DIR}/clusters/core-infra" >/dev/null 2>&1

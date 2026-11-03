@@ -10,3 +10,7 @@ metadata:
 data:
   GF_SERVER_ROOT_URL: https://grafana.k8s.local
   GF_AUTH_GENERIC_OAUTH_CLIENT_ID: JUMPCLOUD_OIDC_PKCE_CLIENT_ID
+  GF_AUTH_KEYCLOAK_CLIENT_ID: KEYCLOAK_OIDC_PKCE_CLIENT_ID
+  GF_AUTH_KEYCLOAK_AUTH_URL: https://keycloak.k8s.local/auth
+  GF_AUTH_KEYCLOAK_TOKEN_URL: https://keycloak.k8s.local/token
+  GF_AUTH_KEYCLOAK_API_URL: https://keycloak.k8s.local/userinfo

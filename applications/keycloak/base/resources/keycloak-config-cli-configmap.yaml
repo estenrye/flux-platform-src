@@ -27,6 +27,11 @@ data:
       - name: ACL_SeaweedFS_AllBucketAdmin
       - name: ACL_SeaweedFS_ListAllBuckets
       - name: ACL_Keycloak_DbBackupOperator
+      # Grafana roles (same names as the JumpCloud groups, so one role mapping
+      # works for both logins): applications/grafana/base/values.yaml.
+      - name: ACL_grafana-admins
+      - name: ACL_grafana-editors
+      - name: ACL_grafana-viewers
 
     # Groups-as-OIDC-claims, assigned per client (not realm-wide
     # defaultDefaultClientScopes). full.path: false so the claim value is the
@@ -63,6 +68,7 @@ data:
         groups:
           - ACL_Keycloak_Administrator
           - ACL_SeaweedFS_AllBucketAdmin
+          - ACL_grafana-admins
       # Machine identity for SeaweedFS (client-credentials grant). Add it to
       # an ACL_* group to grant access, e.g.
       #   groups: [ACL_SeaweedFS_ListAllBuckets]
@@ -75,6 +81,30 @@ data:
     # mapper makes `aud` = seaweedfs-s3 for both, matching the provider's
     # clientId in the SeaweedFS IAM config.
     clients:
+      # Grafana login (OIDC authorization code + PKCE, public client: no
+      # secret). The redirect URI is per cluster; add one per Grafana host.
+      - clientId: grafana
+        name: "Grafana"
+        enabled: true
+        publicClient: true
+        standardFlowEnabled: true
+        implicitFlowEnabled: false
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        redirectUris:
+          - https://core-infra.grafana.rye.ninja/login/keycloak
+        webOrigins:
+          - https://core-infra.grafana.rye.ninja
+        attributes:
+          pkce.code.challenge.method: S256
+        defaultClientScopes:
+          - web-origins
+          - acr
+          - profile
+          - roles
+          - basic
+          - email
+          - groups
       - clientId: seaweedfs-s3
         name: "SeaweedFS S3"
         enabled: true
