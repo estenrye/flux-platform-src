@@ -92,7 +92,7 @@ data:
         directAccessGrantsEnabled: false
         serviceAccountsEnabled: false
         redirectUris:
-          - https://core-infra.grafana.rye.ninja/login/keycloak
+          - https://core-infra.grafana.rye.ninja/login/okta
         webOrigins:
           - https://core-infra.grafana.rye.ninja
         attributes:

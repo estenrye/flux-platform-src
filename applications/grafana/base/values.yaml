@@ -39,7 +39,9 @@ grafana.ini:
     allow_insecure_email_lookup: true
   # Second login option: Keycloak (id.rye.ninja), authorization code + PKCE,
   # public client. client_id and endpoint URLs come from grafana-site.
-  auth.keycloak:
+  # Grafana has no keycloak provider and generic_oauth is taken by JumpCloud,
+  # so this borrows the okta section (callback /login/okta). Okta is not used.
+  auth.okta:
     enabled: true
     name: Keycloak
     scopes: openid email profile

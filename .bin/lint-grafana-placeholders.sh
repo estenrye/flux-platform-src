@@ -35,10 +35,10 @@ for dir in "$@"; do
         | select(.data.GF_AUTH_GENERIC_OAUTH_CLIENT_ID == "'"${CLIENT_PLACEHOLDER}"'")
         | .kind + "/" + .metadata.name + " still uses placeholder GF_AUTH_GENERIC_OAUTH_CLIENT_ID"),
       (select(.kind == "ConfigMap" and .metadata.name == "grafana-site")
-        | select(.data.GF_AUTH_KEYCLOAK_CLIENT_ID == "'"${KC_CLIENT_PLACEHOLDER}"'")
-        | .kind + "/" + .metadata.name + " still uses placeholder GF_AUTH_KEYCLOAK_CLIENT_ID"),
+        | select(.data.GF_AUTH_OKTA_CLIENT_ID == "'"${KC_CLIENT_PLACEHOLDER}"'")
+        | .kind + "/" + .metadata.name + " still uses placeholder GF_AUTH_OKTA_CLIENT_ID"),
       (select(.kind == "ConfigMap" and .metadata.name == "grafana-site")
-        | .data | to_entries | .[] | select(.key | test("^GF_AUTH_KEYCLOAK_.*_URL$"))
+        | .data | to_entries | .[] | select(.key | test("^GF_AUTH_OKTA_.*_URL$"))
         | select(.value | test("keycloak.k8s.local"))
         | "ConfigMap/grafana-site still uses placeholder " + .key)' - | grep -v '^---$' || true)
 
