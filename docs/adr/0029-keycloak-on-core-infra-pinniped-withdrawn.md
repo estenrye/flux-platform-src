@@ -4,7 +4,7 @@ Date: 2026-11-01
 
 ## Status
 
-Accepted
+Accepted (cluster access without Pinniped: [30. Kubernetes API authentication with Keycloak JWTs](0030-kubernetes-api-keycloak-jwt-authentication.md))
 
 Supersedes [26. Keycloak + Pinniped Fleet Identity](0026-keycloak-pinniped-fleet-identity.md)
 

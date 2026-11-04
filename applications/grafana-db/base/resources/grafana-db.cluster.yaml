@@ -1,0 +1,46 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: grafana-db
+  namespace: grafana
+spec:
+  instances: 3
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+
+  # database/owner names match Grafana's [database] settings in
+  # applications/grafana/base/values.yaml.
+  bootstrap:
+    initdb:
+      database: grafana
+      owner: grafana
+
+  # imageName pin: prevents the postgres image from floating with the
+  # operator's compiled-in default.
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.3@sha256:5e30290fba3d990b08a9caea6ddb49c661ad8246cbb2688adad7e6cc78df6c3f
+
+  storage:
+    size: 5Gi
+    storageClass: csi-cinder-sc-retain
+
+  # ServiceAccount token for SeaweedFS STS web-identity auth; audience must
+  # match the kubernetes provider's clientId in the SeaweedFS IAM config.
+  projectedVolumeTemplate:
+    sources:
+      - serviceAccountToken:
+          audience: seaweedfs-s3
+          expirationSeconds: 3600
+          path: token
+
+  primaryUpdateStrategy: unsupervised
+
+  monitoring:
+    enablePodMonitor: true
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: grafana-db-barman

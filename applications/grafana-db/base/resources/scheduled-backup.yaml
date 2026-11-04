@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: grafana-db-backup
+  namespace: grafana
+spec:
+  # Staggered from step-ca-db (03:00), keycloak-db (03:15) and openbao-db (03:30).
+  schedule: "0 45 3 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: grafana-db
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+  target: primary
+  immediate: true

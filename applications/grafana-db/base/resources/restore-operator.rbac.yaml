@@ -1,0 +1,60 @@
+# Lets members of the Keycloak group ACL_Grafana_DbBackupOperator perform a
+# grafana-db restore (docs/runbooks/grafana-db.md): inspect backups, delete the
+# broken Cluster and its PVCs, apply a recovery Cluster, and restart Grafana.
+# Deliberately no access to Secrets (grafana-secret-key lives here) and no
+# patch on Deployments (that would allow mounting Secrets into a pod); Grafana
+# is restarted by deleting its pod. Creating a Cluster is itself powerful
+# (it chooses the image and pod settings), so grant the group accordingly.
+#
+# Inert until the API server authenticates Keycloak tokens (OIDC) and exposes
+# the groups claim under this exact name, i.e. no --oidc-groups-prefix.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: grafana-db-restore-operator
+  namespace: grafana
+rules:
+  - apiGroups: [postgresql.cnpg.io]
+    resources: [clusters]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [postgresql.cnpg.io]
+    resources: [backups]
+    verbs: [get, list, watch, create]
+  - apiGroups: [postgresql.cnpg.io]
+    resources: [scheduledbackups]
+    verbs: [get, list, watch, patch]
+  - apiGroups: [barmancloud.cnpg.io]
+    resources: [objectstores]
+    verbs: [get, list, watch]
+  - apiGroups: [""]
+    resources: [persistentvolumeclaims]
+    verbs: [get, list, watch, delete, deletecollection]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch, delete]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments/scale]
+    verbs: [get, update, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: grafana-db-restore-operator
+  namespace: grafana
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: grafana-db-restore-operator
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: ACL_Grafana_DbBackupOperator
