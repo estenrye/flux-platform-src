@@ -6,6 +6,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: keycloak-cluster-admin
+  annotations:
+    ignore-check.kube-linter.io/cluster-admin-role-binding: "Deliberate (ADR 30): the Keycloak groups ACL_Kubernetes_cluster-admin and ACL_Kubernetes_cluster-admin_core-infra exist to grant cluster-admin on this cluster."
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
