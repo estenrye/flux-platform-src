@@ -198,3 +198,5 @@ filer:
       # keycloak-db barman WAL/base backups (applications/keycloak-db); written
       # through the KeycloakDbBarman STS role, not a static key.
       - name: keycloak-db-barman
+      # grafana-db barman backups (applications/grafana-db), via the GrafanaDbBarman STS role.
+      - name: grafana-db-barman

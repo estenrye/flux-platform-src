@@ -67,6 +67,10 @@ resources:
 # to SeaweedFS, so it follows seaweedfs.
 - ../../applications/keycloak-db/base
 - ../../applications/keycloak/base
+# Kubernetes API access for Keycloak groups (API server JWT authentication, ADR 30).
+- resources/rbac.kubernetes-groups.yaml
+# grafana-db backs up to SeaweedFS and serves Grafana (applications/grafana).
+- ../../applications/grafana-db/base
 # VPA Recommendations
 - resources/vpa.recommendations.yaml
 

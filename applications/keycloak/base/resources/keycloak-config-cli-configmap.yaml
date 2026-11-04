@@ -27,6 +27,13 @@ data:
       - name: ACL_SeaweedFS_AllBucketAdmin
       - name: ACL_SeaweedFS_ListAllBuckets
       - name: ACL_Keycloak_DbBackupOperator
+      - name: ACL_Grafana_DbBackupOperator
+      # Kubernetes API access (clusters/*/resources/rbac.kubernetes-groups.yaml). The
+      # unsuffixed groups apply fleet-wide; the _<cluster> groups to one cluster.
+      - name: ACL_Kubernetes_cluster-admin
+      - name: ACL_Kubernetes_view
+      - name: ACL_Kubernetes_cluster-admin_core-infra
+      - name: ACL_Kubernetes_view_core-infra
       # Grafana roles (same names as the JumpCloud groups, so one role mapping
       # works for both logins): applications/grafana/base/values.yaml.
       - name: ACL_grafana-admins
@@ -95,6 +102,30 @@ data:
           - https://core-infra.grafana.rye.ninja/login/okta
         webOrigins:
           - https://core-infra.grafana.rye.ninja
+        attributes:
+          pkce.code.challenge.method: S256
+        defaultClientScopes:
+          - web-origins
+          - acr
+          - profile
+          - roles
+          - basic
+          - email
+          - groups
+      # kubectl login (kubelogin / oidc-login): authorization code + PKCE,
+      # public client, loopback redirect. The API server validates the ID token
+      # (AuthenticationConfiguration, audience `kubernetes`).
+      - clientId: kubernetes
+        name: "Kubernetes"
+        enabled: true
+        publicClient: true
+        standardFlowEnabled: true
+        implicitFlowEnabled: false
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        redirectUris:
+          - http://localhost:8000
+          - http://localhost:18000
         attributes:
           pkce.code.challenge.method: S256
         defaultClientScopes:

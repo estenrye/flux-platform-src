@@ -1,0 +1,37 @@
+# Keycloak groups (groups claim, bare names, no prefix) bound to built-in roles.
+# The API server maps the claim in its AuthenticationConfiguration
+# (pcd-ce-deploy/tofu-pcd-talos-cluster). Unsuffixed groups apply to every
+# cluster in the fleet, the _core-infra pair to this cluster only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: keycloak-cluster-admin
+  annotations:
+    ignore-check.kube-linter.io/cluster-admin-role-binding: "Deliberate (ADR 30): the Keycloak groups ACL_Kubernetes_cluster-admin and ACL_Kubernetes_cluster-admin_core-infra exist to grant cluster-admin on this cluster."
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: Group
+    name: ACL_Kubernetes_cluster-admin
+    apiGroup: rbac.authorization.k8s.io
+  - kind: Group
+    name: ACL_Kubernetes_cluster-admin_core-infra
+    apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: keycloak-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: Group
+    name: ACL_Kubernetes_view
+    apiGroup: rbac.authorization.k8s.io
+  - kind: Group
+    name: ACL_Kubernetes_view_core-infra
+    apiGroup: rbac.authorization.k8s.io

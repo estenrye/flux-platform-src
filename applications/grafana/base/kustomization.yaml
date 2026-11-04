@@ -16,6 +16,9 @@ resources:
   - resources/site-configmap.yaml
   - resources/eso.password-generator.admin.yaml
   - resources/eso.external-secret.admin.yaml
+  - resources/eso.password-generator.secret-key.yaml
+  - resources/eso.external-secret.secret-key.yaml
+  - resources/eso.push-secret.secret-key.yaml
   - resources/network-policy.yaml
   - resources/vpa.yaml
   - resources/role.yaml

@@ -13,7 +13,28 @@ admin:
   userKey: admin-user
   passwordKey: admin-password
 
+# secret_key (key encryption key) and the database password come from Secrets
+# via environment variables, which override grafana.ini. The key must never
+# change while grafana-db holds encrypted data.
+envValueFrom:
+  GF_SECURITY_SECRET_KEY:
+    secretKeyRef:
+      name: grafana-secret-key
+      key: secret-key
+  GF_DATABASE_PASSWORD:
+    secretKeyRef:
+      name: grafana-db-app
+      key: password
+
 grafana.ini:
+  database:
+    type: postgres
+    host: grafana-db-rw.grafana.svc.cluster.local:5432
+    name: grafana
+    user: grafana
+    # CNPG serves TLS with a cluster-local CA; require encrypts without
+    # verifying the server certificate.
+    ssl_mode: require
   analytics:
     check_for_updates: false
     reporting_enabled: false
@@ -90,6 +111,7 @@ sidecar:
     limits:
       memory: 128Mi
 
+# State lives in grafana-db (CNPG); the pod keeps only an emptyDir for caches.
 persistence:
   enabled: false
 
