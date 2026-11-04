@@ -76,6 +76,8 @@ data:
           - ACL_Keycloak_Administrator
           - ACL_SeaweedFS_AllBucketAdmin
           - ACL_grafana-admins
+          - ACL_Kubernetes_cluster-admin
+          - ACL_Kubernetes_cluster-admin_core-infra
       # Machine identity for SeaweedFS (client-credentials grant). Add it to
       # an ACL_* group to grant access, e.g.
       #   groups: [ACL_SeaweedFS_ListAllBuckets]
