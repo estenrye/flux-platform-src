@@ -8,30 +8,57 @@ source "${SCRIPT_DIR}/lib/prompt-color.sh"
 source "${SCRIPT_DIR}/lib/prompt-cluster.sh"
 source "${SCRIPT_DIR}/lib/prompt-kubeconfig.sh"
 
-# ── Step 1: Prompt — delete old service account first ────────────────────────
-echo ""
-warn "Action required before continuing:"
-warn "  1. Go to https://ryefamily.1password.com"
-warn "  2. Navigate to Settings → Service Accounts"
-warn "  3. Find the service account named '${CLUSTER_NAME}' and delete it"
-echo ""
-read -rp "Press Enter when deleted..."
+# Options (environment variables):
+#   USE_EXISTING_TOKEN=1  Skip creating a service account. Read the token already
+#                         stored at op://<cluster>/service-account-token/credential
+#                         and only propagate it (Kubernetes secret + SOPS file).
+#   WRITE_ACCESS=1        Grant the new service account write_items on the cluster
+#                         vault in addition to read_items. Ignored with
+#                         USE_EXISTING_TOKEN=1 (permissions were set at creation).
+USE_EXISTING_TOKEN="${USE_EXISTING_TOKEN:-}"
+WRITE_ACCESS="${WRITE_ACCESS:-}"
 
-# ── Step 2: Create new 1Password service account ──────────────────────────────
-info "Creating new 1Password service account '${CLUSTER_NAME}' ..."
-SA_TOKEN=$(op service-account create "${CLUSTER_NAME}" \
-  --vault "${CLUSTER_NAME}":read_items \
-  --account "${OP_ACCOUNT}" \
-  --raw)
-success "Service account created."
+if [ -n "${USE_EXISTING_TOKEN}" ]; then
+  [ -z "${WRITE_ACCESS}" ] || warn "WRITE_ACCESS is ignored with USE_EXISTING_TOKEN=1."
 
-# ── Step 3: Store new token in 1Password vault ────────────────────────────────
-info "Storing new token in 1Password vault '${CLUSTER_NAME}' ..."
-op item edit "service-account-token" \
-  --vault "${CLUSTER_NAME}" \
-  --account "${OP_ACCOUNT}" \
-  "credential[password]=${SA_TOKEN}"
-success "Token stored in 1Password."
+  # ── Steps 1-3 (skipped): read the token already stored in 1Password ─────────
+  info "Reading existing token from op://${CLUSTER_NAME}/service-account-token/credential ..."
+  SA_TOKEN=$(op read "op://${CLUSTER_NAME}/service-account-token/credential" \
+    --account "${OP_ACCOUNT}")
+  [ -n "${SA_TOKEN}" ] || { error "Token at op://${CLUSTER_NAME}/service-account-token/credential is empty."; exit 1; }
+  success "Existing token read."
+else
+  if [ -n "${WRITE_ACCESS}" ]; then
+    VAULT_PERMISSIONS="read_items,write_items"
+  else
+    VAULT_PERMISSIONS="read_items"
+  fi
+
+  # ── Step 1: Prompt — delete old service account first ──────────────────────
+  echo ""
+  warn "Action required before continuing:"
+  warn "  1. Go to https://ryefamily.1password.com"
+  warn "  2. Navigate to Settings → Service Accounts"
+  warn "  3. Find the service account named '${CLUSTER_NAME}' and delete it"
+  echo ""
+  read -rp "Press Enter when deleted..."
+
+  # ── Step 2: Create new 1Password service account ───────────────────────────
+  info "Creating new 1Password service account '${CLUSTER_NAME}' (${VAULT_PERMISSIONS}) ..."
+  SA_TOKEN=$(op service-account create "${CLUSTER_NAME}" \
+    --vault "${CLUSTER_NAME}:${VAULT_PERMISSIONS}" \
+    --account "${OP_ACCOUNT}" \
+    --raw)
+  success "Service account created."
+
+  # ── Step 3: Store new token in 1Password vault ─────────────────────────────
+  info "Storing new token in 1Password vault '${CLUSTER_NAME}' ..."
+  op item edit "service-account-token" \
+    --vault "${CLUSTER_NAME}" \
+    --account "${OP_ACCOUNT}" \
+    "credential[password]=${SA_TOKEN}"
+  success "Token stored in 1Password."
+fi
 
 # ── Step 4: Patch Kubernetes secret immediately ───────────────────────────────
 info "Patching onepassword-sdk-token in external-secrets-operator ..."

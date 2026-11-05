@@ -207,7 +207,7 @@ rotate-cluster-deploy-key:
 	CLUSTER=$(CLUSTER) .bin/rotate-cluster-deploy-key.sh
 
 rotate-cluster-service-account-token:
-	CLUSTER=$(CLUSTER) .bin/rotate-cluster-service-account-token.sh
+	CLUSTER=$(CLUSTER) USE_EXISTING_TOKEN=$(USE_EXISTING_TOKEN) WRITE_ACCESS=$(WRITE_ACCESS) .bin/rotate-cluster-service-account-token.sh
 
 rotate-cluster-sops-key:
 	CLUSTER=$(CLUSTER) .bin/rotate-cluster-sops-key.sh
