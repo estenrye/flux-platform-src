@@ -71,6 +71,10 @@ resources:
 - resources/rbac.kubernetes-groups.yaml
 # grafana-db backs up to SeaweedFS and serves Grafana (applications/grafana).
 - ../../applications/grafana-db/base
+# etcd snapshots to Cloudflare R2 (needs Talos kubernetesTalosAPIAccess and the
+# cloudflare-r2-etcd-snapshots 1Password item; docs/runbooks/etcd-snapshot-core-infra.md)
+- ../../applications/etcd-snapshot/base
+- resources/eso.external-secret.cloudflare-r2-etcd-snapshots.yaml
 # VPA Recommendations
 - resources/vpa.recommendations.yaml
 
