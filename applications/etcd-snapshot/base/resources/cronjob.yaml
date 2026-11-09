@@ -117,9 +117,10 @@ spec:
                   SIZE=$(wc -c < "${SNAP}")
                   [ "${SIZE}" -gt 1000000 ] || { echo "snapshot too small (${SIZE} bytes)" >&2; exit 1; }
                   NAME="core-infra-etcd-$(date -u +%Y%m%dT%H%M%SZ).snapshot"
+                  # no_check_bucket: the bucket-scoped R2 token cannot CreateBucket (403).
                   # Endpoint contains ':' -- must be quoted in rclone's
                   # connection-string syntax (see openbao-snapshots-sync).
-                  REMOTE=":s3,provider=Cloudflare,env_auth=false,access_key_id=${R2_ACCESS_KEY_ID},secret_access_key=${R2_SECRET_ACCESS_KEY},endpoint=\"${R2_ENDPOINT}\":${R2_BUCKET}"
+                  REMOTE=":s3,provider=Cloudflare,env_auth=false,no_check_bucket=true,access_key_id=${R2_ACCESS_KEY_ID},secret_access_key=${R2_SECRET_ACCESS_KEY},endpoint=\"${R2_ENDPOINT}\":${R2_BUCKET}"
                   rclone copyto "${SNAP}" "${REMOTE}/${NAME}" --checksum -v
                   rclone delete "${REMOTE}" --min-age "${RETENTION}" --include 'core-infra-etcd-*.snapshot' -v
                   echo "uploaded ${NAME} (${SIZE} bytes)"
