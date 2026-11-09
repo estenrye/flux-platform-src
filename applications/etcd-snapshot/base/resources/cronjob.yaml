@@ -1,0 +1,136 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etcd-snapshot
+  namespace: etcd-backup
+  annotations:
+    ignore-check.kube-linter.io/unset-cpu-requirements: "Small, infrequent batch job; resource envelope not needed."
+    ignore-check.kube-linter.io/unset-memory-requirements: "Small, infrequent batch job; resource envelope not needed."
+    ignore-check.kube-linter.io/no-node-affinity: "Homelab cluster; no zone or role topology to express affinity against."
+    ignore-check.kube-linter.io/no-liveness-probe: "Batch workload; liveness probes are not meaningful."
+    ignore-check.kube-linter.io/no-readiness-probe: "Batch workload; readiness probes are not meaningful."
+    ignore-check.kube-linter.io/no-read-only-root-fs: "rclone writes transient state under $HOME; readOnlyRootFilesystem is not supported."
+    ignore-check.kube-linter.io/env-value-from: "R2 credentials come from an ExternalSecret-managed Secret."
+    ignore-check.kube-linter.io/read-secret-from-env-var: "R2 credentials passed via env for rclone's connection-string remote syntax (no on-disk rclone.conf)."
+    ignore-check.kube-linter.io/default-service-account: "Job does not need Kubernetes API access; automountServiceAccountToken disabled."
+    checkov.io/skip01: "CKV_K8S_10=Small, infrequent batch job; resource requests not needed."
+    checkov.io/skip02: "CKV_K8S_11=Small, infrequent batch job; resource limits not needed."
+    checkov.io/skip03: "CKV_K8S_12=Small, infrequent batch job; memory requests not needed."
+    checkov.io/skip04: "CKV_K8S_13=Small, infrequent batch job; memory limits not needed."
+    checkov.io/skip05: "CKV_K8S_22=rclone writes transient state; readOnlyRootFilesystem not supported."
+    checkov.io/skip06: "CKV_K8S_38=automountServiceAccountToken disabled; SA token is not mounted."
+    checkov.io/skip07: "CKV_K8S_35=R2 credentials passed via env for rclone's connection-string remote syntax (no on-disk rclone.conf)."
+spec:
+  # Every 6 hours, matching the controlplane cluster's snapshot cadence.
+  schedule: "17 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: etcd-snapshot
+        spec:
+          restartPolicy: OnFailure
+          automountServiceAccountToken: false
+          securityContext:
+            runAsUser: 65532
+            runAsGroup: 65532
+            fsGroup: 65532
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          initContainers:
+            # Step 1: snapshot etcd through the Talos API. The control-plane
+            # VIP is both endpoint and node: apid proxies to whichever control
+            # plane currently holds it, so one down node does not fail the job.
+            # The talosconfig (os:etcd:backup role only) is the Secret Talos
+            # creates for the ServiceAccount; talosctl reads it from its default
+            # path /var/run/secrets/talos.dev/config.
+            - name: snapshot
+              # ghcr.io/siderolabs/talosctl:v1.14.1 (matches the Talos nodes)
+              image: "ghcr.io/siderolabs/talosctl@sha256:30791b2ec3ab1dec4093c342306159ebfe876eb9f646d5a710b853844a65ba13"
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              args:
+                - -e
+                - fd97:45c2:b3a1:1179::2c2
+                - -n
+                - fd97:45c2:b3a1:1179::2c2
+                - etcd
+                - snapshot
+                - /snapshots/etcd.snapshot
+              volumeMounts:
+                - name: talosconfig
+                  mountPath: /var/run/secrets/talos.dev
+                  readOnly: true
+                - name: snapshots
+                  mountPath: /snapshots
+          containers:
+            # Step 2: sanity-check, upload to R2, prune beyond retention.
+            - name: upload
+              # rclone/rclone:1.68.2
+              image: "rclone/rclone@sha256:74c51b8817e5431bd6d7ed27cb2a50d8ee78d77f6807b72a41ef6f898845942b"
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: RETENTION
+                  value: "14d"
+                - name: R2_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudflare-r2-etcd-snapshots
+                      key: endpoint
+                - name: R2_BUCKET
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudflare-r2-etcd-snapshots
+                      key: bucket
+                - name: R2_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudflare-r2-etcd-snapshots
+                      key: access-key-id
+                - name: R2_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cloudflare-r2-etcd-snapshots
+                      key: secret-access-key
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  SNAP=/snapshots/etcd.snapshot
+                  # A real core-infra snapshot is tens of MB; refuse to ship
+                  # an empty or truncated file.
+                  SIZE=$(wc -c < "${SNAP}")
+                  [ "${SIZE}" -gt 1000000 ] || { echo "snapshot too small (${SIZE} bytes)" >&2; exit 1; }
+                  NAME="core-infra-etcd-$(date -u +%Y%m%dT%H%M%SZ).snapshot"
+                  # Endpoint contains ':' -- must be quoted in rclone's
+                  # connection-string syntax (see openbao-snapshots-sync).
+                  REMOTE=":s3,provider=Cloudflare,env_auth=false,access_key_id=${R2_ACCESS_KEY_ID},secret_access_key=${R2_SECRET_ACCESS_KEY},endpoint=\"${R2_ENDPOINT}\":${R2_BUCKET}"
+                  rclone copyto "${SNAP}" "${REMOTE}/${NAME}" --checksum -v
+                  rclone delete "${REMOTE}" --min-age "${RETENTION}" --include 'core-infra-etcd-*.snapshot' -v
+                  echo "uploaded ${NAME} (${SIZE} bytes)"
+              volumeMounts:
+                - name: snapshots
+                  mountPath: /snapshots
+                  readOnly: true
+          volumes:
+            - name: talosconfig
+              secret:
+                secretName: etcd-snapshot
+            - name: snapshots
+              emptyDir:
+                sizeLimit: 1Gi

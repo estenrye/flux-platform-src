@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: etcd-snapshot
+  namespace: etcd-backup
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "CronJob creates Job pods dynamically; the podSelector label is valid but no pod exists in the static rendered manifest."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: etcd-snapshot
+  policyTypes:
+    - Egress
+  egress:
+    # Talos apid on the control-plane VIP / nodes.
+    - ports:
+        - protocol: TCP
+          port: 50000
+    # Cloudflare R2 (off-site, external HTTPS endpoint).
+    - ports:
+        - protocol: TCP
+          port: 443
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

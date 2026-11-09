@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: etcd-snapshot
+  description: |-
+    CronJob taking scheduled etcd snapshots of the core-infra cluster through
+    the Talos API (os:etcd:backup role only) and shipping them to Cloudflare
+    R2, off the NFS-backed Cinder storage that the cluster itself runs on.
+  tags:
+    - backup
+    - etcd
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
