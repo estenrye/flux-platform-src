@@ -47,6 +47,19 @@ not exist until step 2, so merging the Flux change first would fail it.
    kubectl -n etcd-backup delete job etcd-snapshot-test
    ```
 
+## Rollout gotchas (hit on 2026-11-09)
+
+- **ClusterSecretStore namespace allow-list.** `1password-sdk`
+  (`clusters/core-infra/resources/eso.cluster-secret-store.yaml`) only serves
+  listed namespaces; `etcd-backup` had to be added or the ExternalSecret fails
+  with `denied by spec.condition`.
+- **`no_check_bucket=true`** is required on the rclone R2 remote: the
+  bucket-scoped token cannot `CreateBucket` (403 AccessDenied).
+- **Flux must be able to dry-run everything.** One unhealthy admission webhook
+  (see the incident notes: SLAAC address on a control plane) blocks the whole
+  `flux-platform` Kustomization, so nothing new applies.
+- Verified: test Job uploaded an 86 MB snapshot to R2. Restore not drilled.
+
 ## Checking it is working
 
 - `kubectl -n etcd-backup get cronjob,job` shows recent successful Jobs.

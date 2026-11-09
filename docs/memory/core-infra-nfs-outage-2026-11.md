@@ -35,6 +35,17 @@ metadata:
    cleared it; all three returned to 3/3 healthy.
 4. Final state: 8/8 nodes Ready, etcd 3 members, no non-Running pods.
 
+## Aftershock: flaky admission webhooks (found 2026-11-09)
+- Flux kept failing on `opentelemetry-operator-webhook` timeouts, intermittently.
+  Cause: `talos-controlplane-1` had picked up a leftover **SLAAC global address**
+  during the hard reboot (before the `autoconf=0` sysctl applied). Node-originated
+  traffic used it as source and the security group dropped it, so the apiserver on
+  CP1 could not reach any pod. Other CPs/pods were fine.
+- Detect: probe a pod's port from each CP with a hostNetwork pod in `kube-system`;
+  `talosctl get addresses` shows an extra `...:f816:3eff:...` global address.
+- Fix: graceful `talosctl reboot` of the affected node. After any hard reboot,
+  check every node for this address.
+
 ## Diagnostics worth remembering
 - Nova `ACTIVE` ≠ healthy. Check `talosctl service` (etcd/cri/kubelet) and
   `talosctl dmesg | grep -i input/output`.
