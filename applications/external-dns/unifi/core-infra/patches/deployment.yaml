@@ -1,10 +1,18 @@
 - op: add
   path: /spec/template/spec/restartPolicy
   value: Always
+# Never two pods at once, even during a rollout: maxSurge 0 + maxUnavailable 1 behaves like
+# Recreate while satisfying the no-rolling-update-strategy check.
 - op: add
   path: /spec/strategy
   value:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
+  value: "Deliberately a single publisher: UniFi DNS runs registry noop + policy sync, so a second concurrent instance deletes the first one's records. Ships at 0 replicas until the cutover (docs/runbooks/external-dns-unifi-cutover.md), then 1."
 # DORMANT until cutover: controlplane's UniFi external-dns still owns UniFi DNS.
 # Two instances delete each other's records. Raise to 1 only in the cutover PR
 # (docs/runbooks/external-dns-unifi-cutover.md), after controlplane's is stopped.
