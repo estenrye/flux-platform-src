@@ -5,7 +5,7 @@
 # docs/specs/2026-09-09-dns-notify-soa-responder.md in the
 # pdns4-external-dns-rest-http-cr-shim repo). UDPRoute is
 # gateway.networking.k8s.io/v1alpha2 -- unlike HTTPRoute it hasn't
-# graduated past alpha, but Envoy Gateway (1.8.1, already deployed here)
+# graduated past alpha, but Envoy Gateway (Calico's bundled build)
 # supports it and the cluster's Gateway API CRDs are installed via the
 # experimental channel (applications/gateway-api-crds) specifically so
 # alpha route kinds like this one are available.
@@ -16,7 +16,7 @@ metadata:
   namespace: external-dns
 spec:
   parentRefs:
-    - name: pdns4-shim
+    - name: pdns4-shim-gateway
       namespace: external-dns
       sectionName: dns
   rules:

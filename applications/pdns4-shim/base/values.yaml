@@ -21,9 +21,9 @@ serviceAccount:
 rbac:
   create: true
 
-# false: external-dns/unifi/base's chart already installs the
+# false: external-dns/cloudflare/base's chart already installs the
 # dnsendpoints.externaldns.k8s.io CRD (includeCRDs: true) and must render
-# before this app in clusters/controlplane/kustomization.yaml.
+# before this app in clusters/core-infra/kustomization.yaml.
 installCRDs: false
 
 service:
@@ -63,9 +63,11 @@ config:
   logLevel: "trace"
 
 # Production pattern per the chart's own values.yaml comment: keep the key
-# out of `helm get values`/release history. Value lives in
-# clusters/controlplane/secrets/pdns4-shim-api-key.sops.yaml -- coordinate
-# rotations with whatever configures Designate's pdns4 backend target.
+# out of `helm get values`/release history. The Secret is created by External
+# Secrets from 1Password core-infra/pdns4-shim-api-key
+# (clusters/core-infra/resources/eso.external-secret.pdns4-shim-api-key.yaml);
+# Designate's pdns4 target reads the same value from the 1Password item named in
+# pcd-ce-deploy's tofu-pcd/terraform.tfvars -- rotate both together.
 apiKey:
   existingSecret: pdns4-shim-api-key
   existingSecretKey: API_KEY

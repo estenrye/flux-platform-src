@@ -4,15 +4,19 @@
 # Issuance is DNS-01 via Cloudflare (letsencrypt-prod ClusterIssuer), so this
 # doesn't require the service to be internet-reachable.
 #
-# gatewayClassName: internal-eg (not merged-eg): pdns4-shim is only called
-# by pcd-ce-lab, which is VLAN-100-resident, so it never needs a GUA-ingress
-# VIP -- and putting it on merged-eg's shared GUA VIP would make it exactly
-# the traffic pattern that hits the on-link reply bug root-caused in
+# gatewayClassName: internal-dedicated (Calico 3.33's bundled Envoy Gateway on
+# core-infra): pdns4-shim is only called by pcd-ce-lab, which is
+# VLAN-100-resident, so it never needs a GUA-ingress VIP -- the Gateway's own
+# LoadBalancer Service takes an address from Calico's lb-internal-routed ULA
+# pool, sidestepping the on-link reply bug root-caused in
 # docs/memory/node-gua-onlink-reply-unreliable.md (a GUA-sourced VLAN-100
 # client's connection to a GUA VIP has its post-handshake packets silently
-# dropped). internal-eg pins its shared Service to Calico's
-# lb-internal-ula-routed IPPool instead, sidestepping the bug entirely
-# rather than needing split-horizon DNS or a Talos-side fix.
+# dropped).
+#
+# Named pdns4-shim-gateway, not pdns4-shim: Calico 3.33 creates each Gateway's
+# proxy ServiceAccount/Deployment/Service in the Gateway's own namespace named
+# after the Gateway, which would collide with the shim's own objects
+# (docs/memory/calico-33-gateway-namespace-mode.md).
 # cert-manager.io/cluster-issuer here (not a standalone Certificate
 # resource, unlike keycloak/step-ca's Gateways in this repo) -- cert-manager's
 # gateway-shim controller is enabled cluster-wide
@@ -24,12 +28,12 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: pdns4-shim
+  name: pdns4-shim-gateway
   namespace: external-dns
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
-  gatewayClassName: internal-eg
+  gatewayClassName: internal-dedicated
   listeners:
     - name: https
       hostname: pdns4-shim.rye.ninja
@@ -49,8 +53,8 @@ spec:
     # supported for a non-HTTP(S) protocol; Designate points at
     # pdns4-shim.rye.ninja:53, the same hostname/VIP as the https listener
     # above, just a different port -- this listener shares that VIP
-    # deliberately (internal-eg's shared Service is pinned to Calico's
-    # lb-internal-ula-routed IPPool, which is what keeps VLAN-100-resident
+    # deliberately (the Gateway's Service is pinned to Calico's
+    # lb-internal-routed IPPool, which is what keeps VLAN-100-resident
     # clients like pcd-ce-lab off the on-link reply bug documented on the
     # https listener above; a standalone LoadBalancer Service for this
     # would need that same pinning independently re-verified).
