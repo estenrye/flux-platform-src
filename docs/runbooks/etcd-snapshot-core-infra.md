@@ -64,8 +64,9 @@ not exist until step 2, so merging the Flux change first would fail it.
 
 - `kubectl -n etcd-backup get cronjob,job` shows recent successful Jobs.
 - The newest object in the R2 bucket is < 6 h old.
-- TODO: alert on `kube_cronjob_status_last_successful_time` older than ~12 h
-  (alerting must not depend only on the cluster being healthy).
+- Alerting: the CronJob pings a self-hosted Healthchecks outside the cluster
+  ([healthchecks-self-hosted.md](healthchecks-self-hosted.md)). No success ping within
+  8 h (6 h period + 2 h grace), or any upload failure, posts to Discord.
 
 ## Restore
 
