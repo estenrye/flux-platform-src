@@ -32,12 +32,12 @@ in-cluster alert path died with the cluster.
 | Item | Vault | Used by |
 |---|---|---|
 | `healthchecks-secret-key` | Platform9 | Django `SECRET_KEY` (Ansible) |
-| `healthchecks-admin` | Platform9 | admin login (Ansible bootstrap) |
+| `healthchecks-admin` | Home_Lab | admin login (Ansible bootstrap) |
 | `healthchecks-discord-webhook` | Platform9 | alert channel (Ansible bootstrap) |
 | `healthchecks-ping-etcd-snapshot` | core-infra | ping URL, read by the cluster via External Secrets |
 | `cloudflare-api-token` | core-infra | Caddy's ACME DNS challenge (**reused**: it is broader than needed; replace with a token scoped to `_acme-challenge` TXT edits) |
 
-The VM-side secrets are deliberately in a vault the cluster cannot read.
+The secret key and webhook are in Platform9, the admin login in Home_Lab: none of these vaults are readable by the cluster.
 
 ## The check
 
