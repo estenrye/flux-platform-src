@@ -35,6 +35,7 @@ in-cluster alert path died with the cluster.
 | `healthchecks-admin` | Home_Lab | admin login (Ansible bootstrap) |
 | `healthchecks-discord-webhook` | Home_Lab | alert channel (Ansible bootstrap) |
 | `healthchecks-ping-etcd-snapshot` | core-infra | ping URL, read by the cluster via External Secrets |
+| `cloudflare-r2-healthchecks-db`, `healthchecks-db-backup-age-key` | Home_Lab | DB backup upload credentials and age keypair (VM-side) |
 | `healthchecks-ping-cnpg-backups` | core-infra | three ping URLs, read by the cluster via External Secrets |
 | `cloudflare-api-token` | core-infra | Caddy's ACME DNS challenge (**reused**: it is broader than needed; replace with a token scoped to `_acme-challenge` TXT edits) |
 
@@ -77,20 +78,54 @@ curl -fsS "$URL/fail"   # check goes down, Discord message
 curl -fsS "$URL"        # recovers, Discord "up" message
 ```
 
+## Database backup (SQLite -> R2, age-encrypted)
+
+Healthchecks uses **SQLite** (`/opt/healthchecks/data/hc.sqlite`), not Postgres.
+`healthchecks-db-backup.timer` on the VM runs daily at 02:30 UTC (+ up to 5 min jitter):
+
+1. SQLite online-backup API inside the app container (consistent while running) + `PRAGMA integrity_check`.
+2. `gzip` then `age` encrypt to the **public** key; the plaintext copy is deleted immediately.
+3. Upload `healthchecks-db-<UTC ts>.sqlite.gz.age` to the private R2 bucket `healthchecks-db`
+   (rclone in a `--network host` container: the VM is IPv6-only, bridge containers cannot reach R2),
+   then delete objects older than 30 days.
+4. Ping the `healthchecks-db-backup` check (1 day + 3 h grace; `/fail` on any error).
+   That check lives on this same instance, so it catches a failing backup but not the loss of the VM.
+
+Secrets (1Password, vault `Home_Lab`): `cloudflare-r2-healthchecks-db` (bucket-scoped R2 token),
+`healthchecks-db-backup-age-key` (`private-key` is **only** here, never on the VM; `public-key` is on the VM).
+
+Run one now: `sudo systemctl start healthchecks-db-backup.service` (takes ~5 s; `journalctl -u healthchecks-db-backup`).
+
+### Restore
+
+```sh
+export OP_ACCOUNT=ryefamily.1password.com
+# download the newest object from R2 (rclone / Cloudflare UI), then:
+op read "op://Home_Lab/healthchecks-db-backup-age-key/private-key" > key.txt   # chmod 600; delete afterwards
+age -d -i key.txt healthchecks-db-<ts>.sqlite.gz.age | gunzip > hc.sqlite
+sqlite3 hc.sqlite 'PRAGMA integrity_check'          # expect: ok
+```
+To restore onto the VM: `docker compose down` in `/opt/healthchecks`, replace
+`data/hc.sqlite` (owner uid 999, mode 0640), `docker compose up -d`. Pings and
+alerts resume with the same check URLs.
+
+**Drilled 2026-11-10:** a manual backup was downloaded, decrypted with the key from
+1Password, passed `integrity_check`, and matched the live database (1 user, 5 checks,
+2 channels). Decrypting without the key fails, as intended.
+
 ## Rebuild / recover
 
-The SQLite database is **not backed up**. If the VM is lost:
 1. `tofu apply` in `pcd-ce-deploy/tofu-pcd-vms`, update the AAAA record if the address changed.
 2. `ansible-playbook -i inventory.yml provision-healthchecks.yml` (set `ansible_host` first).
-3. The bootstrap recreates the admin, channel and check with a **new check UUID**:
-   put the new ping URL in the `healthchecks-ping-etcd-snapshot` item. External
-   Secrets picks it up within its refresh interval.
+3. Either restore the latest backup (above), which keeps every check URL, or let the
+   bootstrap create fresh checks with **new** UUIDs and update the ping URLs in the
+   `healthchecks-ping-*` items in `core-infra`.
 
 ## Known limits
 
 - It is on the same PCD hypervisor as the cluster: a total PCD or hypervisor outage
   silences both. Consider a second, independent watcher.
-- Deliberate weakness: the SQLite DB and Caddy certs live only on the VM.
+- The DB is backed up daily to R2 (above). Caddy's certificate is re-issued automatically on rebuild.
 - Pods reach the VM over the routed network; the security group allows
   `fd97:45c2:b3a1::/48` only. Verified from a pod on 2026-11-10.
 - A new VM on PCD can fail with `NoUniqueMatch` if two security groups share a name
