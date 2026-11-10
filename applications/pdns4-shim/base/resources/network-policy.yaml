@@ -11,27 +11,31 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Envoy Gateway (pdns4-shim.rye.ninja HTTPS-terminate listener) forwarding
-    # to the shim's Service.
+    # The Gateway's proxy (pdns4-shim.rye.ninja HTTPS-terminate listener)
+    # forwarding to the shim's Service. Calico 3.33 runs each Gateway's proxy in
+    # the Gateway's own namespace, selected by owning-gateway-name (there is no
+    # envoy-gateway-system proxy).
     - from:
-        - namespaceSelector:
+        - podSelector:
             matchLabels:
-              kubernetes.io/metadata.name: envoy-gateway-system
+              gateway.envoyproxy.io/owning-gateway-name: pdns4-shim-gateway
+              gateway.envoyproxy.io/owning-gateway-namespace: external-dns
       ports:
         - protocol: TCP
           port: 8081
     # Designate's pdns4 backend NOTIFY/SOA-poll traffic (pdns4-shim 0.1.1+,
     # exposed via UDPRoute -- resources/udp-route.yaml -- since 0.1.2),
-    # forwarded by the same internal-eg Envoy fleet as the rule above, just
-    # over UDP/53 instead of TCP/8081. Port 10053, not 53 -- NetworkPolicy
+    # forwarded by the same proxy as the rule above, just over UDP/53 instead
+    # of TCP/8081. Port 10053, not 53 -- NetworkPolicy
     # ports match the pod's actual containerPort post-Service-DNAT (see the
     # apiserver egress rule below for the same convention), and the DNS
     # listener binds an unprivileged port precisely so this container never
     # needs NET_BIND_SERVICE.
     - from:
-        - namespaceSelector:
+        - podSelector:
             matchLabels:
-              kubernetes.io/metadata.name: envoy-gateway-system
+              gateway.envoyproxy.io/owning-gateway-name: pdns4-shim-gateway
+              gateway.envoyproxy.io/owning-gateway-namespace: external-dns
       ports:
         - protocol: UDP
           port: 10053

@@ -6,7 +6,7 @@ namespace: external-dns
 # Rackspace's OpenStack Designate pdns4 backend target can drive DNSEndpoint
 # objects instead of talking to a real PowerDNS server. Shares the
 # `external-dns` namespace with external-dns/unifi and external-dns/cloudflare
-# (both already in this cluster's kustomization) since ExternalDNS's `crd`
+# (the Cloudflare one is in this cluster's kustomization) since ExternalDNS's `crd`
 # source watches DNSEndpoint objects cluster-wide regardless of namespace.
 # Exposed publicly at pdns4-shim.rye.ninja (Designate calls in from outside
 # the home network) via its own Gateway, same one-Gateway-per-app pattern as

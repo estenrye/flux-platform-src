@@ -1,8 +1,0 @@
-- op: replace
-  path: /spec/parentRefs/0/name
-  value: pdns4-shim-gateway
-# STAGED: ignored by external-dns until cutover (remove this annotation then).
-- op: add
-  path: /metadata/annotations
-  value:
-    external-dns.alpha.kubernetes.io/controller: disabled

@@ -5,7 +5,7 @@ metadata:
   namespace: external-dns
 spec:
   parentRefs:
-    - name: pdns4-shim
+    - name: pdns4-shim-gateway
       namespace: external-dns
       sectionName: https
   hostnames:
