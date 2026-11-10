@@ -3,6 +3,8 @@ kind: NetworkPolicy
 metadata:
   name: pdns4-shim
   namespace: external-dns
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The Gateway's Envoy proxy pods are created at runtime by the Envoy Gateway controller in this namespace (Calico 3.33 GatewayNamespace mode); they are not in the static rendered manifest."
 spec:
   podSelector:
     matchLabels:
