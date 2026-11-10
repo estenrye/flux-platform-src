@@ -78,4 +78,27 @@ not exist until step 2, so merging the Flux change first would fail it.
    (regenerate the talosconfig with `tofu output -raw talosconfig` in
    `pcd-ce-deploy/tofu-pcd-talos-cluster`).
 
-**Restore has not been drilled for core-infra.** Do a drill before relying on it.
+## Restore drill log
+
+### 2026-11-10: scratch etcd restore (snapshot validity)
+Not a full DR rebuild. Procedure, run entirely off-cluster:
+1. Download the newest object from R2 (`rclone copyto`, `--checksum`).
+2. `etcdutl snapshot status` (etcd image `gcr.io/etcd-development/etcd:v3.7.1`,
+   matching the cluster): hash `4abed59e`, revision 12806698, 2526 keys, 86 MB.
+3. `etcdutl snapshot restore` into an empty data dir, start a single-member
+   `etcd` on it, `etcdctl endpoint health` = healthy.
+4. Compared to the live cluster (key names only, never values): 27 namespaces,
+   74 Secrets, 23 PVs/PVCs, 54 Deployments, 3 CNPG clusters identical; Pods
+   205 vs 203 (churn). Spot checks present: `etcd-backup` namespace, the
+   `etcd-snapshot` CronJob, the Talos ServiceAccount, `grafana/grafana-db`.
+5. Wiped the data dir and removed the container (the snapshot holds every Secret).
+
+Also confirmed: the CronJob fires on schedule (objects at 06:17, 12:17, 18:17,
+00:17 UTC). All snapshots are the same byte size because the bbolt file grows
+in steps; compare hashes, not sizes.
+
+**Not yet drilled:** a full DR rebuild (`talosctl bootstrap --recover-from` on
+a fresh control plane with the same machine secrets, then workers rejoining).
+That is what proves the Talos side. Do it on scratch PCD VMs, never on the
+live control planes.
+
