@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: external-dns-unifi-core-infra
+  description: |-
+    external-dns with the UniFi webhook provider on core-infra. Publishes only
+    DNSEndpoint objects (e.g. the records Designate manages through pdns4-shim)
+    and the shim's own route from the external-dns namespace into the UniFi
+    gateway's LAN DNS. Replaces controlplane's UniFi publisher.
+  tags:
+    - dns
+    - external-dns
+    - unifi
+    - platform
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

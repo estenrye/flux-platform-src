@@ -36,6 +36,11 @@ resources:
 - ../../applications/external-dns/cloudflare/base
 - resources/eso.external-secret.cloudflare-api-token.yaml
 - resources/eso.external-secret.cloudflare-dns.yaml
+# UniFi DNS publisher (DORMANT, replicas 0, until the cutover in
+# docs/runbooks/external-dns-unifi-cutover.md) and the controlplane names it must keep.
+- ../../applications/external-dns/unifi/core-infra
+- resources/eso.external-secret.external-dns-unifi-credentials.yaml
+- resources/dnsendpoint.controlplane-legacy.yaml
 - ../../applications/netdata/base
 - ../../applications/victoria-metrics/base
 - ../../applications/grafana/base

@@ -1,0 +1,48 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: external-dns
+
+# UniFi publisher for core-infra (controlplane is being decommissioned).
+# Plan and cutover: docs/runbooks/external-dns-unifi-cutover.md
+#
+# Independent of ../base for the same reasons as external-dns/cloudflare/controlplane
+# (docs/memory/external-dns-multi-instance-collision.md): a distinct releaseName keeps
+# Service/ServiceAccount/ClusterRole names and the app.kubernetes.io/instance pod label
+# from colliding with external-dns/cloudflare/base, which already runs here as
+# `external-dns`. includeCRDs is false for the same reason: cloudflare/base owns
+# dnsendpoints.externaldns.k8s.io.
+#
+# !! UniFi uses registry: noop + policy: sync, so a second instance deletes every
+# record the first one does not itself want. NEVER run this at the same time as
+# controlplane's UniFi external-dns. It ships with replicas: 0
+# (patches/deployment.yaml); raise it only after controlplane's is stopped.
+
+helmCharts:
+  - name: external-dns
+    namespace: external-dns
+    repo: https://kubernetes-sigs.github.io/external-dns/
+    version: 1.20.0
+    releaseName: external-dns-unifi
+    includeCRDs: false
+    valuesFile: values.yaml
+
+resources:
+  - resources/network-policy.yaml
+
+patches:
+  - target:
+      kind: Deployment
+      name: external-dns-unifi
+    path: patches/deployment.yaml
+  - target:
+      kind: ClusterRole
+      name: external-dns-unifi
+    path: patches/cluster-role.yaml
+
+images:
+  - name: registry.k8s.io/external-dns/external-dns
+    newTag: v0.20.0
+    digest: sha256:ddc7f4212ed09a21024deb1f470a05240837712e74e4b9f6d1f2632ff10672e7
+  - name: ghcr.io/kashalls/external-dns-unifi-webhook
+    newTag: v0.9.0
+    digest: sha256:22f4106f44a0b9ac3c97cf29bbfef93026c1164492152dc797a1d6dc86ddfbb5
