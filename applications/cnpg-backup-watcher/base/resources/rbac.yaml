@@ -1,0 +1,28 @@
+# Read-only: the watcher lists CNPG Backups and Clusters and changes nothing.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cnpg-backup-watcher
+  namespace: cnpg-backup-monitor
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cnpg-backup-watcher
+rules:
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["backups", "clusters"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cnpg-backup-watcher
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cnpg-backup-watcher
+subjects:
+  - kind: ServiceAccount
+    name: cnpg-backup-watcher
+    namespace: cnpg-backup-monitor

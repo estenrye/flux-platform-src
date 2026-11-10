@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cnpg-backup-watcher
+  description: |-
+    CronJob that checks the newest CloudNativePG backup and WAL archiving
+    state of each database and reports to the self-hosted Healthchecks
+    (healthchecks.rye.ninja), which alerts on failure or silence.
+  tags:
+    - backup
+    - cnpg
+    - monitoring
+    - platform
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
