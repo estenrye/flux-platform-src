@@ -1,0 +1,39 @@
+- op: add
+  path: /spec/template/spec/restartPolicy
+  value: Always
+# Never two pods at once, even during a rollout: maxSurge 0 + maxUnavailable 1 behaves like
+# Recreate while satisfying the no-rolling-update-strategy check.
+- op: add
+  path: /spec/strategy
+  value:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
+  value: "Deliberately a single publisher: UniFi DNS runs registry noop + policy sync, so a second concurrent instance deletes the first one's records. Ships at 0 replicas until the cutover (docs/runbooks/external-dns-unifi-cutover.md), then 1."
+# DORMANT until cutover: controlplane's UniFi external-dns still owns UniFi DNS.
+# Two instances delete each other's records. Raise to 1 only in the cutover PR
+# (docs/runbooks/external-dns-unifi-cutover.md), after controlplane's is stopped.
+- op: replace
+  path: /spec/replicas
+  value: 0
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1read-secret-from-env-var
+  value: "This is not a custom application."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1env-value-from
+  value: "Secret comes from an external source."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+  value: "Single-host homelab cluster; no zone or role topology to express affinity against."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-read-only-root-fs
+  value: "The external-dns chart does not expose securityContext for the main container's tmp cache; the webhook sidecar is hardened via values."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip1
+  value: "CKV_K8S_38=external-dns requires the service account token to watch Services, Gateways and manage DNS records."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip2
+  value: "CKV_K8S_35=The UniFi webhook consumes the controller API key via environment variables sourced from a Kubernetes Secret (external-dns-unifi-credentials); credentials are not hardcoded in manifests."

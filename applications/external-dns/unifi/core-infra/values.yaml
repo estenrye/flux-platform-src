@@ -1,0 +1,98 @@
+logLevel: info
+logFormat: json
+interval: 3m
+triggerLoopOnEvent: true
+# UniFi's Static DNS feature has no TXT record type at all (confirmed live
+# against the controller API: only A/AAAA/CNAME exist across every managed
+# hostname) -- txt registry can never write its edns.* ownership markers
+# here, so it silently treats every record as unowned and refuses to touch
+# it. That's why bao.rye.ninja got stuck on a stale value indefinitely
+# while nothing ever errored. noop just syncs desired state directly.
+registry: noop
+
+extraArgs:
+  - --domain-filter=rye.ninja
+  # Only look at the external-dns namespace: DNSEndpoints (incl. the ones the
+  # pdns4-shim writes for Designate zones) and the shim's own HTTPRoute. core-infra's
+  # other Gateways (grafana, keycloak, netdata ...) are NOT published into UniFi.
+  - --namespace=external-dns
+  - --gateway-namespace=external-dns
+
+serviceAccount:
+  create: true
+  name: external-dns-unifi
+
+sources:
+  - crd
+  - gateway-httproute
+
+policy: sync
+
+provider:
+  name: webhook
+  webhook:
+    image:
+      repository: ghcr.io/kashalls/external-dns-unifi-webhook
+      tag: v0.9.0
+    env:
+      - name: UNIFI_HOST
+        valueFrom:
+          secretKeyRef:
+            name: external-dns-unifi-credentials
+            key: host
+            optional: false
+      - name: UNIFI_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: external-dns-unifi-credentials
+            key: api-key
+            optional: false
+      # The controller serves an untrusted certificate; pinned explicitly
+      # even though the webhook currently defaults to skipping verification.
+      - name: UNIFI_SKIP_TLS_VERIFY
+        value: "true"
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: http-webhook
+      initialDelaySeconds: 10
+      timeoutSeconds: 5
+    readinessProbe:
+      httpGet:
+        path: /readyz
+        port: http-webhook
+      initialDelaySeconds: 10
+      timeoutSeconds: 5
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop:
+          - ALL
+
+serviceMonitor:
+  enabled: true
+  interval: 60s
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# One replica: a single UniFi publisher, so there is nothing to disrupt.
+podDisruptionBudget:
+  enabled: false
