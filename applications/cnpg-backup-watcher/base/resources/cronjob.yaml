@@ -1,0 +1,91 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cnpg-backup-watcher
+  namespace: cnpg-backup-monitor
+  annotations:
+    ignore-check.kube-linter.io/unset-cpu-requirements: "Small, infrequent batch job; resource envelope not needed."
+    ignore-check.kube-linter.io/unset-memory-requirements: "Small, infrequent batch job; resource envelope not needed."
+    ignore-check.kube-linter.io/no-node-affinity: "Homelab cluster; no zone or role topology to express affinity against."
+    ignore-check.kube-linter.io/no-liveness-probe: "Batch workload; liveness probes are not meaningful."
+    ignore-check.kube-linter.io/no-readiness-probe: "Batch workload; readiness probes are not meaningful."
+    ignore-check.kube-linter.io/env-value-from: "Healthchecks ping URLs come from an ExternalSecret-managed Secret."
+    ignore-check.kube-linter.io/read-secret-from-env-var: "Ping URLs are capability URLs consumed by the script as environment variables."
+    checkov.io/skip01: "CKV_K8S_10=Small, infrequent batch job; resource requests not needed."
+    checkov.io/skip02: "CKV_K8S_11=Small, infrequent batch job; resource limits not needed."
+    checkov.io/skip03: "CKV_K8S_12=Small, infrequent batch job; memory requests not needed."
+    checkov.io/skip04: "CKV_K8S_13=Small, infrequent batch job; memory limits not needed."
+    checkov.io/skip05: "CKV_K8S_38=The job must call the Kubernetes API (read-only RBAC), so the ServiceAccount token is mounted."
+    checkov.io/skip06: "CKV_K8S_35=Ping URLs are capability URLs consumed by the script as environment variables."
+spec:
+  # After the ScheduledBackups: keycloak-db 03:15, grafana-db and seaweedfs-db
+  # 03:45 UTC. Matches the 1-day period of the Healthchecks cnpg-backup-* checks.
+  schedule: "0 5 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: cnpg-backup-watcher
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: cnpg-backup-watcher
+          securityContext:
+            runAsUser: 65532
+            runAsGroup: 65532
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: watcher
+              # python:3.13-alpine
+              image: "python@sha256:1e1f6334529d1fb26a2ef619d7cffb30a7c7d7cc1cc7338ebee283a58d1aeaca"
+              imagePullPolicy: IfNotPresent
+              command: ["python", "/scripts/watcher.py"]
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: PYTHONDONTWRITEBYTECODE
+                  value: "1"
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+                # A completed backup newer than this is healthy (daily schedule
+                # plus slack for a slow run).
+                - name: MAX_BACKUP_AGE_HOURS
+                  value: "26"
+                - name: TARGETS
+                  value: >-
+                    [{"namespace":"keycloak","cluster":"keycloak-db","ping_env":"PING_KEYCLOAK_DB"},
+                     {"namespace":"grafana","cluster":"grafana-db","ping_env":"PING_GRAFANA_DB"},
+                     {"namespace":"seaweedfs","cluster":"seaweedfs-db","ping_env":"PING_SEAWEEDFS_DB"}]
+                - name: PING_KEYCLOAK_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: healthchecks-ping-cnpg-backups
+                      key: keycloak-db
+                - name: PING_GRAFANA_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: healthchecks-ping-cnpg-backups
+                      key: grafana-db
+                - name: PING_SEAWEEDFS_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: healthchecks-ping-cnpg-backups
+                      key: seaweedfs-db
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                  readOnly: true
+          volumes:
+            - name: script
+              configMap:
+                name: cnpg-backup-watcher-script

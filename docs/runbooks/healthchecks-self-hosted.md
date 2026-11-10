@@ -35,6 +35,7 @@ in-cluster alert path died with the cluster.
 | `healthchecks-admin` | Home_Lab | admin login (Ansible bootstrap) |
 | `healthchecks-discord-webhook` | Home_Lab | alert channel (Ansible bootstrap) |
 | `healthchecks-ping-etcd-snapshot` | core-infra | ping URL, read by the cluster via External Secrets |
+| `healthchecks-ping-cnpg-backups` | core-infra | three ping URLs, read by the cluster via External Secrets |
 | `cloudflare-api-token` | core-infra | Caddy's ACME DNS challenge (**reused**: it is broader than needed; replace with a token scoped to `_acme-challenge` TXT edits) |
 
 The VM-side secrets are all in Home_Lab, which the cluster cannot read (its External Secrets store is scoped to the core-infra vault).
@@ -46,6 +47,27 @@ at :17 past 00/06/12/18 UTC and pings after a successful R2 upload, and pings
 `/fail` on any error in the upload step. **An alert fires after 8 h without a
 ping**, or immediately on `/fail`. If the snapshot (init) step fails the upload
 step never runs, so that case alerts via the missed ping rather than `/fail`.
+
+## CNPG backup checks
+
+`applications/cnpg-backup-watcher` runs daily at 05:00 UTC (after the 03:15 / 03:45
+UTC ScheduledBackups) and pings one check per database: `cnpg-backup-keycloak-db`,
+`-grafana-db`, `-seaweedfs-db` (period 1 day, grace 3 h). For each database it checks:
+
+- the newest **completed** `Backup` is less than 26 h old,
+- the **latest** `Backup` did not fail,
+- the Cluster's `ContinuousArchiving` condition is `True` (WAL is flowing).
+
+Healthy -> success ping; any problem -> `/fail` with the reasons (Discord alert).
+No ping for 1 day + 3 h also alerts. It reads Backup objects because
+`Cluster.status.lastSuccessfulBackup` stays empty with the barman-cloud plugin.
+It proves a backup *ran*, not that it is restorable or off-site: keycloak-db and
+grafana-db back up to the in-cluster SeaweedFS (same storage as the data);
+seaweedfs-db backs up to Cloudflare R2.
+
+Ping URLs: 1Password `core-infra/healthchecks-ping-cnpg-backups` (one field per database).
+Add a database by adding a `Check` to `ansible/files/healthchecks-bootstrap.py`, a field
+to that item, and an entry in the CronJob's `TARGETS` and env.
 
 ## Test the alert path
 

@@ -76,6 +76,10 @@ resources:
 - ../../applications/etcd-snapshot/base
 - resources/eso.external-secret.cloudflare-r2-etcd-snapshots.yaml
 - resources/eso.external-secret.healthchecks-ping-etcd-snapshot.yaml
+# CNPG backup watcher: reports backup/WAL-archiving health of each CNPG database
+# to Healthchecks (docs/runbooks/healthchecks-self-hosted.md)
+- ../../applications/cnpg-backup-watcher/base
+- resources/eso.external-secret.healthchecks-ping-cnpg-backups.yaml
 # VPA Recommendations
 - resources/vpa.recommendations.yaml
 
