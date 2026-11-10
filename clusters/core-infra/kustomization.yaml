@@ -75,6 +75,7 @@ resources:
 # cloudflare-r2-etcd-snapshots 1Password item; docs/runbooks/etcd-snapshot-core-infra.md)
 - ../../applications/etcd-snapshot/base
 - resources/eso.external-secret.cloudflare-r2-etcd-snapshots.yaml
+- resources/eso.external-secret.healthchecks-ping-etcd-snapshot.yaml
 # VPA Recommendations
 - resources/vpa.recommendations.yaml
 

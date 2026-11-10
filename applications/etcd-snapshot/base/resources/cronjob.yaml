@@ -106,11 +106,31 @@ spec:
                     secretKeyRef:
                       name: cloudflare-r2-etcd-snapshots
                       key: secret-access-key
+                # Dead-man's-switch: the self-hosted Healthchecks VM (outside
+                # the cluster) alerts if no success ping arrives within
+                # 6h + 2h grace, which also covers the cluster being down.
+                - name: HC_PING_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: healthchecks-ping-etcd-snapshot
+                      key: url
               command:
                 - sh
                 - -c
                 - |
                   set -eu
+                  # Healthchecks ping. Retries; a failed ping fails the Job so it
+                  # is visible, and a missed ping alerts on its own anyway.
+                  ping() {
+                    for i in 1 2 3; do
+                      wget -q -T 10 -O /dev/null "${HC_PING_URL}$1" && return 0
+                      sleep 5
+                    done
+                    echo "healthchecks ping $1 failed" >&2
+                    return 1
+                  }
+                  # Signal failure immediately instead of waiting for the timeout.
+                  trap 'rc=$?; [ "${rc}" -eq 0 ] || ping /fail || true' EXIT
                   SNAP=/snapshots/etcd.snapshot
                   # A real core-infra snapshot is tens of MB; refuse to ship
                   # an empty or truncated file.
@@ -124,6 +144,7 @@ spec:
                   rclone copyto "${SNAP}" "${REMOTE}/${NAME}" --checksum -v
                   rclone delete "${REMOTE}" --min-age "${RETENTION}" --include 'core-infra-etcd-*.snapshot' -v
                   echo "uploaded ${NAME} (${SIZE} bytes)"
+                  ping ""
               volumeMounts:
                 - name: snapshots
                   mountPath: /snapshots
