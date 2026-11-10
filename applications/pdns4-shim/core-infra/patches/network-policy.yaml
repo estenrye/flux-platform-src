@@ -1,0 +1,17 @@
+# Calico 3.33 runs each Gateway's proxy in the Gateway's own namespace, labelled
+# gateway.envoyproxy.io/owning-gateway-name; there is no envoy-gateway-system
+# proxy here. Ports are post-DNAT pod ports (8081 HTTP, 10053 DNS).
+- op: replace
+  path: /spec/ingress/0/from
+  value:
+    - podSelector:
+        matchLabels:
+          gateway.envoyproxy.io/owning-gateway-name: pdns4-shim-gateway
+          gateway.envoyproxy.io/owning-gateway-namespace: external-dns
+- op: replace
+  path: /spec/ingress/1/from
+  value:
+    - podSelector:
+        matchLabels:
+          gateway.envoyproxy.io/owning-gateway-name: pdns4-shim-gateway
+          gateway.envoyproxy.io/owning-gateway-namespace: external-dns

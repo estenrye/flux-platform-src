@@ -34,6 +34,11 @@ resources:
 - ../../applications/vertical-pod-autoscaler/v1.8
 - ../../applications/cert-manager-acme/base
 - ../../applications/external-dns/cloudflare/base
+# pdns4-shim (Designate pdns4 backend impersonator), migrated from controlplane.
+# STAGED: external-dns ignores its Gateway/routes until cutover.
+# docs/superpowers/plans/2026-11-10-pdns4-shim-to-core-infra.md
+- ../../applications/pdns4-shim/core-infra
+- resources/eso.external-secret.pdns4-shim-api-key.yaml
 - resources/eso.external-secret.cloudflare-api-token.yaml
 - resources/eso.external-secret.cloudflare-dns.yaml
 - ../../applications/netdata/base
