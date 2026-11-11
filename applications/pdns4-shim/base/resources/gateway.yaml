@@ -34,6 +34,18 @@ metadata:
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   gatewayClassName: internal-dedicated
+  # Pin the VIP. Designate's pdns4 pool holds this address in
+  # nameservers[].host (pcd-ce-deploy tofu-pcd/terraform.tfvars) to poll SOA over
+  # UDP/53, and it must be an IP: this Designate rejects a hostname there over RPC
+  # (IPOrHost overrides coerce but not from_primitive). If the Gateway were
+  # recreated and Calico handed out a different address, zone polling would
+  # silently break. The annotation is Calico's LoadBalancer IPAM request; it
+  # propagates to the generated proxy Service via infrastructure.annotations and
+  # must stay inside the lb-internal-routed pool selected by the EnvoyProxy.
+  # Change it here AND in pcd-ce-deploy together.
+  infrastructure:
+    annotations:
+      projectcalico.org/loadBalancerIPs: '["fd97:45c2:b3a1:f00::1:9281"]'
   listeners:
     - name: https
       hostname: pdns4-shim.rye.ninja
