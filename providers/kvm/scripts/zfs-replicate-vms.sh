@@ -8,9 +8,14 @@
 # turns "rebuild the cluster" into "roll back the zvols".
 #
 # Install per docs/runbooks/kvm-host-prep.md:
-#   - replication SSH key for ${NAS_USER}@${NAS_HOST} with zfs recv perms
-#     (human installs the key on TrueNAS)
+#   - replication SSH key for ${NAS_USER}@${NAS_HOST}. The user, its
+#     authorized key and its sudo rules are provisioned by pcd-ce-deploy's
+#     tofu-truenas (replication.tf); the rules allow exactly the remote
+#     commands below (recv, send, list, snapshot-only destroy) under
+#     ${NAS_DATASET}.
 #   - target dataset ${NAS_DATASET} exists on TrueNAS
+#   - optional PING_URL (systemd EnvironmentFile /etc/zfs-replicate-vms.env):
+#     Healthchecks check, pinged /start, on success, and /fail on any error.
 #
 # Retention: 7 daily on both sides; Sunday snapshots kept 28 days (≈4 weekly).
 set -euo pipefail
@@ -21,7 +26,17 @@ NAS_USER="${NAS_USER:-replication}"
 NAS_DATASET="${NAS_DATASET:-flash-pool/replication/mf-ms-a2-01.usmnblm01.rye.ninja/vms}"
 # Absolute path: /usr/sbin is not in a non-root user's non-interactive SSH
 # PATH on TrueNAS SCALE, so bare `zfs` fails remotely.
-REMOTE_ZFS="${REMOTE_ZFS:-/usr/sbin/zfs}"
+# The replication user has no ZFS delegation; it runs zfs through sudo rules
+# pinned to ${NAS_DATASET} (tofu-truenas replication.tf).
+REMOTE_ZFS="${REMOTE_ZFS:-sudo -n /usr/sbin/zfs}"
+
+# ── Healthchecks (optional) ──────────────────────────────────────────────────
+ping() { # $1 = suffix ("", /start, /fail)
+  [ -n "${PING_URL:-}" ] || return 0
+  curl -fsS -m 10 --retry 3 -o /dev/null "${PING_URL}$1" || true
+}
+trap 'ping /fail' ERR
+ping /start
 
 today=$(date -u +%Y%m%d)
 label="nightly-${today}"
@@ -80,3 +95,4 @@ for src in $(zfs list -H -r -d 1 -t volume -o name "${SRC_DATASET}"); do
 done
 
 echo "replication complete: ${SRC_DATASET}@${label} -> ${NAS_HOST}:${NAS_DATASET}"
+ping ""

@@ -68,11 +68,20 @@ steps below for a new host.
      `flash-pool/replication/mf-ms-a2-01.usmnblm01.rye.ninja/vms`. Verify:
      `sudo ssh replication@nas.rye.ninja /usr/sbin/zfs list <target>` (remote
      zfs needs the absolute path — `/usr/sbin` is not in a non-root SSH PATH).
-   - ZFS delegation for the `replication` user on the parent dataset must
-     include `send` — nightly push only needs `receive`, but the host-replace
-     restore path pulls the zvols back, and delegation is the only send
-     authority the user has. Full set (as admin on the NAS):
-     `zfs allow replication create,destroy,hold,mount,receive,release,rollback,send,snapshot flash-pool/replication/mf-ms-a2-01.usmnblm01.rye.ninja`.
+   - The NAS side (user, authorized key, SSH service, sudo rules) is provisioned
+     by `pcd-ce-deploy/tofu-truenas/replication.tf`; the key is the public half
+     of `/root/.ssh/replication_ed25519` on this host (`replication_ssh_public_key`).
+     The user has no ZFS delegation, only passwordless sudo for `zfs recv`,
+     `send`, `list` and snapshot-only `destroy` under the replication dataset,
+     so `REMOTE_ZFS` defaults to `sudo -n /usr/sbin/zfs`. `send` is included for
+     the host-replace restore path, which pulls the zvols back.
+   - Trust the NAS host key before the first run (`ssh-keyscan` is not enough on
+     its own: compare the fingerprint with the NAS's own
+     `/etc/ssh/ssh_host_ed25519_key.pub`) so non-interactive SSH can connect.
+   - Healthchecks: check `zfs-replicate-vms` on healthchecks.rye.ninja
+     (created by `pcd-ce-deploy/ansible/provision-healthchecks.yml`). Put its ping
+     URL (`op://Home_Lab/healthchecks-ping-zfs-replicate-vms/url`) in
+     `/etc/zfs-replicate-vms.env` as `PING_URL=...` (mode 0600, root).
 
    Install:
 
