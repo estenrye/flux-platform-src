@@ -5,4 +5,6 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+# PING_URL for Healthchecks (0600, root; see docs/runbooks/kvm-host-prep.md).
+EnvironmentFile=-/etc/zfs-replicate-vms.env
 ExecStart=/usr/local/sbin/zfs-replicate-vms.sh
