@@ -25,17 +25,3 @@
   gather_facts: false
   roles:
     - kvm-host-maintenance
-
-# Separate play, same inventory hosts but connection: local: unsealing
-# OpenBao is a Kubernetes-API operation (kubectl/sops from the operator's
-# own machine), not something that happens on the KVM host itself over
-# SSH. Keyed off the same per-host inventory purely to reuse that host's
-# openbao_* config (kvm_maintenance_openbao_unseal_enabled defaults to
-# false -- see roles/openbao-unseal/defaults/main.yml -- so this is a
-# no-op on any host that doesn't carry the controlplane cluster).
-- name: Unseal OpenBao after the cluster restart
-  hosts: kvm_hosts
-  connection: local
-  gather_facts: false
-  roles:
-    - openbao-unseal
