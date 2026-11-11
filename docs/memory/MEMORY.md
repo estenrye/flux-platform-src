@@ -54,3 +54,4 @@
 - [Minecraft backupOnTerminate Deferred](minecraft-backup-on-terminate-deferred.md) — chart 5.x final-backup-on-stop option is left off; needs a measured terminationGracePeriodSeconds before enabling
 - [core-infra NFS Outage Nov 2026](core-infra-nfs-outage-2026-11.md) — Cinder/NFS loss wedged Talos boot disks, etcd quorum lost ~71h; fixed by Nova hard reboots + CNPG operator restart; open hardening list (no etcd snapshots)
 - [kube-proxy clusterCIDR Masquerade](kube-proxy-clustercidr-masquerade.md) — core-infra kube-proxy SNATed pod→ClusterIP traffic (clusterCIDR ≠ Calico pool), breaking sender-based NetworkPolicies across nodes; fixed via KubeProxyConfig in pcd-ce-deploy
+- [Designate + pdns4-shim gotchas](designate-pdns4-shim-gotchas.md) — pool nameserver host must be an IP (RPC from_primitive), worker caches the pool (restart it), pdns4 never re-creates zones, NOTIFY target is dnsmasq
