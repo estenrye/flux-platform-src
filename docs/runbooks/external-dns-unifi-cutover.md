@@ -76,9 +76,9 @@ Executed in the order above, in one source PR with two render PRs:
 
 Lessons:
 
-- **Do not stop controlplane's instance by editing `applications/external-dns/unifi/base`.** `clusters/observability` renders
-  the same base (the render lint's `minimum-three-replicas` finding exposed it), so that would stop observability's publisher
-  too. Patch it per cluster.
+- **Do not stop controlplane's instance by editing `applications/external-dns/unifi/base`.** `clusters/observability` rendered
+  the same base at the time (the render lint's `minimum-three-replicas` finding exposed it), so that would have stopped that
+  cluster's publisher too. Patch it per cluster. (The observability cluster has since been decommissioned.)
 - **The `noop` registry does not delete records it does not own.** I expected `workload-vm.usmnblm01.rye.ninja` (A + AAAA, stale
   copies from the old shim; Designate has no such record) to be removed. It stayed. Stale UniFi records have to be deleted by
   hand (UniFi UI/API); the publisher will never clean them up.
@@ -89,5 +89,5 @@ Lessons:
 - Reachability of the UniFi API from a core-infra pod was checked beforehand (TCP + TLS from a pod carrying the publisher's
   NetworkPolicy labels).
 
-Open: the observability cluster's API was unreachable from the workstation, so it is unknown whether it runs its own UniFi
-publisher against the same controller. If it does, that is a second publisher and it fights this one.
+Resolved: the observability cluster did not exist at cutover time (no VMs on the KVM host), so there was never a second UniFi
+publisher; it was decommissioned on 2026-11-11.

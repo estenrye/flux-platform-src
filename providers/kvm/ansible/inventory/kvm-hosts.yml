@@ -28,10 +28,9 @@ all:
             - controlplane-wk-1
             - controlplane-wk-2
             - controlplane-wk-3
-          kvm_maintenance_observability_domains:
-            - observability-cp-1
-            - observability-cp-2
-            - observability-cp-3
+          # The observability cluster was decommissioned (2026-11-11), so there
+          # are no workload-cluster domains to shut down or start.
+          kvm_maintenance_observability_domains: []
 
           # Unmanaged, pre-dates this repo (uvtool-provisioned, not on the
           # vmpool ZFS dataset) -- confirmed disposable 2026-08-15. Shut
