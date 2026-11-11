@@ -1,0 +1,14 @@
+# STOPPED (UniFi cutover): core-infra's external-dns-unifi
+# (applications/external-dns/unifi/core-infra) is the single UniFi DNS publisher now.
+# UniFi runs registry noop + policy sync: an instance deletes any record it does not
+# itself want, so two instances against one UniFi delete each other's records. Never
+# run both. Scoped to controlplane here, NOT in applications/external-dns/unifi/base,
+# because clusters/observability also renders that base.
+# The Deployment is kept (replicas 0): it owns the dnsendpoints.externaldns.k8s.io CRD.
+# Rollback: stop core-infra's first, then remove this patch.
+- op: replace
+  path: /spec/replicas
+  value: 0
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
+  value: "Intentionally stopped: core-infra's external-dns-unifi is the single UniFi DNS publisher (docs/runbooks/external-dns-unifi-cutover.md)."

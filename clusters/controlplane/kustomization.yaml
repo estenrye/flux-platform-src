@@ -168,3 +168,8 @@ patches:
       kind: Deployment
       name: external-dns-cloudflare
       namespace: external-dns
+  - path: patches/external-dns.unifi.stopped.yaml
+    target:
+      kind: Deployment
+      name: external-dns
+      namespace: external-dns

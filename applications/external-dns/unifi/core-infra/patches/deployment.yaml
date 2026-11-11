@@ -12,13 +12,14 @@
       maxUnavailable: 1
 - op: add
   path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
-  value: "Deliberately a single publisher: UniFi DNS runs registry noop + policy sync, so a second concurrent instance deletes the first one's records. Ships at 0 replicas until the cutover (docs/runbooks/external-dns-unifi-cutover.md), then 1."
-# DORMANT until cutover: controlplane's UniFi external-dns still owns UniFi DNS.
-# Two instances delete each other's records. Raise to 1 only in the cutover PR
-# (docs/runbooks/external-dns-unifi-cutover.md), after controlplane's is stopped.
+  value: "Deliberately a single publisher: UniFi DNS runs registry noop + policy sync, so a second concurrent instance deletes the first one's records. Runs at 1 replica since the UniFi cutover (docs/runbooks/external-dns-unifi-cutover.md)."
+# ACTIVE (UniFi cutover): the single UniFi DNS publisher. controlplane's
+# (applications/external-dns/unifi/base) is stopped at 0 replicas. Never run both:
+# registry noop + policy sync makes each delete the other's records. Rollback: set
+# this to 0 first, then restore controlplane's (docs/runbooks/external-dns-unifi-cutover.md).
 - op: replace
   path: /spec/replicas
-  value: 0
+  value: 1
 - op: add
   path: /metadata/annotations/ignore-check.kube-linter.io~1read-secret-from-env-var
   value: "This is not a custom application."
