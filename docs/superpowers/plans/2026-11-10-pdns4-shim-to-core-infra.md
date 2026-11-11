@@ -62,13 +62,13 @@ repeating this: repoint Designate (steps 2-5 above) first, remove the old shim l
 
 ## Findings, not fixed
 
-- **NOTIFY never reaches the shim.** Designate sends NOTIFY after a record change to `targets[0].options.host:port`, which has
-  been `10.45.60.1:53` (the hypervisor's own `dnsmasq`) since the first working pool config. The shim only pulls a zone by AXFR
-  when it receives a NOTIFY, so records Designate creates do not propagate. Proven: a manual NOTIFY
-  (`dig +opcode=notify +aaflag +norecurse @<VIP> -p 53 SOA <zone>`) made the shim AXFR and write the `DNSEndpoint`.
-  `options` are free-form strings, so unlike `nameservers[].host` a hostname (`pdns4-shim.rye.ninja`) should work there.
-  Changing it would turn on the Designate -> UniFi/Cloudflare pipeline (zones such as `rye.ninja.` would then publish
-  to Cloudflare): a decision, not a fix.
+- **NOTIFY never reached the shim: fixed 2026-11-11** (pcd-ce-deploy). Designate sends NOTIFY after a record change to
+  `targets[0].options.host:port`, which had been `10.45.60.1:53` (the hypervisor's own `dnsmasq`) since the first working
+  pool config, so records Designate creates never propagated; only a manual NOTIFY
+  (`dig +opcode=notify +aaflag +norecurse @<VIP> -p 53 SOA <zone>`) made the shim AXFR. It is now `pdns4-shim.rye.ninja`
+  (`options` are free-form strings, so a hostname survives RPC, unlike `nameservers[].host`); the worker was restarted.
+  Verified: a zone change reaches the shim as a NOTIFY ~6 s later by itself. **Consequence:** records created in Designate
+  now flow to UniFi and, for `rye.ninja.`, to public Cloudflare.
 - **The old `workload-vm` records were stale.** The copied `DNSEndpoint` carried `10.45.73.112`; Designate has no
   `workload-vm` record (the VM is at `fd97:45c2:b3a1:1000::3cc`). The shim now mirrors Designate: the `usmnblm01.rye.ninja`
   `DNSEndpoint` is empty. controlplane's old copies still feed its UniFi instance until that is stopped.
