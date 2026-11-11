@@ -30,6 +30,12 @@ re-created resources, then:
 - `nas-ula.rye.ninja` /etc/hosts entry and its netplan route on the KVM host (unknown other users).
 - Cloudflare token `rackspace-spot-crossplane-controlplane-cluster` (not in scope).
 
+**1Password.** Vault `controlplane` was renamed to `pcd.rye.ninja` (not archived): PCD config in `pcd-ce-deploy` still reads
+`pdns4-shim.rye.ninja`, `unifi-os-xnetworksegment` and `cloudflare-api-token` from it (tofu-pcd, tofu-pcd-vms, certbot-pcd).
+Archived as dead: `sops-age-key`, `openbao-root-token`, `cloudflare-r2-openbao-snapshots`, `github-auth-app`. Left alone,
+unverified: `service-account-token`, `unifi-os-external-dns`. Older notes that say `op://controlplane/...` predate the
+rename. Shared vault `crossplane-controlplane-secrets` (R2 admin token) is untouched.
+
 **Gotchas hit.**
 - R2 object deletion needs S3 credentials: access key = token ID, secret = SHA-256 hex of the token value. The
   scoped DNS token cannot touch R2; the R2 admin token can.
