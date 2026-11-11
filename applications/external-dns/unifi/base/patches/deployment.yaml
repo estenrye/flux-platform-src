@@ -8,13 +8,9 @@
     rollingUpdate:
       maxSurge: 1
       maxUnavailable: 1
-# STOPPED (UniFi cutover): core-infra's external-dns-unifi
-# (applications/external-dns/unifi/core-infra) is the single UniFi DNS publisher now.
-# Never run both: registry noop + policy sync makes each delete the other's records.
-# Rollback: stop core-infra's first, then set this back to 3.
 - op: replace
   path: /spec/replicas
-  value: 0
+  value: 3
 - op: add
   path: /metadata/annotations/ignore-check.kube-linter.io~1read-secret-from-env-var
   value: "This is not a custom application."
