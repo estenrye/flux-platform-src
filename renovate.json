@@ -15,16 +15,6 @@
       ],
       "groupName": "opentelemetry-operator (chart and image)",
       "minimumReleaseAge": "3 days"
-    },
-    {
-      "description": "The democratic-csi driver is the storage layer for the controlplane cluster and is pinned by digest by hand. As a digest-only kustomize entry Renovate followed the digest of `latest` (#219); keep driver upgrades deliberate and tested.",
-      "matchManagers": [
-        "kustomize"
-      ],
-      "matchPackageNames": [
-        "ghcr.io/democratic-csi/democratic-csi"
-      ],
-      "enabled": false
     }
   ]
 }

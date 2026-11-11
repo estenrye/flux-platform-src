@@ -56,3 +56,4 @@
 - [kube-proxy clusterCIDR Masquerade](kube-proxy-clustercidr-masquerade.md) — core-infra kube-proxy SNATed pod→ClusterIP traffic (clusterCIDR ≠ Calico pool), breaking sender-based NetworkPolicies across nodes; fixed via KubeProxyConfig in pcd-ce-deploy
 - [Designate + pdns4-shim gotchas](designate-pdns4-shim-gotchas.md) — pool nameserver host must be an IP (RPC from_primitive), worker caches the pool (restart it), pdns4 never re-creates zones, NOTIFY target is dnsmasq
 - [Observability cluster decommission](observability-decommission.md) — 2026-11-11: what was removed in order (repo, VLAN 200, GitHub, local) and what is deliberately left (OpenBao role, 1Password, FRR lines)
+- [Controlplane cluster decommission](controlplane-decommission.md) — 2026-11-11: AWS/Cloudflare/R2/NAS/KVM/repo removal order, what was kept (zfs-replicate-vms, shared R2 admin token), gotchas

@@ -1,6 +1,5 @@
 .DS_Store
-.mcp.json# controlplane cluster: private age key stays out of git (1Password holds it)
-clusters/controlplane/.sops.age-key
+.mcp.json
 # crossplane private age key: untracked (was committed since afe949f — rotate the
 # crossplane age key, its exposure is already in git history)
 clusters/crossplane/.sops.age-key
@@ -14,5 +13,4 @@ providers/kvm/**/.terraform/
 providers/kvm/**/.terraform.lock.hcl
 providers/kvm/**/*.tfstate*
 # rendered Talos machine configs contain live secrets
-providers/kvm/controlplane/.rendered/
 etcd-backups/

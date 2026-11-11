@@ -80,7 +80,7 @@ Three cluster roles, per the
 
 | Role | Purpose | Status |
 |---|---|---|
-| **Control plane** (`controlplane`) | Crossplane, Flux, step-ca (trust domain root), Keycloak, OpenBao, Garage, Backstage. The only cluster with cloud-mutation credentials. Runs as an IPv6-only Talos-on-KVM cluster in the home lab — a script-bootstrapped pet, not self-managed by Crossplane. | Live (M1 complete — see [status](docs/memory/m1-implementation-status.md)) |
+| **Control plane** (`controlplane`) | Crossplane, Flux, step-ca, OpenBao, Garage; an IPv6-only Talos-on-KVM cluster. | **Decommissioned 2026-11-11** — see [decommission note](docs/memory/controlplane-decommission.md). Running clusters: `core-infra` (PCD). |
 | **Observability** | LGTM stack, Garage gateway, Dispatch — isolated so control plane and observability failures aren't correlated. | Planned |
 | **Workload clusters** | Tenant applications plus a thin platform baseline (Flux, cert-manager+SPIFFE, Calico, OTel, ESO). Never run Crossplane. | Planned (fleet expansion after control plane migration) |
 
@@ -115,10 +115,9 @@ make lint           # render + checkov + kube-linter
 make push-pr        # push rendered output as a PR to each cluster's rendered repo
 ```
 
-`.bin/create-controlplane-cluster.sh` and `.bin/destroy-controlplane-cluster.sh`
-provision and tear down the home lab control plane cluster itself (see
-[`providers/kvm/README.md`](providers/kvm/README.md)); this is infrastructure
-bootstrap, separate from the GitOps flow above.
+The KVM-hosted control plane cluster and its provisioning scripts were removed with the
+controlplane decommission (2026-11-11); only the shared NAT64 appliance and KVM host prep remain
+under [`providers/kvm/`](providers/kvm/README.md).
 
 ## Key documents
 

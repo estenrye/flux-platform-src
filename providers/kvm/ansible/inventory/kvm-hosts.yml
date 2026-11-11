@@ -20,14 +20,9 @@ all:
           # domains are added/removed/renamed.
           kvm_maintenance_nat64_domains:
             - nat64-01
-          kvm_maintenance_controlplane_domains:
-            - controlplane-cp-1
-            - controlplane-cp-2
-            - controlplane-cp-3
-          kvm_maintenance_worker_domains:
-            - controlplane-wk-1
-            - controlplane-wk-2
-            - controlplane-wk-3
+          # The controlplane cluster was decommissioned (2026-11-11).
+          kvm_maintenance_controlplane_domains: []
+          kvm_maintenance_worker_domains: []
           # The observability cluster was decommissioned (2026-11-11), so there
           # are no workload-cluster domains to shut down or start.
           kvm_maintenance_observability_domains: []
@@ -39,15 +34,3 @@ all:
           # from the host for good.
           kvm_maintenance_legacy_domains:
             - qf-r64-v6-tun.usmnblm01.rye.ninja
-
-          # This host carries the controlplane cluster, so its OpenBao
-          # always boots sealed after every VM restart this playbook does
-          # (docs/runbooks/openbao-unseal.md) -- roles/openbao-unseal runs
-          # locally (kubectl/sops from the operator's machine), keyed off
-          # this host purely to reuse its config, not because it executes
-          # here. Leave kvm_maintenance_openbao_unseal_enabled false on any
-          # future host that doesn't carry controlplane.
-          kvm_maintenance_openbao_unseal_enabled: true
-          kvm_maintenance_openbao_kubeconfig: "{{ lookup('env', 'HOME') }}/.kube/homelab/controlplane.yaml"
-          kvm_maintenance_openbao_sops_file: "{{ playbook_dir }}/../../../../clusters/controlplane/secrets/openbao-unseal.sops.yaml"
-          kvm_maintenance_openbao_age_key_ref: "op://controlplane/sops-age-key/private-key"
