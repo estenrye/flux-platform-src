@@ -1,8 +1,7 @@
 # Runbook: UniFi DNS publisher cutover (controlplane -> core-infra)
 
-`applications/external-dns/unifi/core-infra` is the UniFi publisher for core-infra. It ships
-**dormant (replicas 0)**. controlplane's UniFi `external-dns`
-(`applications/external-dns/unifi/base`, 3 replicas) still owns UniFi DNS until you run this.
+`applications/external-dns/unifi/core-infra` is the UniFi publisher for core-infra. **Cutover done 2026-11-11** (see
+"Outcome" below): core-infra's instance is the single UniFi publisher (replicas 1) and controlplane's is stopped (replicas 0).
 
 ## Why exactly one at a time
 
@@ -63,3 +62,32 @@ within a sync interval (3 min). Never start it while core-infra's is running.
 
 As each controlplane service moves, delete its entry from `clusters/core-infra/resources/dnsendpoint.controlplane-legacy.yaml`.
 When controlplane is decommissioned, remove `applications/external-dns/unifi/base` along with the rest of it.
+
+## Outcome (2026-11-11)
+
+Executed in the order above, in one source PR with two render PRs:
+
+1. controlplane's `external-dns` stopped with a **controlplane-scoped patch**
+   (`clusters/controlplane/patches/external-dns.unifi.stopped.yaml`), confirmed `0/0`. The Deployment is kept (it owns the
+   `DNSEndpoint` CRD).
+2. core-infra's `external-dns-unifi` set to 1 replica. Controller metrics after the first reconcile: 0 errors, 3 source
+   endpoints, all 3 AAAA verified. From the LAN, UniFi answers `bao.rye.ninja` and `ca.rye.ninja`
+   (`2607:3640:1064:27f::9280`) and `pdns4-shim.rye.ninja` (`fd97:45c2:b3a1:f00::1:9281`).
+
+Lessons:
+
+- **Do not stop controlplane's instance by editing `applications/external-dns/unifi/base`.** `clusters/observability` renders
+  the same base (the render lint's `minimum-three-replicas` finding exposed it), so that would stop observability's publisher
+  too. Patch it per cluster.
+- **The `noop` registry does not delete records it does not own.** I expected `workload-vm.usmnblm01.rye.ninja` (A + AAAA, stale
+  copies from the old shim; Designate has no such record) to be removed. It stayed. Stale UniFi records have to be deleted by
+  hand (UniFi UI/API); the publisher will never clean them up.
+- The new pod's `external-dns` container restarted twice at startup while the webhook sidecar came up; it then ran clean.
+- A publisher that logs nothing is not necessarily idle: use the metrics (`:7979/metrics`:
+  `external_dns_controller_last_sync_timestamp_seconds`, `external_dns_source_endpoints_total`,
+  `external_dns_registry_endpoints_total`).
+- Reachability of the UniFi API from a core-infra pod was checked beforehand (TCP + TLS from a pod carrying the publisher's
+  NetworkPolicy labels).
+
+Open: the observability cluster's API was unreachable from the workstation, so it is unknown whether it runs its own UniFi
+publisher against the same controller. If it does, that is a second publisher and it fights this one.
