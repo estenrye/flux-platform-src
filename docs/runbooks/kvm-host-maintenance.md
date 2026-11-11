@@ -37,9 +37,9 @@ Not a disaster-recovery procedure — for total loss of a host, use
   just whatever happens to be up when you start.
 - A maintenance window: rebooting a host that carries the `controlplane`
   cluster takes the platform's Flux/Crossplane control plane down for the
-  duration. Workload clusters (e.g. `observability`) keep running on
-  last-synced state; they just won't reconcile new changes until
-  `controlplane` is back.
+  duration. Any workload cluster (none today; `observability` was
+  decommissioned 2026-11-11) keeps running on last-synced state; it just
+  won't reconcile new changes until `controlplane` is back.
 - Your own SOPS age private key available locally (`SOPS_AGE_KEY_FILE` or
   the default `~/.config/sops/age/keys.txt`) if the target host carries
   the `controlplane` cluster — the `openbao` phase decrypts
@@ -55,7 +55,7 @@ Not a disaster-recovery procedure — for total loss of a host, use
    hosts that don't run the `controlplane` cluster.
 2. **Shutdown**, in order: legacy/unmanaged domains (autostart disabled
    after, never restarted by this playbook) → workload cluster domains
-   (e.g. `observability`) → `controlplane` workers → `controlplane`
+   (none today) → `controlplane` workers → `controlplane`
    control-plane nodes → NAT64/DNS64 appliance last (nothing on the host
    needs egress once every cluster is down). Each domain shutdown is a
    graceful `virsh shutdown`, polled until `shut off`; already-off domains

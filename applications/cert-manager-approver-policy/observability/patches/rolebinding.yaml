@@ -1,3 +1,0 @@
-- op: add
-  path: /metadata/annotations/ignore-check.kube-linter.io~1access-to-secrets
-  value: "cert-manager-approver-policy requires access to the cert-manager-approver-policy-tls secret to manage its webhook TLS certificates."
