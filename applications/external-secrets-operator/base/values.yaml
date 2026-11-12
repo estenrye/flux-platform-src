@@ -266,13 +266,15 @@ securityContext:
 
 # The controller builds informer caches over every Secret and ExternalSecret in the
 # cluster; at 256Mi it was OOM-killed (exit 137) during startup, dozens of times, and
-# rarely stayed up long enough to reconcile.
+# rarely stayed up long enough to reconcile. With memory fixed, the 200m CPU limit
+# throttled the leader while it filled those caches (~195m used), so it missed its
+# lease renewal ("leader election lost", exit 1) and restarted; hence the CPU limit.
 resources:
   requests:
-    cpu: 50m
+    cpu: 100m
     memory: 256Mi
   limits:
-    cpu: 200m
+    cpu: "1"
     memory: 1Gi
 
 serviceMonitor:
