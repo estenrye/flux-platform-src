@@ -29,3 +29,15 @@ FUSE; provisioning is in `pcd-ce-deploy/tofu-truenas/gitea.tf`. NAS UID/GID 3004
 enforced by the PV mount option only, because disabling v3 on the server would hit the PCD Cinder/Glance exports. HA
 (Valkey, RWX, indexer) was deliberately deferred; see [[core-infra-nfs-outage-2026-11]] for why the shared NAS
 dependency matters.
+
+**Rolled out 2026-11-12 (PRs #312-#315).** Live and serving at https://git.rye.ninja; Keycloak redirect and in-cluster
+discovery verified, an interactive login was not (needs a human). Three things only the live cluster showed:
+- CNPG 1.30's `bootstrap.initdb` has **no `template` field** (Flux's dry-run rejected the whole apply); `encoding` and
+  `localeCollate/CType` go to Postgres's initdb, so the app database inherits them.
+- CNPG with cert-manager certs: setting `serverCASecret` alone makes the operator try to sign client certs with it and fail
+  on a missing `ca.key`; also issue a `streaming_replica` client cert and set `clientCASecret` + `replicationTLSSecret`.
+  A **denied** CertificateRequest is final and cert-manager then backs off ~1h: delete the Certificate to reissue.
+- A volume mounted **inside** another volume (NFS at `/data/git/gitea-repositories` under the Cinder `/data`) makes kubelet
+  create the mountpoint as root and breaks `mkdir` for UID 1000; mount it elsewhere (`/repos`, `repository.ROOT`).
+Rollout steps that were manual: deleting the CreatedOnce `seaweedfs-iam-config` Secret and restarting the filers (existing
+databases' archiving stayed healthy), and nothing for Keycloak (the config Job had already run; its 10-minute TTL had removed it).
