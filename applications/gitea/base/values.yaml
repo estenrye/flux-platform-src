@@ -151,6 +151,12 @@ gitea:
       ENABLE_OPENID_SIGNUP: false
     other:
       SHOW_FOOTER_VERSION: false
+    migrations:
+      # Nodes are IPv6-only behind DNS64/NAT64, so github.com resolves to
+      # 64:ff9b::/96, which Gitea's default `external` rule rejects as a reserved
+      # range. A hostname allow-list replaces that rule; add hosts here to mirror
+      # from elsewhere.
+      ALLOWED_DOMAINS: github.com,*.github.com,*.githubusercontent.com
 
   # The database password is read from the CNPG-generated Secret.
   additionalConfigFromEnvs:
