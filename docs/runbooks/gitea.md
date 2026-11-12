@@ -88,27 +88,31 @@ and the snapshot tasks are provisioned by `pcd-ce-deploy/tofu-truenas/gitea.tf`.
 - **Capacity check:** the CronJob `gitea-repos-capacity` runs hourly, reads the
   volume's size and usage, and pings the Healthchecks check on `/fail` at 75% or
   more, otherwise success. It also fails if the reported size exceeds the expected
-  50 GiB (quota not applied). Create the check on healthchecks.rye.ninja (period
-  1 hour, grace 30 minutes) and store its ping URL in 1Password
-  `core-infra/healthchecks-ping-gitea-repos`, field `capacity`. Resizing means
-  changing `var.gitea_repos_quota_gib`, the PV `capacity` and the CronJob's
-  `EXPECTED_SIZE_GIB` together.
+  50 GiB (quota not applied). Check `gitea-repos-capacity` (period 1 hour, grace 30
+  minutes); its ping URL is in 1Password `core-infra/healthchecks-ping-gitea-repos`,
+  field `capacity`. Resizing means changing `var.gitea_repos_quota_gib`, the PV
+  `capacity` and the CronJob's `EXPECTED_SIZE_GIB` together.
+- **Snapshot check:** the same CronJob lists `/repos/.zfs/snapshot` (the NAS exports
+  the snapshot directory over NFS) and pings check `gitea-repos-snapshots` (period 1
+  hour, grace 30 minutes, URL in field `snapshots` of the same 1Password item) while
+  the newest snapshot is under 26 hours old, `/fail` when older or when none is
+  listed. Only the daily snapshot is guaranteed: its task has `allow_empty = true`,
+  while the hourly one is skipped on an idle dataset.
 - **NAS unreachable:** `hard` mounts block I/O instead of erroring, so Gitea hangs
   until the NAS returns, and the capacity job's pod sits in ContainerCreating (the
   silent check alerts on its own).
 
 ## Backup and restore
 
-Database: same procedure as grafana-db, see `keycloak-realm-restore.md` and
+Database backups are watched by `cnpg-backup-watcher` (check `cnpg-backup-gitea-db`, daily; URL in
+1Password `core-infra/healthchecks-ping-cnpg-backups`, field `gitea-db`): it fails when the latest
+backup is older than 26 hours or WAL archiving is unhealthy. Restore: same procedure as grafana-db, see `keycloak-realm-restore.md` and
 `grafana-db.md`, substituting `gitea-db`, `gitea-db-barman` and the `gitea`
 namespace. Repositories: ZFS snapshots above (same NAS as the data, so not
 off-site).
 
 ## Not done yet
 
-- No Healthchecks check for gitea-db: add `gitea-db` to the `TARGETS` of
-  `applications/cnpg-backup-watcher` and a `healthchecks-ping-cnpg-backups/gitea-db`
-  field in 1Password together.
 - No restore-operator Role / SeaweedFS operator role (grafana-db has one).
 - No off-site copy of the repositories or the `/data` volume; no SSH access.
 - Not applied yet: the tofu in pcd-ce-deploy, and the node-to-NAS NFS path over

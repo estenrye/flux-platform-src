@@ -1,4 +1,4 @@
-"""Report the utilisation of Gitea's repository volume to Healthchecks.
+"""Report the utilisation and snapshot freshness of Gitea's repository volume to Healthchecks.
 
 The volume is the NFS PV gitea-repos, mounted read-only at MOUNT. Its size is
 the dataset's refquota (pcd-ce-deploy tofu-truenas), which NFS clients see as
@@ -9,6 +9,12 @@ mount leaves the pod in ContainerCreating and no ping is sent).
 
 If the reported size is more than 10% over EXPECTED_SIZE_GIB the quota is not
 applied (the percentage would be meaningless), and that is reported as a failure.
+
+Second check (PING_URL_SNAPSHOTS, optional): the newest ZFS snapshot of the
+dataset, listed from MOUNT/.zfs/snapshot (the directory's mtime is the snapshot
+creation time), must be younger than MAX_SNAPSHOT_AGE_HOURS. The daily snapshot
+task takes a snapshot even when nothing changed, so a gap is a real failure; the
+hourly ones are skipped on an idle dataset and are not checked.
 Stdlib only.
 """
 
@@ -35,6 +41,23 @@ def evaluate(total, used, threshold, expected_gib):
     return True, summary
 
 
+def evaluate_snapshots(mtimes, now, max_age_hours):
+    """Return (ok, message) from snapshot creation times (epoch seconds)."""
+    if not mtimes:
+        return False, "no ZFS snapshots found under .zfs/snapshot"
+    newest = max(mtimes)
+    age_h = (now - newest) / 3600
+    summary = f"{len(mtimes)} snapshots, newest {age_h:.1f}h old"
+    if age_h > max_age_hours:
+        return False, f"{summary}; older than {max_age_hours:g}h"
+    return True, summary
+
+
+def snapshot_mtimes(mount):
+    snapdir = os.path.join(mount, ".zfs", "snapshot")
+    return [e.stat().st_mtime for e in os.scandir(snapdir) if e.is_dir()]
+
+
 def ping(url, body):
     last = None
     for _ in range(3):
@@ -50,17 +73,31 @@ def ping(url, body):
     return False
 
 
+def report(url, ok, message):
+    print(("OK " if ok else "PROBLEM ") + message)
+    return ping(url if ok else url + "/fail", message)
+
+
 def main():
-    usage = shutil.disk_usage(os.environ.get("MOUNT", "/repos"))
+    mount = os.environ.get("MOUNT", "/repos")
+    usage = shutil.disk_usage(mount)
     ok, message = evaluate(
         usage.total,
         usage.used,
         float(os.environ.get("THRESHOLD_PERCENT", "75")),
         float(os.environ.get("EXPECTED_SIZE_GIB", "50")),
     )
-    print(("OK " if ok else "PROBLEM ") + message)
-    url = os.environ["PING_URL"]
-    sent = ping(url if ok else url + "/fail", message)
+    sent = report(os.environ["PING_URL"], ok, message)
+
+    snap_url = os.environ.get("PING_URL_SNAPSHOTS")
+    if snap_url:
+        try:
+            ok, message = evaluate_snapshots(
+                snapshot_mtimes(mount), time.time(), float(os.environ.get("MAX_SNAPSHOT_AGE_HOURS", "26"))
+            )
+        except OSError as exc:
+            ok, message = False, f"cannot read {mount}/.zfs/snapshot: {exc}"
+        sent = report(snap_url, ok, "gitea-repos snapshots: " + message) and sent
     sys.exit(0 if sent else 1)
 
 

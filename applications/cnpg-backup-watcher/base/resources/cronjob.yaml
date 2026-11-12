@@ -19,7 +19,8 @@ metadata:
     checkov.io/skip06: "CKV_K8S_35=Ping URLs are capability URLs consumed by the script as environment variables."
 spec:
   # After the ScheduledBackups: keycloak-db 03:15, grafana-db and seaweedfs-db
-  # 03:45 UTC. Matches the 1-day period of the Healthchecks cnpg-backup-* checks.
+  # 03:45, gitea-db 04:00 UTC. Matches the 1-day period of the Healthchecks
+  # cnpg-backup-* checks.
   schedule: "0 5 * * *"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
@@ -65,7 +66,8 @@ spec:
                   value: >-
                     [{"namespace":"keycloak","cluster":"keycloak-db","ping_env":"PING_KEYCLOAK_DB"},
                      {"namespace":"grafana","cluster":"grafana-db","ping_env":"PING_GRAFANA_DB"},
-                     {"namespace":"seaweedfs","cluster":"seaweedfs-db","ping_env":"PING_SEAWEEDFS_DB"}]
+                     {"namespace":"seaweedfs","cluster":"seaweedfs-db","ping_env":"PING_SEAWEEDFS_DB"},
+                     {"namespace":"gitea","cluster":"gitea-db","ping_env":"PING_GITEA_DB"}]
                 - name: PING_KEYCLOAK_DB
                   valueFrom:
                     secretKeyRef:
@@ -81,6 +83,11 @@ spec:
                     secretKeyRef:
                       name: healthchecks-ping-cnpg-backups
                       key: seaweedfs-db
+                - name: PING_GITEA_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: healthchecks-ping-cnpg-backups
+                      key: gitea-db
               volumeMounts:
                 - name: script
                   mountPath: /scripts

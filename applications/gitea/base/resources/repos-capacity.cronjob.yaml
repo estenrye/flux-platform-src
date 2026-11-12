@@ -75,6 +75,15 @@ spec:
                     secretKeyRef:
                       name: healthchecks-ping-gitea-repos
                       key: capacity
+                # Newest ZFS snapshot (read from /repos/.zfs/snapshot) must be younger
+                # than this; the daily snapshot task runs every 24h.
+                - name: MAX_SNAPSHOT_AGE_HOURS
+                  value: "26"
+                - name: PING_URL_SNAPSHOTS
+                  valueFrom:
+                    secretKeyRef:
+                      name: healthchecks-ping-gitea-repos
+                      key: snapshots
               volumeMounts:
                 - name: script
                   mountPath: /scripts

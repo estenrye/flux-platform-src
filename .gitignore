@@ -14,3 +14,5 @@ providers/kvm/**/.terraform.lock.hcl
 providers/kvm/**/*.tfstate*
 # rendered Talos machine configs contain live secrets
 etcd-backups/
+__pycache__/
+*.pyc
