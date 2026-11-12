@@ -41,3 +41,13 @@ discovery verified, an interactive login was not (needs a human). Three things o
   create the mountpoint as root and breaks `mkdir` for UID 1000; mount it elsewhere (`/repos`, `repository.ROOT`).
 Rollout steps that were manual: deleting the CreatedOnce `seaweedfs-iam-config` Secret and restarting the filers (existing
 databases' archiving stayed healthy), and nothing for Keycloak (the config Job had already run; its 10-minute TTL had removed it).
+
+**Mirroring from GitHub (PRs #317-#319, 2026-11-12).** Verified working end to end (mirror of a private repo, sign-out).
+- Gitea's default `external` migration rule treats `64:ff9b::/96` as reserved, and DNS64 makes github.com resolve there
+  from the IPv6-only nodes, so every import was "disallowed hosts". Fix: `migrations.ALLOWED_DOMAINS` hostname list.
+- The Gitea NetworkPolicy had no internet egress; the next failure was an i/o timeout to the NAT64 address. Fix: TCP 443
+  to `64:ff9b::/96`.
+- Gitea's sign-out link failed with an invalid redirect URI until the Keycloak client got `post.logout.redirect.uris`.
+- The 1Password item's token is in the `token` field. A fine-grained PAT is scoped to one resource owner and cannot see a
+  private org repo (404); a classic PAT with `repo` worked. Gitea does not resolve `op://` references.
+

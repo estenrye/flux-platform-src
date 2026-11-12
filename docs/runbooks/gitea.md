@@ -39,7 +39,27 @@ because they are created once:
   fetched from `keycloak-http.keycloak.svc.cluster.local`. Keycloak's
   `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true` makes that document list in-cluster token and
   userinfo URLs, while the issuer and authorization URL stay public.
+- Sign-out: the client's `post.logout.redirect.uris` is `https://git.rye.ninja/*`; without
+  it Keycloak rejects Gitea's logout redirect as an invalid redirect URI.
 - Break-glass local admin: Secret `gitea/gitea-admin` (`username`, `password`).
+
+## Mirrors and migrations from GitHub
+
+The nodes are IPv6-only, so github.com is reached through DNS64/NAT64 (`64:ff9b::/96`).
+Two settings make that work, and both are needed:
+
+- `migrations.ALLOWED_DOMAINS` (`applications/gitea/base/values.yaml`) is a hostname
+  allow-list: github.com, `*.github.com`, `*.githubusercontent.com`. Gitea's default
+  `external` rule rejects `64:ff9b::/96` as a reserved range ("You cannot import from
+  disallowed hosts"). To mirror from another host, add it here.
+- The `gitea` NetworkPolicy allows egress TCP 443 to `64:ff9b::/96`. Without it the
+  clone fails with `dial tcp [64:ff9b::...]:443: i/o timeout` (the policy drops it).
+
+Private repos need a token the form can use: paste the token value, not a 1Password
+`op://` reference. A classic PAT needs the `repo` scope (and SSO authorization if the
+org enforces it); a fine-grained token is scoped to one owner, so for an org's private
+repo its resource owner must be that org. GitHub answers 404 for a repo the token
+cannot see. A failed migration leaves a broken repository record; delete it before retrying.
 
 ## Database TLS
 
