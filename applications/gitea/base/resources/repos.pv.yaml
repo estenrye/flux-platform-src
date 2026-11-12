@@ -1,0 +1,43 @@
+# Gitea's repositories: the flash-pool/gitea-repos dataset on the NAS, exported
+# over NFSv4 (pcd-ce-deploy tofu-truenas/gitea.tf). Static: no CSI driver, the
+# dataset and export are provisioned by OpenTofu. Every client is mapped to the
+# NAS user gitea (UID/GID 3004) server-side, so ownership needs no fsGroup.
+#
+# capacity is informational for NFS; the real limit is the dataset's 50 GiB
+# refquota, which NFS clients see as the volume size (repos-capacity CronJob).
+# hard: an unreachable NAS blocks I/O instead of failing writes mid-push.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: gitea-repos
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+    - nfsvers=4.1
+    - hard
+    - noatime
+  nfs:
+    server: nfs.nas.rye.ninja
+    path: /mnt/flash-pool/gitea-repos
+  claimRef:
+    namespace: gitea
+    name: gitea-repos
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-repos
+  namespace: gitea
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: gitea-repos
+  resources:
+    requests:
+      storage: 50Gi

@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitea-repos-capacity
+  namespace: gitea
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "CronJob creates Job pods dynamically; the podSelector label is valid but no pod exists in the static rendered manifest."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gitea-repos-capacity
+  policyTypes:
+    - Ingress
+    - Egress
+  # The NFS mount is made by the kubelet on the node, not from the pod network.
+  egress:
+    # healthchecks.rye.ninja (HTTPS).
+    - ports:
+        - protocol: TCP
+          port: 443
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53

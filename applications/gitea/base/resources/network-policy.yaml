@@ -1,0 +1,53 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitea
+  namespace: gitea
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The Gateway's Envoy proxy pods are created at runtime by the Envoy Gateway controller in this namespace; they are not in the static rendered manifests but exist at runtime. gitea-db (CNPG) pods are likewise created by the operator."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gitea
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # The Gateway's Envoy proxy pods run in the Gateway's own namespace under
+    # Calico 3.33, so no namespaceSelector. Gitea listens on 3000.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              gateway.envoyproxy.io/owning-gateway-name: gitea-gateway
+              gateway.envoyproxy.io/owning-gateway-namespace: gitea
+      ports:
+        - protocol: TCP
+          port: 3000
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    # Keycloak OIDC back-channel (discovery, token, userinfo) via the
+    # in-cluster Service (pod port 8080); the public id.rye.ninja route is not
+    # reachable from the pod (gateway hairpin).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: keycloak
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+    # gitea-db (CNPG) read-write Service.
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: gitea-db
+      ports:
+        - protocol: TCP
+          port: 5432

@@ -1,0 +1,64 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gitea-db-ca
+  namespace: gitea
+spec:
+  isCA: true
+  commonName: gitea-db-ca
+  secretName: gitea-db-ca
+  duration: 87600h # 10 years
+  renewBefore: 8760h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  usages:
+    - digital signature
+    - cert sign
+    - crl sign
+  issuerRef:
+    group: cert-manager.io
+    kind: Issuer
+    name: gitea-db-selfsigned
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gitea-db-server-tls
+  namespace: gitea
+spec:
+  isCA: false
+  commonName: gitea-db-rw
+  secretName: gitea-db-server-tls
+  duration: 2160h # 90 days
+  renewBefore: 720h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+  dnsNames:
+    - gitea-db-rw
+    - gitea-db-rw.gitea
+    - gitea-db-rw.gitea.svc
+    - gitea-db-rw.gitea.svc.cluster.local
+    - gitea-db-r
+    - gitea-db-r.gitea
+    - gitea-db-r.gitea.svc
+    - gitea-db-r.gitea.svc.cluster.local
+    - gitea-db-ro
+    - gitea-db-ro.gitea
+    - gitea-db-ro.gitea.svc
+    - gitea-db-ro.gitea.svc.cluster.local
+  # CNPG reloads the server certificate when the Secret carries this label.
+  secretTemplate:
+    labels:
+      cnpg.io/reload: ""
+  issuerRef:
+    group: cert-manager.io
+    kind: Issuer
+    name: gitea-db-ca

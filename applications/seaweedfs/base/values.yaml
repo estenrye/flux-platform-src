@@ -200,3 +200,5 @@ filer:
       - name: keycloak-db-barman
       # grafana-db barman backups (applications/grafana-db), via the GrafanaDbBarman STS role.
       - name: grafana-db-barman
+      # gitea-db barman backups (applications/gitea-db), via the GiteaDbBarman STS role.
+      - name: gitea-db-barman
