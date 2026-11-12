@@ -63,6 +63,29 @@ spec:
       matchNames:
         - gitea
 ---
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: gitea-db-replication
+spec:
+  allowed:
+    commonName:
+      required: true
+      value: streaming_replica
+    isCA: false
+    usages:
+      - digital signature
+      - key encipherment
+      - client auth
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: Issuer
+      name: gitea-db-ca
+    namespace:
+      matchNames:
+        - gitea
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -71,7 +94,7 @@ rules:
   - apiGroups: ["policy.cert-manager.io"]
     resources: ["certificaterequestpolicies"]
     verbs: ["use"]
-    resourceNames: ["gitea-db-ca", "gitea-db-server"]
+    resourceNames: ["gitea-db-ca", "gitea-db-server", "gitea-db-replication"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
