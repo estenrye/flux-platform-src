@@ -264,13 +264,16 @@ securityContext:
   seccompProfile:
     type: RuntimeDefault
 
+# The controller builds informer caches over every Secret and ExternalSecret in the
+# cluster; at 256Mi it was OOM-killed (exit 137) during startup, dozens of times, and
+# rarely stayed up long enough to reconcile.
 resources:
   requests:
     cpu: 50m
-    memory: 64Mi
+    memory: 256Mi
   limits:
     cpu: 200m
-    memory: 256Mi
+    memory: 1Gi
 
 serviceMonitor:
   # -- Specifies whether to create a ServiceMonitor resource for collecting Prometheus metrics
