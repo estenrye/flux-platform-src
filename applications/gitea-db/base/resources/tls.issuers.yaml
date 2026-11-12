@@ -1,0 +1,21 @@
+# Self-signed CA for gitea-db's server certificate (the chain is private to
+# the gitea namespace; Gitea trusts the CA through the ca.crt in
+# gitea-db-server-tls):
+#   gitea-db-selfsigned (Issuer) -> gitea-db-ca (Certificate, isCA)
+#     -> gitea-db-ca (Issuer) -> gitea-db-server-tls (Certificate)
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: gitea-db-selfsigned
+  namespace: gitea
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: gitea-db-ca
+  namespace: gitea
+spec:
+  ca:
+    secretName: gitea-db-ca

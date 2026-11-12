@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: gitea
+
+helmCharts:
+  - name: gitea
+    repo: https://dl.gitea.com/charts/
+    version: 12.7.0
+    releaseName: gitea
+    namespace: gitea
+    valuesFile: values.yaml
+    # Drops the chart's `helm test` Pod.
+    skipTests: true
+
+resources:
+  - resources/namespace.yaml
+  - resources/gateway.yaml
+  - resources/network-policy.yaml
+  - resources/eso.password-generator.admin.yaml
+  - resources/eso.external-secret.admin.yaml
+  - resources/eso.external-secret.oidc-client.yaml
+  - resources/vpa.yaml
+  - resources/repos.pv.yaml
+  - resources/repos-capacity.cronjob.yaml
+  - resources/repos-capacity.network-policy.yaml
+
+configMapGenerator:
+  - name: gitea-repos-capacity-script
+    files:
+      - repos-capacity.py=resources/repos-capacity.py
+
+patches:
+  - path: patches/deployment.yaml
+
+
+images:
+  # newTag + digest: Renovate then follows the image by version (see
+  # applications/grafana/base/kustomization.yaml). The chart's own default tag
+  # is appVersion-rootless.
+  - name: docker.gitea.com/gitea
+    newTag: 1.27.0-rootless
+    digest: sha256:414ba5b2b1163480e9ed4213a989cd798579cfa88582a2359303273009b2b852

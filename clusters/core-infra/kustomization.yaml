@@ -79,6 +79,13 @@ resources:
 - resources/rbac.kubernetes-groups.yaml
 # grafana-db backs up to SeaweedFS and serves Grafana (applications/grafana).
 - ../../applications/grafana-db/base
+# Gitea (git.rye.ninja). The gitea app owns the gitea namespace; gitea-db backs
+# up to SeaweedFS (bucket gitea-db-barman, role GiteaDbBarman) and its server
+# certificate comes from cert-manager. The OIDC client lives in keycloak.
+- ../../applications/gitea/base
+- ../../applications/gitea-db/base
+- resources/gitea.client-traffic-policy.yaml
+- resources/eso.external-secret.healthchecks-ping-gitea-repos.yaml
 # etcd snapshots to Cloudflare R2 (needs Talos kubernetesTalosAPIAccess and the
 # cloudflare-r2-etcd-snapshots 1Password item; docs/runbooks/etcd-snapshot-core-infra.md)
 - ../../applications/etcd-snapshot/base

@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea
+  namespace: gitea
+  annotations:
+    ignore-check.kube-linter.io/no-node-affinity: No zone or role topology to express node affinity against.
+    ignore-check.kube-linter.io/minimum-three-replicas: Gitea keeps repositories on a ReadWriteOnce volume, so it runs as a single replica and restarts in place (strategy Recreate).
+    ignore-check.kube-linter.io/no-read-only-root-fs: Gitea writes under /data and /tmp (mounted volumes) but the chart does not offer a read-only root filesystem.
+    ignore-check.kube-linter.io/env-value-from: The database password comes from the CNPG-generated gitea-db-app Secret and the admin and OIDC client credentials from gitea-admin and gitea-oidc-client (ESO); none is a static resource in this render.
+    ignore-check.kube-linter.io/read-secret-from-env-var: The chart's init container passes the database password, admin credentials and OIDC client secret to the gitea CLI as environment variables sourced from Secrets.
+    ignore-check.kube-linter.io/no-rolling-update-strategy: A ReadWriteOnce data volume cannot be attached by a surge pod, so the strategy is Recreate.
+    ignore-check.kube-linter.io/restart-policy: Deployments always use restartPolicy Always.
+    checkov.io/skip1: CKV_K8S_11=Memory limits are set and the VPA recommends CPU; CPU limits only add throttling.
+    checkov.io/skip2: CKV_K8S_15=Images are pinned by digest, so the pull policy cannot pick up a different image.
+    checkov.io/skip3: CKV_K8S_22=Gitea writes to /data and /tmp (mounted volumes); the chart does not offer a read-only root filesystem.
+    checkov.io/skip4: CKV_K8S_35=The chart's init container passes the database password, admin credentials and OIDC client secret to the gitea CLI as environment variables sourced from Secrets.
+    checkov.io/skip5: CKV_K8S_40=UID 1000 is the upstream rootless gitea image's fixed non-root user.
+spec:
+  template:
+    spec:
+      # Gitea makes no Kubernetes API calls.
+      automountServiceAccountToken: false

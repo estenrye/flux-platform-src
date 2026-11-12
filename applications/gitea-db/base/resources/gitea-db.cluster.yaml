@@ -1,0 +1,63 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: gitea-db
+  namespace: gitea
+spec:
+  instances: 3
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+
+  # Gitea's database prep (https://docs.gitea.com/installation/database-prep):
+  # a dedicated role owning a UTF8 database created from template0 with a
+  # case-sensitive collation. CNPG's initdb does the equivalent of
+  #   CREATE ROLE gitea WITH LOGIN PASSWORD '...';
+  #   CREATE DATABASE gitea WITH OWNER gitea TEMPLATE template0
+  #     ENCODING UTF8 LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8';
+  # and stores the generated password in the gitea-db-app Secret. database and
+  # owner match [database] in applications/gitea/base/values.yaml.
+  bootstrap:
+    initdb:
+      database: gitea
+      owner: gitea
+      encoding: UTF8
+      localeCollate: en_US.UTF-8
+      localeCType: en_US.UTF-8
+      template: template0
+
+  # Server certificate from the cert-manager self-signed CA
+  # (resources/tls.*.yaml). The secret carries ca.crt, which CNPG serves to
+  # clients and Gitea mounts to verify the server (sslmode=verify-full).
+  certificates:
+    serverCASecret: gitea-db-server-tls
+    serverTLSSecret: gitea-db-server-tls
+
+  # imageName pin: prevents the postgres image from floating with the
+  # operator's compiled-in default. Same image as grafana-db.
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.3@sha256:5e30290fba3d990b08a9caea6ddb49c661ad8246cbb2688adad7e6cc78df6c3f
+
+  storage:
+    size: 10Gi
+    storageClass: csi-cinder-sc-retain
+
+  # ServiceAccount token for SeaweedFS STS web-identity auth; audience must
+  # match the kubernetes provider's clientId in the SeaweedFS IAM config.
+  projectedVolumeTemplate:
+    sources:
+      - serviceAccountToken:
+          audience: seaweedfs-s3
+          expirationSeconds: 3600
+          path: token
+
+  primaryUpdateStrategy: unsupervised
+
+  monitoring:
+    enablePodMonitor: true
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: gitea-db-barman

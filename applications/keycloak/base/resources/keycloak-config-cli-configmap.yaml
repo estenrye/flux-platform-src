@@ -39,6 +39,11 @@ data:
       - name: ACL_grafana-admins
       - name: ACL_grafana-editors
       - name: ACL_grafana-viewers
+      # Gitea (git.rye.ninja): sign-in needs ACL_gitea-users, the admin flag
+      # follows ACL_gitea-admins (applications/gitea/base/values.yaml). Admins
+      # must be in both; the groups do not nest.
+      - name: ACL_gitea-users
+      - name: ACL_gitea-admins
 
     # Groups-as-OIDC-claims, assigned per client (not realm-wide
     # defaultDefaultClientScopes). full.path: false so the claim value is the
@@ -76,6 +81,8 @@ data:
           - ACL_Keycloak_Administrator
           - ACL_SeaweedFS_AllBucketAdmin
           - ACL_grafana-admins
+          - ACL_gitea-users
+          - ACL_gitea-admins
           - ACL_Kubernetes_cluster-admin
           - ACL_Kubernetes_cluster-admin_core-infra
       # Machine identity for SeaweedFS (client-credentials grant). Add it to
@@ -106,6 +113,32 @@ data:
           - https://core-infra.grafana.rye.ninja
         attributes:
           pkce.code.challenge.method: S256
+        defaultClientScopes:
+          - web-origins
+          - acr
+          - profile
+          - roles
+          - basic
+          - email
+          - groups
+      # Gitea login (OIDC authorization code, confidential client). Not a PKCE
+      # public client: Gitea 1.27's OIDC client cannot send a code challenge,
+      # and enforcing PKCE here would reject its requests. The secret comes
+      # from keycloak-gitea-client (shared with Gitea through 1Password).
+      - clientId: gitea
+        name: "Gitea"
+        enabled: true
+        clientAuthenticatorType: client-secret
+        secret: "$(env:GITEA_CLIENT_SECRET)"
+        publicClient: false
+        standardFlowEnabled: true
+        implicitFlowEnabled: false
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        redirectUris:
+          - https://git.rye.ninja/user/oauth2/Keycloak/callback
+        webOrigins:
+          - https://git.rye.ninja
         defaultClientScopes:
           - web-origins
           - acr

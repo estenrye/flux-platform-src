@@ -1,0 +1,194 @@
+priorityClassName: platform
+
+replicaCount: 1
+
+# ReadWriteOnce data volume: a surge pod could not attach it while the old pod
+# still holds it.
+strategy:
+  type: Recreate
+
+image:
+  rootless: true
+
+# State lives in gitea-db (CNPG) and the repository volume. The chart's bundled
+# PostgreSQL and Valkey are replaced/unused: sessions and cache are in-process,
+# the queue is on-disk (single replica).
+postgresql:
+  enabled: false
+postgresql-ha:
+  enabled: false
+valkey:
+  enabled: false
+valkey-cluster:
+  enabled: false
+
+# The rootless image runs as UID/GID 1000.
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+# Gitea makes no Kubernetes API calls: dedicated ServiceAccount, no token.
+serviceAccount:
+  create: true
+  automountServiceAccountToken: false
+
+initContainers:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+persistence:
+  enabled: true
+  size: 20Gi
+  storageClass: csi-cinder-sc-retain
+  accessModes:
+    - ReadWriteOnce
+
+service:
+  http:
+    type: ClusterIP
+    port: 3000
+
+# The chart renders the HTTPRoute for the Gateway in resources/gateway.yaml;
+# tls: true makes ROOT_URL https.
+gatewayAPI:
+  enabled: true
+  core:
+    httpRoute:
+      enabled: true
+      tls: true
+      parentRefs:
+        - group: gateway.networking.k8s.io
+          kind: Gateway
+          name: gitea-gateway
+          namespace: gitea
+          sectionName: https
+      hostnames:
+        - git.rye.ninja
+
+# Break-glass local admin, generated once by ESO (resources/eso.*.admin.yaml).
+gitea:
+  admin:
+    existingSecret: gitea-admin
+    email: gitea-admin@rye.ninja
+    passwordMode: initialOnlyNoReset
+
+  # Keycloak (id.rye.ninja, realm ryezone-labs), authorization code flow with a
+  # confidential client. Gitea 1.27 cannot do PKCE as an OIDC client (its
+  # goth OIDC provider sends no code_challenge), so there is no public/PKCE
+  # client here; the secret lives in gitea-oidc-client (key `key` = client id,
+  # key `secret`). The chart runs `gitea admin auth add-oauth|update-oauth` in
+  # an init container, so the source is reconciled on every start.
+  #
+  # The discovery document is fetched from the in-cluster Service, not
+  # id.rye.ninja (pods cannot reach the public route through the gateway). With
+  # KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true Keycloak answers with in-cluster token
+  # and userinfo URLs while the issuer and authorization URL stay public.
+  oauth:
+    - name: Keycloak
+      provider: openidConnect
+      existingSecret: gitea-oidc-client
+      autoDiscoverUrl: http://keycloak-http.keycloak.svc.cluster.local/realms/ryezone-labs/.well-known/openid-configuration
+      scopes: openid,email,profile,groups
+      groupClaimName: groups
+      # Sign-in requires membership of ACL_gitea-users; the admin flag follows
+      # ACL_gitea-admins on every login. Keycloak does not nest the groups, so
+      # admins must be members of both.
+      adminGroup: ACL_gitea-admins
+      requiredClaimName: groups
+      requiredClaimValue: ACL_gitea-users
+
+  config:
+    server:
+      DOMAIN: git.rye.ninja
+      ROOT_URL: https://git.rye.ninja/
+      PROTOCOL: http
+      HTTP_PORT: 3000
+      # Only HTTPS is exposed (Gateway on 443).
+      DISABLE_SSH: true
+    database:
+      DB_TYPE: postgres
+      HOST: gitea-db-rw.gitea.svc.cluster.local:5432
+      NAME: gitea
+      USER: gitea
+      # Verify the server certificate and hostname against the cert-manager
+      # CA mounted below (PGSSLROOTCERT).
+      SSL_MODE: verify-full
+    session:
+      PROVIDER: db
+    cache:
+      ADAPTER: memory
+    queue:
+      TYPE: level
+    service:
+      # Accounts come from Keycloak only.
+      DISABLE_REGISTRATION: false
+      ALLOW_ONLY_EXTERNAL_REGISTRATION: true
+      SHOW_REGISTRATION_BUTTON: false
+    oauth2_client:
+      ENABLE_AUTO_REGISTRATION: true
+      USERNAME: preferred_username
+      ACCOUNT_LINKING: login
+      UPDATE_AVATAR: false
+    openid:
+      ENABLE_OPENID_SIGNIN: false
+      ENABLE_OPENID_SIGNUP: false
+    other:
+      SHOW_FOOTER_VERSION: false
+
+  # The database password is read from the CNPG-generated Secret.
+  additionalConfigFromEnvs:
+    - name: GITEA__DATABASE__PASSWD
+      valueFrom:
+        secretKeyRef:
+          name: gitea-db-app
+          key: password
+
+# CA that signed gitea-db's server certificate; only ca.crt is projected (not
+# the private key). lib/pq and pgx read PGSSLROOTCERT.
+extraVolumes:
+  # Repositories on the NAS over NFSv4 (resources/repos.pv.yaml); /data (config,
+  # queue, attachments) stays on the Cinder volume above.
+  - name: repos
+    persistentVolumeClaim:
+      claimName: gitea-repos
+  - name: gitea-db-ca
+    secret:
+      secretName: gitea-db-server-tls
+      items:
+        - key: ca.crt
+          path: ca.crt
+extraVolumeMounts:
+  # repository.ROOT, the chart's default.
+  - name: repos
+    mountPath: /data/git/gitea-repositories
+  - name: gitea-db-ca
+    mountPath: /etc/gitea-db-ca
+    readOnly: true
+
+deployment:
+  env:
+    - name: PGSSLROOTCERT
+      value: /etc/gitea-db-ca/ca.crt
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 1Gi
+

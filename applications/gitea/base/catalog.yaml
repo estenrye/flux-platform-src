@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: gitea
+  description: |-
+    Self-hosted Git service at git.rye.ninja, backed by the gitea-db CNPG
+    cluster, with Keycloak (id.rye.ninja) OIDC single sign-on.
+  tags:
+    - git
+    - gitea
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

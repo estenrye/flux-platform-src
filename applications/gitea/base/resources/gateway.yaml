@@ -1,0 +1,31 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  # Not "gitea": Calico 3.33's bundled Envoy Gateway deploys the proxy into the
+  # Gateway's own namespace and creates a ServiceAccount named after the
+  # Gateway, which would collide with the chart's ServiceAccount gitea/gitea
+  # (docs/memory/calico-33-gateway-namespace-mode.md). The HTTPRoute is
+  # rendered by the chart (values.yaml gatewayAPI).
+  name: gitea-gateway
+  namespace: gitea
+  annotations:
+    # cert-manager's Gateway API shim creates the Certificate for the https
+    # listener's certificateRef.
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  gatewayClassName: external-dedicated
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: git.rye.ninja
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: git-rye-ninja-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
+        kinds:
+          - kind: HTTPRoute

@@ -60,6 +60,13 @@ database:
 extraEnv: |
   - name: KC_HOSTNAME
     value: https://id.rye.ninja
+  # Back-channel endpoints (token, userinfo, jwks) in the discovery document
+  # follow the request's host, so a client that fetches discovery from the
+  # in-cluster Service (Gitea) gets in-cluster URLs; the issuer and the browser
+  # authorization URL stay on id.rye.ninja. Pods cannot reach the public route
+  # (gateway hairpin).
+  - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+    value: "true"
   - name: KC_BOOTSTRAP_ADMIN_USERNAME
     value: admin
   - name: KC_BOOTSTRAP_ADMIN_PASSWORD
