@@ -139,6 +139,9 @@ data:
           - https://git.rye.ninja/user/oauth2/Keycloak/callback
         webOrigins:
           - https://git.rye.ninja
+        attributes:
+          # RP-initiated logout from the Gitea sign-out link.
+          post.logout.redirect.uris: "https://git.rye.ninja/*"
         defaultClientScopes:
           - web-origins
           - acr
