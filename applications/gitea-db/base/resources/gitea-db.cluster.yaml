@@ -26,12 +26,17 @@ spec:
       localeCollate: en_US.UTF-8
       localeCType: en_US.UTF-8
 
-  # Server certificate from the cert-manager self-signed CA
-  # (resources/tls.*.yaml). The secret carries ca.crt, which CNPG serves to
-  # clients and Gitea mounts to verify the server (sslmode=verify-full).
+  # Certificates from the cert-manager self-signed CA (resources/tls.*.yaml).
+  # The server secret carries ca.crt, which CNPG serves to clients and Gitea
+  # mounts to verify the server (sslmode=verify-full). The replication
+  # certificate and clientCASecret are required as well: without them CNPG
+  # tries to sign its own client certificates with serverCASecret and fails
+  # for want of a ca.key.
   certificates:
     serverCASecret: gitea-db-server-tls
     serverTLSSecret: gitea-db-server-tls
+    clientCASecret: gitea-db-replication-tls
+    replicationTLSSecret: gitea-db-replication-tls
 
   # imageName pin: prevents the postgres image from floating with the
   # operator's compiled-in default. Same image as grafana-db.
