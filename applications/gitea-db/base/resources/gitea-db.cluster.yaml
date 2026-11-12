@@ -10,13 +10,13 @@ spec:
     parameters:
       max_connections: "100"
 
-  # Gitea's database prep (https://docs.gitea.com/installation/database-prep):
-  # a dedicated role owning a UTF8 database created from template0 with a
-  # case-sensitive collation. CNPG's initdb does the equivalent of
-  #   CREATE ROLE gitea WITH LOGIN PASSWORD '...';
-  #   CREATE DATABASE gitea WITH OWNER gitea TEMPLATE template0
-  #     ENCODING UTF8 LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8';
-  # and stores the generated password in the gitea-db-app Secret. database and
+  # Gitea's database prep (https://docs.gitea.com/installation/database-prep)
+  # wants a dedicated role owning a UTF8 database with a case-sensitive
+  # collation (CREATE DATABASE ... TEMPLATE template0 ENCODING UTF8
+  # LC_COLLATE 'en_US.UTF-8' LC_CTYPE 'en_US.UTF-8'). CNPG's initdb passes
+  # encoding and locale to Postgres's own initdb, so they are the cluster
+  # defaults and the app database inherits them (there is no template field).
+  # The generated password is stored in the gitea-db-app Secret. database and
   # owner match [database] in applications/gitea/base/values.yaml.
   bootstrap:
     initdb:
@@ -25,7 +25,6 @@ spec:
       encoding: UTF8
       localeCollate: en_US.UTF-8
       localeCType: en_US.UTF-8
-      template: template0
 
   # Server certificate from the cert-manager self-signed CA
   # (resources/tls.*.yaml). The secret carries ca.crt, which CNPG serves to
