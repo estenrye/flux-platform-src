@@ -55,7 +55,7 @@ and the `cert-manager-policy:gitea-db` grant. Gitea connects with
 
 Repositories live on the NAS dataset `flash-pool/gitea-repos` (50 GiB refquota),
 exported over NFSv4 as `nfs.nas.rye.ninja:/mnt/flash-pool/gitea-repos` and mounted
-at `/data/git/gitea-repositories` through the static PV/PVC `gitea-repos`
+at `/repos` (`repository.ROOT`; not under `/data`, because kubelet would create the nested mountpoint as root in the Cinder volume) through the static PV/PVC `gitea-repos`
 (`applications/gitea/base/resources/repos.pv.yaml`, `ReadWriteMany`, mount options
 `nfsvers=4.1,hard,noatime`). `/data` (app.ini, queue, attachments) stays on the
 20 Gi Cinder volume. The dataset, the NAS user/group `gitea` (UID/GID 3004), the
