@@ -120,6 +120,8 @@ gitea:
       HTTP_PORT: 3000
       # Only HTTPS is exposed (Gateway on 443).
       DISABLE_SSH: true
+    repository:
+      ROOT: /repos
     database:
       DB_TYPE: postgres
       HOST: gitea-db-rw.gitea.svc.cluster.local:5432
@@ -161,7 +163,7 @@ gitea:
 # CA that signed gitea-db's server certificate; only ca.crt is projected (not
 # the private key). lib/pq and pgx read PGSSLROOTCERT.
 extraVolumes:
-  # Repositories on the NAS over NFSv4 (resources/repos.pv.yaml); /data (config,
+  # Repositories on the NAS over NFSv4 at /repos (resources/repos.pv.yaml); /data (config,
   # queue, attachments) stays on the Cinder volume above.
   - name: repos
     persistentVolumeClaim:
@@ -173,9 +175,11 @@ extraVolumes:
         - key: ca.crt
           path: ca.crt
 extraVolumeMounts:
-  # repository.ROOT, the chart's default.
+  # Not under /data: kubelet would create the nested mountpoint as root inside
+  # the Cinder volume, leaving /data/git root-owned and the init container
+  # unable to create /data/git/.ssh. repository.ROOT points here.
   - name: repos
-    mountPath: /data/git/gitea-repositories
+    mountPath: /repos
   - name: gitea-db-ca
     mountPath: /etc/gitea-db-ca
     readOnly: true
