@@ -69,56 +69,13 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
-      containers:
-        - name: runner
-          image: docker.io/gitea/act_runner
-          imagePullPolicy: IfNotPresent
-          env:
-            - name: GITEA_INSTANCE_URL
-              value: http://gitea-http.gitea.svc.cluster.local:3000
-            - name: GITEA_RUNNER_REGISTRATION_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: gitea-runner-registration
-                  key: token
-            - name: GITEA_RUNNER_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: CONFIG_FILE
-              value: /config/config.yaml
-            # UID 1000 has no passwd entry in this image, so HOME would be /: the action
-            # cache (/.cache/act) and the cache server could not be created.
-            - name: HOME
-              value: /data
-            - name: DOCKER_HOST
-              value: unix:///run/user/1000/docker.sock
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-            seccompProfile:
-              type: RuntimeDefault
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              memory: 512Mi
-          volumeMounts:
-            - name: data
-              mountPath: /data
-            - name: config
-              mountPath: /config
-              readOnly: true
-            - name: docker-run
-              mountPath: /run/user/1000
+      initContainers:
         - name: docker
           image: docker.io/library/docker
           imagePullPolicy: IfNotPresent
+          # Native sidecar: the runner container starts only after the startup probe
+          # passes, so it no longer crash-restarts while dockerd comes up.
+          restartPolicy: Always
           # Rootless Docker-in-Docker with IPv6. The nodes are IPv6-only behind
           # DNS64/NAT64, so job containers need IPv6 addresses (an IPv4-only host
           # resolves to 64:ff9b::/96). slirp4netns (--ipv6) gives the daemon's
@@ -204,6 +161,65 @@ spec:
               mountPath: /etc/subgid
               subPath: subgid
               readOnly: true
+          startupProbe:
+            exec:
+              command:
+                - docker
+                - -H
+                - unix:///run/user/1000/docker.sock
+                - network
+                - inspect
+                - gitea-actions
+            periodSeconds: 2
+            timeoutSeconds: 5
+            failureThreshold: 90
+      containers:
+        - name: runner
+          image: docker.io/gitea/act_runner
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: GITEA_INSTANCE_URL
+              value: http://gitea-http.gitea.svc.cluster.local:3000
+            - name: GITEA_RUNNER_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-runner-registration
+                  key: token
+            - name: GITEA_RUNNER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CONFIG_FILE
+              value: /config/config.yaml
+            # UID 1000 has no passwd entry in this image, so HOME would be /: the action
+            # cache (/.cache/act) and the cache server could not be created.
+            - name: HOME
+              value: /data
+            - name: DOCKER_HOST
+              value: unix:///run/user/1000/docker.sock
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: docker-run
+              mountPath: /run/user/1000
       volumes:
         - name: config
           configMap:
