@@ -45,18 +45,6 @@ write_files:
       dynamic-pool ${tayga_pool_cidr}
       data-dir /var/spool/tayga
 
-  - path: /etc/default/tayga
-    content: |
-      RUN="yes"
-      # Let the packaged unit bring up the tun device and install routes for
-      # the NAT64 prefix and the dynamic pool.
-      CONFIGURE_IFACE="yes"
-      # NAT44 for the pool is handled explicitly in /etc/nftables.conf.
-      CONFIGURE_NAT44="no"
-      IPV4_TUN_ADDR="192.168.255.2"
-      IPV6_TUN_ADDR="${tayga_ula_prefix}::6402"
-      DAEMON_OPTS=""
-
   - path: /etc/nftables.conf
     content: |
       #!/usr/sbin/nft -f
@@ -78,12 +66,42 @@ write_files:
         }
       }
 
-  - path: /etc/systemd/system/tayga.service.d/mtu.conf
+  - path: /etc/systemd/system/tayga.service
     content: |
+      # Native unit for the well-known-prefix instance, replacing the packaged
+      # /etc/init.d/tayga (which systemd wraps as tayga.service). That script
+      # starts the daemon with `start-stop-daemon --exec /usr/sbin/tayga`, which
+      # refuses to start while ANY process runs that binary -- and
+      # tayga-priv.service does. At boot tayga happened to win the race; when
+      # unattended-upgrades restarted services (2026-11-13 06:24 UTC) tayga lost
+      # it, stayed failed for hours and broke all NAT64 egress (kubelet could not
+      # pull ghcr.io). This unit has no such check, brings its own tun device up
+      # idempotently and restarts on failure. Same shape as tayga-priv.service.
+      [Unit]
+      Description=Userspace NAT64, well-known prefix instance (nat64)
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=forking
+      PIDFile=/run/tayga.pid
+      ExecStartPre=-/usr/sbin/tayga -c /etc/tayga.conf --mktun
+      ExecStartPre=-/sbin/ip link set nat64 up
       # Clamp the translator TUN to the IPv6 minimum MTU; oversized packets
       # then trigger local fragmentation/PTB instead of blackholing.
-      [Service]
-      ExecStartPost=/usr/sbin/ip link set dev nat64 mtu 1280
+      ExecStartPre=-/sbin/ip link set dev nat64 mtu 1280
+      ExecStartPre=-/sbin/ip addr add ${tayga_tun_ip} dev nat64
+      ExecStartPre=-/sbin/ip addr add ${tayga_ula_prefix}::6402 dev nat64
+      ExecStartPre=-/sbin/ip route add ${tayga_pool_cidr} dev nat64
+      ExecStartPre=-/sbin/ip route add ${nat64_prefix} dev nat64
+      ExecStart=/usr/sbin/tayga -c /etc/tayga.conf --pidfile /run/tayga.pid
+      ExecStopPost=-/sbin/ip link set nat64 down
+      ExecStopPost=-/usr/sbin/tayga -c /etc/tayga.conf --rmtun
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
 
   - path: /etc/tayga-priv.conf
     content: |
