@@ -84,8 +84,8 @@ resources:
 # certificate comes from cert-manager. The OIDC client lives in keycloak.
 - ../../applications/gitea/base
 - ../../applications/gitea-db/base
-# Gitea Actions runners: temporarily decommissioned to recreate the StatefulSet
-# (volumeClaimTemplates are immutable). Re-added in the follow-up PR.
+# Gitea Actions runners (act_runner + rootless DinD), registered instance-wide.
+- ../../applications/gitea-runner/base
 - resources/gitea.client-traffic-policy.yaml
 - resources/eso.external-secret.healthchecks-ping-gitea-repos.yaml
 # etcd snapshots to Cloudflare R2 (needs Talos kubernetesTalosAPIAccess and the
