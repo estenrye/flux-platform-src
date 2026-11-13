@@ -11,6 +11,11 @@ resources:
   - resources/scaledjob.yaml
   - resources/device-plugin.daemonset.yaml
 
+# The ScaledJob's pod template is inside a custom resource, so kustomize cannot
+# rewrite the ConfigMap names it references to the hashed ones.
+generatorOptions:
+  disableNameSuffixHash: true
+
 configMapGenerator:
   - name: gitea-runner-config
     files:
