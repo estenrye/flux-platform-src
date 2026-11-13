@@ -29,3 +29,14 @@ spec:
           from: Same
         kinds:
           - kind: HTTPRoute
+    # Git over SSH. A TCP listener has no hostname: git.rye.ninja already resolves
+    # to this Gateway's address, so clients use git@git.rye.ninja:owner/repo.git.
+    # Envoy Gateway binds privileged ports on the proxy as 10000+port.
+    - name: ssh
+      protocol: TCP
+      port: 22
+      allowedRoutes:
+        namespaces:
+          from: Same
+        kinds:
+          - kind: TCPRoute

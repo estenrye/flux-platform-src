@@ -24,6 +24,9 @@ spec:
       ports:
         - protocol: TCP
           port: 3000
+        # Built-in SSH server (Calico evaluates after DNAT, so the pod port).
+        - protocol: TCP
+          port: 2222
   egress:
     - ports:
         - protocol: TCP
