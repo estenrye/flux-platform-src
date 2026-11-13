@@ -195,7 +195,7 @@ spec:
               - -c
               - |
                 touch /data/runner.log
-                /opt/act/run.sh >>/data/runner.log 2>&1 &
+                run.sh >>/data/runner.log 2>&1 &
                 pid=$!
                 tail -f /data/runner.log &
                 ( sleep 300
