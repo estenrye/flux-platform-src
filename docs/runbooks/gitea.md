@@ -127,11 +127,24 @@ can use them), capacity 2 jobs per pod. Workflow labels: `ubuntu-latest`, `ubunt
   Each runner registers on first start and then keeps its identity in `/data/.runner` on its own
   1 Gi volume; deleting a PVC makes it register again (delete the stale runner under Site
   Administration -> Actions -> Runners).
-- **Network:** the runner talks to Gitea at `gitea-http.gitea.svc:3000`; jobs check out from
-  `https://git.rye.ninja` through the Gateway VIP. Egress is DNS, those two, and TCP 80/443 to the
-  internet (including NAT64) but not to the cluster ULAs or the site's delegated GUA `/60`
-  (the `/60` changes on re-delegation, see `gua-prefix-renumber.md`). Nothing may connect to a
-  runner pod (the daemon's TCP 2375 is published inside the pod network, so the policy's empty ingress matters).
+- **Network:** the runner and the jobs talk to Gitea at `http://gitea-http.gitea.svc.cluster.local:3000`
+  (act_runner passes its instance URL to jobs as the server URL, so `actions/checkout` fetches from it).
+  Pods cannot reach the Gateway VIP `git.rye.ninja` (the known pod-to-own-VIP hairpin), and nothing
+  needs it. Egress is DNS, Gitea on 3000, and TCP 80/443 to the internet (including NAT64) but not to
+  the cluster ULAs or the site's delegated GUA `/60` (the `/60` changes on re-delegation, see
+  `gua-prefix-renumber.md`). Nothing may connect to a runner pod (the daemon's TCP 2375 is published
+  inside the pod network, so the policy's empty ingress matters).
+- **DNS in jobs:** dockerd runs with `--dns=fd00::3` (slirp4netns' IPv6 forwarder). By default Docker's
+  embedded resolver also lists `10.0.2.3` first, which cannot reach the IPv6-only pod resolver, so every
+  lookup waited ~5 s and some failed.
+- **Verified (2026-11-13)** with a private repo `gitea_admin/actions-smoke` and a workflow on
+  `ubuntu-latest`: `actions/checkout@v4` (cloned from github.com through NAT64, repo fetched from Gitea),
+  `curl` to an IPv4-only host through NAT64 (github.com, ghcr.io), a native-IPv6 host and an IPv6-only
+  host, and `docker version` plus `docker build` inside a job (act mounts the daemon socket). The first job
+  on a new pod pulls `docker.gitea.com/runner-images:ubuntu-latest` (~3 min) because layers are in an
+  emptyDir. The runner container may restart 2-3 times at pod start while the daemon is coming up.
+- **If jobs stall or pulls fail,** check NAT64 first (`nat64-appliance-rebuild.md`; Healthchecks
+  `nat64-wkp`), then `kubectl -n gitea-runner get pods` and the node `talos-rootless-test-1`.
 
 ## Mirrors and migrations from GitHub
 
