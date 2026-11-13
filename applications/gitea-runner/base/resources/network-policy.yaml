@@ -62,3 +62,37 @@ spec:
     - Egress
   ingress: []
   egress: []
+---
+# The cleaner only talks to Gitea's API.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitea-runner-cleaner
+  namespace: gitea-runner
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The gitea pods live in another namespace and exist at runtime."
+    ignore-check.kube-linter.io/dangling-networkpolicy: "The cleaner pods are created by a CronJob."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gitea-runner-cleaner
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gitea
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gitea
+      ports:
+        - protocol: TCP
+          port: 3000

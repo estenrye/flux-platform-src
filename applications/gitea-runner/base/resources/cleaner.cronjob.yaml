@@ -1,0 +1,74 @@
+# An ephemeral runner that is killed before it takes its job (idle timeout, node
+# loss, OOM) leaves an offline record in Gitea. Delete those every 10 minutes.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gitea-runner-cleaner
+  namespace: gitea-runner
+  annotations:
+    ignore-check.kube-linter.io/no-read-only-root-fs: "Short-lived script; the root filesystem is read-only anyway (readOnlyRootFilesystem: true)."
+    ignore-check.kube-linter.io/env-value-from: "The token comes from the ESO-managed gitea-runner-cleaner Secret."
+    ignore-check.kube-linter.io/read-secret-from-env-var: "The script reads its API token from the environment."
+    checkov.io/skip01: "CKV_K8S_35=The script reads its API token from the environment."
+    checkov.io/skip02: "CKV_K8S_11=Memory limit set; CPU limits only throttle."
+    checkov.io/skip03: "CKV_K8S_10=CPU requests are set below; limits only throttle."
+spec:
+  schedule: "*/10 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 120
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: gitea-runner-cleaner
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          priorityClassName: application
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: cleaner
+              image: docker.io/library/python
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: GITEA_URL
+                  value: http://gitea-http.gitea.svc.cluster.local:3000
+                - name: GITEA_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: gitea-runner-cleaner
+                      key: token
+              command:
+                - python
+                - -c
+                - |
+                  import json, os, urllib.request
+                  base = os.environ["GITEA_URL"] + "/api/v1/admin/actions/runners"
+                  hdr = {"Authorization": "token " + os.environ["GITEA_TOKEN"]}
+                  def call(method, url):
+                      with urllib.request.urlopen(urllib.request.Request(url, method=method, headers=hdr), timeout=15) as r:
+                          return json.load(r) if method == "GET" else None
+                  for r in call("GET", base + "?limit=100")["runners"]:
+                      if r.get("ephemeral") and r["status"] == "offline" and not r.get("busy"):
+                          call("DELETE", "%s/%s" % (base, r["id"]))
+                          print("deleted", r["id"], r["name"])
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  memory: 64Mi

@@ -33,8 +33,10 @@ spec:
             matchLabels:
               kubernetes.io/metadata.name: gitea-runner
           podSelector:
-            matchLabels:
-              app.kubernetes.io/name: gitea-runner
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: [gitea-runner, gitea-runner-cleaner]
       ports:
         - protocol: TCP
           port: 3000
