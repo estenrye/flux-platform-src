@@ -9,6 +9,7 @@ metadata:
     ignore-check.kube-linter.io/no-read-only-root-fs: "The rootless Docker daemon and act_runner write under their home and /data."
     ignore-check.kube-linter.io/env-value-from: "The registration token comes from the ESO-managed gitea-runner-registration Secret."
     ignore-check.kube-linter.io/read-secret-from-env-var: "act_runner reads its registration token from the environment on first start."
+    ignore-check.kube-linter.io/privilege-escalation-container: "Rootless dockerd uses the setuid newuidmap/newgidmap helpers; the container is neither privileged nor given capabilities."
     ignore-check.kube-linter.io/no-liveness-probe: "Runner and daemon exit on failure and are restarted."
     ignore-check.kube-linter.io/no-readiness-probe: "Nothing sends traffic to a runner."
     checkov.io/skip01: "CKV_K8S_35=act_runner reads its registration token from the environment on first start."
@@ -18,11 +19,16 @@ metadata:
     checkov.io/skip05: "CKV_K8S_40=UID 1000 is the upstream rootless Docker user."
     checkov.io/skip06: "CKV_K8S_15=Images are pinned by digest."
     checkov.io/skip07: "CKV_K8S_20=Rootless dockerd needs allowPrivilegeEscalation for its setuid newuidmap/newgidmap helpers."
+    checkov.io/skip09: "CKV_K8S_31=The Docker daemon runs with an Unconfined seccomp profile (see CKV_K8S_30)."
+    checkov.io/skip10: "CKV_K8S_8=Runner and daemon exit on failure and are restarted."
+    checkov.io/skip11: "CKV_K8S_9=Nothing sends traffic to a runner."
     checkov.io/skip08: "CKV_K8S_28=Rootless dockerd runs without added capabilities; the check also flags NET_RAW being kept."
 spec:
   serviceName: gitea-runner
   replicas: 2
   podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
   selector:
     matchLabels:
       app.kubernetes.io/name: gitea-runner
@@ -34,13 +40,16 @@ spec:
       priorityClassName: application
       automountServiceAccountToken: false
       # Jobs from every repo run here, so spread the two runners over nodes.
-      topologySpreadConstraints:
-        - maxSkew: 1
-          topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: ScheduleAnyway
-          labelSelector:
-            matchLabels:
-              app.kubernetes.io/name: gitea-runner
+      restartPolicy: Always
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: gitea-runner
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
