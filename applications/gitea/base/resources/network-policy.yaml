@@ -27,6 +27,17 @@ spec:
         # Built-in SSH server (Calico evaluates after DNAT, so the pod port).
         - protocol: TCP
           port: 2222
+    # Gitea Actions runners (applications/gitea-runner) poll the API.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gitea-runner
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gitea-runner
+      ports:
+        - protocol: TCP
+          port: 3000
   egress:
     - ports:
         - protocol: TCP

@@ -1,0 +1,90 @@
+# Exposes /dev/net/tun to unprivileged pods as devic.es/tun (Kubernetes device
+# plugin). Rootless Docker's slirp4netns needs the TUN device and a pod cannot
+# open it without a device grant. Runs only on the rootless pool.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: generic-device-plugin
+  namespace: gitea-runner
+  annotations:
+    ignore-check.kube-linter.io/no-node-affinity: "Pinned to the rootless pool with a nodeSelector."
+    ignore-check.kube-linter.io/privileged-container: "A device plugin must write to the kubelet's device-plugins directory and read /dev."
+    ignore-check.kube-linter.io/privilege-escalation-container: "Privileged by design, see privileged-container."
+    ignore-check.kube-linter.io/run-as-non-root: "Needs root to write the kubelet device-plugins socket directory."
+    ignore-check.kube-linter.io/no-read-only-root-fs: "Privileged device plugin; writes only to the mounted device-plugins directory."
+    ignore-check.kube-linter.io/host-mounts: "Needs the kubelet device-plugins directory and /dev."
+    ignore-check.kube-linter.io/docker-sock: "Not the Docker socket; the host mounts are the kubelet device-plugins directory and /dev."
+    ignore-check.kube-linter.io/writable-host-mount: "The plugin creates its socket in the kubelet device-plugins directory; /dev is read for the device it advertises."
+    ignore-check.kube-linter.io/no-liveness-probe: "Restarted by the DaemonSet if it exits."
+    ignore-check.kube-linter.io/no-readiness-probe: "Nothing sends traffic to it."
+    ignore-check.kube-linter.io/sensitive-host-mounts: "Needs the kubelet device-plugins directory and /dev."
+    checkov.io/skip01: "CKV_K8S_16=A device plugin needs a privileged container."
+    checkov.io/skip02: "CKV_K8S_20=Privileged by design."
+    checkov.io/skip03: "CKV_K8S_23=Needs root to write the kubelet device-plugins socket directory."
+    checkov.io/skip04: "CKV_K8S_28=Privileged by design."
+    checkov.io/skip05: "CKV_K8S_30=Privileged by design."
+    checkov.io/skip06: "CKV_K8S_31=Privileged containers ignore the seccomp profile."
+    checkov.io/skip07: "CKV_K8S_37=Privileged by design."
+    checkov.io/skip08: "CKV_K8S_40=Runs as root."
+    checkov.io/skip09: "CKV_K8S_22=Privileged device plugin; writes only to the mounted device-plugins directory."
+    checkov.io/skip10: "CKV_K8S_8=Restarted by the DaemonSet if it exits."
+    checkov.io/skip11: "CKV_K8S_9=Nothing sends traffic to it."
+    checkov.io/skip12: "CKV_K8S_11=Memory limit is set; CPU limits only throttle."
+    checkov.io/skip14: "CKV_K8S_25=Privileged by design."
+    checkov.io/skip13: "CKV_K8S_15=Image is pinned by digest."
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: generic-device-plugin
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: generic-device-plugin
+    spec:
+      priorityClassName: platform
+      automountServiceAccountToken: false
+      restartPolicy: Always
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      nodeSelector:
+        pool: rootless-test
+      tolerations:
+        - key: pool
+          operator: Equal
+          value: rootless-test
+          effect: NoSchedule
+      containers:
+        - name: generic-device-plugin
+          image: docker.io/squat/generic-device-plugin
+          imagePullPolicy: IfNotPresent
+          args:
+            - --device
+            - |
+              name: tun
+              groups:
+                - count: 10
+                  paths:
+                    - path: /dev/net/tun
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - name: device-plugins
+              mountPath: /var/lib/kubelet/device-plugins
+            - name: dev
+              mountPath: /dev
+      volumes:
+        - name: device-plugins
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+        - name: dev
+          hostPath:
+            path: /dev

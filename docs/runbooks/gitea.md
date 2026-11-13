@@ -87,6 +87,52 @@ because they are created once:
 - The `gitea` NetworkPolicy allows ingress from the Gateway's Envoy pods on 2222 (the pod
   port: Calico evaluates after DNAT).
 
+## Actions runners
+
+`applications/gitea-runner` (namespace `gitea-runner`): a StatefulSet of 2 pods, each an
+`act_runner` container plus a **rootless** `docker:dind-rootless` sidecar sharing a Unix socket
+(`/run/user/1000/docker.sock`). Runners are registered instance-wide (any repo on git.rye.ninja
+can use them), capacity 2 jobs per pod. Workflow labels: `ubuntu-latest`, `ubuntu-24.04`,
+`ubuntu-22.04` (images from `docker.gitea.com/runner-images`).
+
+- **Where they run:** only on the tainted node pool `pool=rootless-test` (nodeSelector and toleration
+  in the StatefulSet), a single worker defined in `pcd-ce-deploy/tofu-pcd-talos-cluster/rootless_test_node.tf`
+  (`rootless_test_node_enabled`, 80 GiB root disk). Talos disables user namespaces
+  (`user.max_user_namespaces=0`); that node raises it to 11255, so the exposure stays off the other
+  workers. If the node is gone the runners stay Pending and jobs queue.
+- **Isolation:** not privileged, no added capabilities except `SETUID`/`SETGID` (for the
+  `newuidmap`/`newgidmap` helpers), Unconfined seccomp/AppArmor, and `hostUsers: false` so root in the
+  pod is an unprivileged UID on the node. `procMount: Unmasked` (needed because rootless dockerd writes
+  `/proc/sys` in its own network namespace) is only allowed with `hostUsers: false`. The namespace is
+  labelled Pod Security `privileged` for this. `container.privileged` is off and `valid_volumes` is
+  empty in the runner config. Image layers live in an emptyDir (30 Gi limit) and are lost on restart.
+- **Extra pieces rootless needs:**
+  - `devic.es/tun`: slirp4netns needs `/dev/net/tun`. The `generic-device-plugin` DaemonSet
+    (`resources/device-plugin.daemonset.yaml`, privileged, pool only) advertises it, and the docker
+    container requests one.
+  - `/etc/subuid` and `/etc/subgid` come from the ConfigMap `gitea-runner-subid`
+    (`rootless:10000:50000`): a pod user namespace has 65536 IDs, so the image's `100000:65536` does not fit.
+  - The emptyDir for Docker's data is mounted at `~/.local/share`, not `~/.local/share/docker`, because
+    dockerd chmods its data dir and the volume root is not owned by UID 1000.
+- **IPv6 / NAT64:** nodes are IPv6-only, so job containers need IPv6. dockerd runs with
+  `--ipv6 --ip6tables` and rootlesskit with `--ipv6` (slirp4netns). slirp4netns gives the daemon's
+  namespace an IPv6 address but no default route, so the sidecar adds `default via fd00::2 dev tap0`
+  through `nsenter` after start and re-asserts it every 30 s. The default bridge (`fd00:d0c:a::/64`) and
+  the `gitea-actions` network (`fd00:d0c:b::/64`, set as `container.network`) are dual-stack and masquerade.
+  Hosts that only have an A record resolve through DNS64 to `64:ff9b::/96` and work; IPv4 *literals* do
+  not, because the pod has no IPv4 route. NAT64 is a hard dependency: if `nat64-01` is down, image pulls
+  from IPv4-only registries fail (see `nat64-appliance-rebuild.md`).
+- **Registration:** the token comes from 1Password (`core-infra/gitea-runner-registration`, field
+  `token`) through ESO. Generate it with `kubectl -n gitea exec deploy/gitea -c gitea -- gitea actions generate-runner-token`.
+  Each runner registers on first start and then keeps its identity in `/data/.runner` on its own
+  1 Gi volume; deleting a PVC makes it register again (delete the stale runner under Site
+  Administration -> Actions -> Runners).
+- **Network:** the runner talks to Gitea at `gitea-http.gitea.svc:3000`; jobs check out from
+  `https://git.rye.ninja` through the Gateway VIP. Egress is DNS, those two, and TCP 80/443 to the
+  internet (including NAT64) but not to the cluster ULAs or the site's delegated GUA `/60`
+  (the `/60` changes on re-delegation, see `gua-prefix-renumber.md`). Nothing may connect to a
+  runner pod (the daemon's TCP 2375 is published inside the pod network, so the policy's empty ingress matters).
+
 ## Mirrors and migrations from GitHub
 
 The nodes are IPv6-only, so github.com is reached through DNS64/NAT64 (`64:ff9b::/96`).
