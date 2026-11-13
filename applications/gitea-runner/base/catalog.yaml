@@ -3,7 +3,7 @@ kind: Component
 metadata:
   name: gitea-runner
   description: |-
-    Gitea Actions runners (act_runner with a rootless Docker-in-Docker sidecar)
+    Gitea Actions runners (act_runner with a Docker-in-Docker sidecar)
     for git.rye.ninja, registered instance-wide.
   tags:
     - git

@@ -13,7 +13,8 @@ runner:
 cache:
   enabled: true
 container:
-  network: ""
+  # Dual-stack bridge created by the docker sidecar (statefulset.yaml).
+  network: gitea-actions
   privileged: false
   options:
   workdir_parent:

@@ -19,5 +19,5 @@ images:
     newTag: 0.6.1
     digest: sha256:b5c35d6bdbb9bb25e531230bfc7cc663cb751406cbec90a2a891b85fea54de86
   - name: docker.io/library/docker
-    newTag: 29.9.3-dind-rootless
-    digest: sha256:707a099b8ddd86306eb28c8b1775264a3ee0135b16dc505b7b48ffb328edf8d0
+    newTag: 29.9.3-dind
+    digest: sha256:7bf70dcb85c822e3fa6f2d332143e474b99147b9d7b39102b0cfe8b04a7dd61b

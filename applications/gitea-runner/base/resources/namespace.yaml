@@ -3,7 +3,6 @@ kind: Namespace
 metadata:
   name: gitea-runner
   labels:
-    # The rootless Docker daemon needs an unconfined seccomp/AppArmor profile,
-    # which the baseline Pod Security Standard rejects. Kept out of the gitea
-    # namespace so this one pod spec is the only exception.
+    # The Docker-in-Docker sidecar is a privileged container. Kept out of the
+    # gitea namespace so this one pod spec is the only exception.
     pod-security.kubernetes.io/enforce: privileged

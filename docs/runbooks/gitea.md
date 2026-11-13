@@ -90,15 +90,24 @@ because they are created once:
 ## Actions runners
 
 `applications/gitea-runner` (namespace `gitea-runner`): a StatefulSet of 2 pods, each an
-`act_runner` container plus a `docker:dind-rootless` sidecar sharing a Unix socket. Runners are
-registered instance-wide (any repo on git.rye.ninja can use them), capacity 2 jobs per pod.
-Workflow labels: `ubuntu-latest`, `ubuntu-24.04`, `ubuntu-22.04` (images from
-`docker.gitea.com/runner-images`).
+`act_runner` container plus a `docker:dind` sidecar. The runner talks to the daemon on the pod's
+loopback (`tcp://127.0.0.1:2375`), which job containers cannot reach. Runners are registered
+instance-wide (any repo on git.rye.ninja can use them), capacity 2 jobs per pod. Workflow labels:
+`ubuntu-latest`, `ubuntu-24.04`, `ubuntu-22.04` (images from `docker.gitea.com/runner-images`).
 
-- **Isolation:** the sidecar is not privileged and has no added capabilities, but needs an
-  Unconfined seccomp/AppArmor profile for rootless user namespaces, so the namespace is labelled
-  Pod Security `privileged`. A job can run `docker build` and container jobs, but never gets host
-  root. Image layers live in an emptyDir (30 Gi limit) and are lost on restart.
+- **Isolation:** the sidecar is a **privileged** container (the namespace is labelled Pod Security
+  `privileged`), so a workflow that escapes its container can reach the node. Rootless Docker was
+  tried first and cannot start: the Talos nodes have `user.max_user_namespaces=0`. Enabling that
+  sysctl on the workers would allow rootless; until then only let people you trust create
+  repositories. `container.privileged` is off and `valid_volumes` is empty in the runner config.
+  Image layers live in an emptyDir (30 Gi limit) and are lost on restart.
+- **IPv6 / NAT64:** nodes are IPv6-only, so job containers need IPv6. The daemon runs with
+  `--ipv6 --ip6tables`; the default bridge (`fd00:d0c:a::/64`) and the `gitea-actions` network
+  (`fd00:d0c:b::/64`, set as `container.network`) are dual-stack and masquerade to the pod
+  address. Hosts that only have an A record resolve through DNS64 to `64:ff9b::/96` and work;
+  IPv4 *literals* (for example `curl http://1.2.3.4`) do not, because the pod has no IPv4 route.
+  Tested from a job container: github.com (NAT64), registry.npmjs.org (native) and an
+  IPv6-only site all returned 200.
 - **Registration:** the token comes from 1Password (`core-infra/gitea-runner-registration`, field
   `token`) through ESO. Generate it with `kubectl -n gitea exec deploy/gitea -c gitea -- gitea actions generate-runner-token`.
   Each runner registers on first start and then keeps its identity in `/data/.runner` on its own
