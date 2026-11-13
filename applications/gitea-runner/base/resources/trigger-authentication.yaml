@@ -1,0 +1,10 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: gitea-runner-scaler
+  namespace: gitea-runner
+spec:
+  secretTargetRef:
+    - parameter: token
+      name: gitea-runner-scaler
+      key: token

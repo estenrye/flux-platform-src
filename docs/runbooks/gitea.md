@@ -89,10 +89,17 @@ because they are created once:
 
 ## Actions runners
 
-`applications/gitea-runner` (namespace `gitea-runner`): a StatefulSet of 2 pods, each an
-`act_runner` container plus a **rootless** `docker:dind-rootless` sidecar sharing a Unix socket
-(`/run/user/1000/docker.sock`). Runners are registered instance-wide (any repo on git.rye.ninja
-can use them), capacity 2 jobs per pod. Workflow labels: `ubuntu-latest`, `ubuntu-24.04`,
+`applications/gitea-runner` (namespace `gitea-runner`): **ephemeral** runners. A KEDA `ScaledJob`
+creates one pod per queued Actions job (max 4 at once); each pod is an `act_runner` container plus a
+**rootless** `docker:dind-rootless` native sidecar sharing a Unix socket (`/run/user/1000/docker.sock`).
+The runner registers with `GITEA_RUNNER_EPHEMERAL`, takes exactly one job, Gitea deletes the
+registration, and the pod exits. Nothing persists between jobs (workspace, image layers and build cache
+are emptyDirs), so no job can break because of what another left behind. Runners are registered
+instance-wide (any repo on git.rye.ninja can use them). Idle cost is zero; every job pays the pod start
+and the image pull (~3 min for the runner image) until a pull-through registry (Harbor) exists.
+KEDA counts jobs with `GET /api/v1/admin/actions/jobs?status=queued` using the token in 1Password
+(`core-infra/gitea-runner-scaler`, Gitea token `keda-runner-scaler`, scope `read:admin`, owner
+`gitea_admin`); `activeDeadlineSeconds` (3 h) removes a runner that never gets a job. Workflow labels: `ubuntu-latest`, `ubuntu-24.04`,
 `ubuntu-22.04` (images from `docker.gitea.com/runner-images`).
 
 - **Where they run:** only on the tainted node pool `pool=rootless-test` (nodeSelector and toleration
@@ -105,7 +112,7 @@ can use them), capacity 2 jobs per pod. Workflow labels: `ubuntu-latest`, `ubunt
   pod is an unprivileged UID on the node. `procMount: Unmasked` (needed because rootless dockerd writes
   `/proc/sys` in its own network namespace) is only allowed with `hostUsers: false`. The namespace is
   labelled Pod Security `privileged` for this. `container.privileged` is off and `valid_volumes` is
-  empty in the runner config. Image layers live in an emptyDir (30 Gi limit) and are lost on restart.
+  empty in the runner config. Image layers live in an emptyDir (30 Gi limit) and go with the pod.
 - **Extra pieces rootless needs:**
   - `devic.es/tun`: slirp4netns needs `/dev/net/tun`. The `generic-device-plugin` DaemonSet
     (`resources/device-plugin.daemonset.yaml`, privileged, pool only) advertises it, and the docker
@@ -124,9 +131,8 @@ can use them), capacity 2 jobs per pod. Workflow labels: `ubuntu-latest`, `ubunt
   from IPv4-only registries fail (see `nat64-appliance-rebuild.md`).
 - **Registration:** the token comes from 1Password (`core-infra/gitea-runner-registration`, field
   `token`) through ESO. Generate it with `kubectl -n gitea exec deploy/gitea -c gitea -- gitea actions generate-runner-token`.
-  Each runner registers on first start and then keeps its identity in `/data/.runner` on its own
-  1 Gi volume; deleting a PVC makes it register again (delete the stale runner under Site
-  Administration -> Actions -> Runners).
+  Every pod registers with it; ephemeral registrations are removed by Gitea after the job. A pod killed
+  mid-job can leave an offline runner behind (Site Administration -> Actions -> Runners).
 - **Network:** the runner and the jobs talk to Gitea at `http://gitea-http.gitea.svc.cluster.local:3000`
   (act_runner passes its instance URL to jobs as the server URL, so `actions/checkout` fetches from it).
   Pods cannot reach the Gateway VIP `git.rye.ninja` (the known pod-to-own-VIP hairpin), and nothing
@@ -141,10 +147,11 @@ can use them), capacity 2 jobs per pod. Workflow labels: `ubuntu-latest`, `ubunt
   `ubuntu-latest`: `actions/checkout@v4` (cloned from github.com through NAT64, repo fetched from Gitea),
   `curl` to an IPv4-only host through NAT64 (github.com, ghcr.io), a native-IPv6 host and an IPv6-only
   host, and `docker version` plus `docker build` inside a job (act mounts the daemon socket). The first job
-  on a new pod pulls `docker.gitea.com/runner-images:ubuntu-latest` (~3 min) because layers are in an
-  emptyDir. The runner container may restart 2-3 times at pod start while the daemon is coming up.
+  pulls `docker.gitea.com/runner-images:ubuntu-latest` (~3 min); every pod does, because layers are in an
+  emptyDir. That run used the earlier static runners; the ephemeral setup has not been verified yet.
 - **If jobs stall or pulls fail,** check NAT64 first (`nat64-appliance-rebuild.md`; Healthchecks
-  `nat64-wkp`), then `kubectl -n gitea-runner get pods` and the node `talos-rootless-test-1`.
+  `nat64-wkp`), then `kubectl -n gitea-runner get pods` and the node `talos-rootless-test-1`. Queued job but no pod: `kubectl -n gitea-runner get scaledjob,triggerauthentication` and
+  the keda-operator logs (the scaler token or the Gitea ingress rule for the `keda` namespace).
 
 ## Mirrors and migrations from GitHub
 

@@ -38,6 +38,17 @@ spec:
       ports:
         - protocol: TCP
           port: 3000
+    # KEDA polls the queued-jobs count to scale the ephemeral runners.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: keda
+          podSelector:
+            matchLabels:
+              app: keda-operator
+      ports:
+        - protocol: TCP
+          port: 3000
   egress:
     - ports:
         - protocol: TCP
