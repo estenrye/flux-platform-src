@@ -14,3 +14,23 @@ spec:
     spec:
       restartPolicy: Always
       priorityClassName: platform-critical
+      containers:
+        - name: cert-approver
+          # Upstream's 250m CPU / 32Mi limits throttle the controller at start-up
+          # (VPA target: 271m CPU, 250Mi): the 1s health probes time out and the
+          # kubelet kills it, ~1300 restarts. Raise the limits and loosen the probes.
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          startupProbe:
+            timeoutSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            timeoutSeconds: 5
