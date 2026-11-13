@@ -87,6 +87,10 @@ spec:
                   fieldPath: metadata.name
             - name: CONFIG_FILE
               value: /config/config.yaml
+            # UID 1000 has no passwd entry in this image, so HOME would be /: the action
+            # cache (/.cache/act) and the cache server could not be created.
+            - name: HOME
+              value: /data
             - name: DOCKER_HOST
               value: unix:///run/user/1000/docker.sock
           securityContext:
