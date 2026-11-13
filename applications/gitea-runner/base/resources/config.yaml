@@ -2,7 +2,7 @@ log:
   level: info
 runner:
   file: /data/.runner
-  capacity: 2
+  capacity: 1
   timeout: 3h
   fetch_timeout: 5s
   fetch_interval: 2s
@@ -13,7 +13,7 @@ runner:
 cache:
   enabled: true
 container:
-  # Dual-stack bridge created by the docker sidecar (statefulset.yaml).
+  # Dual-stack bridge created by the docker sidecar (scaledjob.yaml).
   network: gitea-actions
   privileged: false
   options:

@@ -6,7 +6,9 @@ resources:
   - resources/namespace.yaml
   - resources/eso.external-secret.registration-token.yaml
   - resources/network-policy.yaml
-  - resources/statefulset.yaml
+  - resources/eso.external-secret.scaler-token.yaml
+  - resources/trigger-authentication.yaml
+  - resources/scaledjob.yaml
   - resources/device-plugin.daemonset.yaml
 
 configMapGenerator:
