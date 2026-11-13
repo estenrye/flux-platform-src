@@ -125,13 +125,16 @@ spec:
           # network namespace an IPv6 address but no default route, so one is added
           # (and re-asserted) through nsenter. The default bridge and the
           # `gitea-actions` network (act_runner's container.network) are dual-stack
-          # ULA /64s that ip6tables masquerades. Tested on the pool's node with
-          # github.com (NAT64), a native-IPv6 and an IPv6-only site.
+          # ULA /64s that ip6tables masquerades. --dns=fd00::3 is slirp4netns' IPv6
+          # DNS forwarder: by default Docker's embedded resolver also tries 10.0.2.3
+          # first, which cannot reach the (IPv6-only) pod resolver and costs every
+          # lookup a 5 s timeout. Tested on the pool's node with github.com (NAT64),
+          # a native-IPv6 and an IPv6-only site.
           command:
             - sh
             - -c
             - |
-              dockerd-entrypoint.sh --ipv6 --ip6tables --fixed-cidr-v6=fd00:d0c:a::/64 &
+              dockerd-entrypoint.sh --ipv6 --ip6tables --fixed-cidr-v6=fd00:d0c:a::/64 --dns=fd00::3 &
               pid=$!
               export DOCKER_HOST=unix:///run/user/1000/docker.sock
               until docker info >/dev/null 2>&1; do sleep 1; done
