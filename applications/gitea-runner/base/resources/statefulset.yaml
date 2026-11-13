@@ -9,22 +9,19 @@ metadata:
     ignore-check.kube-linter.io/no-read-only-root-fs: "The Docker daemon writes under /var/lib/docker and act_runner under /data."
     ignore-check.kube-linter.io/env-value-from: "The registration token comes from the ESO-managed gitea-runner-registration Secret."
     ignore-check.kube-linter.io/read-secret-from-env-var: "act_runner reads its registration token from the environment on first start."
-    ignore-check.kube-linter.io/privilege-escalation-container: "Docker-in-Docker needs a privileged container; see docs/runbooks/gitea.md, Actions runners."
-    ignore-check.kube-linter.io/privileged-container: "Docker-in-Docker needs a privileged container; Talos nodes have user.max_user_namespaces=0, so rootless Docker cannot start."
-    ignore-check.kube-linter.io/run-as-non-root: "The Docker daemon runs as root inside its privileged container."
+    ignore-check.kube-linter.io/privilege-escalation-container: "Rootless dockerd needs newuidmap/newgidmap (file capabilities), which need allowPrivilegeEscalation; the container is neither privileged nor root on the node (hostUsers: false)."
+    ignore-check.kube-linter.io/unsafe-proc-mount: "Rootless dockerd writes /proc/sys in its own network namespace. Unmasked /proc is only allowed with hostUsers: false, so it is scoped to a pod user namespace."
     ignore-check.kube-linter.io/no-liveness-probe: "Runner and daemon exit on failure and are restarted."
     ignore-check.kube-linter.io/no-readiness-probe: "Nothing sends traffic to a runner."
     checkov.io/skip01: "CKV_K8S_35=act_runner reads its registration token from the environment on first start."
     checkov.io/skip03: "CKV_K8S_11=Memory limits are set; CPU limits only throttle builds."
     checkov.io/skip04: "CKV_K8S_22=Rootless dockerd and act_runner write to their home and data volumes."
-    checkov.io/skip12: "CKV_K8S_16=Docker-in-Docker needs a privileged container."
-    checkov.io/skip13: "CKV_K8S_20=Docker-in-Docker needs a privileged container, which implies privilege escalation."
-    checkov.io/skip14: "CKV_K8S_23=The Docker daemon runs as root inside its privileged container."
-    checkov.io/skip15: "CKV_K8S_28=The Docker daemon needs NET_RAW and other capabilities as a privileged container."
-    checkov.io/skip16: "CKV_K8S_30=Docker-in-Docker needs a privileged container."
-    checkov.io/skip17: "CKV_K8S_31=Privileged containers ignore the seccomp profile."
-    checkov.io/skip18: "CKV_K8S_40=The Docker daemon runs as root; act_runner runs as 1000."
-    checkov.io/skip19: "CKV_K8S_37=A privileged Docker-in-Docker container holds every capability."
+    checkov.io/skip17: "CKV_K8S_25=Rootless dockerd needs CAP_SETUID and CAP_SETGID."
+    checkov.io/skip12: "CKV_K8S_20=Rootless dockerd needs newuidmap/newgidmap, which need allowPrivilegeEscalation."
+    checkov.io/skip13: "CKV_K8S_28=Rootless dockerd needs CAP_SETUID and CAP_SETGID for newuidmap/newgidmap."
+    checkov.io/skip14: "CKV_K8S_30=Rootless dockerd needs Unconfined seccomp/AppArmor and an unmasked /proc, which requires hostUsers: false."
+    checkov.io/skip15: "CKV_K8S_31=Rootless dockerd needs an Unconfined seccomp profile."
+    checkov.io/skip16: "CKV_K8S_40=UID 1000 is the upstream rootless Docker user."
     checkov.io/skip06: "CKV_K8S_15=Images are pinned by digest."
     checkov.io/skip10: "CKV_K8S_8=Runner and daemon exit on failure and are restarted."
     checkov.io/skip11: "CKV_K8S_9=Nothing sends traffic to a runner."
@@ -44,6 +41,18 @@ spec:
     spec:
       priorityClassName: application
       automountServiceAccountToken: false
+      # Own user namespace: root in the pod is an unprivileged UID on the node.
+      # Required for procMount: Unmasked below (rootless dockerd writes /proc/sys).
+      hostUsers: false
+      # Only the rootless pool has user.max_user_namespaces raised and the TUN
+      # device plugin: pcd-ce-deploy tofu-pcd-talos-cluster/rootless_test_node.tf.
+      nodeSelector:
+        pool: rootless-test
+      tolerations:
+        - key: pool
+          operator: Equal
+          value: rootless-test
+          effect: NoSchedule
       # Jobs from every repo run here, so spread the two runners over nodes.
       restartPolicy: Always
       affinity:
@@ -57,6 +66,9 @@ spec:
                     app.kubernetes.io/name: gitea-runner
       securityContext:
         fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
       containers:
         - name: runner
           image: docker.io/gitea/act_runner
@@ -75,10 +87,8 @@ spec:
                   fieldPath: metadata.name
             - name: CONFIG_FILE
               value: /config/config.yaml
-            # The daemon listens on the pod's loopback only. Job containers run in
-            # their own network namespaces and cannot reach it.
             - name: DOCKER_HOST
-              value: tcp://127.0.0.1:2375
+              value: unix:///run/user/1000/docker.sock
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000
@@ -100,46 +110,93 @@ spec:
             - name: config
               mountPath: /config
               readOnly: true
+            - name: docker-run
+              mountPath: /run/user/1000
         - name: docker
           image: docker.io/library/docker
           imagePullPolicy: IfNotPresent
-          # Dual-stack job networking: the nodes are IPv6-only behind DNS64/NAT64, so
-          # job containers need IPv6 addresses to reach anything (an IPv4-only host
-          # resolves to 64:ff9b::/96). The default bridge and the `gitea-actions`
-          # network (act_runner's container.network) both get a ULA /64 that
-          # ip6tables masquerades to the pod address. The network is created once the
-          # daemon answers.
+          # Rootless Docker-in-Docker with IPv6. The nodes are IPv6-only behind
+          # DNS64/NAT64, so job containers need IPv6 addresses (an IPv4-only host
+          # resolves to 64:ff9b::/96). slirp4netns (--ipv6) gives the daemon's
+          # network namespace an IPv6 address but no default route, so one is added
+          # (and re-asserted) through nsenter. The default bridge and the
+          # `gitea-actions` network (act_runner's container.network) are dual-stack
+          # ULA /64s that ip6tables masquerades. Tested on the pool's node with
+          # github.com (NAT64), a native-IPv6 and an IPv6-only site.
           command:
             - sh
             - -c
             - |
-              dockerd-entrypoint.sh --host=unix:///var/run/docker.sock --host=tcp://127.0.0.1:2375 \
-                --ipv6 --ip6tables --fixed-cidr-v6=fd00:d0c:a::/64 &
+              dockerd-entrypoint.sh --ipv6 --ip6tables --fixed-cidr-v6=fd00:d0c:a::/64 &
               pid=$!
-              until docker -H unix:///var/run/docker.sock info >/dev/null 2>&1; do sleep 1; done
+              export DOCKER_HOST=unix:///run/user/1000/docker.sock
+              until docker info >/dev/null 2>&1; do sleep 1; done
+              route() {
+                nsenter -t "$(pgrep -x dockerd | head -1)" -U -n --preserve-credentials \
+                  ip -6 route replace default via fd00::2 dev tap0
+              }
+              route
               docker network inspect gitea-actions >/dev/null 2>&1 || \
                 docker network create --ipv6 --subnet fd00:d0c:b::/64 gitea-actions
-              wait $pid
+              while kill -0 "$pid" 2>/dev/null; do sleep 30; route || true; done
+              wait "$pid"
           env:
             - name: DOCKER_TLS_CERTDIR
               value: ""
+            - name: DOCKERD_ROOTLESS_ROOTLESSKIT_FLAGS
+              value: --ipv6
           securityContext:
-            privileged: true
+            allowPrivilegeEscalation: true
+            procMount: Unmasked
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            # newuidmap/newgidmap carry file capabilities and need these two in the
+            # bounding set; nothing else is granted.
+            capabilities:
+              drop: ["ALL"]
+              add: ["SETUID", "SETGID"]
+            seccompProfile:
+              type: Unconfined
+            appArmorProfile:
+              type: Unconfined
           resources:
             requests:
               cpu: 500m
               memory: 1Gi
               ephemeral-storage: 5Gi
             limits:
+              # slirp4netns needs /dev/net/tun, exposed by the device plugin
+              # (resources/device-plugin.daemonset.yaml).
+              devic.es/tun: "1"
               memory: 6Gi
               ephemeral-storage: 30Gi
           volumeMounts:
+            - name: docker-run
+              mountPath: /run/user/1000
+            # One level above docker/: the emptyDir root is not owned by UID 1000
+            # and dockerd chmods its data dir.
             - name: docker-data
-              mountPath: /var/lib/docker
+              mountPath: /home/rootless/.local/share
+            # The user namespace has 65536 IDs; the image's 100000:65536 does not fit.
+            - name: subid
+              mountPath: /etc/subuid
+              subPath: subuid
+              readOnly: true
+            - name: subid
+              mountPath: /etc/subgid
+              subPath: subgid
+              readOnly: true
       volumes:
         - name: config
           configMap:
             name: gitea-runner-config
+        - name: subid
+          configMap:
+            name: gitea-runner-subid
+        - name: docker-run
+          emptyDir:
+            sizeLimit: 16Mi
         # Image layers and build cache: disposable, rebuilt after a restart.
         - name: docker-data
           emptyDir:
