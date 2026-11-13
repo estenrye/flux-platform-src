@@ -8,6 +8,7 @@ terraform {
 
 locals {
   tayga_pool_gw = cidrhost(var.tayga_pool_cidr, 1) # tayga's own v4 tunnel address
+  tayga_tun_ip  = cidrhost(var.tayga_pool_cidr, 2) # the tun interface's v4 address
 }
 
 # RAW Ubuntu cloud image as a file-backed volume in the images dir pool:
@@ -54,6 +55,7 @@ resource "libvirt_cloudinit_disk" "seed" {
     ipv4_gateway        = var.ipv4_gateway
     tayga_pool_cidr     = var.tayga_pool_cidr
     tayga_pool_gw       = local.tayga_pool_gw
+    tayga_tun_ip        = local.tayga_tun_ip
     tayga_ula_prefix    = var.tayga_ula_prefix
     nat64_prefix        = var.nat64_prefix
     dns64_allowed_cidrs = var.dns64_allowed_cidrs

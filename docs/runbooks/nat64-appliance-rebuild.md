@@ -115,6 +115,21 @@ blocks can break the public path too.
   instance-id it has already provisioned. Use the taint-based rebuild in
   the "Rebuild" section above, and confirm with `uptime` over SSH that the
   guest actually rebooted just now, not days ago.
+- **The packaged `tayga` init script cannot coexist with `tayga-priv`
+  (2026-11-13 outage).** `/etc/init.d/tayga` starts the daemon with
+  `start-stop-daemon --exec /usr/sbin/tayga`, which refuses to start while
+  *any* process runs that binary, and `tayga-priv.service` does. At boot tayga
+  won the race; when `apt-daily-upgrade` restarted services at 06:24 UTC it
+  lost it, stayed `failed` for about 8 hours and all IPv4-only egress broke
+  (a new node's kubelet could not pull `ghcr.io`). `tayga.service` is now a
+  native unit in the cloud-init template, shaped like `tayga-priv.service`:
+  no `--exec` check, idempotent tun setup, `Restart=on-failure`. The packaged
+  `/etc/default/tayga` and the `mtu.conf` drop-in are gone. On a VM built before
+  this change, install the same unit by hand (the cloud-init seed does not
+  re-run, see the first gotcha): write `/etc/systemd/system/tayga.service` from
+  the template, remove `tayga.service.d/mtu.conf`, `systemctl daemon-reload`,
+  stop any stray `tayga` daemon, `tayga -c /etc/tayga.conf --rmtun`, then
+  `systemctl start tayga`. Applied live to `nat64-01` on 2026-11-13.
 - **tayga rejects a self-address that falls inside its own `prefix` — for
   IPv6 only.** Confirmed live error: `Error: ipv6-addr cannot reside
   within configured prefix ...`. This is unlike the IPv4 side, where
