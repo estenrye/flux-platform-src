@@ -31,13 +31,6 @@ spec:
       ports:
         - protocol: TCP
           port: 3000
-    # Jobs check out from https://git.rye.ninja through the Gateway's VIP.
-    - to:
-        - ipBlock:
-            cidr: 2607:3640:1064:27f::1:9289/128
-      ports:
-        - protocol: TCP
-          port: 443
     # Job containers pull images and packages from the internet (IPv4-only hosts
     # through NAT64, 64:ff9b::/96), but not from the cluster (ULA fd10::/16 pod and
     # service ranges, fd97/fd92 LAN ULAs) or this site's delegated GUA /60.
