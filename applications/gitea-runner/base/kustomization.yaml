@@ -13,6 +13,11 @@ configMapGenerator:
   - name: gitea-runner-config
     files:
       - config.yaml=resources/config.yaml
+  # Sub-ID ranges for rootless dockerd inside the pod's user namespace.
+  - name: gitea-runner-subid
+    files:
+      - subuid=resources/subuid
+      - subgid=resources/subgid
 
 images:
   # newTag + digest: Renovate follows the image by version.
