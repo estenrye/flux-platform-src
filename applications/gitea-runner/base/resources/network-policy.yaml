@@ -5,6 +5,7 @@ metadata:
   namespace: gitea-runner
   annotations:
     ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The gitea pods live in another namespace and exist at runtime."
+    ignore-check.kube-linter.io/dangling-networkpolicy: "The runner pods are created at runtime by the KEDA ScaledJob (a custom resource kube-linter does not expand)."
 spec:
   podSelector:
     matchLabels:
