@@ -87,6 +87,28 @@ because they are created once:
 - The `gitea` NetworkPolicy allows ingress from the Gateway's Envoy pods on 2222 (the pod
   port: Calico evaluates after DNAT).
 
+## Actions runners
+
+`applications/gitea-runner` (namespace `gitea-runner`): a StatefulSet of 2 pods, each an
+`act_runner` container plus a `docker:dind-rootless` sidecar sharing a Unix socket. Runners are
+registered instance-wide (any repo on git.rye.ninja can use them), capacity 2 jobs per pod.
+Workflow labels: `ubuntu-latest`, `ubuntu-24.04`, `ubuntu-22.04` (images from
+`docker.gitea.com/runner-images`).
+
+- **Isolation:** the sidecar is not privileged and has no added capabilities, but needs an
+  Unconfined seccomp/AppArmor profile for rootless user namespaces, so the namespace is labelled
+  Pod Security `privileged`. A job can run `docker build` and container jobs, but never gets host
+  root. Image layers live in an emptyDir (30 Gi limit) and are lost on restart.
+- **Registration:** the token comes from 1Password (`core-infra/gitea-runner-registration`, field
+  `token`) through ESO. Generate it with `kubectl -n gitea exec deploy/gitea -c gitea -- gitea actions generate-runner-token`.
+  Each runner registers on first start and then keeps its identity in `/data/.runner` on its own
+  1 Gi volume; deleting a PVC makes it register again (delete the stale runner under Site
+  Administration -> Actions -> Runners).
+- **Network:** the runner talks to Gitea at `gitea-http.gitea.svc:3000`; jobs check out from
+  `https://git.rye.ninja` through the Gateway VIP. Egress is DNS, those two, and TCP 80/443 to the
+  internet (including NAT64) but not to the cluster ULAs or the site's delegated GUA `/60`
+  (the `/60` changes on re-delegation, see `gua-prefix-renumber.md`).
+
 ## Mirrors and migrations from GitHub
 
 The nodes are IPv6-only, so github.com is reached through DNS64/NAT64 (`64:ff9b::/96`).

@@ -1,0 +1,140 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gitea-runner
+  namespace: gitea-runner
+  annotations:
+    ignore-check.kube-linter.io/no-node-affinity: "Homelab cluster; no zone or role topology to express affinity against."
+    ignore-check.kube-linter.io/minimum-three-replicas: "CI capacity, not an availability tier; two runners."
+    ignore-check.kube-linter.io/no-read-only-root-fs: "The rootless Docker daemon and act_runner write under their home and /data."
+    ignore-check.kube-linter.io/env-value-from: "The registration token comes from the ESO-managed gitea-runner-registration Secret."
+    ignore-check.kube-linter.io/read-secret-from-env-var: "act_runner reads its registration token from the environment on first start."
+    ignore-check.kube-linter.io/no-liveness-probe: "Runner and daemon exit on failure and are restarted."
+    ignore-check.kube-linter.io/no-readiness-probe: "Nothing sends traffic to a runner."
+    checkov.io/skip01: "CKV_K8S_35=act_runner reads its registration token from the environment on first start."
+    checkov.io/skip02: "CKV_K8S_30=The Docker daemon needs an unconfined seccomp profile for user namespaces; it stays unprivileged."
+    checkov.io/skip03: "CKV_K8S_11=Memory limits are set; CPU limits only throttle builds."
+    checkov.io/skip04: "CKV_K8S_22=Rootless dockerd and act_runner write to their home and data volumes."
+    checkov.io/skip05: "CKV_K8S_40=UID 1000 is the upstream rootless Docker user."
+    checkov.io/skip06: "CKV_K8S_15=Images are pinned by digest."
+    checkov.io/skip07: "CKV_K8S_20=Rootless dockerd needs allowPrivilegeEscalation for its setuid newuidmap/newgidmap helpers."
+    checkov.io/skip08: "CKV_K8S_28=Rootless dockerd runs without added capabilities; the check also flags NET_RAW being kept."
+spec:
+  serviceName: gitea-runner
+  replicas: 2
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gitea-runner
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gitea-runner
+    spec:
+      priorityClassName: application
+      automountServiceAccountToken: false
+      # Jobs from every repo run here, so spread the two runners over nodes.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: gitea-runner
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: runner
+          image: docker.io/gitea/act_runner
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: GITEA_INSTANCE_URL
+              value: http://gitea-http.gitea.svc.cluster.local:3000
+            - name: GITEA_RUNNER_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-runner-registration
+                  key: token
+            - name: GITEA_RUNNER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CONFIG_FILE
+              value: /config/config.yaml
+            - name: DOCKER_HOST
+              value: unix:///run/user/1000/docker.sock
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: docker-run
+              mountPath: /run/user/1000
+        - name: docker
+          image: docker.io/library/docker
+          imagePullPolicy: IfNotPresent
+          env:
+            # Unix socket only, shared with the runner through docker-run.
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          securityContext:
+            # No privileged mode and no capabilities: dockerd runs in user, mount
+            # and network namespaces it owns (rootlesskit). The default seccomp
+            # and AppArmor profiles block the mount and unshare calls it needs.
+            allowPrivilegeEscalation: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: Unconfined
+            appArmorProfile:
+              type: Unconfined
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+              ephemeral-storage: 5Gi
+            limits:
+              memory: 6Gi
+              ephemeral-storage: 30Gi
+          volumeMounts:
+            - name: docker-run
+              mountPath: /run/user/1000
+            - name: docker-data
+              mountPath: /home/rootless/.local/share/docker
+      volumes:
+        - name: config
+          configMap:
+            name: gitea-runner-config
+        - name: docker-run
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+        # Image layers and build cache: disposable, rebuilt after a restart.
+        - name: docker-data
+          emptyDir:
+            sizeLimit: 30Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: csi-cinder-sc-retain
+        resources:
+          requests:
+            storage: 1Gi

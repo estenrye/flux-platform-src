@@ -1,0 +1,54 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitea-runner
+  namespace: gitea-runner
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The gitea pods live in another namespace and exist at runtime."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gitea-runner
+  policyTypes:
+    - Ingress
+    - Egress
+  # Nothing connects to a runner: it polls Gitea.
+  ingress: []
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    # Runner -> Gitea API (pod port 3000; Calico evaluates after DNAT).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gitea
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gitea
+      ports:
+        - protocol: TCP
+          port: 3000
+    # Jobs check out from https://git.rye.ninja through the Gateway's VIP.
+    - to:
+        - ipBlock:
+            cidr: 2607:3640:1064:27f::1:9289/128
+      ports:
+        - protocol: TCP
+          port: 443
+    # Job containers pull images and packages from the internet (IPv4-only hosts
+    # through NAT64, 64:ff9b::/96), but not from the cluster (ULA fd10::/16 pod and
+    # service ranges, fd97/fd92 LAN ULAs) or this site's delegated GUA /60.
+    - to:
+        - ipBlock:
+            cidr: ::/0
+            except:
+              - fc00::/7
+              - 2607:3640:1064:270::/60
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

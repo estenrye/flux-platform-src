@@ -1,0 +1,23 @@
+log:
+  level: info
+runner:
+  file: /data/.runner
+  capacity: 2
+  timeout: 3h
+  fetch_timeout: 5s
+  fetch_interval: 2s
+  labels:
+    - "ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest"
+    - "ubuntu-24.04:docker://docker.gitea.com/runner-images:ubuntu-24.04"
+    - "ubuntu-22.04:docker://docker.gitea.com/runner-images:ubuntu-22.04"
+cache:
+  enabled: true
+container:
+  network: ""
+  privileged: false
+  options:
+  workdir_parent:
+  valid_volumes: []
+  docker_host: ""
+  force_pull: false
+  force_rebuild: false
