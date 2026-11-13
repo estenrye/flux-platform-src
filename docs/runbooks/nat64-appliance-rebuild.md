@@ -105,6 +105,15 @@ Also re-run the WKP checks above (`ping -6`, `dig AAAA github.com`, `curl
 cloud-init template, so a mistake in the private path's `write_files`
 blocks can break the public path too.
 
+### Monitoring
+
+`nat64-probe.timer` on the Healthchecks VM (`pcd-ce-deploy` ansible, `files/nat64-probe.py`) runs
+every 5 minutes and pings two checks on healthchecks.rye.ninja: `nat64-wkp` (the DNS64 resolver
+answers, and a TLS handshake to `64:ff9b::<IPv4 of github.com>` completes, which exercises
+`tayga`) and `nat64-private` (the private-prefix path, `tayga-priv`). Each has a 5 minute period and
+10 minute grace. A failing `nat64-wkp` means IPv4-only egress is down for the whole cluster:
+check `systemctl is-active tayga tayga-priv unbound` on the VM first.
+
 ### Gotchas found rebuilding this path (2026-09-28)
 
 - **A template-only `tofu apply` is not a rebuild.** It replaces the
