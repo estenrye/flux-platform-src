@@ -55,9 +55,35 @@ because they are created once:
   through Keycloak. Host keys are generated on first start under `/data/ssh` (Cinder
   volume), so they survive restarts; clients will see a host key change if `/data` is
   ever lost.
-- The Gateway's address is a public GUA (class `external-dedicated`), so SSH is reachable
-  from wherever the edge firewall allows inbound TCP 22 to it. There is no rate limiting
-  or fail2ban in front of it.
+- Who can connect is decided in three places, and all three must allow a client:
+  1. The `ssh` security group (`pcd-ce-deploy/tofu-pcd-talos-cluster`,
+     `ssh_allowed_prefixes`): the ULA prefixes `fd97:45c2:b3a1::/48` and
+     `fd92:b792:95e:db94::/64` plus the ISP-delegated GUA `/60`
+     (`2607:3640:1064:270::/60`). The Gateway's address is a public GUA, so a LAN client
+     reaches it from its own **GUA** source address, not its ULA; a ULA-only list times
+     out for ordinary clients (found live: a connect with `-s <ULA>` worked, the default
+     source did not). The `/60` changes if the ISP re-delegates, see
+     `gua-prefix-renumber.md`. Anything else (for example a WireGuard client sourcing
+     from `fd54:616c:6f73::`) is dropped until its prefix is added.
+  2. The UniFi zone firewall: VIPs are routed prefixes that belong to no zone, so another
+     zone needs a Policy Table rule scoped to the destination IP and port 22
+     (`unifi-zone-firewall.md`). Internal LAN clients already work without one.
+  3. Nothing further in the cluster: the NetworkPolicy below only admits Envoy.
+- Connection cap: `gitea-gateway-ssh-connection-limit` (ClientTrafficPolicy on the `ssh`
+  listener) limits concurrent connections to 100 per Envoy pod, closing extras after 1s.
+  It is a ceiling, not a per-client rate limit, and was chosen well above real use (a person
+  plus CI needs under 20). A per-client new-connection limit
+  (`BackendTrafficPolicy` `rateLimit.local` on the TCPRoute) was not added: it is not
+  verified that Envoy Gateway applies it to TCP routes, so test that before relying on it.
+- Monitoring: the Healthchecks check `gitea-ssh` (5 minute period, 10 minute grace) is pinged
+  by `gitea-ssh-probe.timer` on the Healthchecks VM (`pcd-ce-deploy` ansible,
+  `files/gitea-ssh-probe.py`), which connects to `git.rye.ninja:22` and reads the
+  `SSH-2.0-` banner. It runs outside the cluster because pods cannot reach the Gateway's
+  own VIP. It proves the path end to end but does not authenticate. Envoy's TCP listener
+  metrics are scraped by the `envoy-proxy` PodMonitor; there is no alert rule on them.
+  Gitea only sees Envoy's pod IP as the client address (PROXY protocol is not enabled).
+- `gitea-ssh` is a headless Service (the chart default): a Service's `clusterIP` cannot be
+  changed in place, and Envoy resolves it through the EndpointSlice, which works.
 - The `gitea` NetworkPolicy allows ingress from the Gateway's Envoy pods on 2222 (the pod
   port: Calico evaluates after DNAT).
 

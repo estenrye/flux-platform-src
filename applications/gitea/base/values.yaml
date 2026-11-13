@@ -62,10 +62,6 @@ service:
   http:
     type: ClusterIP
     port: 3000
-  ssh:
-    # A normal ClusterIP rather than the chart's headless default, so the Gateway
-    # routes to a stable Service address.
-    clusterIP: ""
 
 # The chart renders the HTTPRoute for the Gateway in resources/gateway.yaml;
 # tls: true makes ROOT_URL https.
