@@ -3,8 +3,8 @@
 Gitea on core-infra: `applications/gitea` (Helm chart 12.7.0, Gitea 1.27.0 rootless),
 database `applications/gitea-db` (CNPG, 3 instances, barman backups to the SeaweedFS
 bucket `gitea-db-barman`, daily 04:00 UTC), exposed by the `gitea-gateway` Gateway
-(class `external-dedicated`, Let's Encrypt) with the chart-rendered HTTPRoute. HTTPS
-only; built-in SSH is disabled.
+(class `external-dedicated`, Let's Encrypt) with the chart-rendered HTTPRoute, plus a
+TCP listener on 22 for Git over SSH (see "Git over SSH").
 
 ## Rollout order
 
@@ -42,6 +42,24 @@ because they are created once:
 - Sign-out: the client's `post.logout.redirect.uris` is `https://git.rye.ninja/*`; without
   it Keycloak rejects Gitea's logout redirect as an invalid redirect URI.
 - Break-glass local admin: Secret `gitea/gitea-admin` (`username`, `password`).
+
+## Git over SSH
+
+- Clone URL: `git@git.rye.ninja:owner/repo.git` (port 22). The `gitea-gateway` Gateway has a
+  TCP listener `ssh` on 22 and the chart's TCPRoute sends it to the `gitea-ssh` Service
+  (22 -> pod port 2222). `git.rye.ninja` already resolves to the Gateway's address, so no
+  extra DNS record. Envoy binds privileged ports as 10000+port, so an edge firewall or
+  anything inspecting the proxy sees 10022 inside the cluster.
+- Gitea's built-in SSH server (rootless image) listens on 2222 as a non-root user; it only
+  accepts public keys. Users add keys under Settings -> SSH / GPG Keys after signing in
+  through Keycloak. Host keys are generated on first start under `/data/ssh` (Cinder
+  volume), so they survive restarts; clients will see a host key change if `/data` is
+  ever lost.
+- The Gateway's address is a public GUA (class `external-dedicated`), so SSH is reachable
+  from wherever the edge firewall allows inbound TCP 22 to it. There is no rate limiting
+  or fail2ban in front of it.
+- The `gitea` NetworkPolicy allows ingress from the Gateway's Envoy pods on 2222 (the pod
+  port: Calico evaluates after DNAT).
 
 ## Mirrors and migrations from GitHub
 
@@ -114,6 +132,6 @@ off-site).
 ## Not done yet
 
 - No restore-operator Role / SeaweedFS operator role (grafana-db has one).
-- No off-site copy of the repositories or the `/data` volume; no SSH access.
+- No off-site copy of the repositories or the `/data` volume.
 - Not applied yet: the tofu in pcd-ce-deploy, and the node-to-NAS NFS path over
   IPv6 (UniFi firewall between VLAN 1179 and the NAS) is unverified.

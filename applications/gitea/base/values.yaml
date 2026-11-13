@@ -62,6 +62,10 @@ service:
   http:
     type: ClusterIP
     port: 3000
+  ssh:
+    # A normal ClusterIP rather than the chart's headless default, so the Gateway
+    # routes to a stable Service address.
+    clusterIP: ""
 
 # The chart renders the HTTPRoute for the Gateway in resources/gateway.yaml;
 # tls: true makes ROOT_URL https.
@@ -79,6 +83,15 @@ gatewayAPI:
           sectionName: https
       hostnames:
         - git.rye.ninja
+    # TCP 22 -> the chart's gitea-ssh Service (pod port 2222).
+    tcpRoute:
+      enabled: true
+      parentRefs:
+        - group: gateway.networking.k8s.io
+          kind: Gateway
+          name: gitea-gateway
+          namespace: gitea
+          sectionName: ssh
 
 # Break-glass local admin, generated once by ESO (resources/eso.*.admin.yaml).
 gitea:
@@ -118,8 +131,13 @@ gitea:
       ROOT_URL: https://git.rye.ninja/
       PROTOCOL: http
       HTTP_PORT: 3000
-      # Only HTTPS is exposed (Gateway on 443).
-      DISABLE_SSH: true
+      # SSH goes through the Gateway's TCP listener on 22 (resources/gateway.yaml). The
+      # rootless image runs Gitea's built-in SSH server as a non-root user with all
+      # capabilities dropped, so it listens on 2222 and clients are told port 22.
+      DISABLE_SSH: false
+      SSH_DOMAIN: git.rye.ninja
+      SSH_PORT: 22
+      SSH_LISTEN_PORT: 2222
     repository:
       ROOT: /repos
     database:
