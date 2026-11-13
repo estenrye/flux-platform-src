@@ -145,7 +145,17 @@ spec:
               route
               docker network inspect gitea-actions >/dev/null 2>&1 || \
                 docker network create --ipv6 --subnet fd00:d0c:b::/64 gitea-actions
-              while kill -0 "$pid" 2>/dev/null; do sleep 30; route || true; done
+              # Re-assert the route every 30s; once a day drop unused images and
+              # build cache older than a week so the persistent volume cannot fill.
+              n=0
+              while kill -0 "$pid" 2>/dev/null; do
+                sleep 30; route || true
+                n=$((n + 1))
+                if [ "$n" -ge 2880 ]; then
+                  n=0
+                  docker system prune -af --filter until=168h || true
+                fi
+              done
               wait "$pid"
           env:
             - name: DOCKER_TLS_CERTDIR
@@ -177,7 +187,7 @@ spec:
               # (resources/device-plugin.daemonset.yaml).
               devic.es/tun: "1"
               memory: 6Gi
-              ephemeral-storage: 30Gi
+              ephemeral-storage: 10Gi
           volumeMounts:
             - name: docker-run
               mountPath: /run/user/1000
@@ -204,10 +214,6 @@ spec:
         - name: docker-run
           emptyDir:
             sizeLimit: 16Mi
-        # Image layers and build cache: disposable, rebuilt after a restart.
-        - name: docker-data
-          emptyDir:
-            sizeLimit: 30Gi
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -217,3 +223,14 @@ spec:
         resources:
           requests:
             storage: 1Gi
+    # Image layers and build cache, per runner (a dockerd data dir cannot be
+    # shared). Disposable, so the Delete class: it survives pod restarts and
+    # rescheduling but is removed with the StatefulSet's PVCs.
+    - metadata:
+        name: docker-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: csi-cinder-sc-delete
+        resources:
+          requests:
+            storage: 40Gi

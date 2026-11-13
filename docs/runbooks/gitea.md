@@ -105,14 +105,14 @@ can use them), capacity 2 jobs per pod. Workflow labels: `ubuntu-latest`, `ubunt
   pod is an unprivileged UID on the node. `procMount: Unmasked` (needed because rootless dockerd writes
   `/proc/sys` in its own network namespace) is only allowed with `hostUsers: false`. The namespace is
   labelled Pod Security `privileged` for this. `container.privileged` is off and `valid_volumes` is
-  empty in the runner config. Image layers live in an emptyDir (30 Gi limit) and are lost on restart.
+  empty in the runner config. Image layers live on a per-runner 40 Gi PVC (`docker-data`, `csi-cinder-sc-delete`), so they survive restarts; unused images older than a week are pruned daily.
 - **Extra pieces rootless needs:**
   - `devic.es/tun`: slirp4netns needs `/dev/net/tun`. The `generic-device-plugin` DaemonSet
     (`resources/device-plugin.daemonset.yaml`, privileged, pool only) advertises it, and the docker
     container requests one.
   - `/etc/subuid` and `/etc/subgid` come from the ConfigMap `gitea-runner-subid`
     (`rootless:10000:50000`): a pod user namespace has 65536 IDs, so the image's `100000:65536` does not fit.
-  - The emptyDir for Docker's data is mounted at `~/.local/share`, not `~/.local/share/docker`, because
+  - The `docker-data` volume is mounted at `~/.local/share`, not `~/.local/share/docker`, because
     dockerd chmods its data dir and the volume root is not owned by UID 1000.
 - **IPv6 / NAT64:** nodes are IPv6-only, so job containers need IPv6. dockerd runs with
   `--ipv6 --ip6tables` and rootlesskit with `--ipv6` (slirp4netns). slirp4netns gives the daemon's
@@ -141,8 +141,7 @@ can use them), capacity 2 jobs per pod. Workflow labels: `ubuntu-latest`, `ubunt
   `ubuntu-latest`: `actions/checkout@v4` (cloned from github.com through NAT64, repo fetched from Gitea),
   `curl` to an IPv4-only host through NAT64 (github.com, ghcr.io), a native-IPv6 host and an IPv6-only
   host, and `docker version` plus `docker build` inside a job (act mounts the daemon socket). The first job
-  on a new pod pulls `docker.gitea.com/runner-images:ubuntu-latest` (~3 min) because layers are in an
-  emptyDir. The runner container may restart 2-3 times at pod start while the daemon is coming up.
+  on a new runner pulls `docker.gitea.com/runner-images:ubuntu-latest` (~3 min); the layers then persist on the PVC. The runner container may restart 2-3 times at pod start while the daemon is coming up.
 - **If jobs stall or pulls fail,** check NAT64 first (`nat64-appliance-rebuild.md`; Healthchecks
   `nat64-wkp`), then `kubectl -n gitea-runner get pods` and the node `talos-rootless-test-1`.
 
