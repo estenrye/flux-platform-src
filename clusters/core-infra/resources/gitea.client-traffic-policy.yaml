@@ -20,3 +20,26 @@ spec:
         - traceparent
         - tracestate
         - baggage
+---
+# Caps concurrent Git SSH connections on the Gateway's TCP listener. The limit is
+# per Envoy proxy pod and per listener, not per client address; the allowed
+# source prefixes are enforced earlier, by the ssh security group in
+# pcd-ce-deploy tofu-pcd-talos-cluster. One person plus CI needs well under 20
+# at once (a clone or push is one or two connections), so 100 leaves ample
+# headroom while bounding what a flood can hold open against Gitea's built-in
+# SSH server. Over-limit connections are closed after one second.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: gitea-gateway-ssh-connection-limit
+  namespace: gitea
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: gitea-gateway
+      sectionName: ssh
+  connection:
+    connectionLimit:
+      value: 100
+      closeDelay: 1s
