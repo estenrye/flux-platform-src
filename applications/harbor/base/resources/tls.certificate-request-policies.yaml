@@ -1,0 +1,102 @@
+# cert-manager-approver-policy is cluster-wide and the built-in approver is
+# disabled, so these Certificates sit WaitingForApproval forever unless a
+# CertificateRequestPolicy matches them AND cert-manager's ServiceAccount has
+# the `use` grant (same pattern as applications/harbor-db).
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: harbor-ca
+spec:
+  allowed:
+    commonName:
+      required: true
+      value: harbor-ca
+    isCA: true
+    usages:
+      - digital signature
+      - cert sign
+      - crl sign
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: Issuer
+      name: harbor-selfsigned
+    namespace:
+      matchNames:
+        - harbor
+---
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: harbor-tls
+spec:
+  allowed:
+    commonName:
+      required: true
+      value: harbor
+    dnsNames:
+      required: true
+      values:
+        - harbor
+        - harbor.harbor
+        - harbor.harbor.svc
+        - harbor.harbor.svc.cluster.local
+        - harbor.rye.ninja
+    isCA: false
+    usages:
+      - digital signature
+      - key encipherment
+      - server auth
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: Issuer
+      name: harbor-ca
+    namespace:
+      matchNames:
+        - harbor
+---
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: harbor-token
+spec:
+  allowed:
+    commonName:
+      required: true
+      value: harbor-token
+    isCA: false
+    usages:
+      - digital signature
+      - key encipherment
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: Issuer
+      name: harbor-ca
+    namespace:
+      matchNames:
+        - harbor
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cert-manager-policy:harbor
+rules:
+  - apiGroups: ["policy.cert-manager.io"]
+    resources: ["certificaterequestpolicies"]
+    verbs: ["use"]
+    resourceNames: ["harbor-ca", "harbor-tls", "harbor-token"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cert-manager-policy:harbor
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cert-manager-policy:harbor
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager
+    namespace: cert-manager

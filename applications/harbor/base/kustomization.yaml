@@ -1,0 +1,78 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: harbor
+
+helmCharts:
+  - name: harbor
+    repo: https://helm.goharbor.io
+    version: 1.19.4
+    releaseName: harbor
+    namespace: harbor
+    valuesFile: values.yaml
+    skipTests: true
+
+resources:
+  - resources/namespace.yaml
+  - resources/registry.serviceaccount.yaml
+  - resources/eso.generators.yaml
+  - resources/eso.external-secret.harbor.yaml
+  - resources/tls.issuers.yaml
+  - resources/tls.certificates.yaml
+  - resources/tls.certificate-request-policies.yaml
+  - resources/network-policy.yaml
+  - resources/vpa.yaml
+
+patches:
+  - path: patches/deployment.registry.yaml
+  - target:
+      kind: Deployment
+    path: patches/annotations.yaml
+  - target:
+      kind: StatefulSet
+    path: patches/annotations.yaml
+  - target:
+      kind: StatefulSet
+      name: harbor-redis
+    path: patches/statefulset.redis.yaml
+  - target:
+      kind: Deployment
+    path: patches/workload.yaml
+  - target:
+      kind: StatefulSet
+    path: patches/workload.yaml
+  - target:
+      kind: Deployment
+    path: patches/deployment.strategy.yaml
+  - target:
+      kind: ConfigMap
+      name: "harbor-(core|jobservice-env)"
+    path: patches/configmap.sorted-keys.yaml
+
+images:
+  # newTag + digest: Renovate follows the images by version (see
+  # applications/gitea-runner/base/kustomization.yaml). The chart's tags are
+  # the Harbor release.
+  - name: docker.io/goharbor/nginx-photon
+    newTag: v2.15.4
+    digest: sha256:7eff0287d5ad0f35754e162c8481ced04bbde107153ce586cefb15ee74fa1311
+  - name: docker.io/goharbor/harbor-portal
+    newTag: v2.15.4
+    digest: sha256:01edf478505b21dba23a83c095f6ecac0c1e705690093edbab41e9a4d6754a75
+  - name: docker.io/goharbor/harbor-core
+    newTag: v2.15.4
+    digest: sha256:7d2ba5304a729887cdec7cb222a82b500278423de230ae5150c386a6c332b112
+  - name: docker.io/goharbor/harbor-jobservice
+    newTag: v2.15.4
+    digest: sha256:f143578ef30e2be5c48873298257ed0fca31545025958c534e536a06765d2b82
+  - name: docker.io/goharbor/registry-photon
+    newTag: v2.15.4
+    digest: sha256:dc0cb388a6445c69c8a0c406679290d2991c9698833d9e6e86a23bdfaf2f83c3
+  - name: docker.io/goharbor/harbor-registryctl
+    newTag: v2.15.4
+    digest: sha256:30bd1ace4e3bb390d75b84673f98ddb4a69fcc6d116932ea764391df01943fb7
+  - name: docker.io/goharbor/valkey-photon
+    newTag: v2.15.4
+    digest: sha256:bb022e8f236f56f53cee7bb1f609595e497da67d829048e0af2284f97e6eb54f
+  - name: docker.io/goharbor/harbor-exporter
+    newTag: v2.15.4
+    digest: sha256:9ffede33dc519b4be035596a72f00f354754a22a3769077731f81ee7d6852f4f

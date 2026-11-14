@@ -18,10 +18,19 @@ homelab.
 
 Constraints found while building the runners:
 
-- Pods in the restricted runner namespace did not reach the Gateway VIPs (the pod-to-VIP path was
-  blocked or hairpinned; a pod in an unrestricted namespace does reach `https://id.rye.ninja`), and
-  an offline build must not depend on public DNS or the VIP at all, so CI uses an in-cluster
-  Service name, not `harbor.rye.ninja`.
+- Gateway VIP names resolve to the Gateway's own LoadBalancer Service, so a pod's connection is DNAT'd
+  inside the cluster and NetworkPolicy egress must allow the Envoy proxy port (10443 for 443;
+  `docs/memory/calico-networkpolicy-dnat.md`). A pod in an unrestricted namespace reaches
+  `https://id.rye.ninja` (tested 2026-11-14); the runner namespace blocks the delegated GUA /60 that
+  contains the VIPs on purpose. An offline build must not depend on public DNS or the VIP at all, so
+  CI uses an in-cluster path to Harbor.
+- **Token realm:** Harbor core builds the registry's `Www-Authenticate` realm from `externalURL`
+  (`https://harbor.rye.ninja/service/token`), so a client that reaches Harbor through
+  `harbor.harbor.svc.cluster.local` is sent to the public name for its token. Either in-cluster
+  clients must resolve `harbor.rye.ninja` to the Harbor Service (split-horizon DNS such as a CoreDNS
+  rewrite, or `hostAliases` on the runner pods, with the Let's Encrypt certificate served by the
+  chart's nginx, which also removes the need to distribute a private CA), or the realm has to be
+  made configurable. To be verified in phase 1; this may replace the private-CA decision below.
 - The nodes and the runner pods are IPv6-only; IPv4-only upstreams work through DNS64/NAT64.
 - SeaweedFS S3 on core-infra authenticates workloads with web identity (projected ServiceAccount
   tokens, `AssumeRoleWithWebIdentity`), plus one static admin identity

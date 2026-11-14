@@ -1,0 +1,69 @@
+# Phase 1: Harbor's own components talk to each other, the database and
+# SeaweedFS; nothing outside the namespace reaches them (use kubectl
+# port-forward to test). The Gateway, the runners and Keycloak get rules in
+# later phases.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: harbor
+  namespace: harbor
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "harbor-db (CNPG) pods are created by the operator at runtime."
+spec:
+  podSelector:
+    matchLabels:
+      app: harbor
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: harbor
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    # Components talk to each other (core <-> registry <-> jobservice <-> valkey <-> portal).
+    - to:
+        - podSelector:
+            matchLabels:
+              app: harbor
+    # PostgreSQL (CNPG creates the pods).
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: harbor-db
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Registry blobs: SeaweedFS filer-embedded S3 gateway, also the STS endpoint.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: seaweedfs
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: seaweedfs
+              app.kubernetes.io/component: filer
+      ports:
+        - protocol: TCP
+          port: 8333
+    # Proxy-cache upstreams (docker.io, ghcr.io, quay.io, docker.gitea.com;
+    # IPv4-only hosts through NAT64, 64:ff9b::/96), but not the cluster, the
+    # LAN ULAs or this site's delegated GUA /60 (changes on re-delegation,
+    # docs/runbooks/gua-prefix-renumber.md).
+    - to:
+        - ipBlock:
+            cidr: ::/0
+            except:
+              - fc00::/7
+              - 2607:3640:1064:270::/60
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

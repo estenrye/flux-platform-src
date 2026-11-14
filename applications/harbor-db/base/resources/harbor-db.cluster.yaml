@@ -1,0 +1,62 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: harbor-db
+  namespace: harbor
+spec:
+  instances: 3
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+
+  # Harbor core migrates the `registry` database itself. The generated password
+  # is stored in the harbor-db-app Secret. database and owner match
+  # database.external in applications/harbor/base/values.yaml.
+  bootstrap:
+    initdb:
+      database: registry
+      owner: harbor
+      encoding: UTF8
+      localeCollate: en_US.UTF-8
+      localeCType: en_US.UTF-8
+
+  # Certificates from the cert-manager self-signed CA (resources/tls.*.yaml).
+  # The server secret carries ca.crt, which CNPG serves to clients and Harbor
+  # mounts to verify the server (sslmode=verify-full). The replication
+  # certificate and clientCASecret are required as well: without them CNPG
+  # tries to sign its own client certificates with serverCASecret and fails
+  # for want of a ca.key.
+  certificates:
+    serverCASecret: harbor-db-server-tls
+    serverTLSSecret: harbor-db-server-tls
+    clientCASecret: harbor-db-replication-tls
+    replicationTLSSecret: harbor-db-replication-tls
+
+  # imageName pin: prevents the postgres image from floating with the
+  # operator's compiled-in default. Same image as grafana-db.
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.3@sha256:5e30290fba3d990b08a9caea6ddb49c661ad8246cbb2688adad7e6cc78df6c3f
+
+  storage:
+    size: 10Gi
+    storageClass: csi-cinder-sc-retain
+
+  # ServiceAccount token for SeaweedFS STS web-identity auth; audience must
+  # match the kubernetes provider's clientId in the SeaweedFS IAM config.
+  projectedVolumeTemplate:
+    sources:
+      - serviceAccountToken:
+          audience: seaweedfs-s3
+          expirationSeconds: 3600
+          path: token
+
+  primaryUpdateStrategy: unsupervised
+
+  monitoring:
+    enablePodMonitor: true
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: harbor-db-barman

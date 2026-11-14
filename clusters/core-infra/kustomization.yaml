@@ -84,6 +84,12 @@ resources:
 # certificate comes from cert-manager. The OIDC client lives in keycloak.
 - ../../applications/gitea/base
 - ../../applications/gitea-db/base
+# Harbor (harbor.rye.ninja): pull-through image registry for CI, phase 1 (ClusterIP only).
+# The harbor app owns the harbor namespace; harbor-db backs up to SeaweedFS
+# (bucket harbor-db-barman, role HarborDbBarman) and the registry stores blobs in
+# bucket harbor-registry (role HarborRegistry). docs/adr/0031-harbor-pull-through-registry.md
+- ../../applications/harbor/base
+- ../../applications/harbor-db/base
 # Gitea Actions runners: ephemeral act_runner + rootless DinD pods, one per queued
 # job, created by a KEDA ScaledJob.
 - ../../applications/gitea-runner/base

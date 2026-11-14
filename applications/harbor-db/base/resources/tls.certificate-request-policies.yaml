@@ -1,0 +1,110 @@
+# cert-manager-approver-policy is cluster-wide and the built-in approver is
+# disabled, so these Certificates sit WaitingForApproval forever unless a
+# CertificateRequestPolicy matches them AND cert-manager's ServiceAccount has
+# the `use` grant (same pattern as applications/vertical-pod-autoscaler).
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: harbor-db-ca
+spec:
+  allowed:
+    commonName:
+      required: true
+      value: harbor-db-ca
+    isCA: true
+    usages:
+      - digital signature
+      - cert sign
+      - crl sign
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: Issuer
+      name: harbor-db-selfsigned
+    namespace:
+      matchNames:
+        - harbor
+---
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: harbor-db-server
+spec:
+  allowed:
+    commonName:
+      required: true
+      value: harbor-db-rw
+    dnsNames:
+      required: true
+      values:
+        - harbor-db-r
+        - harbor-db-r.harbor
+        - harbor-db-r.harbor.svc
+        - harbor-db-r.harbor.svc.cluster.local
+        - harbor-db-ro
+        - harbor-db-ro.harbor
+        - harbor-db-ro.harbor.svc
+        - harbor-db-ro.harbor.svc.cluster.local
+        - harbor-db-rw
+        - harbor-db-rw.harbor
+        - harbor-db-rw.harbor.svc
+        - harbor-db-rw.harbor.svc.cluster.local
+    isCA: false
+    usages:
+      - digital signature
+      - key encipherment
+      - server auth
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: Issuer
+      name: harbor-db-ca
+    namespace:
+      matchNames:
+        - harbor
+---
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: harbor-db-replication
+spec:
+  allowed:
+    commonName:
+      required: true
+      value: streaming_replica
+    isCA: false
+    usages:
+      - digital signature
+      - key encipherment
+      - client auth
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: Issuer
+      name: harbor-db-ca
+    namespace:
+      matchNames:
+        - harbor
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cert-manager-policy:harbor-db
+rules:
+  - apiGroups: ["policy.cert-manager.io"]
+    resources: ["certificaterequestpolicies"]
+    verbs: ["use"]
+    resourceNames: ["harbor-db-ca", "harbor-db-server", "harbor-db-replication"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cert-manager-policy:harbor-db
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cert-manager-policy:harbor-db
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager
+    namespace: cert-manager
