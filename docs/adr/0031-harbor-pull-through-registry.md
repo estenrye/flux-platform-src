@@ -30,7 +30,7 @@ Constraints found while building the runners:
 
 ## Decision
 
-Run Harbor (`goharbor/harbor-helm`, chart 1.19.x, Harbor 2.15) on core-infra as
+Run Harbor (`goharbor/harbor-helm` chart 1.19.4, Harbor 2.15.4) on core-infra as
 `applications/harbor` and `applications/harbor-db`, with:
 
 - **Exposure:** `harbor.rye.ninja` on an `external-dedicated` Gateway (like Gitea and Keycloak),
@@ -39,18 +39,25 @@ Run Harbor (`goharbor/harbor-helm`, chart 1.19.x, Harbor 2.15) on core-infra as
   public address would let anyone on the internet fill the cache and spend the uplink.
 - **Sign-in (Keycloak OIDC):** Harbor's `oidc_auth` mode, set through the chart's
   `core.configureUserSettings` (`oidc_endpoint: https://id.rye.ninja/realms/ryezone-labs`,
-  `oidc_client_id: harbor`, scope `openid,email,profile,groups`, `oidc_groups_claim: groups`,
+  `oidc_client_id: harbor`, scope `openid,email,profile,groups,offline_access`, `oidc_groups_claim: groups`,
   `oidc_admin_group: ACL_harbor-admins`, `oidc_user_claim: preferred_username`, auto-onboard on).
-  Keycloak gets a confidential client `harbor` with `pkce.code.challenge.method: S256` enforced
-  (Harbor 2.13+ always sends a PKCE S256 challenge in the authorization code flow and it is not
-  configurable; goharbor/harbor#21702, merged 2025-03-10, is an ancestor of v2.13.0; we run 2.15).
-  A *public* client without a secret is not documented for Harbor: the code treats the secret as
-  an ordinary setting and never requires it, but oauth2 would send an empty-secret Basic header
-  to the token endpoint, which is untested against Keycloak. Start confidential and try public
-  only if holding the secret becomes a problem. The client has redirect
+  Keycloak gets a confidential client `harbor`. The Harbor 2.16 OIDC page does not mention PKCE or
+  public clients at all and describes the secret only as "The secret for the Harbor client
+  application". The source does send a PKCE S256 challenge on every login (goharbor/harbor#21702,
+  merged 2025-03-10, in v2.13.0 and later; not configurable and not documented), so Keycloak may
+  enforce `pkce.code.challenge.method: S256` on the client, but treat that as an implementation
+  detail to re-verify on upgrades, and do not plan on a public client: the code never rejects an
+  empty secret, but oauth2 would send an empty-secret Basic header to the token endpoint, which is
+  untested against Keycloak and unsupported by the docs. `offline_access` is in the scope because
+  the CLI secret relies on a refresh token. The client has redirect
   `https://harbor.rye.ninja/c/oidc/callback`, the existing `groups` scope, and groups
-  `ACL_harbor-users` / `ACL_harbor-admins` in the keycloak-config-cli ConfigMap, with the client
-  secret generated in the `keycloak` namespace, shared through 1Password and read back by ESO, as
+  `ACL_harbor-admins` (the only group Harbor acts on, through `oidc_admin_group`) in the
+  keycloak-config-cli ConfigMap. Harbor cannot restrict *who may sign in* by group (the group
+  filter only chooses which groups are imported), so any realm user could onboard themselves.
+  Contain that in Harbor with project creation restricted to admins (`project_creation_restriction:
+  adminonly`) so a new user has no projects, and in Keycloak with a client-scoped
+  authentication-flow condition that denies users outside `ACL_harbor-users` if stricter gating is
+  wanted. The client secret is generated in the `keycloak` namespace, shared through 1Password and read back by ESO, as
   for Gitea. Harbor requires the discovery document's issuer to equal `oidc_endpoint` exactly (no
   separate discovery URL), so Harbor core reaches Keycloak through the public issuer URL and its
   NetworkPolicy must allow that egress. Auth mode must be chosen before any local users beyond
@@ -95,6 +102,17 @@ Run Harbor (`goharbor/harbor-helm`, chart 1.19.x, Harbor 2.15) on core-infra as
 5. **Warm-up CronJob, monitoring (ServiceMonitor, Healthchecks ping) and a restore drill.**
 
 ## Risks and open questions
+
+- **Version:** Harbor 2.16.0 was released 2026-11-10, but no chart carries it yet:
+  `helm.goharbor.io` ends at chart 1.19.4 (Harbor 2.15.4) and `harbor-helm` has no 1.20 tag. 2.16
+  replaces Redis with Valkey, so its images differ from what chart 1.19.4 deploys; do not pair
+  the old chart with 2.16 images. Start on chart 1.19.4 / Harbor 2.15.4 and move when the chart
+  lands. 2.16 is worth taking: proxy-cache advanced settings and a repository filter API (UI
+  and backend), referrer API proxying, token and blob-mount security fixes, and an OIDC fix
+  (`robot_name_prefix` can no longer be empty, which broke OIDC CLI login).
+- **OIDC specifics:** PKCE and public-client behaviour are undocumented (see Sign-in); the docs
+  recommend `offline_access`; the local-user restriction on switching auth mode is from memory,
+  confirm it against the 2.15 docs before the first install.
 
 - Whether Harbor's registry (distribution) takes web-identity credentials against SeaweedFS STS;
   the fallback is a bucket-scoped static key.
