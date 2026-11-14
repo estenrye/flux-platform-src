@@ -9,6 +9,8 @@ resources:
   - resources/eso.external-secret.scaler-token.yaml
   - resources/trigger-authentication.yaml
   - resources/scaledjob.yaml
+  - resources/eso.external-secret.cache.yaml
+  - resources/cache-server.yaml
   - resources/eso.external-secret.cleaner-token.yaml
   - resources/cleaner.cronjob.yaml
   - resources/device-plugin.daemonset.yaml

@@ -21,6 +21,14 @@ spec:
           port: 53
         - protocol: UDP
           port: 53
+    # Runner and jobs -> the shared Actions cache.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gitea-runner-cache
+      ports:
+        - protocol: TCP
+          port: 8088
     # Runner -> Gitea API (pod port 3000; Calico evaluates after DNAT).
     - to:
         - namespaceSelector:
@@ -96,3 +104,28 @@ spec:
       ports:
         - protocol: TCP
           port: 3000
+---
+# The cache server only accepts runners and talks to nobody.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitea-runner-cache
+  namespace: gitea-runner
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The runner pods are created at runtime by the KEDA ScaledJob."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gitea-runner-cache
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gitea-runner
+      ports:
+        - protocol: TCP
+          port: 8088
+  egress: []

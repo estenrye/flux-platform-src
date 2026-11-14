@@ -113,6 +113,14 @@ KEDA counts jobs with `GET /api/v1/admin/actions/jobs?status=queued` using the t
   `/proc/sys` in its own network namespace) is only allowed with `hostUsers: false`. The namespace is
   labelled Pod Security `privileged` for this. `container.privileged` is off and `valid_volumes` is
   empty in the runner config. Image layers live in an emptyDir (30 Gi limit) and go with the pod.
+- **Actions cache:** one shared `act_runner cache-server` (`gitea-runner-cache` Deployment, 20 Gi PVC,
+  Service on 8088) serves `actions/cache` for all ephemeral runners, which point at it with
+  `cache.external_server`. A per-pod cache would vanish with each pod, and act_runner 0.6.1 cannot start
+  its own here anyway (no IPv4 route, and its single-address fallback has an off-by-one). The shared
+  secret (`core-infra/gitea-runner-cache`, field `secret`) is substituted into a copy of the runner
+  config at pod start; each job's token is pre-registered with the server, so a job only reaches its own
+  repo's entries. The server is given its Service DNS name as the host, because it embeds that host in the
+  download URLs it returns to jobs.
 - **Extra pieces rootless needs:**
   - `devic.es/tun`: slirp4netns needs `/dev/net/tun`. The `generic-device-plugin` DaemonSet
     (`resources/device-plugin.daemonset.yaml`, privileged, pool only) advertises it, and the docker

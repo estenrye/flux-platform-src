@@ -12,6 +12,10 @@ runner:
     - "ubuntu-22.04:docker://docker.gitea.com/runner-images:ubuntu-22.04"
 cache:
   enabled: true
+  # Shared server (resources/cache-server.yaml). The secret is substituted into a copy of
+  # this file at pod start (scaledjob.yaml) so it stays out of the ConfigMap.
+  external_server: http://gitea-runner-cache.gitea-runner.svc.cluster.local:8088/
+  external_secret: __CACHE_SECRET__
 container:
   # Dual-stack bridge created by the docker sidecar (scaledjob.yaml).
   network: gitea-actions

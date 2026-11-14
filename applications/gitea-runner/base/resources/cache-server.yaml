@@ -1,0 +1,121 @@
+# Shared Actions cache for the ephemeral runners (`act_runner cache-server`). A
+# runner's own cache server would die with its pod and could not even start here
+# (act_runner 0.6.1 cannot work out an outbound address without an IPv4 route).
+# Runners point at this Service through cache.external_server; the runner pre-
+# registers each job's token with it, so jobs only reach their own repo's entries.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea-runner-cache
+  namespace: gitea-runner
+  annotations:
+    ignore-check.kube-linter.io/minimum-three-replicas: "A cache: a brief outage only means cache misses."
+    ignore-check.kube-linter.io/no-node-affinity: "Homelab cluster; no zone or role topology to express affinity against."
+    ignore-check.kube-linter.io/no-rolling-update-strategy: "ReadWriteOnce volume: a surge pod could not attach it while the old pod still holds it."
+    ignore-check.kube-linter.io/env-value-from: "The shared secret comes from the ESO-managed gitea-runner-cache Secret."
+    ignore-check.kube-linter.io/read-secret-from-env-var: "act_runner reads external_secret from its config file, which the start-up script writes from the environment."
+    checkov.io/skip01: "CKV_K8S_35=act_runner reads external_secret from its config file, written at start-up from the environment."
+    checkov.io/skip02: "CKV_K8S_11=Memory limit set; CPU limits only throttle."
+    checkov.io/skip03: "CKV_K8S_43=Image is pinned by digest."
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gitea-runner-cache
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gitea-runner-cache
+    spec:
+      priorityClassName: application
+      restartPolicy: Always
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: cache
+          image: docker.io/gitea/act_runner
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              printf 'cache:\n  enabled: true\n  dir: /cache\n  external_secret: %s\n' "$CACHE_SECRET" > /tmp/config.yaml
+              exec act_runner cache-server -c /tmp/config.yaml -d /cache -p 8088 \
+                -s gitea-runner-cache.gitea-runner.svc.cluster.local
+          env:
+            - name: HOME
+              value: /tmp
+            - name: CACHE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-runner-cache
+                  key: secret
+          ports:
+            - name: http
+              containerPort: 8088
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: cache
+              mountPath: /cache
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: cache
+          persistentVolumeClaim:
+            claimName: gitea-runner-cache
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi
+---
+# Cache entries are rebuildable, so the Delete class.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitea-runner-cache
+  namespace: gitea-runner
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: csi-cinder-sc-delete
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitea-runner-cache
+  namespace: gitea-runner
+spec:
+  selector:
+    app.kubernetes.io/name: gitea-runner-cache
+  ports:
+    - name: http
+      port: 8088
+      targetPort: http
