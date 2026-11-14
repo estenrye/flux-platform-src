@@ -202,3 +202,7 @@ filer:
       - name: grafana-db-barman
       # gitea-db barman backups (applications/gitea-db), via the GiteaDbBarman STS role.
       - name: gitea-db-barman
+      # harbor-db barman backups (applications/harbor-db), via the HarborDbBarman STS role.
+      - name: harbor-db-barman
+      # Harbor registry blobs (applications/harbor), via the HarborRegistry STS role.
+      - name: harbor-registry
