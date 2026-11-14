@@ -1,0 +1,21 @@
+# Private CA for Harbor's in-cluster TLS (the nginx front end of the chart's
+# Service). Clients inside the cluster trust it through ca.crt in
+# harbor-tls (distribution into the runners' dockerd is phase 4).
+#   harbor-selfsigned (Issuer) -> harbor-ca (Certificate, isCA)
+#     -> harbor-ca (Issuer) -> harbor-tls, harbor-token (Certificates)
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: harbor-selfsigned
+  namespace: harbor
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: harbor-ca
+  namespace: harbor
+spec:
+  ca:
+    secretName: harbor-ca

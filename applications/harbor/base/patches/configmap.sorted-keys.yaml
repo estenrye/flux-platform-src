@@ -1,0 +1,4 @@
+- op: add
+  path: /metadata/annotations
+  value:
+    ignore-check.kube-linter.io/sorted-keys: "Rendered from the chart; key order is not ours to change."

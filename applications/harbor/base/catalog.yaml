@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: harbor
+  description: |-
+    Container registry and pull-through cache (harbor.rye.ninja) for CI image
+    pulls, backed by the harbor-db CNPG cluster and SeaweedFS S3. See
+    docs/adr/0031-harbor-pull-through-registry.md.
+  tags:
+    - registry
+    - harbor
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: experimental
+  owner: platform-engineering

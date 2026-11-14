@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: harbor-db
+  description: |-
+    Highly available PostgreSQL cluster for Harbor's storage backend,
+    managed by the CloudNativePG operator. TLS comes from a cert-manager
+    self-signed CA.
+  tags:
+    - database
+    - postgresql
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering

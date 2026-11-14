@@ -1,0 +1,38 @@
+# Random values for the chart's *existingSecret options, so nothing secret is
+# rendered into git. Each generator emits one key, "password".
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: harbor-admin-password
+  namespace: harbor
+spec:
+  length: 32
+  digits: 6
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
+---
+# Exactly 16 characters: Harbor's secretKey encrypts stored credentials (AES-128).
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: harbor-secret-key
+  namespace: harbor
+spec:
+  length: 16
+  digits: 4
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
+---
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: harbor-component-secret
+  namespace: harbor
+spec:
+  length: 32
+  digits: 8
+  symbols: 0
+  noUpper: false
+  allowRepeat: true

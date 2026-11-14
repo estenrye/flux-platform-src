@@ -1,0 +1,80 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: harbor-ca
+  namespace: harbor
+spec:
+  isCA: true
+  commonName: harbor-ca
+  secretName: harbor-ca
+  duration: 87600h # 10 years
+  renewBefore: 8760h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  usages:
+    - digital signature
+    - cert sign
+    - crl sign
+  issuerRef:
+    group: cert-manager.io
+    kind: Issuer
+    name: harbor-selfsigned
+---
+# Served by the chart's nginx for the harbor Service (expose.tls.secret).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: harbor-tls
+  namespace: harbor
+spec:
+  isCA: false
+  commonName: harbor
+  secretName: harbor-tls
+  duration: 2160h # 90 days
+  renewBefore: 720h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+  dnsNames:
+    - harbor
+    - harbor.harbor
+    - harbor.harbor.svc
+    - harbor.harbor.svc.cluster.local
+    - harbor.rye.ninja
+  issuerRef:
+    group: cert-manager.io
+    kind: Issuer
+    name: harbor-ca
+---
+# Signs the registry bearer tokens issued by Harbor core (core.secretName,
+# keys tls.crt/tls.key); the registry verifies them with the certificate. RSA,
+# because the registry's token verification needs it.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: harbor-token
+  namespace: harbor
+spec:
+  isCA: false
+  commonName: harbor-token
+  secretName: harbor-token
+  duration: 87600h # 10 years
+  renewBefore: 8760h
+  privateKey:
+    algorithm: RSA
+    size: 4096
+    rotationPolicy: Never
+  usages:
+    - digital signature
+    - key encipherment
+  issuerRef:
+    group: cert-manager.io
+    kind: Issuer
+    name: harbor-ca

@@ -1,0 +1,21 @@
+# Self-signed CA for harbor-db's server certificate (the chain is private to
+# the harbor namespace; Harbor trusts the CA through the ca.crt in
+# harbor-db-server-tls):
+#   harbor-db-selfsigned (Issuer) -> harbor-db-ca (Certificate, isCA)
+#     -> harbor-db-ca (Issuer) -> harbor-db-server-tls (Certificate)
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: harbor-db-selfsigned
+  namespace: harbor
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: harbor-db-ca
+  namespace: harbor
+spec:
+  ca:
+    secretName: harbor-db-ca

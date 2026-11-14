@@ -1,0 +1,174 @@
+# Harbor chart 1.19.4 (Harbor 2.15.4); docs/adr/0031-harbor-pull-through-registry.md.
+# Phase 1: ClusterIP only (test with kubectl port-forward); the Gateway,
+# Keycloak sign-in, the proxy-cache projects and the runner integration come in
+# later phases. Every secret value is read from the harbor-secrets Secret
+# (resources/eso.external-secret.harbor.yaml), none is rendered.
+
+expose:
+  type: clusterIP
+  tls:
+    enabled: true
+    certSource: secret
+    secret:
+      # cert-manager Certificate harbor-tls (resources/tls.certificates.yaml).
+      secretName: harbor-tls
+  clusterIP:
+    name: harbor
+
+# Used in the token realm and redirects Harbor hands to clients; the public
+# name, served by the Gateway in phase 2. In-cluster clients must reach this
+# same name (see the ADR on the token realm).
+externalURL: https://harbor.rye.ninja
+
+# The nodes and pods are IPv6-only.
+ipFamily:
+  ipv6:
+    enabled: true
+  ipv4:
+    enabled: false
+
+existingSecretAdminPassword: harbor-secrets
+existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+existingSecretSecretKey: harbor-secrets
+
+# The chart's Secret objects are replaced by ones from ESO/cert-manager.
+persistence:
+  enabled: true
+  persistentVolumeClaim:
+    # Registry blobs are in SeaweedFS (imageChartStorage), so no registry PVC.
+    jobservice:
+      jobLog:
+        storageClass: csi-cinder-sc-delete
+        size: 1Gi
+    redis:
+      storageClass: csi-cinder-sc-delete
+      size: 1Gi
+  imageChartStorage:
+    # Clients are not given pre-signed SeaweedFS URLs; the registry streams blobs.
+    disableredirect: true
+    type: s3
+    s3:
+      region: us-east-1
+      bucket: harbor-registry
+      regionendpoint: http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333
+      secure: false
+      v4auth: true
+      # No static keys: the registry authenticates with the pod's projected
+      # ServiceAccount token (STS role HarborRegistry), see patches/deployment.registry.yaml.
+
+core:
+  existingSecret: harbor-secrets
+  existingXsrfSecret: harbor-secrets
+  existingXsrfSecretKey: CSRF_KEY
+  # cert-manager Certificate harbor-token: signs the registry bearer tokens.
+  secretName: harbor-token
+  automountServiceAccountToken: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+jobservice:
+  existingSecret: harbor-secrets
+  existingSecretKey: JOBSERVICE_SECRET
+  automountServiceAccountToken: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+registry:
+  existingSecret: harbor-secrets
+  existingSecretKey: REGISTRY_HTTP_SECRET
+  credentials:
+    username: harbor_registry_user
+    existingSecret: harbor-secrets
+  serviceAccountName: harbor-registry
+  automountServiceAccountToken: false
+  registry:
+    extraEnvVars:
+      # STS web-identity credentials against SeaweedFS (HarborRegistry role);
+      # the token is projected at /projected/token by patches/deployment.registry.yaml.
+      - name: AWS_ROLE_ARN
+        value: arn:aws:iam::role/HarborRegistry
+      - name: AWS_WEB_IDENTITY_TOKEN_FILE
+        value: /projected/token
+      - name: AWS_ENDPOINT_URL_STS
+        value: http://seaweedfs-s3.seaweedfs.svc.cluster.local:8333
+      - name: AWS_REGION
+        value: us-east-1
+      - name: AWS_REQUEST_CHECKSUM_CALCULATION
+        value: when_required
+      - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+        value: when_required
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1Gi
+  controller:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+
+portal:
+  automountServiceAccountToken: false
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+nginx:
+  automountServiceAccountToken: false
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+# PostgreSQL: the CNPG cluster harbor-db (applications/harbor-db). The password
+# is the CNPG-generated harbor-db-app Secret. sslmode require encrypts the
+# connection but does not verify the server: the chart offers no way to mount
+# the CA for verify-full (follow-up).
+database:
+  type: external
+  external:
+    host: harbor-db-rw.harbor.svc.cluster.local
+    port: "5432"
+    username: harbor
+    coreDatabase: registry
+    existingSecret: harbor-db-app
+    sslmode: require
+
+# Valkey (cache and job queue) stays in the chart on a small volume.
+redis:
+  type: internal
+  internal:
+    automountServiceAccountToken: false
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+
+# A cache needs no vulnerability scanner for now; Trivy can be enabled later.
+trivy:
+  enabled: false
+
+exporter:
+  automountServiceAccountToken: false
+
+metrics:
+  enabled: false

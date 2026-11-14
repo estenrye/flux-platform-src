@@ -1,0 +1,27 @@
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-node-affinity
+  value: "Homelab cluster; no zone or role topology to express affinity against."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
+  value: "Single instance for now (docs/adr/0031-harbor-pull-through-registry.md); the state is in harbor-db and SeaweedFS."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1no-read-only-root-fs
+  value: "The Harbor images write to their own paths; the chart offers no read-only root filesystem for every component."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1env-value-from
+  value: "Credentials come from ESO-generated Secrets and the CNPG harbor-db-app Secret."
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1read-secret-from-env-var
+  value: "The Harbor components read their secrets from environment variables set from Secrets."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip1
+  value: "CKV_K8S_11=Memory limits are set; CPU limits only add throttling."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip2
+  value: "CKV_K8S_35=The Harbor components read their secrets from environment variables set from Secrets."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip3
+  value: "CKV_K8S_22=The Harbor images write to their own paths."
+- op: add
+  path: /metadata/annotations/checkov.io~1skip4
+  value: "CKV_K8S_43=Images are pinned by digest."
