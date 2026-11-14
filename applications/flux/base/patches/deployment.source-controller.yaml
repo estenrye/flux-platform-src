@@ -1,3 +1,15 @@
+# source-controller keeps its artifacts in a per-pod emptyDir and only the elected leader
+# runs the artifact server, but the Service routes to every replica. With 3 replicas two
+# of every three downloads by kustomize-controller got "connection refused", and a
+# reconcile gave up after 10 attempts ("failed to download archive"). Failover would
+# not be faster either: a new leader has to re-fetch every source into its empty
+# emptyDir. One replica is the simple, deterministic setup.
+- op: replace
+  path: /spec/replicas
+  value: 1
+- op: add
+  path: /metadata/annotations/ignore-check.kube-linter.io~1minimum-three-replicas
+  value: "Only the leader serves artifacts and its store is per-pod, so extra replicas only break the Service (docs/runbooks)."
 - op: add
   path: /spec/template/spec/affinity/podAntiAffinity/preferredDuringSchedulingIgnoredDuringExecution/0/podAffinityTerm/labelSelector/matchExpressions/-
   value:
