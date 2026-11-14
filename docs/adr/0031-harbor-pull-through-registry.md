@@ -41,8 +41,14 @@ Run Harbor (`goharbor/harbor-helm`, chart 1.19.x, Harbor 2.15) on core-infra as
   `core.configureUserSettings` (`oidc_endpoint: https://id.rye.ninja/realms/ryezone-labs`,
   `oidc_client_id: harbor`, scope `openid,email,profile,groups`, `oidc_groups_claim: groups`,
   `oidc_admin_group: ACL_harbor-admins`, `oidc_user_claim: preferred_username`, auto-onboard on).
-  Keycloak gets a confidential client `harbor` (redirect
-  `https://harbor.rye.ninja/c/oidc/callback`, the existing `groups` scope) and groups
+  Keycloak gets a confidential client `harbor` with `pkce.code.challenge.method: S256` enforced
+  (Harbor 2.13+ always sends a PKCE S256 challenge in the authorization code flow and it is not
+  configurable; goharbor/harbor#21702, merged 2025-03-10, is an ancestor of v2.13.0; we run 2.15).
+  A *public* client without a secret is not documented for Harbor: the code treats the secret as
+  an ordinary setting and never requires it, but oauth2 would send an empty-secret Basic header
+  to the token endpoint, which is untested against Keycloak. Start confidential and try public
+  only if holding the secret becomes a problem. The client has redirect
+  `https://harbor.rye.ninja/c/oidc/callback`, the existing `groups` scope, and groups
   `ACL_harbor-users` / `ACL_harbor-admins` in the keycloak-config-cli ConfigMap, with the client
   secret generated in the `keycloak` namespace, shared through 1Password and read back by ESO, as
   for Gitea. Harbor requires the discovery document's issuer to equal `oidc_endpoint` exactly (no
