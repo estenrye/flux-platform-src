@@ -119,7 +119,7 @@ KEDA counts jobs with `GET /api/v1/admin/actions/jobs?status=queued` using the t
   its own on 0.6.1 anyway (no IPv4 route, and its single-address fallback has an off-by-one, fixed in 6.0.0). The shared
   secret (`core-infra/gitea-runner-cache`, field `secret`) is substituted into a copy of the runner
   config at pod start; each job's token is pre-registered with the server, so a job only reaches its own
-  repo's entries. The server is given its Service DNS name as the host, because it embeds that host in the
+  repo's entries. Jobs reach the runner's local cache endpoint by the name `runner-cache.internal` (config `cache.host`, mapped to the pod IP with `container.options: --add-host=...` at start): Node's HTTP client cannot dial an `http://[ipv6]:port` URL (`getaddrinfo ENOTFOUND [fd00:...]`, even on 6.0.0), so `actions/cache` fails with the auto-detected address. The server is given its Service DNS name as the host, because it embeds that host in the
   download URLs it returns to jobs.
 - **Action mirrors:** `uses: owner/repo@ref` is cloned by the runner container, from github.com by default
   (minutes per job over NAT64, and again for every ephemeral pod). `runner.github_mirror` rewrites
