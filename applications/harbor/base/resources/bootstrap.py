@@ -34,7 +34,11 @@ def call(method, path, body=None, ok=(200, 201, 204)):
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             raw = r.read()
-            return r.status, (json.loads(raw) if raw else None), r.headers
+            try:
+                parsed = json.loads(raw) if raw else None
+            except ValueError:  # /ping answers plain text
+                parsed = raw.decode(errors="replace")
+            return r.status, parsed, r.headers
     except urllib.error.HTTPError as e:
         raw = e.read().decode(errors="replace")
         if e.code in ok:
