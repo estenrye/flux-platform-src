@@ -96,9 +96,23 @@ straight to `harbor-core` / `harbor-portal`, sign-in with Keycloak). In-cluster 
   resolve (1-3 s); a push as the robot is `UNAUTHORIZED`; a second bootstrap run only reconciles the robot.
 - No quota or retention is set yet; a project's storage limit can be set in the UI or API once sizes are known.
 
+## Runner integration (phase 4)
+
+- Runner labels use `harbor.harbor.svc.cluster.local/gitea/runner-images:<tag>`. The ExternalSecret
+  `gitea-runner/gitea-runner-harbor` holds `config.json` (registry login for `robot$runner-pull`, from
+  1Password `harbor-robot-runner`) mounted into the runner container as `DOCKER_CONFIG`, and `ca.crt` (from
+  1Password `harbor-ca`, pushed by the `harbor-ca` PushSecret from `harbor-tls`) mounted into the dockerd
+  sidecar under `certs.d/harbor.harbor.svc.cluster.local/`. NetworkPolicies allow the runner pods to Harbor's
+  nginx pods on 8443.
+- **Harbor is now a dependency of every job**: if it is down or the image is not cached and the internet is
+  unreachable, jobs fail at the image pull. Check `kubectl -n harbor get pods` first.
+- Dockerfiles and `docker build` steps inside jobs are not rewritten: they must use Harbor paths
+  (`harbor.harbor.svc.cluster.local/dockerhub/library/<image>`) and `docker login` with a robot account;
+  dockerd's `registry-mirrors` cannot reach a private proxy project.
+
 ## Known gaps (later phases)
 
 - Database connection uses `sslmode: require` (encrypted, not verified); the chart cannot mount the
   CA for `verify-full`.
-- Runners do not use it yet (phase 4); no Docker Hub credentials yet.
+- No Docker Hub credentials yet; the warm-up CronJob and monitoring are phase 5.
 - Trivy is disabled.

@@ -13,9 +13,12 @@ runner:
   fetch_timeout: 5s
   fetch_interval: 2s
   labels:
-    - "ubuntu-latest:docker://docker.gitea.com/runner-images:ubuntu-latest"
-    - "ubuntu-24.04:docker://docker.gitea.com/runner-images:ubuntu-24.04"
-    - "ubuntu-22.04:docker://docker.gitea.com/runner-images:ubuntu-22.04"
+    # Job images come through Harbor's proxy-cache project `gitea` (docker.gitea.com);
+    # dockerd trusts its CA and the runner logs in with the read-only robot
+    # (resources/eso.external-secret.harbor.yaml).
+    - "ubuntu-latest:docker://harbor.harbor.svc.cluster.local/gitea/runner-images:ubuntu-latest"
+    - "ubuntu-24.04:docker://harbor.harbor.svc.cluster.local/gitea/runner-images:ubuntu-24.04"
+    - "ubuntu-22.04:docker://harbor.harbor.svc.cluster.local/gitea/runner-images:ubuntu-22.04"
 cache:
   enabled: true
   # The runner's local cache endpoint (it forwards to the shared server below). Node's HTTP

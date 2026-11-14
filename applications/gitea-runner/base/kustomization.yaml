@@ -10,6 +10,7 @@ resources:
   - resources/trigger-authentication.yaml
   - resources/scaledjob.yaml
   - resources/eso.external-secret.cache.yaml
+  - resources/eso.external-secret.harbor.yaml
   - resources/cache-server.yaml
   - resources/eso.external-secret.cleaner-token.yaml
   - resources/cleaner.cronjob.yaml

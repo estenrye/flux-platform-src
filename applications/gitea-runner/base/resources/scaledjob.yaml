@@ -169,6 +169,16 @@ spec:
                 mountPath: /etc/subgid
                 subPath: subgid
                 readOnly: true
+              # Trust for Harbor's in-cluster name; rootless dockerd reads certs.d under
+              # $XDG_CONFIG_HOME, the rootful path is mounted too.
+              - name: harbor
+                mountPath: /home/rootless/.config/docker/certs.d/harbor.harbor.svc.cluster.local/ca.crt
+                subPath: ca.crt
+                readOnly: true
+              - name: harbor
+                mountPath: /etc/docker/certs.d/harbor.harbor.svc.cluster.local/ca.crt
+                subPath: ca.crt
+                readOnly: true
             startupProbe:
               exec:
                 command:
@@ -240,6 +250,9 @@ spec:
                 value: /data
               - name: DOCKER_HOST
                 value: unix:///run/user/1000/docker.sock
+              # Registry login for Harbor (the robot), read by the Docker client act uses.
+              - name: DOCKER_CONFIG
+                value: /docker-config
             securityContext:
               runAsNonRoot: true
               runAsUser: 1000
@@ -263,6 +276,10 @@ spec:
                 readOnly: true
               - name: docker-run
                 mountPath: /run/user/1000
+              - name: harbor
+                mountPath: /docker-config/config.json
+                subPath: config.json
+                readOnly: true
         volumes:
           - name: config
             configMap:
@@ -273,6 +290,9 @@ spec:
           - name: docker-run
             emptyDir:
               sizeLimit: 16Mi
+          - name: harbor
+            secret:
+              secretName: gitea-runner-harbor
           # Nothing survives the job: image layers, build cache and the workspace are
           # discarded with the pod, so no job sees another's state.
           - name: docker-data

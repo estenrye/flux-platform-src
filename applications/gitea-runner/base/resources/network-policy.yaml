@@ -21,6 +21,18 @@ spec:
           port: 53
         - protocol: UDP
           port: 53
+    # dockerd pulls job images from Harbor over TLS (Service harbor 443 -> nginx pod 8443).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: harbor
+          podSelector:
+            matchLabels:
+              app: harbor
+              component: nginx
+      ports:
+        - protocol: TCP
+          port: 8443
     # Runner and jobs -> the shared Actions cache.
     - to:
         - podSelector:
