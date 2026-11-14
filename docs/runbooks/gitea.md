@@ -100,7 +100,7 @@ and the image pull (~3 min for the runner image) until a pull-through registry (
 KEDA counts jobs with `GET /api/v1/admin/actions/jobs?status=queued` using the token in 1Password
 (`core-infra/gitea-runner-scaler`, Gitea token `keda-runner-scaler`, scope `read:admin`, owner
 `gitea_admin`); `activeDeadlineSeconds` (3 h) removes a runner that never gets a job. Workflow labels: `ubuntu-latest`, `ubuntu-24.04`,
-`ubuntu-22.04` (images from `docker.gitea.com/runner-images`).
+`ubuntu-22.04` (images from `docker.gitea.com/runner-images`, pulled through Harbor's `gitea` proxy-cache project: `harbor.harbor.svc.cluster.local/gitea/runner-images:<tag>`, `docs/runbooks/harbor.md`).
 
 - **Where they run:** only on the tainted node pool `pool=rootless-test` (nodeSelector and toleration
   in the ScaledJob pod template), a single worker defined in `pcd-ce-deploy/tofu-pcd-talos-cluster/rootless_test_node.tf`

@@ -57,3 +57,28 @@ spec:
         remoteRef:
           remoteKey: harbor-robot-runner
           property: secret
+---
+# Public CA certificate of the in-cluster Harbor endpoint (harbor-ca signs
+# harbor-tls), published through 1Password (core-infra/harbor-ca, field ca.crt) so the
+# runners' dockerd can trust harbor.harbor.svc.cluster.local (gitea-runner reads it back).
+apiVersion: external-secrets.io/v1alpha1
+kind: PushSecret
+metadata:
+  name: harbor-ca
+  namespace: harbor
+spec:
+  refreshInterval: 1h
+  deletionPolicy: None
+  updatePolicy: Replace
+  secretStoreRefs:
+    - name: 1password-sdk
+      kind: ClusterSecretStore
+  selector:
+    secret:
+      name: harbor-tls
+  data:
+    - match:
+        secretKey: ca.crt
+        remoteRef:
+          remoteKey: harbor-ca
+          property: ca.crt

@@ -33,6 +33,18 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+    # The CI runners' dockerd pulls through the chart's nginx over TLS (Service
+    # harbor 443 -> pod port 8443).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gitea-runner
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gitea-runner
+      ports:
+        - protocol: TCP
+          port: 8443
     # The bootstrap CronJob calls the core API.
     - from:
         - podSelector:
