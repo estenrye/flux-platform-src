@@ -13,9 +13,9 @@ helmCharts:
 
 resources:
   - resources/namespace.yaml
-  - resources/registry.serviceaccount.yaml
   - resources/eso.generators.yaml
   - resources/eso.external-secret.harbor.yaml
+  - resources/eso.external-secret.registry-s3.yaml
   - resources/tls.issuers.yaml
   - resources/tls.certificates.yaml
   - resources/tls.certificate-request-policies.yaml
@@ -23,7 +23,6 @@ resources:
   - resources/vpa.yaml
 
 patches:
-  - path: patches/deployment.registry.yaml
   - target:
       kind: Deployment
     path: patches/annotations.yaml
