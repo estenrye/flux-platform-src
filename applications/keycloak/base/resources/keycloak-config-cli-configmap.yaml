@@ -44,6 +44,9 @@ data:
       # must be in both; the groups do not nest.
       - name: ACL_gitea-users
       - name: ACL_gitea-admins
+      # Harbor (harbor.rye.ninja): the admin flag follows ACL_harbor-admins
+      # (oidc_admin_group in applications/harbor). Harbor cannot restrict sign-in by group.
+      - name: ACL_harbor-admins
 
     # Groups-as-OIDC-claims, assigned per client (not realm-wide
     # defaultDefaultClientScopes). full.path: false so the claim value is the
@@ -83,6 +86,7 @@ data:
           - ACL_grafana-admins
           - ACL_gitea-users
           - ACL_gitea-admins
+          - ACL_harbor-admins
           - ACL_Kubernetes_cluster-admin
           - ACL_Kubernetes_cluster-admin_core-infra
       # Machine identity for SeaweedFS (client-credentials grant). Add it to
@@ -150,6 +154,38 @@ data:
           - basic
           - email
           - groups
+      # Harbor login (OIDC authorization code, confidential client). Harbor 2.13+
+      # always sends a PKCE S256 challenge, so it is enforced here. The secret
+      # comes from keycloak-harbor-client (shared with Harbor through 1Password).
+      - clientId: harbor
+        name: "Harbor"
+        enabled: true
+        clientAuthenticatorType: client-secret
+        secret: "$(env:HARBOR_CLIENT_SECRET)"
+        publicClient: false
+        standardFlowEnabled: true
+        implicitFlowEnabled: false
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        redirectUris:
+          - https://harbor.rye.ninja/c/oidc/callback
+        webOrigins:
+          - https://harbor.rye.ninja
+        attributes:
+          pkce.code.challenge.method: S256
+          # RP-initiated logout from the Harbor sign-out link.
+          post.logout.redirect.uris: "https://harbor.rye.ninja/*"
+        defaultClientScopes:
+          - web-origins
+          - acr
+          - profile
+          - roles
+          - basic
+          - email
+          - groups
+        # The CLI secret relies on a refresh token.
+        optionalClientScopes:
+          - offline_access
       # kubectl login (kubelogin / oidc-login): authorization code + PKCE,
       # public client, loopback redirect. The API server validates the ID token
       # (AuthenticationConfiguration, audience `kubernetes`).

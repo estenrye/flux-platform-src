@@ -1,0 +1,29 @@
+# Public entry for harbor.rye.ninja. Not named "harbor": Calico 3.33's bundled
+# Envoy Gateway deploys the proxy into the Gateway's namespace under a
+# ServiceAccount named after the Gateway (docs/memory/calico-33-gateway-namespace-mode.md).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: harbor-gateway
+  namespace: harbor
+  annotations:
+    # cert-manager's Gateway API shim creates the Certificate for the https
+    # listener's certificateRef.
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  gatewayClassName: external-dedicated
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: harbor.rye.ninja
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: harbor-rye-ninja-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
+        kinds:
+          - kind: HTTPRoute

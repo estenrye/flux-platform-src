@@ -16,6 +16,10 @@ resources:
   - resources/eso.generators.yaml
   - resources/eso.external-secret.harbor.yaml
   - resources/eso.external-secret.registry-s3.yaml
+  - resources/eso.external-secret.oidc.yaml
+  - resources/gateway.yaml
+  - resources/httproute.yaml
+  - resources/client-traffic-policy.yaml
   - resources/tls.issuers.yaml
   - resources/tls.certificates.yaml
   - resources/tls.certificate-request-policies.yaml

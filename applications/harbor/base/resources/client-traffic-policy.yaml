@@ -1,0 +1,19 @@
+# harbor-gateway uses an external Gateway class, so inbound W3C trace context
+# from the internet must not reach Envoy's tracer (same as gitea-gateway,
+# docs/memory/external-gateway-header-sanitization-deferred.md).
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: harbor-gateway-sanitize-trace-headers
+  namespace: harbor
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: harbor-gateway
+  headers:
+    earlyRequestHeaders:
+      remove:
+        - traceparent
+        - tracestate
+        - baggage
