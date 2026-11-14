@@ -70,6 +70,12 @@ straight to `harbor-core` / `harbor-portal`, sign-in with Keycloak). In-cluster 
   egress; Calico evaluates after DNAT).
 - **Break-glass:** local `admin` still works at `https://harbor.rye.ninja/account/sign-in` (password in
   `harbor-secrets`); it is the only way in while Keycloak or public DNS is down.
+- **Verified 2026-11-14 (without a browser sign-in):** `https://harbor.rye.ninja` serves the Let's Encrypt
+  certificate over IPv6; `/v2/` answers 401 with `realm="https://harbor.rye.ninja/service/token"`;
+  `/c/oidc/login` redirects to Keycloak with PKCE `S256`, the `harbor` client and scope
+  `openid email profile groups offline_access` (so core reached Keycloak's discovery document through the
+  Envoy egress rule); the configuration API shows `auth_mode oidc_auth` with the settings above. A browser
+  sign-in as a member of `ACL_harbor-admins` (admin flag) is still to be confirmed.
 - OIDC users pull with their per-user CLI secret (user profile in the UI); CI uses robot accounts (phase 3).
 
 ## Known gaps (later phases)
