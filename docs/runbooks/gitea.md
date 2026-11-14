@@ -169,7 +169,12 @@ KEDA counts jobs with `GET /api/v1/admin/actions/jobs?status=queued` using the t
   `curl` to an IPv4-only host through NAT64 (github.com, ghcr.io), a native-IPv6 host and an IPv6-only
   host, and `docker version` plus `docker build` inside a job (act mounts the daemon socket). The first job
   pulls `docker.gitea.com/runner-images:ubuntu-latest` (~3 min); every pod does, because layers are in an
-  emptyDir. That run used the earlier static runners; the ephemeral setup has not been verified yet.
+  emptyDir. That run used the earlier static runners.
+  **Ephemeral setup (2026-11-14):** the same workflow passes on one-job runners (KEDA creates the pod, the runner
+  registers, runs and deregisters, the Job completes, the cleaner CronJob clears stray records), and
+  `actions/cache` saves in one pod and restores (`cache-hit=true`) in a different pod through the shared cache server.
+  Known cost: each job pulls the runner image (~3 min) and clones `uses:` actions from github.com in the runner
+  container, which was slow (minutes for `actions/cache`).
 - **If jobs stall or pulls fail,** check NAT64 first (`nat64-appliance-rebuild.md`; Healthchecks
   `nat64-wkp`), then `kubectl -n gitea-runner get pods` and the node `talos-rootless-test-1`. Queued job but no pod: `kubectl -n gitea-runner get scaledjob,triggerauthentication` and
   the keda-operator logs (the scaler token or the Gitea ingress rule for the `keda` namespace).
