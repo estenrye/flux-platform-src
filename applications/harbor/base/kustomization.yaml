@@ -20,11 +20,19 @@ resources:
   - resources/gateway.yaml
   - resources/httproute.yaml
   - resources/client-traffic-policy.yaml
+  - resources/eso.robot-runner.yaml
+  - resources/bootstrap.cronjob.yaml
+  - resources/bootstrap.network-policy.yaml
   - resources/tls.issuers.yaml
   - resources/tls.certificates.yaml
   - resources/tls.certificate-request-policies.yaml
   - resources/network-policy.yaml
   - resources/vpa.yaml
+
+configMapGenerator:
+  - name: harbor-bootstrap-script
+    files:
+      - bootstrap.py=resources/bootstrap.py
 
 patches:
   - target:
@@ -52,6 +60,9 @@ patches:
     path: patches/configmap.sorted-keys.yaml
 
 images:
+  - name: docker.io/library/python
+    newTag: 3.14-alpine
+    digest: sha256:5862d971d1f0ae26b258cefa4e893556b1d3aba81bd2ff30888704ad378bab67
   # newTag + digest: Renovate follows the images by version (see
   # applications/gitea-runner/base/kustomization.yaml). The chart's tags are
   # the Harbor release.

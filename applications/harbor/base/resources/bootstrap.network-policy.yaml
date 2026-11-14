@@ -1,0 +1,30 @@
+# The bootstrap CronJob only talks to Harbor core's API.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: harbor-bootstrap
+  namespace: harbor
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "The pods are created by a CronJob."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: harbor-bootstrap
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    - to:
+        - podSelector:
+            matchLabels:
+              app: harbor
+              component: core
+      ports:
+        - protocol: TCP
+          port: 8080

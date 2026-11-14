@@ -8,7 +8,7 @@ metadata:
   name: harbor
   namespace: harbor
   annotations:
-    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "harbor-db (CNPG) pods are created by the operator and the Gateway's Envoy proxy pods by Envoy Gateway, at runtime."
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "harbor-db (CNPG) pods, the Gateway's Envoy proxy pods and the bootstrap CronJob pods are created at runtime."
 spec:
   podSelector:
     matchLabels:
@@ -30,6 +30,14 @@ spec:
               app.kubernetes.io/name: envoy
               gateway.envoyproxy.io/owning-gateway-name: harbor-gateway
               gateway.envoyproxy.io/owning-gateway-namespace: harbor
+      ports:
+        - protocol: TCP
+          port: 8080
+    # The bootstrap CronJob calls the core API.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: harbor-bootstrap
       ports:
         - protocol: TCP
           port: 8080

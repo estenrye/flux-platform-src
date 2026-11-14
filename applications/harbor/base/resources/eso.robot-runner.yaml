@@ -1,0 +1,59 @@
+# Secret of the read-only robot account robot$runner-pull that the CI runners pull
+# with. Generated once here, set on the robot by the bootstrap CronJob, and pushed to
+# 1Password (core-infra/harbor-robot-runner, field secret) for the runners' ExternalSecret
+# (phase 4). Harbor requires upper case, lower case and a digit, 8-128 characters.
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: harbor-robot-runner-secret
+  namespace: harbor
+spec:
+  length: 40
+  digits: 8
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: harbor-robot-runner
+  namespace: harbor
+spec:
+  refreshPolicy: CreatedOnce
+  target:
+    name: harbor-robot-runner
+    creationPolicy: Owner
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: harbor-robot-runner-secret
+      rewrite:
+        - regexp:
+            source: "password"
+            target: "secret"
+---
+# deletionPolicy: None keeps the 1Password item if this object is removed.
+apiVersion: external-secrets.io/v1alpha1
+kind: PushSecret
+metadata:
+  name: harbor-robot-runner
+  namespace: harbor
+spec:
+  refreshInterval: 1h
+  deletionPolicy: None
+  updatePolicy: Replace
+  secretStoreRefs:
+    - name: 1password-sdk
+      kind: ClusterSecretStore
+  selector:
+    secret:
+      name: harbor-robot-runner
+  data:
+    - match:
+        secretKey: secret
+        remoteRef:
+          remoteKey: harbor-robot-runner
+          property: secret
