@@ -35,9 +35,9 @@ images:
     newTag: 3.14-alpine
     digest: sha256:5862d971d1f0ae26b258cefa4e893556b1d3aba81bd2ff30888704ad378bab67
   # newTag + digest: Renovate follows the image by version.
-  - name: docker.io/gitea/act_runner
-    newTag: 0.6.1
-    digest: sha256:b5c35d6bdbb9bb25e531230bfc7cc663cb751406cbec90a2a891b85fea54de86
+  - name: docker.io/gitea/runner
+    newTag: 6.0.0
+    digest: sha256:f9a1f17484398b861c25a763b81febfb394b17b72e0522c25d8067d7b484f347
   - name: docker.io/library/docker
     newTag: 29.9.3-dind-rootless
     digest: sha256:707a099b8ddd86306eb28c8b1775264a3ee0135b16dc505b7b48ffb328edf8d0
