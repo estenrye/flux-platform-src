@@ -15,7 +15,7 @@ Reach it with `kubectl -n harbor port-forward svc/harbor 8443:443`.
 - SeaweedFS: buckets `harbor-db-barman` and `harbor-registry`, STS roles `HarborDbBarman`
   (ServiceAccount `harbor:harbor-db`) and `HarborRegistry` (`harbor:harbor-registry`).
 - Registry blobs are in SeaweedFS (`s3`, `disableredirect: true`) with a **static key limited to the
-  bucket**: identity `harbor-registry` (`Read/Write/List:harbor-registry`) in `seaweedfs-s3-config`,
+  bucket**: identity `harbor-registry` (`Read/Write/List/ReadAcp/WriteAcp:harbor-registry`; the registry always sends `x-amz-acl: private`, which SeaweedFS rejects without the ACP actions) in `seaweedfs-s3-config`,
   key in 1Password `core-infra/harbor-registry-s3` (fields `accessKey`, `secretKey`), read into
   `harbor/harbor-registry-s3` by ESO. Harbor's registry (distribution 2.8.3, aws-sdk-go v1) has no
   web-identity credential provider (`NoCredentialProviders`), so the `HarborRegistry` STS role in the
