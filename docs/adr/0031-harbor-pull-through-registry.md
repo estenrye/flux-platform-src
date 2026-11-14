@@ -24,13 +24,10 @@ Constraints found while building the runners:
   `https://id.rye.ninja` (tested 2026-11-14); the runner namespace blocks the delegated GUA /60 that
   contains the VIPs on purpose. An offline build must not depend on public DNS or the VIP at all, so
   CI uses an in-cluster path to Harbor.
-- **Token realm:** Harbor core builds the registry's `Www-Authenticate` realm from `externalURL`
-  (`https://harbor.rye.ninja/service/token`), so a client that reaches Harbor through
-  `harbor.harbor.svc.cluster.local` is sent to the public name for its token. Either in-cluster
-  clients must resolve `harbor.rye.ninja` to the Harbor Service (split-horizon DNS such as a CoreDNS
-  rewrite, or `hostAliases` on the runner pods, with the Let's Encrypt certificate served by the
-  chart's nginx, which also removes the need to distribute a private CA), or the realm has to be
-  made configurable. To be verified in phase 1; this may replace the private-CA decision below.
+- **Token realm (verified in phase 1, 2026-11-14):** Harbor builds the registry's `Www-Authenticate`
+  realm from the request host, so a client using `harbor.harbor.svc.cluster.local` is sent to
+  `https://harbor.harbor.svc.cluster.local/service/token`. In-cluster clients can stay on the Service
+  name; no split-horizon DNS is needed.
 - The nodes and the runner pods are IPv6-only; IPv4-only upstreams work through DNS64/NAT64.
 - SeaweedFS S3 on core-infra authenticates workloads with web identity (projected ServiceAccount
   tokens, `AssumeRoleWithWebIdentity`), plus one static admin identity
@@ -76,10 +73,12 @@ Run Harbor (`goharbor/harbor-helm` chart 1.19.4, Harbor 2.15.4) on core-infra as
 - **Database:** a CNPG cluster `harbor-db` modelled on `gitea-db` (verify-full TLS from the
   cert-manager self-signed CA, barman backups to SeaweedFS). Harbor's bundled Redis (valkey) stays
   in-chart with a small volume.
-- **Blob storage:** the SeaweedFS S3 gateway, bucket `harbor-registry`, through a dedicated
-  `HarborRegistry` role bound to the registry's ServiceAccount with web identity. If the registry
-  image cannot use web identity, fall back to a dedicated static key limited to that bucket, not
-  the admin identity.
+- **Blob storage:** the SeaweedFS S3 gateway, bucket `harbor-registry`, with a dedicated static key
+  limited to that bucket (identity `harbor-registry` in `seaweedfs-s3-config`, key in 1Password
+  `harbor-registry-s3`). Web identity was tried first and does not work: Harbor's registry
+  (distribution 2.8.3, aws-sdk-go v1) has no web-identity credential provider
+  (`NoCredentialProviders`). The unused `HarborRegistry` STS role should be removed with the next
+  IAM change.
 - **In-cluster TLS:** Harbor's internal Service is served over TLS with a certificate from a
   cluster CA (cert-manager), with the CA bundle distributed by trust-manager into the runner
   pods' dockerd (`/etc/docker/certs.d/<service-name>/ca.crt`). The runners pull
@@ -123,8 +122,6 @@ Run Harbor (`goharbor/harbor-helm` chart 1.19.4, Harbor 2.15.4) on core-infra as
   recommend `offline_access`; the local-user restriction on switching auth mode is from memory,
   confirm it against the 2.15 docs before the first install.
 
-- Whether Harbor's registry (distribution) takes web-identity credentials against SeaweedFS STS;
-  the fallback is a bucket-scoped static key.
 - Harbor chart IPv6 support (`ipFamily.ipv6.enabled`) on an IPv6-only cluster, including its
   nginx. Gateway routing may allow dropping the chart's nginx proxy.
 - Harbor's Trivy and ChartMuseum are not needed for a cache; start with them disabled to save

@@ -14,10 +14,15 @@ Reach it with `kubectl -n harbor port-forward svc/harbor 8443:443`.
   barman backups to SeaweedFS bucket `harbor-db-barman` (role `HarborDbBarman`), daily 04:15 UTC.
 - SeaweedFS: buckets `harbor-db-barman` and `harbor-registry`, STS roles `HarborDbBarman`
   (ServiceAccount `harbor:harbor-db`) and `HarborRegistry` (`harbor:harbor-registry`).
-- Registry blobs are in SeaweedFS (`s3`, `disableredirect: true`). The registry authenticates
-  with the projected ServiceAccount token (audience `seaweedfs-s3`, `AWS_ROLE_ARN` etc. in
-  `values.yaml`), no static keys. **Unverified until first deploy**; if the registry cannot use web
-  identity, use a static key limited to `harbor-registry` (not the admin identity).
+- Registry blobs are in SeaweedFS (`s3`, `disableredirect: true`) with a **static key limited to the
+  bucket**: identity `harbor-registry` (`Read/Write/List:harbor-registry`) in `seaweedfs-s3-config`,
+  key in 1Password `core-infra/harbor-registry-s3` (fields `accessKey`, `secretKey`), read into
+  `harbor/harbor-registry-s3` by ESO. Harbor's registry (distribution 2.8.3, aws-sdk-go v1) has no
+  web-identity credential provider (`NoCredentialProviders`), so the `HarborRegistry` STS role in the
+  SeaweedFS IAM config is unused (remove it with the next IAM change). `seaweedfs-s3-config` is
+  CreatedOnce: the identity was added to the live Secret by patching it, then the filers were
+  restarted; the ExternalSecret template only matters for a fresh bootstrap. Rotating the key means
+  changing the 1Password item, patching the SeaweedFS Secret to match, restarting the filers.
 
 ## Rollout order
 
@@ -38,15 +43,15 @@ Reach it with `kubectl -n harbor port-forward svc/harbor 8443:443`.
   completes (`kubectl -n harbor get backup`).
 - `kubectl -n harbor get pods`: core, jobservice, nginx, portal, registry, redis Running. The core
   pod waits for the database; check `kubectl -n harbor logs deploy/harbor-core`.
-- Registry storage over web identity: `kubectl -n harbor logs deploy/harbor-registry -c registry`
-  must show no S3/STS errors; push a test image through the port-forward and list the bucket.
+- Registry storage: `kubectl -n harbor logs deploy/harbor-registry -c registry` must show no S3
+  errors; push a test image (crane copy from a pod labelled `app=harbor`, or through the
+  port-forward) and list the `harbor-registry` bucket.
 - Local admin: user `admin`, password `kubectl -n harbor get secret harbor-secrets -o
   jsonpath='{.data.HARBOR_ADMIN_PASSWORD}' | base64 -d`.
-- **Token realm:** Harbor puts `externalURL` (`https://harbor.rye.ninja`) in the registry's
-  `Www-Authenticate` realm. From a pod, `curl -sk -D- https://harbor.harbor.svc.cluster.local/v2/`
-  and read the realm. If it points at the public name, in-cluster clients can only authenticate
-  if that name resolves to the Service inside the cluster (phase 2/4 decision: split-horizon
-  DNS for `harbor.rye.ninja`).
+- **Token realm (verified 2026-11-14):** Harbor builds the registry's `Www-Authenticate` realm from the
+  request host, so a client using `harbor.harbor.svc.cluster.local` is sent to
+  `https://harbor.harbor.svc.cluster.local/service/token`, not the public name. In-cluster clients
+  stay on the Service name (trusting `harbor-ca`).
 
 ## Known gaps (later phases)
 
