@@ -59,3 +59,4 @@
 - [Controlplane cluster decommission](controlplane-decommission.md) — 2026-11-11: AWS/Cloudflare/R2/NAS/KVM/repo removal order, what was kept (zfs-replicate-vms, shared R2 admin token), gotchas
 - [Gitea on core-infra](gitea-core-infra.md) — git.rye.ninja: core-infra not controlplane; confidential OIDC client because Gitea 1.27 has no PKCE client; Keycloak backchannel-dynamic for the pod hairpin
 - [NAT64 tayga unit race](nat64-tayga-unit-race.md) — 2026-11-13: packaged tayga init script lost a race with tayga-priv, ~8h NAT64 outage; native unit fix; reach the VM via guest agent
+- [Harbor phase 1 gotchas](harbor-phase1-gotchas.md) — registry has no web identity, SeaweedFS needs ReadAcp/WriteAcp, CreatedOnce secret patches get reverted, token realm follows request host
