@@ -22,7 +22,8 @@ UPSTREAMS = {
     "dockerhub": ("dockerhub", "docker-hub", "https://hub.docker.com"),
     "gitea": ("gitea-images", "docker-registry", "https://docker.gitea.com"),
     "ghcr": ("ghcr", "github-ghcr", "https://ghcr.io"),
-    "quay": ("quay", "quay", "https://quay.io"),
+    # Harbor's proxy-cache allow-list has no "quay" type; quay.io speaks the plain registry API.
+    "quay": ("quay", "docker-registry", "https://quay.io"),
 }
 ROBOT_NAME = "runner-pull"  # Harbor prefixes it: robot$runner-pull
 
@@ -34,7 +35,11 @@ def call(method, path, body=None, ok=(200, 201, 204)):
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             raw = r.read()
-            return r.status, (json.loads(raw) if raw else None), r.headers
+            try:
+                parsed = json.loads(raw) if raw else None
+            except ValueError:  # /ping answers plain text
+                parsed = raw.decode(errors="replace")
+            return r.status, parsed, r.headers
     except urllib.error.HTTPError as e:
         raw = e.read().decode(errors="replace")
         if e.code in ok:
@@ -67,6 +72,12 @@ def ensure_registry(name, rtype, url):
         cred = {"credential": {"type": "basic", "access_key": os.environ["DOCKERHUB_USERNAME"],
                                "access_secret": os.environ["DOCKERHUB_TOKEN"]}}
     body = {"name": name, "type": rtype, "url": url, "insecure": False, **cred}
+    if existing is not None and existing["type"] != rtype:
+        # The type of an endpoint cannot be changed; no project uses it yet if the
+        # project does not exist, otherwise this fails and needs a manual fix.
+        call("DELETE", "/registries/%d" % existing["id"])
+        print("deleted registry", name, "(type", existing["type"], "->", rtype + ")")
+        existing = None
     if existing is None:
         call("POST", "/registries", body)
         print("created registry", name)
