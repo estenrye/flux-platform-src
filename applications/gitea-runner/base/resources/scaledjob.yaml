@@ -194,7 +194,7 @@ spec:
               - bash
               - -c
               - |
-                sed "s|__CACHE_SECRET__|$GITEA_RUNNER_CACHE_SECRET|" /config/config.yaml > /data/config.yaml
+                sed -e "s|__CACHE_SECRET__|$GITEA_RUNNER_CACHE_SECRET|" -e "s|__POD_IP__|$POD_IP|" /config/config.yaml > /data/config.yaml
                 touch /data/runner.log
                 run.sh >>/data/runner.log 2>&1 &
                 pid=$!
@@ -225,6 +225,10 @@ spec:
                     fieldPath: metadata.name
               - name: CONFIG_FILE
                 value: /data/config.yaml
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    fieldPath: status.podIP
               - name: GITEA_RUNNER_CACHE_SECRET
                 valueFrom:
                   secretKeyRef:

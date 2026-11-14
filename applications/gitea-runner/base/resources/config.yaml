@@ -18,6 +18,10 @@ runner:
     - "ubuntu-22.04:docker://docker.gitea.com/runner-images:ubuntu-22.04"
 cache:
   enabled: true
+  # The runner's local cache endpoint (it forwards to the shared server below). Node's HTTP
+  # client cannot dial an http://[ipv6]:port URL (getaddrinfo ENOTFOUND [fd00:...]), so jobs
+  # reach it by name; container.options maps the name to the pod's address at start.
+  host: runner-cache.internal
   # Shared server (resources/cache-server.yaml). The secret is substituted into a copy of
   # this file at pod start (scaledjob.yaml) so it stays out of the ConfigMap.
   external_server: http://gitea-runner-cache.gitea-runner.svc.cluster.local:8088/
@@ -26,7 +30,7 @@ container:
   # Dual-stack bridge created by the docker sidecar (scaledjob.yaml).
   network: gitea-actions
   privileged: false
-  options:
+  options: --add-host=runner-cache.internal:__POD_IP__
   workdir_parent:
   valid_volumes: []
   docker_host: ""
