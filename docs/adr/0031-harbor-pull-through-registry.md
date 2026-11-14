@@ -18,7 +18,9 @@ homelab.
 
 Constraints found while building the runners:
 
-- Pods cannot reach Gateway VIPs (the pod-to-own-VIP hairpin), so CI must use an in-cluster
+- Pods in the restricted runner namespace did not reach the Gateway VIPs (the pod-to-VIP path was
+  blocked or hairpinned; a pod in an unrestricted namespace does reach `https://id.rye.ninja`), and
+  an offline build must not depend on public DNS or the VIP at all, so CI uses an in-cluster
   Service name, not `harbor.rye.ninja`.
 - The nodes and the runner pods are IPv6-only; IPv4-only upstreams work through DNS64/NAT64.
 - SeaweedFS S3 on core-infra authenticates workloads with web identity (projected ServiceAccount
@@ -33,8 +35,22 @@ Run Harbor (`goharbor/harbor-helm`, chart 1.19.x, Harbor 2.15) on core-infra as
 
 - **Exposure:** `harbor.rye.ninja` on an `external-dedicated` Gateway (like Gitea and Keycloak),
   cert-manager `letsencrypt-prod`, the trace-header sanitising ClientTrafficPolicy, UI sign-in
-  with Keycloak OIDC. All proxy-cache projects are **private**: an open pull-through cache on a
+  with Keycloak OIDC (see below). All proxy-cache projects are **private**: an open pull-through cache on a
   public address would let anyone on the internet fill the cache and spend the uplink.
+- **Sign-in (Keycloak OIDC):** Harbor's `oidc_auth` mode, set through the chart's
+  `core.configureUserSettings` (`oidc_endpoint: https://id.rye.ninja/realms/ryezone-labs`,
+  `oidc_client_id: harbor`, scope `openid,email,profile,groups`, `oidc_groups_claim: groups`,
+  `oidc_admin_group: ACL_harbor-admins`, `oidc_user_claim: preferred_username`, auto-onboard on).
+  Keycloak gets a confidential client `harbor` (redirect
+  `https://harbor.rye.ninja/c/oidc/callback`, the existing `groups` scope) and groups
+  `ACL_harbor-users` / `ACL_harbor-admins` in the keycloak-config-cli ConfigMap, with the client
+  secret generated in the `keycloak` namespace, shared through 1Password and read back by ESO, as
+  for Gitea. Harbor requires the discovery document's issuer to equal `oidc_endpoint` exactly (no
+  separate discovery URL), so Harbor core reaches Keycloak through the public issuer URL and its
+  NetworkPolicy must allow that egress. Auth mode must be chosen before any local users beyond
+  `admin` exist, so it is set at first install. The local `admin` (password from ESO) stays as
+  break-glass at `/account/sign-in`, and is the only way in while Keycloak or public DNS is down.
+  OIDC users pull with their per-user CLI secret; CI uses robot accounts, not OIDC identities.
 - **Database:** a CNPG cluster `harbor-db` modelled on `gitea-db` (verify-full TLS from the
   cert-manager self-signed CA, barman backups to SeaweedFS). Harbor's bundled Redis (valkey) stays
   in-chart with a small volume.
