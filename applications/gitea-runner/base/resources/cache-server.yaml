@@ -1,6 +1,6 @@
-# Shared Actions cache for the ephemeral runners (`act_runner cache-server`). A
+# Shared Actions cache for the ephemeral runners (`gitea-runner cache-server`). A
 # runner's own cache server would die with its pod and could not even start here
-# (act_runner 0.6.1 cannot work out an outbound address without an IPv4 route).
+# (act_runner 0.6.1 could not work out an outbound address without an IPv4 route; fixed in 6.0.0).
 # Runners point at this Service through cache.external_server; the runner pre-
 # registers each job's token with it, so jobs only reach their own repo's entries.
 apiVersion: apps/v1
@@ -41,14 +41,14 @@ spec:
           type: RuntimeDefault
       containers:
         - name: cache
-          image: docker.io/gitea/act_runner
+          image: docker.io/gitea/runner
           imagePullPolicy: IfNotPresent
           command:
             - sh
             - -c
             - |
               printf 'cache:\n  enabled: true\n  dir: /cache\n  external_secret: %s\n' "$CACHE_SECRET" > /tmp/config.yaml
-              exec act_runner cache-server -c /tmp/config.yaml -d /cache -p 8088 \
+              exec gitea-runner cache-server -c /tmp/config.yaml -d /cache -p 8088 \
                 -s gitea-runner-cache.gitea-runner.svc.cluster.local
           env:
             - name: HOME

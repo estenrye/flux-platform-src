@@ -90,7 +90,7 @@ because they are created once:
 ## Actions runners
 
 `applications/gitea-runner` (namespace `gitea-runner`): **ephemeral** runners. A KEDA `ScaledJob`
-creates one pod per queued Actions job (max 4 at once); each pod is an `act_runner` container plus a
+creates one pod per queued Actions job (max 4 at once); each pod is a `gitea/runner` container plus a
 **rootless** `docker:dind-rootless` native sidecar sharing a Unix socket (`/run/user/1000/docker.sock`).
 The runner registers with `GITEA_RUNNER_EPHEMERAL`, takes exactly one job, Gitea deletes the
 registration, and the pod exits. Nothing persists between jobs (workspace, image layers and build cache
@@ -113,10 +113,10 @@ KEDA counts jobs with `GET /api/v1/admin/actions/jobs?status=queued` using the t
   `/proc/sys` in its own network namespace) is only allowed with `hostUsers: false`. The namespace is
   labelled Pod Security `privileged` for this. `container.privileged` is off and `valid_volumes` is
   empty in the runner config. Image layers live in an emptyDir (30 Gi limit) and go with the pod.
-- **Actions cache:** one shared `act_runner cache-server` (`gitea-runner-cache` Deployment, 20 Gi PVC,
+- **Actions cache:** one shared `gitea-runner cache-server` (`gitea-runner-cache` Deployment, 20 Gi PVC,
   Service on 8088) serves `actions/cache` for all ephemeral runners, which point at it with
   `cache.external_server`. A per-pod cache would vanish with each pod, and act_runner 0.6.1 cannot start
-  its own here anyway (no IPv4 route, and its single-address fallback has an off-by-one). The shared
+  its own on 0.6.1 anyway (no IPv4 route, and its single-address fallback has an off-by-one, fixed in 6.0.0). The shared
   secret (`core-infra/gitea-runner-cache`, field `secret`) is substituted into a copy of the runner
   config at pod start; each job's token is pre-registered with the server, so a job only reaches its own
   repo's entries. The server is given its Service DNS name as the host, because it embeds that host in the
@@ -173,8 +173,12 @@ KEDA counts jobs with `GET /api/v1/admin/actions/jobs?status=queued` using the t
   **Ephemeral setup (2026-11-14):** the same workflow passes on one-job runners (KEDA creates the pod, the runner
   registers, runs and deregisters, the Job completes, the cleaner CronJob clears stray records), and
   `actions/cache` saves in one pod and restores (`cache-hit=true`) in a different pod through the shared cache server.
-  Known cost: each job pulls the runner image (~3 min) and clones `uses:` actions from github.com in the runner
-  container, which was slow (minutes for `actions/cache`).
+  Known cost: each job pulls the runner image (~3 min) until Harbor exists. act_runner 0.6.1 cloned `uses:`
+  actions with go-git (about 4 min per action, even re-fetching into an existing clone took 2 min, so a
+  persisted action-cache directory would not have helped; NFS cannot be mounted into `hostUsers: false`
+  pods either, MOUNT_ATTR_IDMAP). The runner is now `gitea/runner` 6.0.0, which downloads actions as
+  archives and shallow-clones the rest (`runner.action_shallow_clone`), and which fixes the IPv6 cache
+  address bug.
 - **If jobs stall or pulls fail,** check NAT64 first (`nat64-appliance-rebuild.md`; Healthchecks
   `nat64-wkp`), then `kubectl -n gitea-runner get pods` and the node `talos-rootless-test-1`. Queued job but no pod: `kubectl -n gitea-runner get scaledjob,triggerauthentication` and
   the keda-operator logs (the scaler token or the Gitea ingress rule for the `keda` namespace).
