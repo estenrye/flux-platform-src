@@ -121,6 +121,19 @@ KEDA counts jobs with `GET /api/v1/admin/actions/jobs?status=queued` using the t
   config at pod start; each job's token is pre-registered with the server, so a job only reaches its own
   repo's entries. The server is given its Service DNS name as the host, because it embeds that host in the
   download URLs it returns to jobs.
+- **Action mirrors:** `uses: owner/repo@ref` is cloned by the runner container, from github.com by default
+  (minutes per job over NAT64, and again for every ephemeral pod). `runner.github_mirror` rewrites
+  `https://github.com` to the in-cluster Gitea, which holds public **pull mirrors** (8 h interval, all tags)
+  of the actions in use: `actions/{checkout,cache,upload-artifact,download-artifact,setup-go,setup-python}`,
+  `docker/{setup-buildx-action,build-push-action,login-action,metadata-action,setup-qemu-action}`,
+  `dtolnay/rust-toolchain`, `Swatinem/rust-cache`, `golangci/golangci-lint-action`,
+  `goreleaser/goreleaser-action`, `azure/setup-helm`, `helm/{chart-testing-action,chart-releaser-action}`,
+  `pypa/gh-action-pypi-publish`, `astral-sh/setup-uv`. The mirrors live in Gitea (one public org per
+  owner), not in git. **An action that is not mirrored fails to resolve.** To add one, create the org if
+  needed and migrate the repo as a pull mirror (New Migration -> GitHub, "This repository will be a mirror",
+  or `POST /api/v1/repos/migrate` with `mirror: true`). Docker-based actions (for example
+  `pypa/gh-action-pypi-publish`) also pull their image at run time. `actions/upload-artifact` and
+  `download-artifact` v4 do not work on Gitea; use v3 (the tags are mirrored).
 - **Extra pieces rootless needs:**
   - `devic.es/tun`: slirp4netns needs `/dev/net/tun`. The `generic-device-plugin` DaemonSet
     (`resources/device-plugin.daemonset.yaml`, privileged, pool only) advertises it, and the docker

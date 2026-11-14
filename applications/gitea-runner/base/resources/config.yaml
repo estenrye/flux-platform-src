@@ -4,6 +4,12 @@ runner:
   file: /data/.runner
   capacity: 1
   timeout: 3h
+  # `uses: owner/repo@ref` is cloned from github.com by default (slow, per job, over
+  # NAT64). Rewrite it to the in-cluster Gitea, which holds pull mirrors of the actions
+  # we use (orgs actions, docker, dtolnay, Swatinem, golangci, goreleaser, azure, helm,
+  # pypa, astral-sh; docs/runbooks/gitea.md). An action that is not mirrored fails to
+  # resolve: mirror it first, or use a full URL.
+  github_mirror: http://gitea-http.gitea.svc.cluster.local:3000
   fetch_timeout: 5s
   fetch_interval: 2s
   labels:
