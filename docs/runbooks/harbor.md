@@ -82,7 +82,7 @@ straight to `harbor-core` / `harbor-portal`, sign-in with Keycloak). In-cluster 
 
 - The CronJob `harbor-bootstrap` (daily 05:17 UTC; script `applications/harbor/base/resources/bootstrap.py`)
   reconciles through the API as the local admin: registry endpoints `dockerhub` (docker-hub),
-  `gitea-images` (docker.gitea.com), `ghcr`, `quay`; **private** proxy-cache projects `dockerhub`, `gitea`,
+  `gitea-images` (docker.gitea.com), `ghcr`, `quay` (type `docker-registry`: the chart's proxy-cache allow-list has no `quay` type); **private** proxy-cache projects `dockerhub`, `gitea`,
   `ghcr`, `quay`; and the system robot `robot$runner-pull` with `repository:pull` on those four projects.
   After changing the script: `kubectl -n harbor create job --from=cronjob/harbor-bootstrap harbor-bootstrap-manual`.
 - Image paths: `harbor.harbor.svc.cluster.local/dockerhub/library/alpine:3`,
@@ -91,6 +91,9 @@ straight to `harbor-core` / `harbor-portal`, sign-in with Keycloak). In-cluster 
   pushed to 1Password (`core-infra/harbor-robot-runner`, field `secret`) for the runners (phase 4).
 - Docker Hub credentials (anonymous pulls are rate limited): create the Secret `harbor-dockerhub` in `harbor`
   with keys `username` and `token` (a Docker Hub access token); the job sets them on the `dockerhub` endpoint.
+- **Verified 2026-11-14** with the robot from a pod: manifests through `dockerhub/library/alpine:3.20`,
+  `gitea/runner-images:ubuntu-latest` (same digest as docker.gitea.com) and `quay/prometheus/busybox:latest`
+  resolve (1-3 s); a push as the robot is `UNAUTHORIZED`; a second bootstrap run only reconciles the robot.
 - No quota or retention is set yet; a project's storage limit can be set in the UI or API once sizes are known.
 
 ## Known gaps (later phases)
