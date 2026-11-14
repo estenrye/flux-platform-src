@@ -8,7 +8,7 @@ metadata:
   name: harbor
   namespace: harbor
   annotations:
-    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "harbor-db (CNPG) pods are created by the operator at runtime."
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "harbor-db (CNPG) pods are created by the operator and the Gateway's Envoy proxy pods by Envoy Gateway, at runtime."
 spec:
   podSelector:
     matchLabels:
@@ -21,6 +21,18 @@ spec:
         - podSelector:
             matchLabels:
               app: harbor
+    # The Gateway's Envoy proxy pods run in the Gateway's own namespace under
+    # Calico 3.33 (no namespaceSelector); core and portal listen on 8080
+    # (Calico evaluates after DNAT, so the pod port).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              gateway.envoyproxy.io/owning-gateway-name: harbor-gateway
+              gateway.envoyproxy.io/owning-gateway-namespace: harbor
+      ports:
+        - protocol: TCP
+          port: 8080
   egress:
     - ports:
         - protocol: TCP
@@ -52,6 +64,21 @@ spec:
       ports:
         - protocol: TCP
           port: 8333
+    # Keycloak OIDC (discovery, token, userinfo): id.rye.ninja resolves to the
+    # keycloak-gateway LoadBalancer Service and is DNAT'd to its Envoy pods, so the
+    # rule names those pods and their listener port (10000 + 443), not the VIP
+    # (docs/memory/calico-networkpolicy-dnat.md).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: keycloak
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              gateway.envoyproxy.io/owning-gateway-name: keycloak-gateway
+      ports:
+        - protocol: TCP
+          port: 10443
     # Proxy-cache upstreams (docker.io, ghcr.io, quay.io, docker.gitea.com;
     # IPv4-only hosts through NAT64, 64:ff9b::/96), but not the cluster, the
     # LAN ULAs or this site's delegated GUA /60 (changes on re-delegation,

@@ -60,6 +60,14 @@ persistence:
 
 core:
   existingSecret: harbor-secrets
+  # Keycloak OIDC settings (resources/eso.external-secret.oidc.yaml): the chart's
+  # configureUserSettings would render the client secret, so the JSON comes from a Secret.
+  extraEnvVars:
+    - name: CONFIG_OVERWRITE_JSON
+      valueFrom:
+        secretKeyRef:
+          name: harbor-oidc
+          key: CONFIG_OVERWRITE_JSON
   existingXsrfSecret: harbor-secrets
   existingXsrfSecretKey: CSRF_KEY
   # cert-manager Certificate harbor-token: signs the registry bearer tokens.

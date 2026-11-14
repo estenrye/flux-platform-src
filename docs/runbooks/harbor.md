@@ -1,8 +1,10 @@
 # Harbor
 
 Pull-through image registry for CI (`docs/adr/0031-harbor-pull-through-registry.md`).
-Phase 1 (this runbook): Harbor 2.15.4 from chart 1.19.4 on core-infra, **ClusterIP only**.
-Reach it with `kubectl -n harbor port-forward svc/harbor 8443:443`.
+Phases 1-2: Harbor 2.15.4 from chart 1.19.4 on core-infra. Public at `https://harbor.rye.ninja` (phase 2:
+`harbor-gateway` on the `external-dedicated` class, Let's Encrypt certificate `harbor-rye-ninja-tls`, an HTTPRoute
+straight to `harbor-core` / `harbor-portal`, sign-in with Keycloak). In-cluster clients use the `harbor` Service
+(nginx, private CA `harbor-ca`); `kubectl -n harbor port-forward svc/harbor 8443:443` also works.
 
 ## Pieces
 
@@ -53,9 +55,26 @@ Reach it with `kubectl -n harbor port-forward svc/harbor 8443:443`.
   `https://harbor.harbor.svc.cluster.local/service/token`, not the public name. In-cluster clients
   stay on the Service name (trusting `harbor-ca`).
 
+## Sign-in (phase 2)
+
+- Harbor runs in `oidc_auth` mode (`CONFIG_OVERWRITE_JSON` from the ESO Secret `harbor-oidc`, applied on every
+  start): issuer `https://id.rye.ninja/realms/ryezone-labs`, client `harbor`, scope
+  `openid,email,profile,groups,offline_access`, groups claim `groups`, admin group `ACL_harbor-admins`,
+  `project_creation_restriction: adminonly`. Harbor cannot limit sign-in by group: any realm user can onboard
+  but has no projects.
+- The client secret is generated in `keycloak` (`keycloak-harbor-client`), pushed to 1Password
+  (`core-infra/harbor-oidc-client`, field `client-secret`) and read back into `harbor/harbor-oidc`. The Keycloak
+  `harbor` client (confidential, PKCE S256 enforced) and group `ACL_harbor-admins` come from keycloak-config-cli:
+  **re-run the keycloak-config-cli Job** after the Keycloak change merges, then restart `harbor-core`.
+- Harbor core reaches `id.rye.ninja` through the keycloak-gateway Envoy pods on port 10443 (NetworkPolicy
+  egress; Calico evaluates after DNAT).
+- **Break-glass:** local `admin` still works at `https://harbor.rye.ninja/account/sign-in` (password in
+  `harbor-secrets`); it is the only way in while Keycloak or public DNS is down.
+- OIDC users pull with their per-user CLI secret (user profile in the UI); CI uses robot accounts (phase 3).
+
 ## Known gaps (later phases)
 
 - Database connection uses `sslmode: require` (encrypted, not verified); the chart cannot mount the
   CA for `verify-full`.
-- No Gateway, no Keycloak sign-in, no proxy-cache projects, runners do not use it yet.
+- No proxy-cache projects, runners do not use it yet.
 - Trivy is disabled.
