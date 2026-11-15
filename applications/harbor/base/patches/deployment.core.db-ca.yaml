@@ -1,0 +1,23 @@
+# harbor-db's server certificate is checked (sslmode verify-full): the chart has
+# no way to mount the CA, so core gets it here. pgx and lib/pq read PGSSLROOTCERT;
+# only ca.crt of the cert-manager Secret is projected (not the private key).
+- op: add
+  path: /spec/template/spec/volumes/-
+  value:
+    name: harbor-db-ca
+    secret:
+      secretName: harbor-db-server-tls
+      items:
+        - key: ca.crt
+          path: ca.crt
+- op: add
+  path: /spec/template/spec/containers/0/volumeMounts/-
+  value:
+    name: harbor-db-ca
+    mountPath: /etc/harbor-db-ca
+    readOnly: true
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: PGSSLROOTCERT
+    value: /etc/harbor-db-ca/ca.crt

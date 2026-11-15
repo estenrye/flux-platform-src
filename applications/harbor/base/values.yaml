@@ -130,9 +130,9 @@ portal:
       memory: 128Mi
 
 # PostgreSQL: the CNPG cluster harbor-db (applications/harbor-db). The password
-# is the CNPG-generated harbor-db-app Secret. sslmode require encrypts the
-# connection but does not verify the server: the chart offers no way to mount
-# the CA for verify-full (follow-up).
+# is the CNPG-generated harbor-db-app Secret. verify-full checks the server
+# certificate and host name against the cert-manager CA, which
+# patches/deployment.core.db-ca.yaml mounts into core (PGSSLROOTCERT).
 database:
   type: external
   external:
@@ -141,7 +141,7 @@ database:
     username: harbor
     coreDatabase: registry
     existingSecret: harbor-db-app
-    sslmode: require
+    sslmode: verify-full
 
 # Valkey (cache and job queue) stays in the chart on a small volume.
 redis:

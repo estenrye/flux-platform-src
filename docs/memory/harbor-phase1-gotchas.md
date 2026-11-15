@@ -9,7 +9,7 @@ Harbor 2.15.4 (chart 1.19.4) runs on core-infra (`applications/harbor`, `harbor-
 
 - **Registry S3:** Harbor's registry is distribution 2.8.3 on aws-sdk-go v1: no web-identity credential provider
   (`NoCredentialProviders`). Use a static key limited to the bucket: SeaweedFS identity `harbor-registry` in
-  `seaweedfs-s3-config`, key in 1Password `core-infra/harbor-registry-s3`. The `HarborRegistry` STS role is unused.
+  `seaweedfs-s3-config`, key in 1Password `core-infra/harbor-registry-s3`. The unused `HarborRegistry` STS role was removed (2026-11-15).
 - **x-amz-acl:** the registry always sends `x-amz-acl: private`; SeaweedFS rejects that with AccessDenied for a
   non-admin identity unless it also has `ReadAcp:<bucket>` and `WriteAcp:<bucket>` (found by testing with aws-cli).
 - **CreatedOnce secrets:** ESO reverts in-place patches to `seaweedfs-s3-config` (data-hash drift). Change the
