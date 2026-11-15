@@ -4,16 +4,23 @@
 # later phases. Every secret value is read from the harbor-secrets Secret
 # (resources/eso.external-secret.harbor.yaml), none is rendered.
 
+# type route: the chart deploys no nginx and no Service for it. The Gateway
+# (resources/gateway.yaml) terminates TLS for harbor.rye.ninja with a Let's
+# Encrypt certificate and resources/httproute.yaml sends the traffic to core and
+# portal; the chart's own HTTPRoute is deleted in kustomization.yaml in favour of
+# that one (it cannot set the unlimited timeouts blob transfers need).
 expose:
-  type: clusterIP
+  type: route
   tls:
-    enabled: true
-    certSource: secret
-    secret:
-      # cert-manager Certificate harbor-tls (resources/tls.certificates.yaml).
-      secretName: harbor-tls
-  clusterIP:
-    name: harbor
+    enabled: false
+  route:
+    parentRefs:
+      - group: gateway.networking.k8s.io
+        kind: Gateway
+        name: harbor-gateway
+        sectionName: https
+    hosts:
+      - harbor.rye.ninja
 
 # Used in the token realm and redirects Harbor hands to clients; the public
 # name, served by the Gateway in phase 2. In-cluster clients must reach this
@@ -114,15 +121,6 @@ registry:
         memory: 512Mi
 
 portal:
-  automountServiceAccountToken: false
-  resources:
-    requests:
-      cpu: 10m
-      memory: 32Mi
-    limits:
-      memory: 128Mi
-
-nginx:
   automountServiceAccountToken: false
   resources:
     requests:

@@ -17,7 +17,7 @@ Harbor 2.15.4 (chart 1.19.4) runs on core-infra (`applications/harbor`, `harbor-
   it; the template needs a `secretStoreRef` once it has remoteRefs). Deleting it rotates the generated admin key
   (only `.bin/seaweedfs-restore-drill` reads it, live).
 - **Token realm:** Harbor builds the registry's `Www-Authenticate` realm from the request host, so in-cluster
-  clients stay on `harbor.harbor.svc.cluster.local` (no split-horizon DNS).
+  clients use `harbor.rye.ninja` (LAN record in UniFi, VIP pinned on the Gateway; the chart's nginx was removed).
 - **ESO templates:** `htpasswd` takes `(user, password, "bcrypt")`.
 - **Flux:** source-controller runs 1 replica (the artifact server is leader-only, store per pod).
 
