@@ -125,12 +125,29 @@ route:
         namespace: grafana
         sectionName: https
 
+# The 512Mi limit was pinned at memory.max: the page cache (binary, plugins,
+# bleve indexes) thrashed (millions of refaults), so slow requests and failed
+# liveness probes. The VPA reading is censored by that cap; 350m CPU is its target.
 resources:
   requests:
-    cpu: 50m
-    memory: 192Mi
+    cpu: 350m
+    memory: 768Mi
   limits:
-    memory: 512Mi
+    memory: 1Gi
+
+# Prefer a node without the grafana-db primary: both on one hot node starved
+# each other. Soft, because the primary role moves on failover.
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          topologyKey: kubernetes.io/hostname
+          namespaces: [grafana]
+          labelSelector:
+            matchLabels:
+              cnpg.io/cluster: grafana-db
+              cnpg.io/instanceRole: primary
 
 testFramework:
   enabled: false
