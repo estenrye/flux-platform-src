@@ -115,9 +115,31 @@ both together. `kubectl -n harbor port-forward svc/harbor-core 8080:80` reaches 
   (`harbor.rye.ninja/dockerhub/library/<image>`) and `docker login` with a robot account;
   dockerd's `registry-mirrors` cannot reach a private proxy project.
 
+## Warm-up and monitoring (phase 5)
+
+- **Warm-up:** the `harbor-warmup` CronJob (daily 05:47 UTC, `resources/warmup.py`) pulls every image in
+  `resources/warmup.images.txt` through Harbor core as `robot$runner-pull` (manifest plus all blobs, linux/amd64
+  only), so a proxy-cache project holds them before the internet is needed. Edit the list and merge; run it now
+  with `kubectl -n harbor create job --from=cronjob/harbor-warmup harbor-warmup-manual` and read
+  `kubectl -n harbor logs job/harbor-warmup-manual` (one `OK`/`FAIL` line per image). A tag that moves upstream
+  is revalidated on the next run. Docker Hub rate limits are the usual failure: create the Secret
+  `harbor-dockerhub` (keys `username`, `token`) for the bootstrap job.
+- **Healthchecks:** the job pings `PING_URL` (Secret `healthchecks-ping-harbor`, key `warmup`, optional) when every
+  image warmed and `/fail` with the failures otherwise. The checks `harbor-warmup` and `cnpg-backup-harbor-db`
+  are defined in `pcd-ce-deploy/ansible/files/healthchecks-bootstrap.py`; after running the playbook, put the ping
+  URLs in 1Password (`healthchecks-ping-harbor/warmup`, and a `harbor-db` field in `healthchecks-ping-cnpg-backups`),
+  then add the ExternalSecret and the `harbor-db` target to `cnpg-backup-watcher` (follow-up PR; adding the
+  target before the 1Password field exists would break the watcher for every database).
+- **Metrics:** `metrics.enabled` and the chart's ServiceMonitor scrape core, registry, jobservice and the exporter
+  (port 8001, 60 s) through the OpenTelemetry collector; the NetworkPolicy allows the collector pods. The exporter
+  reads the database, so it verifies the CA like core (`patches/deployment.exporter.db-ca.yaml`).
+- **Restore drill:** not done yet. The scratch cluster must use ServiceAccount `harbor:harbor-db` to assume
+  `HarborDbBarman`, so a drill needs either a temporary second subject in that role's trust policy or a restore in
+  place; see the open items.
+
 ## Known gaps (later phases)
 
 - Database connection uses `sslmode: verify-full`: `patches/deployment.core.db-ca.yaml` mounts the
   `harbor-db-server-tls` CA into core and sets `PGSSLROOTCERT`. Only core connects to the database.
-- No Docker Hub credentials yet; the warm-up CronJob and monitoring are phase 5.
+- No Docker Hub credentials yet (warm-up above).
 - Trivy is disabled.
