@@ -60,3 +60,4 @@
 - [Gitea on core-infra](gitea-core-infra.md) — git.rye.ninja: core-infra not controlplane; confidential OIDC client because Gitea 1.27 has no PKCE client; Keycloak backchannel-dynamic for the pod hairpin
 - [NAT64 tayga unit race](nat64-tayga-unit-race.md) — 2026-11-13: packaged tayga init script lost a race with tayga-priv, ~8h NAT64 outage; native unit fix; reach the VM via guest agent
 - [Harbor phase 1 gotchas](harbor-phase1-gotchas.md) — registry has no web identity, SeaweedFS needs ReadAcp/WriteAcp, CreatedOnce secret patches get reverted, token realm follows request host
+- [ESO CreatedOnce trust-policy edits](eso-createdonce-trust-policy-edits.md) — live patches revert, spec changes don't re-render; merge, then patch with the same content, then restart the filers

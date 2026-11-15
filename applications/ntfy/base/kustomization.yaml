@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: ntfy
+
+resources:
+  - resources/namespace.yaml
+  - resources/ntfy.deployment.yaml
+  - resources/ntfy.service.yaml
+  - resources/oauth2-proxy.deployment.yaml
+  - resources/oauth2-proxy.service.yaml
+  - resources/gateway.yaml
+  - resources/httproute.yaml
+  - resources/network-policy.yaml
+  - resources/eso.password-generators.yaml
+  - resources/eso.external-secret.admin.yaml
+  - resources/eso.external-secret.oidc-client.yaml
+  - resources/eso.external-secret.oauth2-proxy-cookie.yaml
+  - resources/vpa.yaml
+
+images:
+  # newTag + digest: Renovate then follows the image by version (see
+  # applications/gitea/base/kustomization.yaml).
+  - name: docker.io/binwiederhier/ntfy
+    newTag: v2.38.0
+    digest: sha256:771309aecfce18d8fe2bfb8069994ddd6be6ca6ccdd7badace3d791a0045ff0d
+  - name: quay.io/oauth2-proxy/oauth2-proxy
+    newTag: v7.15.6
+    digest: sha256:c3415e8660af553f5e18f5d90db050614c02493c0ac6260ac59442f6d9b12048

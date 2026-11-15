@@ -1,0 +1,21 @@
+# Self-signed CA for ntfy-db's server certificate (the chain is private to
+# the ntfy namespace; ntfy trusts the CA through the ca.crt in
+# ntfy-db-server-tls):
+#   ntfy-db-selfsigned (Issuer) -> ntfy-db-ca (Certificate, isCA)
+#     -> ntfy-db-ca (Issuer) -> ntfy-db-server-tls (Certificate)
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ntfy-db-selfsigned
+  namespace: ntfy
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ntfy-db-ca
+  namespace: ntfy
+spec:
+  ca:
+    secretName: ntfy-db-ca

@@ -1,0 +1,110 @@
+# cert-manager-approver-policy is cluster-wide and the built-in approver is
+# disabled, so these Certificates sit WaitingForApproval forever unless a
+# CertificateRequestPolicy matches them AND cert-manager's ServiceAccount has
+# the `use` grant (same pattern as applications/vertical-pod-autoscaler).
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: ntfy-db-ca
+spec:
+  allowed:
+    commonName:
+      required: true
+      value: ntfy-db-ca
+    isCA: true
+    usages:
+      - digital signature
+      - cert sign
+      - crl sign
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: Issuer
+      name: ntfy-db-selfsigned
+    namespace:
+      matchNames:
+        - ntfy
+---
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: ntfy-db-server
+spec:
+  allowed:
+    commonName:
+      required: true
+      value: ntfy-db-rw
+    dnsNames:
+      required: true
+      values:
+        - ntfy-db-r
+        - ntfy-db-r.ntfy
+        - ntfy-db-r.ntfy.svc
+        - ntfy-db-r.ntfy.svc.cluster.local
+        - ntfy-db-ro
+        - ntfy-db-ro.ntfy
+        - ntfy-db-ro.ntfy.svc
+        - ntfy-db-ro.ntfy.svc.cluster.local
+        - ntfy-db-rw
+        - ntfy-db-rw.ntfy
+        - ntfy-db-rw.ntfy.svc
+        - ntfy-db-rw.ntfy.svc.cluster.local
+    isCA: false
+    usages:
+      - digital signature
+      - key encipherment
+      - server auth
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: Issuer
+      name: ntfy-db-ca
+    namespace:
+      matchNames:
+        - ntfy
+---
+apiVersion: policy.cert-manager.io/v1alpha1
+kind: CertificateRequestPolicy
+metadata:
+  name: ntfy-db-replication
+spec:
+  allowed:
+    commonName:
+      required: true
+      value: streaming_replica
+    isCA: false
+    usages:
+      - digital signature
+      - key encipherment
+      - client auth
+  selector:
+    issuerRef:
+      group: cert-manager.io
+      kind: Issuer
+      name: ntfy-db-ca
+    namespace:
+      matchNames:
+        - ntfy
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cert-manager-policy:ntfy-db
+rules:
+  - apiGroups: ["policy.cert-manager.io"]
+    resources: ["certificaterequestpolicies"]
+    verbs: ["use"]
+    resourceNames: ["ntfy-db-ca", "ntfy-db-server", "ntfy-db-replication"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cert-manager-policy:ntfy-db
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cert-manager-policy:ntfy-db
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager
+    namespace: cert-manager

@@ -1,0 +1,17 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: ntfy-db-backup
+  namespace: ntfy
+spec:
+  # Staggered from step-ca-db (03:00), keycloak-db (03:15), openbao-db (03:30),
+  # grafana-db (03:45), gitea-db (04:00) and harbor-db (04:15).
+  schedule: "0 30 4 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: ntfy-db
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+  target: primary
+  immediate: true

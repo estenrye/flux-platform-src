@@ -1,0 +1,94 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ntfy-db-ca
+  namespace: ntfy
+spec:
+  isCA: true
+  commonName: ntfy-db-ca
+  secretName: ntfy-db-ca
+  duration: 87600h # 10 years
+  renewBefore: 8760h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  usages:
+    - digital signature
+    - cert sign
+    - crl sign
+  issuerRef:
+    group: cert-manager.io
+    kind: Issuer
+    name: ntfy-db-selfsigned
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ntfy-db-server-tls
+  namespace: ntfy
+spec:
+  isCA: false
+  commonName: ntfy-db-rw
+  secretName: ntfy-db-server-tls
+  duration: 2160h # 90 days
+  renewBefore: 720h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+  dnsNames:
+    - ntfy-db-rw
+    - ntfy-db-rw.ntfy
+    - ntfy-db-rw.ntfy.svc
+    - ntfy-db-rw.ntfy.svc.cluster.local
+    - ntfy-db-r
+    - ntfy-db-r.ntfy
+    - ntfy-db-r.ntfy.svc
+    - ntfy-db-r.ntfy.svc.cluster.local
+    - ntfy-db-ro
+    - ntfy-db-ro.ntfy
+    - ntfy-db-ro.ntfy.svc
+    - ntfy-db-ro.ntfy.svc.cluster.local
+  # CNPG reloads the server certificate when the Secret carries this label.
+  secretTemplate:
+    labels:
+      cnpg.io/reload: ""
+  issuerRef:
+    group: cert-manager.io
+    kind: Issuer
+    name: ntfy-db-ca
+---
+# Client certificate for the streaming_replica role. Supplying it (with the CA
+# as clientCASecret) stops CNPG from generating its own client CA from
+# serverCASecret, which would need a ca.key this Secret does not carry.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ntfy-db-replication
+  namespace: ntfy
+spec:
+  isCA: false
+  commonName: streaming_replica
+  secretName: ntfy-db-replication-tls
+  duration: 2160h # 90 days
+  renewBefore: 720h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  usages:
+    - digital signature
+    - key encipherment
+    - client auth
+  secretTemplate:
+    labels:
+      cnpg.io/reload: ""
+  issuerRef:
+    group: cert-manager.io
+    kind: Issuer
+    name: ntfy-db-ca

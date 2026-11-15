@@ -53,6 +53,8 @@ data:
       # not here.
       - name: ACL_harbor-agents-scotty-admin
       - name: ACL_harbor-proxy-pull
+      # ntfy (ntfy.rye.ninja) web UI: oauth2-proxy admits ACL_ntfy-users only.
+      - name: ACL_ntfy-users
 
     # Groups-as-OIDC-claims, assigned per client (not realm-wide
     # defaultDefaultClientScopes). full.path: false so the claim value is the
@@ -93,6 +95,7 @@ data:
           - ACL_gitea-users
           - ACL_gitea-admins
           - ACL_harbor-admins
+          - ACL_ntfy-users
           - ACL_Kubernetes_cluster-admin
           - ACL_Kubernetes_cluster-admin_core-infra
       # Scotty (pcd-lab-manager agent). Least privilege: Gitea sign-in only
@@ -170,6 +173,33 @@ data:
         attributes:
           # RP-initiated logout from the Gitea sign-out link.
           post.logout.redirect.uris: "https://git.rye.ninja/*"
+        defaultClientScopes:
+          - web-origins
+          - acr
+          - profile
+          - roles
+          - basic
+          - email
+          - groups
+      # ntfy web UI login through oauth2-proxy (authorization code, confidential
+      # client, PKCE S256 enforced: oauth2-proxy sends a challenge). The secret
+      # comes from keycloak-ntfy-client (shared with oauth2-proxy through 1Password).
+      - clientId: ntfy
+        name: "ntfy"
+        enabled: true
+        clientAuthenticatorType: client-secret
+        secret: "$(env:NTFY_CLIENT_SECRET)"
+        publicClient: false
+        standardFlowEnabled: true
+        implicitFlowEnabled: false
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        redirectUris:
+          - https://ntfy.rye.ninja/oauth2/callback
+        webOrigins:
+          - https://ntfy.rye.ninja
+        attributes:
+          pkce.code.challenge.method: S256
         defaultClientScopes:
           - web-origins
           - acr

@@ -1,0 +1,58 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ntfy-db
+  namespace: ntfy
+spec:
+  instances: 3
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+
+  # The generated password is stored in the ntfy-db-app Secret (its `uri` key
+  # is what applications/ntfy passes to ntfy as database-url). database and
+  # owner are the CNPG defaults spelled out.
+  bootstrap:
+    initdb:
+      database: ntfy
+      owner: ntfy
+
+  # Certificates from the cert-manager self-signed CA (resources/tls.*.yaml).
+  # The server secret carries ca.crt, which ntfy mounts to verify the server
+  # (sslmode=verify-full). The replication certificate and clientCASecret are
+  # required as well: without them CNPG tries to sign its own client
+  # certificates with serverCASecret and fails for want of a ca.key.
+  certificates:
+    serverCASecret: ntfy-db-server-tls
+    serverTLSSecret: ntfy-db-server-tls
+    clientCASecret: ntfy-db-replication-tls
+    replicationTLSSecret: ntfy-db-replication-tls
+
+  # imageName pin: same image as gitea-db and grafana-db.
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.3@sha256:5e30290fba3d990b08a9caea6ddb49c661ad8246cbb2688adad7e6cc78df6c3f
+
+  # Small: a message cache with a 12h default retention, plus users and ACLs.
+  storage:
+    size: 5Gi
+    storageClass: csi-cinder-sc-retain
+
+  # ServiceAccount token for SeaweedFS STS web-identity auth; audience must
+  # match the kubernetes provider's clientId in the SeaweedFS IAM config.
+  projectedVolumeTemplate:
+    sources:
+      - serviceAccountToken:
+          audience: seaweedfs-s3
+          expirationSeconds: 3600
+          path: token
+
+  primaryUpdateStrategy: unsupervised
+
+  monitoring:
+    enablePodMonitor: true
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: ntfy-db-barman
