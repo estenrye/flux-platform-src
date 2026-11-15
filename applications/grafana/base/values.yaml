@@ -38,6 +38,16 @@ grafana.ini:
   analytics:
     check_for_updates: false
     reporting_enabled: false
+  # Only the prometheus datasource (VictoriaMetrics) and core panels are used.
+  # Grafana 13 ships its datasources as separate plugins, each a backend process
+  # (~25-37MB RSS), and preinstall downloaded a second 574MB copy of them into
+  # /var/lib/grafana/plugins on every start. Preinstall off keeps the copies baked
+  # into the image (plugins-bundled); disable_plugins stops the unused ones from
+  # loading. To use one later, drop it from disable_plugins (restart required).
+  plugins:
+    preinstall_disabled: true
+    disable_plugins: >-
+      mysql,cloudwatch,elasticsearch,mssql,stackdriver,influxdb,opentsdb,tempo,jaeger,zipkin,loki,grafana-pyroscope-datasource,grafana-postgresql-datasource
   auth.generic_oauth:
     enabled: true
     name: JumpCloud
