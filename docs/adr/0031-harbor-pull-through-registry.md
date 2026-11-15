@@ -83,7 +83,7 @@ Run Harbor (`goharbor/harbor-helm` chart 1.19.4, Harbor 2.15.4) on core-infra as
   pods' dockerd (`/etc/docker/certs.d/<service-name>/ca.crt`). The runners pull
   `harbor.harbor.svc.cluster.local` names, never the public VIP.
 - **Proxy-cache projects:** `dockerhub` (docker.io), `gitea` (docker.gitea.com), `ghcr`
-  (ghcr.io) and `quay` (quay.io). Harbor has no declarative API objects, so a bootstrap Job
+  (ghcr.io), `quay` (quay.io) and `registryk8s` (registry.k8s.io). Harbor has no declarative API objects, so a bootstrap Job
   (idempotent, API based, like the Healthchecks bootstrap) creates the registry endpoints, the
   projects and a read-only robot account for the runners. Docker Hub credentials from 1Password
   avoid anonymous rate limits.

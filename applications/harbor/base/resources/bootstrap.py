@@ -24,6 +24,8 @@ UPSTREAMS = {
     "ghcr": ("ghcr", "github-ghcr", "https://ghcr.io"),
     # Harbor's proxy-cache allow-list has no "quay" type; quay.io speaks the plain registry API.
     "quay": ("quay", "docker-registry", "https://quay.io"),
+    # registry.k8s.io (Kubernetes images) is also a plain registry API; the project name has no dots.
+    "registryk8s": ("registryk8s", "docker-registry", "https://registry.k8s.io"),
 }
 ROBOT_NAME = "runner-pull"  # Harbor prefixes it: robot$runner-pull
 
