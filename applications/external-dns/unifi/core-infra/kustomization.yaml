@@ -28,6 +28,7 @@ helmCharts:
 
 resources:
   - resources/network-policy.yaml
+  - resources/dnsendpoint.harbor.yaml
 
 patches:
   - target:

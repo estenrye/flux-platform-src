@@ -1,0 +1,18 @@
+# LAN record for harbor.rye.ninja. This instance only watches the external-dns
+# namespace (see values.yaml), so Harbor's HTTPRoute is not published into UniFi
+# automatically. Without a LAN record the runners' image pulls would depend on
+# public DNS. The address is the harbor-gateway VIP
+# (kubectl -n harbor get gateway harbor-gateway); update it if the Gateway is
+# recreated with a new address.
+apiVersion: externaldns.k8s.io/v1alpha1
+kind: DNSEndpoint
+metadata:
+  name: harbor
+  namespace: external-dns
+spec:
+  endpoints:
+    - dnsName: harbor.rye.ninja
+      recordType: AAAA
+      recordTTL: 300
+      targets:
+        - 2607:3640:1064:27f::1:928a
