@@ -158,3 +158,8 @@ patches:
     kind: ObjectStore
     name: seaweedfs-db-barman
     namespace: seaweedfs
+- path: patches/harbor.gateway.address.yaml
+  target:
+    kind: Gateway
+    name: harbor-gateway
+    namespace: harbor
