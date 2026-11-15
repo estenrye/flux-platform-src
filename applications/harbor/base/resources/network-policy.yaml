@@ -8,7 +8,7 @@ metadata:
   name: harbor
   namespace: harbor
   annotations:
-    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "harbor-db (CNPG) pods, the Gateway's Envoy proxy pods and the bootstrap CronJob pods are created at runtime."
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "harbor-db (CNPG) pods, the Gateway's Envoy proxy pods, the CronJob pods and the OpenTelemetry collector are created at runtime."
 spec:
   podSelector:
     matchLabels:
@@ -33,11 +33,25 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-    # The bootstrap CronJob calls the core API.
+    # Metrics scrape from the OpenTelemetry collector daemonset (ServiceMonitor).
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: opentelemetry-collector
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: otelcol-ds-collector
+      ports:
+        - protocol: TCP
+          port: 8001
+    # The bootstrap and warm-up CronJobs call core (API, token, /v2).
     - from:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: harbor-bootstrap
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: harbor-warmup
       ports:
         - protocol: TCP
           port: 8080

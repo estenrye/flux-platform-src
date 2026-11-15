@@ -1,0 +1,20 @@
+# Images kept warm in Harbor (project/repository:tag, linux/amd64). Edit this file,
+# merge, and the next run (or `kubectl -n harbor create job --from=cronjob/harbor-warmup
+# harbor-warmup-manual`) pulls them. Projects: gitea = docker.gitea.com, dockerhub =
+# docker.io, ghcr = ghcr.io, quay = quay.io. A multi-platform tag only needs amd64 here.
+
+# CI job images (the runner labels in applications/gitea-runner).
+gitea/runner-images:ubuntu-latest
+gitea/runner-images:ubuntu-latest-slim
+
+# Base images for Go, Rust, Python, Node and Docker builds, and small utilities.
+dockerhub/library/golang:1
+dockerhub/library/rust:1
+dockerhub/library/python:3
+dockerhub/library/node:lts
+dockerhub/library/alpine:3
+dockerhub/library/debian:stable-slim
+dockerhub/library/ubuntu:24.04
+dockerhub/library/docker:cli
+dockerhub/library/docker:dind
+dockerhub/alpine/helm:latest

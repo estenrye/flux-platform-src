@@ -1,0 +1,23 @@
+# The exporter reads the database too, so it verifies the harbor-db certificate
+# like core (patches/deployment.core.db-ca.yaml). The chart renders an empty
+# volumeMounts list here, so it is set rather than appended to.
+- op: add
+  path: /spec/template/spec/volumes/-
+  value:
+    name: harbor-db-ca
+    secret:
+      secretName: harbor-db-server-tls
+      items:
+        - key: ca.crt
+          path: ca.crt
+- op: add
+  path: /spec/template/spec/containers/0/volumeMounts
+  value:
+    - name: harbor-db-ca
+      mountPath: /etc/harbor-db-ca
+      readOnly: true
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: PGSSLROOTCERT
+    value: /etc/harbor-db-ca/ca.crt

@@ -120,6 +120,15 @@ registry:
       limits:
         memory: 512Mi
 
+# Metrics: core, registry, jobservice and the exporter (Harbor's own business
+# metrics from the database) on 8001, scraped through the ServiceMonitor by the
+# OpenTelemetry collector (resources/network-policy.yaml allows it).
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 60s
+
 portal:
   automountServiceAccountToken: false
   resources:
@@ -161,6 +170,9 @@ trivy:
 
 exporter:
   automountServiceAccountToken: false
-
-metrics:
-  enabled: false
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi

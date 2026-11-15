@@ -23,6 +23,8 @@ resources:
   - resources/eso.robot-runner.yaml
   - resources/bootstrap.cronjob.yaml
   - resources/bootstrap.network-policy.yaml
+  - resources/warmup.cronjob.yaml
+  - resources/warmup.network-policy.yaml
   - resources/tls.issuers.yaml
   - resources/tls.certificates.yaml
   - resources/tls.certificate-request-policies.yaml
@@ -33,6 +35,10 @@ configMapGenerator:
   - name: harbor-bootstrap-script
     files:
       - bootstrap.py=resources/bootstrap.py
+  - name: harbor-warmup
+    files:
+      - warmup.py=resources/warmup.py
+      - images.txt=resources/warmup.images.txt
 
 patches:
   - target:
@@ -68,8 +74,12 @@ patches:
       name: harbor-core
     path: patches/deployment.core.db-ca.yaml
   - target:
+      kind: Deployment
+      name: harbor-exporter
+    path: patches/deployment.exporter.db-ca.yaml
+  - target:
       kind: ConfigMap
-      name: "harbor-(core|jobservice-env)"
+      name: "harbor-(core|jobservice-env|exporter-env)"
     path: patches/configmap.sorted-keys.yaml
 
 images:

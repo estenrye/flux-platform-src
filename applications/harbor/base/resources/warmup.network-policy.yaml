@@ -1,0 +1,34 @@
+# The warm-up job talks to Harbor core (token and /v2) and reports to Healthchecks.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: harbor-warmup
+  namespace: harbor
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicy: "The pods are created by a CronJob."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: harbor-warmup
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    - to:
+        - podSelector:
+            matchLabels:
+              app: harbor
+              component: core
+      ports:
+        - protocol: TCP
+          port: 8080
+    # healthchecks.rye.ninja (HTTPS); the script runs without a ping URL too.
+    - ports:
+        - protocol: TCP
+          port: 443
