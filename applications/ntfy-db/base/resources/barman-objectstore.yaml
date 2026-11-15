@@ -1,6 +1,6 @@
 # WAL archiving + base backups to the in-cluster SeaweedFS S3 gateway,
 # authenticated with the pod's projected ServiceAccount token (STS
-# AssumeRoleWithWebIdentity, role ntfyDbBarman in
+# AssumeRoleWithWebIdentity, role NtfyDbBarman in
 # applications/seaweedfs/base/resources/eso.external-secret.iam-config.yaml);
 # no static keys. The token itself is projected into the postgres pods by
 # Cluster.spec.projectedVolumeTemplate (ntfy-db.cluster.yaml), which
@@ -23,7 +23,7 @@ spec:
   instanceSidecarConfiguration:
     env:
       - name: AWS_ROLE_ARN
-        value: arn:aws:iam::role/ntfyDbBarman
+        value: arn:aws:iam::role/NtfyDbBarman
       - name: AWS_WEB_IDENTITY_TOKEN_FILE
         value: /projected/token
       - name: AWS_ENDPOINT_URL_STS
