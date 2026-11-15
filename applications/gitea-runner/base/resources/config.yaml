@@ -14,8 +14,16 @@ runner:
   fetch_interval: 2s
   labels:
     # Job images come through Harbor's proxy-cache project `gitea` (docker.gitea.com);
-    # dockerd trusts its CA and the runner logs in with the read-only robot
-    # (resources/eso.external-secret.harbor.yaml).
+    # the runner logs in with the read-only robot
+    # (resources/eso.external-secret.harbor.yaml); harbor.rye.ninja has a public
+    # certificate, so dockerd needs no CA.
+    #
+    # ubuntu-slim is opt-in (`runs-on: ubuntu-slim`): 132 MB compressed against
+    # 569 MB for ubuntu-latest, so a cold pull is about 60 s instead of 160 s
+    # (unpacking the layers dominates). It has node, npm, git, curl and tar only:
+    # no compiler, make, python, docker CLI, jq/yq or unzip. Rust builds (linker),
+    # docker builds and anything compiling need ubuntu-latest.
+    - "ubuntu-slim:docker://harbor.rye.ninja/gitea/runner-images:ubuntu-latest-slim"
     - "ubuntu-latest:docker://harbor.rye.ninja/gitea/runner-images:ubuntu-latest"
     - "ubuntu-24.04:docker://harbor.rye.ninja/gitea/runner-images:ubuntu-24.04"
     - "ubuntu-22.04:docker://harbor.rye.ninja/gitea/runner-images:ubuntu-22.04"

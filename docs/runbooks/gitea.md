@@ -102,6 +102,8 @@ KEDA counts jobs with `GET /api/v1/admin/actions/jobs?status=queued` using the t
 `gitea_admin`); `activeDeadlineSeconds` (3 h) removes a runner that never gets a job. Workflow labels: `ubuntu-latest`, `ubuntu-24.04`,
 `ubuntu-22.04` (images from `docker.gitea.com/runner-images`, pulled through Harbor's `gitea` proxy-cache project: `harbor.rye.ninja/gitea/runner-images:<tag>`, `docs/runbooks/harbor.md`).
 
+Add `runs-on: ubuntu-slim` for jobs that need only node, git, curl and tar (lint, release scripts, Go builds without cgo): the image is 132 MB compressed instead of 569 MB, which cuts a cold pull from about 160 s to about 60 s. It has no gcc/make, python, docker CLI, jq/yq or unzip, so Rust, Docker image builds and anything that compiles stay on `ubuntu-latest`. Layer unpacking (about 1 core, gzip) dominates the pull, not the network; zstd-recompressed layers saved only about 45 s on `ubuntu-latest` and would need a conversion job, so they are not used (measured 2026-11-15).
+
 - **Where they run:** only on the tainted node pool `pool=rootless-test` (nodeSelector and toleration
   in the ScaledJob pod template), a single worker defined in `pcd-ce-deploy/tofu-pcd-talos-cluster/rootless_test_node.tf`
   (`rootless_test_node_enabled`, 80 GiB root disk). Talos disables user namespaces
