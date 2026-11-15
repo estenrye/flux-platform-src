@@ -123,7 +123,8 @@ Run Harbor (`goharbor/harbor-helm` chart 1.19.4, Harbor 2.15.4) on core-infra as
   confirm it against the 2.15 docs before the first install.
 
 - Harbor chart IPv6 support (`ipFamily.ipv6.enabled`) on an IPv6-only cluster, including its
-  nginx. Gateway routing may allow dropping the chart's nginx proxy.
+  nginx. Amended 2026-11-15: the chart's nginx and its private-CA endpoint were removed; in-cluster
+  clients use `harbor.rye.ninja` through the Gateway (measured no slower end to end).
 - Harbor's Trivy and ChartMuseum are not needed for a cache; start with them disabled to save
   resources (Trivy can be added later).
 - An externally exposed registry needs strict authentication and rate limiting; confirm the

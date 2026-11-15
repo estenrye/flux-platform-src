@@ -1,7 +1,7 @@
-# The routes the chart's nginx would apply, straight to core and portal: the
-# Gateway terminates TLS for the public name, the chart's nginx (Service
-# harbor, private CA) stays for in-cluster clients. Image pushes and pulls
-# stream large blobs, so no request timeout.
+# The routes the chart's HTTPRoute would apply (it is deleted in
+# kustomization.yaml), straight to core and portal. Clients inside the cluster
+# use the same name through the VIP. Image pushes and pulls stream large blobs,
+# so no request timeout.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
