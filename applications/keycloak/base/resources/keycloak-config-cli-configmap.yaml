@@ -47,6 +47,12 @@ data:
       # Harbor (harbor.rye.ninja): the admin flag follows ACL_harbor-admins
       # (oidc_admin_group in applications/harbor). Harbor cannot restrict sign-in by group.
       - name: ACL_harbor-admins
+      # Harbor project roles. Harbor learns these from the `groups` claim at a
+      # member's first login; the project binding itself (agents-scotty ->
+      # Project Admin, proxy-cache projects -> Limited Guest) is made in Harbor,
+      # not here.
+      - name: ACL_harbor-agents-scotty-admin
+      - name: ACL_harbor-proxy-pull
 
     # Groups-as-OIDC-claims, assigned per client (not realm-wide
     # defaultDefaultClientScopes). full.path: false so the claim value is the
@@ -89,6 +95,24 @@ data:
           - ACL_harbor-admins
           - ACL_Kubernetes_cluster-admin
           - ACL_Kubernetes_cluster-admin_core-infra
+      # Scotty (pcd-lab-manager agent). Least privilege: Gitea sign-in only
+      # (ACL_gitea-users, no ACL_gitea-admins), plus the two Harbor project
+      # groups. His Gitea org/repo roles are granted inside Gitea, and the Harbor
+      # groups only take effect once bound to projects in Harbor. Not in
+      # ACL_harbor-admins: that is Harbor system admin. No `credentials`, for
+      # the reason above: set a password from the admin console for the first
+      # sign-in that creates his Gitea/Harbor accounts. The email must match his
+      # git commit email so signatures verify.
+      - username: scotty
+        email: scotty@agents.rye.ninja
+        firstName: Scotty
+        lastName: Agent
+        enabled: true
+        emailVerified: true
+        groups:
+          - ACL_gitea-users
+          - ACL_harbor-agents-scotty-admin
+          - ACL_harbor-proxy-pull
       # Machine identity for SeaweedFS (client-credentials grant). Add it to
       # an ACL_* group to grant access, e.g.
       #   groups: [ACL_SeaweedFS_ListAllBuckets]
