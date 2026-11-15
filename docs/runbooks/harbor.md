@@ -124,12 +124,11 @@ both together. `kubectl -n harbor port-forward svc/harbor-core 8080:80` reaches 
   `kubectl -n harbor logs job/harbor-warmup-manual` (one `OK`/`FAIL` line per image). A tag that moves upstream
   is revalidated on the next run. Docker Hub rate limits are the usual failure: create the Secret
   `harbor-dockerhub` (keys `username`, `token`) for the bootstrap job.
-- **Healthchecks:** the job pings `PING_URL` (Secret `healthchecks-ping-harbor`, key `warmup`, optional) when every
-  image warmed and `/fail` with the failures otherwise. The checks `harbor-warmup` and `cnpg-backup-harbor-db`
-  are defined in `pcd-ce-deploy/ansible/files/healthchecks-bootstrap.py`; after running the playbook, put the ping
-  URLs in 1Password (`healthchecks-ping-harbor/warmup`, and a `harbor-db` field in `healthchecks-ping-cnpg-backups`),
-  then add the ExternalSecret and the `harbor-db` target to `cnpg-backup-watcher` (follow-up PR; adding the
-  target before the 1Password field exists would break the watcher for every database).
+- **Healthchecks:** the job pings `PING_URL` (Secret `healthchecks-ping-harbor`, key `warmup`, from 1Password
+  `core-infra/healthchecks-ping-harbor`, field `warmup`) when every image warmed and `/fail` with the failures
+  otherwise (check `harbor-warmup`, daily, grace 3 h). `cnpg-backup-watcher` also watches `harbor-db` (check
+  `cnpg-backup-harbor-db`, field `harbor-db` of `healthchecks-ping-cnpg-backups`). Both checks are defined in
+  `pcd-ce-deploy/ansible/files/healthchecks-bootstrap.py` (applied 2026-11-15).
 - **Metrics:** `metrics.enabled` and the chart's ServiceMonitor scrape core, registry, jobservice and the exporter
   (port 8001, 60 s) through the OpenTelemetry collector; the NetworkPolicy allows the collector pods. The exporter
   reads the database, so it verifies the CA like core (`patches/deployment.exporter.db-ca.yaml`).

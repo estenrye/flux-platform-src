@@ -104,6 +104,7 @@ resources:
 # to Healthchecks (docs/runbooks/healthchecks-self-hosted.md)
 - ../../applications/cnpg-backup-watcher/base
 - resources/eso.external-secret.healthchecks-ping-cnpg-backups.yaml
+- resources/eso.external-secret.healthchecks-ping-harbor.yaml
 # VPA Recommendations
 - resources/vpa.recommendations.yaml
 
