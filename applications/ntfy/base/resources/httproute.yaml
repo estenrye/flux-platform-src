@@ -1,0 +1,46 @@
+# Two paths to one host:
+#  1. Requests that already carry ntfy credentials (Authorization header, as
+#     the Android app, curl and the web app's own API calls send; or the `auth`
+#     query parameter, which browsers must use for WebSockets and SSE) go
+#     directly to ntfy. ntfy denies everything by default (deny-all), so a
+#     bogus header gains nothing.
+#  2. Everything else, i.e. a browser loading the UI, goes to oauth2-proxy,
+#     which requires a Keycloak session in ACL_ntfy-users and forwards to ntfy.
+# Long-lived streams (JSON, SSE, WebSocket subscriptions) need no request timeout.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ntfy
+  namespace: ntfy
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: ntfy-gateway
+      sectionName: https
+  hostnames:
+    - ntfy.rye.ninja
+  rules:
+    - matches:
+        - headers:
+            - type: RegularExpression
+              name: Authorization
+              value: ".+"
+        - queryParams:
+            - type: RegularExpression
+              name: auth
+              value: ".+"
+      backendRefs:
+        - name: ntfy
+          port: 80
+      timeouts:
+        request: 0s
+        backendRequest: 0s
+    - matches:
+        - path: { type: PathPrefix, value: / }
+      backendRefs:
+        - name: oauth2-proxy
+          port: 80
+      timeouts:
+        request: 0s
+        backendRequest: 0s

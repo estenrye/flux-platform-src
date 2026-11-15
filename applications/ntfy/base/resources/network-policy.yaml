@@ -1,0 +1,94 @@
+# Both workloads: default-deny plus the listed flows. Calico evaluates egress
+# after DNAT, so ports are pod ports (docs/memory/calico-networkpolicy-dnat.md).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ntfy
+  namespace: ntfy
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The Gateway's Envoy proxy pods are created at runtime by the Envoy Gateway controller in this namespace; ntfy-db (CNPG) pods are likewise created by the operator."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: ntfy
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Envoy proxy pods run in the Gateway's own namespace under Calico 3.33.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              gateway.envoyproxy.io/owning-gateway-name: ntfy-gateway
+              gateway.envoyproxy.io/owning-gateway-namespace: ntfy
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: oauth2-proxy
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    # ntfy-db (CNPG) read-write Service.
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: ntfy-db
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: oauth2-proxy
+  namespace: ntfy
+  annotations:
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The Gateway's Envoy proxy pods are created at runtime by the Envoy Gateway controller in this namespace."
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: oauth2-proxy
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              gateway.envoyproxy.io/owning-gateway-name: ntfy-gateway
+              gateway.envoyproxy.io/owning-gateway-namespace: ntfy
+      ports:
+        - protocol: TCP
+          port: 4180
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    # Keycloak token and JWKS endpoints via the in-cluster Service (pod port 8080).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: keycloak
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Upstream: ntfy.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: ntfy
+      ports:
+        - protocol: TCP
+          port: 8080

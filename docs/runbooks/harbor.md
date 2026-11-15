@@ -132,9 +132,24 @@ both together. `kubectl -n harbor port-forward svc/harbor-core 8080:80` reaches 
 - **Metrics:** `metrics.enabled` and the chart's ServiceMonitor scrape core, registry, jobservice and the exporter
   (port 8001, 60 s) through the OpenTelemetry collector; the NetworkPolicy allows the collector pods. The exporter
   reads the database, so it verifies the CA like core (`patches/deployment.exporter.db-ca.yaml`).
-- **Restore drill:** not done yet. The scratch cluster must use ServiceAccount `harbor:harbor-db` to assume
-  `HarborDbBarman`, so a drill needs either a temporary second subject in that role's trust policy or a restore in
-  place; see the open items.
+- **Restore drill (done 2026-11-15):** a scratch CNPG cluster `harbor-db-drill` (1 instance, `csi-cinder-sc-delete`,
+  same image, `bootstrap.recovery` from `externalClusters` plugin `barman-cloud.cloudnative-pg.io` with
+  `barmanObjectName: harbor-db-barman`, `serverName: harbor-db`, no WAL archiving) restored the 04:15 base backup
+  plus WAL in about 3.5 minutes. It matched the live database: 49 tables, 7 projects, 62 artifacts, 4 users, 1 robot,
+  schema version 181, and the newest push (08:16, four hours after the base backup), so WAL replay works. Steps:
+  1. The recovery pod authenticates as its own ServiceAccount, so `system:serviceaccount:harbor:harbor-db-drill`
+     must be a subject of the `HarborDbBarman` trust policy
+     (`applications/seaweedfs/base/resources/eso.external-secret.iam-config.yaml`). Do it through a PR and revert it
+     afterwards: ESO overwrites live edits of `seaweedfs-iam-config` within seconds, and an ExternalSecret that is
+     `CreatedOnce` does not re-render on a spec change, so after the render PR is applied patch the Secret with the
+     same content (ESO then re-renders and the change persists).
+  2. The filers read the trust policy at start: `kubectl -n seaweedfs rollout restart sts/seaweedfs-filer` (rolling,
+     about 1.5 minutes; Harbor and the backups kept working).
+  3. Apply the Cluster, wait for `Cluster in healthy state`, compare with
+     `kubectl -n harbor exec <pod> -c postgres -- psql -d registry -c '...'`, delete the Cluster, revert the trust
+     entry and restart the filers again.
+  Blob data (the `harbor-registry` bucket) was not part of the drill: it lives in SeaweedFS, which has its own
+  restore procedure (`seaweedfs-db-restore.md`).
 
 ## Known gaps (later phases)
 

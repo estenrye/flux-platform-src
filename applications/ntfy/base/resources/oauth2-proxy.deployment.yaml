@@ -1,0 +1,106 @@
+# SSO for the ntfy web UI only. The HTTPRoute (httproute.yaml) sends requests
+# that carry no ntfy credentials here; anything with an Authorization header or
+# an auth query parameter goes straight to ntfy, which enforces its own users
+# and tokens (ntfy has no OIDC or trusted-header login, so SSO cannot replace
+# them). Allowed users: Keycloak group ACL_ntfy-users.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oauth2-proxy
+  namespace: ntfy
+  labels:
+    app.kubernetes.io/name: oauth2-proxy
+  annotations:
+    reloader.stakater.com/auto: "true"
+    ignore-check.kube-linter.io/no-node-affinity: No zone or role topology to express node affinity against.
+    ignore-check.kube-linter.io/minimum-three-replicas: oauth2-proxy only gates the web UI; API clients bypass it (httproute.yaml), so one replica is enough and an outage does not stop notifications.
+    ignore-check.kube-linter.io/env-value-from: ntfy-oidc-client and ntfy-oauth2-proxy-cookie are ESO-generated; neither is a static resource in this render.
+    ignore-check.kube-linter.io/read-secret-from-env-var: oauth2-proxy's documented way to take the client and cookie secrets is the OAUTH2_PROXY_* environment variables.
+    ignore-check.kube-linter.io/restart-policy: Deployments always use restartPolicy Always.
+    checkov.io/skip1: CKV_K8S_11=Memory limits are set and the VPA recommends CPU; CPU limits only add throttling.
+    checkov.io/skip2: CKV_K8S_35=oauth2-proxy's documented way to take the client and cookie secrets is the OAUTH2_PROXY_* environment variables.
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: oauth2-proxy
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: oauth2-proxy
+    spec:
+      restartPolicy: Always
+      priorityClassName: platform
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy
+          args:
+            - --http-address=0.0.0.0:4180
+            - --upstream=http://ntfy.ntfy.svc.cluster.local:80
+            - --reverse-proxy=true
+            - --provider=keycloak-oidc
+            - --client-id=ntfy
+            - --code-challenge-method=S256
+            - --redirect-url=https://ntfy.rye.ninja/oauth2/callback
+            # The issuer and sign-in URL are public; token and key fetches use
+            # the in-cluster Service because pods cannot reach id.rye.ninja
+            # through the gateway (docs/memory/gitea-core-infra.md). Discovery
+            # is skipped for that reason.
+            - --skip-oidc-discovery=true
+            - --oidc-issuer-url=https://id.rye.ninja/realms/ryezone-labs
+            - --login-url=https://id.rye.ninja/realms/ryezone-labs/protocol/openid-connect/auth
+            - --redeem-url=http://keycloak-http.keycloak.svc.cluster.local/realms/ryezone-labs/protocol/openid-connect/token
+            - --oidc-jwks-url=http://keycloak-http.keycloak.svc.cluster.local/realms/ryezone-labs/protocol/openid-connect/certs
+            - --scope=openid email profile groups
+            - --oidc-groups-claim=groups
+            - --allowed-group=ACL_ntfy-users
+            - --email-domain=*
+            - --cookie-secure=true
+            - --cookie-domain=ntfy.rye.ninja
+            - --cookie-samesite=lax
+            - --silence-ping-logging=true
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ntfy-oidc-client
+                  key: client-secret
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ntfy-oauth2-proxy-cookie
+                  key: cookie-secret
+          ports:
+            - name: http
+              containerPort: 4180
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

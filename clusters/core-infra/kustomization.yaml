@@ -90,6 +90,11 @@ resources:
 # bucket harbor-registry (role HarborRegistry). docs/adr/0031-harbor-pull-through-registry.md
 - ../../applications/harbor/base
 - ../../applications/harbor-db/base
+# ntfy (ntfy.rye.ninja): push notifications. The ntfy app owns the ntfy namespace;
+# ntfy-db backs up to SeaweedFS (bucket ntfy-db-barman, role NtfyDbBarman). The web UI
+# is behind oauth2-proxy and the Keycloak `ntfy` client; docs/runbooks/ntfy.md
+- ../../applications/ntfy/base
+- ../../applications/ntfy-db/base
 # Gitea Actions runners: ephemeral act_runner + rootless DinD pods, one per queued
 # job, created by a KEDA ScaledJob.
 - ../../applications/gitea-runner/base

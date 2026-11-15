@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ntfy
+  description: |-
+    Self-hosted push notification service at ntfy.rye.ninja, backed by the
+    ntfy-db CNPG cluster. The web UI sits behind oauth2-proxy and Keycloak
+    (id.rye.ninja); the API and mobile apps use ntfy's own users and tokens.
+  tags:
+    - notifications
+    - ntfy
+    - platform
+    - infrastructure
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
