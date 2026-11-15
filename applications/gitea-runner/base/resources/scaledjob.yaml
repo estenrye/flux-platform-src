@@ -169,16 +169,6 @@ spec:
                 mountPath: /etc/subgid
                 subPath: subgid
                 readOnly: true
-              # Trust for Harbor's in-cluster name; rootless dockerd reads certs.d under
-              # $XDG_CONFIG_HOME, the rootful path is mounted too.
-              - name: harbor
-                mountPath: /home/rootless/.config/docker/certs.d/harbor.harbor.svc.cluster.local/ca.crt
-                subPath: ca.crt
-                readOnly: true
-              - name: harbor
-                mountPath: /etc/docker/certs.d/harbor.harbor.svc.cluster.local/ca.crt
-                subPath: ca.crt
-                readOnly: true
             startupProbe:
               exec:
                 command:

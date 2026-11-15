@@ -21,18 +21,19 @@ spec:
           port: 53
         - protocol: UDP
           port: 53
-    # dockerd pulls job images from Harbor over TLS (Service harbor 443 -> nginx pod 8443).
+    # dockerd pulls job images from harbor.rye.ninja: the VIP is DNATed to the
+    # harbor-gateway Envoy pods (listener 443 -> pod port 10443; Calico evaluates
+    # after DNAT).
     - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: harbor
           podSelector:
             matchLabels:
-              app: harbor
-              component: nginx
+              gateway.envoyproxy.io/owning-gateway-name: harbor-gateway
       ports:
         - protocol: TCP
-          port: 8443
+          port: 10443
     # Runner and jobs -> the shared Actions cache.
     - to:
         - podSelector:
