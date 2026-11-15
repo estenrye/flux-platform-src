@@ -18,7 +18,7 @@ both together. `kubectl -n harbor port-forward svc/harbor-core 8080:80` reaches 
 - `applications/harbor-db`: CNPG cluster `harbor-db` (database `registry`, owner `harbor`),
   barman backups to SeaweedFS bucket `harbor-db-barman` (role `HarborDbBarman`), daily 04:15 UTC.
 - SeaweedFS: buckets `harbor-db-barman` and `harbor-registry`, STS roles `HarborDbBarman`
-  (ServiceAccount `harbor:harbor-db`) and `HarborRegistry` (`harbor:harbor-registry`).
+  (ServiceAccount `harbor:harbor-db`). The registry uses a static key (below), not STS.
 - Registry blobs are in SeaweedFS (`s3`, `disableredirect: true`) with a **static key limited to the
   bucket**: identity `harbor-registry` (`Read/Write/List/ReadAcp/WriteAcp:harbor-registry`; the registry always sends `x-amz-acl: private`, which SeaweedFS rejects without the ACP actions) in `seaweedfs-s3-config`,
   key in 1Password `core-infra/harbor-registry-s3` (fields `accessKey`, `secretKey`), read into
@@ -117,7 +117,7 @@ both together. `kubectl -n harbor port-forward svc/harbor-core 8080:80` reaches 
 
 ## Known gaps (later phases)
 
-- Database connection uses `sslmode: require` (encrypted, not verified); the chart cannot mount the
-  CA for `verify-full`.
+- Database connection uses `sslmode: verify-full`: `patches/deployment.core.db-ca.yaml` mounts the
+  `harbor-db-server-tls` CA into core and sets `PGSSLROOTCERT`. Only core connects to the database.
 - No Docker Hub credentials yet; the warm-up CronJob and monitoring are phase 5.
 - Trivy is disabled.

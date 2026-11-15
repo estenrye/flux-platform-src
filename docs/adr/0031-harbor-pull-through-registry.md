@@ -77,8 +77,7 @@ Run Harbor (`goharbor/harbor-helm` chart 1.19.4, Harbor 2.15.4) on core-infra as
   limited to that bucket (identity `harbor-registry` in `seaweedfs-s3-config`, key in 1Password
   `harbor-registry-s3`). Web identity was tried first and does not work: Harbor's registry
   (distribution 2.8.3, aws-sdk-go v1) has no web-identity credential provider
-  (`NoCredentialProviders`). The unused `HarborRegistry` STS role should be removed with the next
-  IAM change.
+  (`NoCredentialProviders`). The unused `HarborRegistry` STS role was removed on 2026-11-15.
 - **In-cluster TLS:** Harbor's internal Service is served over TLS with a certificate from a
   cluster CA (cert-manager), with the CA bundle distributed by trust-manager into the runner
   pods' dockerd (`/etc/docker/certs.d/<service-name>/ca.crt`). The runners pull

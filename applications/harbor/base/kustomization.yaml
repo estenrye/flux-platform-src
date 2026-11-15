@@ -64,6 +64,10 @@ patches:
       kind: Deployment
     path: patches/deployment.strategy.yaml
   - target:
+      kind: Deployment
+      name: harbor-core
+    path: patches/deployment.core.db-ca.yaml
+  - target:
       kind: ConfigMap
       name: "harbor-(core|jobservice-env)"
     path: patches/configmap.sorted-keys.yaml
