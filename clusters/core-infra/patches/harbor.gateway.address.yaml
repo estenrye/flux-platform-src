@@ -1,0 +1,10 @@
+# Pin harbor-gateway's VIP. Envoy Gateway copies this into the proxy Service's
+# spec.loadBalancerIP and Calico's LB IPAM allocates exactly that address from
+# the lb-ingress-routed pool. The same address is published to UniFi LAN DNS by
+# applications/external-dns/unifi/core-infra/resources/dnsendpoint.harbor.yaml;
+# change both together.
+- op: add
+  path: /spec/addresses
+  value:
+    - type: IPAddress
+      value: 2607:3640:1064:27f::1:928a
