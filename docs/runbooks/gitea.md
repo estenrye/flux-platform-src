@@ -106,12 +106,19 @@ Gitea's merge and not from a push. Requirements: `esten/pcd-lab-manager`
   ExternalSecret `gitea-signing-key`, mounted `0400`. Not in git.
 - **Public key** (no login needed): `https://git.rye.ninja/api/v1/signing-key.pub`
   (`curl -fsS https://git.rye.ninja/api/v1/signing-key.pub`).
-- **Signer identity:** `Gitea Merge Signer <gitea-signer@rye.ninja>`. Pin the key together with
-  that principal.
-- **Verify:** put `gitea-signer@rye.ninja namespaces="git" <the public key line>` in an
-  allowed-signers file and run
-  `git -c gpg.ssh.allowedSignersFile=allowed_signers verify-commit <merge-sha>`. A commit signed by any other key
-  (for example the author's own) fails.
+- **Signer identity:** the key, not a name. Gitea writes the *merging user* as author and committer
+  of the merge commit (for example `Scotty Agent`), and `SIGNING_NAME`/`SIGNING_EMAIL`
+  (`Gitea Merge Signer <gitea-signer@rye.ninja>`) are the key's label (also the comment on the
+  public key), not what the commit shows. Pin the **key** (SHA256 fingerprint
+  `SHA256:9oU63ACedEpEQxf39uaFB24EE0RFKfV/ra6CLnCLTiI` for the first key) and use the wildcard principal
+  `*`, because `git verify-commit` looks the principal up by the committer's email.
+- **Verify:** put `* namespaces="git" <the public key line>` in an allowed-signers file and run
+  `git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=allowed_signers verify-commit <merge-sha>`. It prints
+  `Good "git" signature for * with ED25519 key SHA256:...`. A commit signed by any other key (for
+  example the author's own) fails with `No principal matched`, and an unsigned one fails too.
+- **Tested 2026-11-16** (scratch repo, non-admin user with Write, API merge): the merge commit carried an
+  SSH signature that verified against only the published key; a commit signed by a different key and an
+  unsigned commit did not verify.
 - **Direct pushes to `main`** are not blocked by this change: signing only marks merges Gitea made. A
   pusher cannot forge the instance signature, so the applier's rule is "the merge commit verifies
   against the pinned key"; an unsigned or other-signed commit on `main` is not applied. Branch
