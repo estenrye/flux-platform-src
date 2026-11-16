@@ -136,6 +136,20 @@ gitea:
       SSH_LISTEN_PORT: 2222
     repository:
       ROOT: /repos
+    # Instance signing of PR merge commits, for applier-01 (AP-D6). SSH format: the
+    # private key sits next to the .pub (mounted from gitea-signing-key). Only merges
+    # are signed, by every merging user (API or UI), in every repo; initial commits,
+    # wiki and web-editor commits stay unsigned as before. Public key:
+    # https://git.rye.ninja/api/v1/signing-key.pub
+    repository.signing:
+      SIGNING_FORMAT: ssh
+      SIGNING_KEY: /etc/gitea-signing/signing-key.pub
+      SIGNING_NAME: Gitea Merge Signer
+      SIGNING_EMAIL: gitea-signer@rye.ninja
+      MERGES: always
+      INITIAL_COMMIT: never
+      WIKI: never
+      CRUD_ACTIONS: never
     database:
       DB_TYPE: postgres
       HOST: gitea-db-rw.gitea.svc.cluster.local:5432
@@ -194,6 +208,11 @@ extraVolumes:
       items:
         - key: ca.crt
           path: ca.crt
+  # Merge-signing key pair. 0400: OpenSSH refuses a private key that others can read.
+  - name: gitea-signing
+    secret:
+      secretName: gitea-signing-key
+      defaultMode: 0400
 extraVolumeMounts:
   # Not under /data: kubelet would create the nested mountpoint as root inside
   # the Cinder volume, leaving /data/git root-owned and the init container
@@ -202,6 +221,9 @@ extraVolumeMounts:
     mountPath: /repos
   - name: gitea-db-ca
     mountPath: /etc/gitea-db-ca
+    readOnly: true
+  - name: gitea-signing
+    mountPath: /etc/gitea-signing
     readOnly: true
 
 deployment:

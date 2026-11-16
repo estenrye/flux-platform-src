@@ -87,6 +87,54 @@ because they are created once:
 - The `gitea` NetworkPolicy allows ingress from the Gateway's Envoy pods on 2222 (the pod
   port: Calico evaluates after DNAT).
 
+## Merge signing
+
+Gitea signs every **PR merge commit** it creates, with one instance SSH key, so `applier-01`
+(pcd-lab-manager's pull-based reconciler, AP-D6) can check that a commit on `main` really came from
+Gitea's merge and not from a push. Requirements: `esten/pcd-lab-manager`
+`docs/superpowers/specs/2026-11-16-gitea-merge-signing-requirements.md`.
+
+- **Config:** `[repository.signing]` in `applications/gitea/base/values.yaml`: `SIGNING_FORMAT=ssh`,
+  `MERGES=always`, key at `/etc/gitea-signing/signing-key.pub` (the private half sits next to it).
+  `always` signs merges by any user, API or UI, so `scotty`'s API merges and esten's UI merges are
+  treated the same. `INITIAL_COMMIT`, `WIKI` and `CRUD_ACTIONS` are `never`, so nothing but merges is
+  signed.
+- **Instance-wide effect:** the setting is global. Merges in **every** repo on git.rye.ninja are now
+  signed by this key. Nothing else changes: no repo is required to have signed commits, and users'
+  own keys are not involved.
+- **Secret:** 1Password `core-infra/gitea-signing-key` (`private-key`, `public-key`), read by the
+  ExternalSecret `gitea-signing-key`, mounted `0400`. Not in git.
+- **Public key** (no login needed): `https://git.rye.ninja/api/v1/signing-key.pub`
+  (`curl -fsS https://git.rye.ninja/api/v1/signing-key.pub`).
+- **Signer identity:** `Gitea Merge Signer <gitea-signer@rye.ninja>`. Pin the key together with
+  that principal.
+- **Verify:** put `gitea-signer@rye.ninja namespaces="git" <the public key line>` in an
+  allowed-signers file and run
+  `git -c gpg.ssh.allowedSignersFile=allowed_signers verify-commit <merge-sha>`. A commit signed by any other key
+  (for example the author's own) fails.
+- **Direct pushes to `main`** are not blocked by this change: signing only marks merges Gitea made. A
+  pusher cannot forge the instance signature, so the applier's rule is "the merge commit verifies
+  against the pinned key"; an unsigned or other-signed commit on `main` is not applied. Branch
+  protection against direct pushes is a separate decision (access spec 8.3).
+
+### Rotating the key
+
+1. Generate a new key off-cluster: `ssh-keygen -t ed25519 -N "" -C gitea-signer@rye.ninja -f new-key`.
+2. Edit the 1Password item `core-infra/gitea-signing-key`: put `new-key` in `private-key` and
+   `new-key.pub` in `public-key`. Delete the local files.
+3. Force the sync, then restart Gitea so it picks the files up at once:
+   `kubectl -n gitea annotate externalsecret gitea-signing-key force-sync=$(date +%s) --overwrite`,
+   `kubectl -n gitea rollout restart deploy/gitea`.
+4. Confirm `curl -fsS https://git.rye.ninja/api/v1/signing-key.pub` shows the new key, then merge a
+   throwaway PR and verify it against the new key.
+5. **Tell Scotty before step 3**: open an issue on `esten/pcd-lab-manager`. The applier refuses
+   merges signed by a key it doesn't have pinned, so the pinned key must be updated first or
+   at the same time.
+6. The old public key keeps verifying the merges it signed. Keep it in the allowed-signers list for
+   as long as older commits need re-verifying (the applier acts on new commits only, so one
+   release cycle is enough); list it under `TRUSTED_SSH_KEYS` in `[repository.signing]` if the
+   Gitea UI should keep showing those commits as verified.
+
 ## Actions runners
 
 `applications/gitea-runner` (namespace `gitea-runner`): **ephemeral** runners. A KEDA `ScaledJob`
