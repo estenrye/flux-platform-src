@@ -19,6 +19,7 @@ resources:
   - resources/eso.password-generator.admin.yaml
   - resources/eso.external-secret.admin.yaml
   - resources/eso.external-secret.oidc-client.yaml
+  - resources/eso.external-secret.signing-key.yaml
   - resources/vpa.yaml
   - resources/repos.pv.yaml
   - resources/repos-capacity.cronjob.yaml
