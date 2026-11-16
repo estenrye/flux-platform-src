@@ -4,7 +4,7 @@ metadata:
   name: gitea
   namespace: gitea
   annotations:
-    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The Gateway's Envoy proxy pods are created at runtime by the Envoy Gateway controller in this namespace; they are not in the static rendered manifests but exist at runtime. gitea-db (CNPG) pods are likewise created by the operator."
+    ignore-check.kube-linter.io/dangling-networkpolicypeer-podselector: "The Gateway's Envoy proxy pods are created at runtime by the Envoy Gateway controller in this namespace; they are not in the static rendered manifests but exist at runtime. gitea-db (CNPG) pods are likewise created by the operator; the ntfy-gateway Envoy pods likewise."
 spec:
   podSelector:
     matchLabels:
@@ -78,6 +78,21 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+    # Repository webhooks to ntfy (agents-scotty-inbox, docs/runbooks/ntfy.md).
+    # The webhook URL is https://ntfy.rye.ninja, whose address is the
+    # ntfy-gateway VIP. Pods cannot use the VIP directly, so the rule names the
+    # gateway's Envoy pods and their listener port (443 -> pod port 10443;
+    # Calico evaluates egress after DNAT). Same pattern as gitea-runner -> Harbor.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ntfy
+          podSelector:
+            matchLabels:
+              gateway.envoyproxy.io/owning-gateway-name: ntfy-gateway
+      ports:
+        - protocol: TCP
+          port: 10443
     # Mirrors and migrations from GitHub over HTTPS. The nodes are IPv6-only, so
     # github.com is reached through the DNS64/NAT64 prefix 64:ff9b::/96; the
     # destination host is further limited by migrations.ALLOWED_DOMAINS.
