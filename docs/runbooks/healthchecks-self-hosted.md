@@ -37,7 +37,7 @@ in-cluster alert path died with the cluster.
 | `healthchecks-ping-etcd-snapshot` | core-infra | ping URL, read by the cluster via External Secrets |
 | `cloudflare-r2-healthchecks-db`, `healthchecks-db-backup-age-key` | Home_Lab | DB backup upload credentials and age keypair (VM-side) |
 | `healthchecks-ping-cnpg-backups` | core-infra | three ping URLs, read by the cluster via External Secrets |
-| `cloudflare-api-token` | core-infra | Caddy's ACME DNS challenge (**reused**: it is broader than needed; replace with a token scoped to `_acme-challenge` TXT edits) |
+| `cloudflare-api-token` | core-infra | Caddy's ACME DNS challenge (**reused**: it is broader than needed; replaced by its own token `cloudflare-api-token-healthchecks` after the migration in `cloudflare-api-token-rotation.md`) |
 
 The VM-side secrets are all in Home_Lab, which the cluster cannot read (its External Secrets store is scoped to the core-infra vault).
 
