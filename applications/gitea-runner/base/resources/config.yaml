@@ -23,7 +23,12 @@ runner:
     # (unpacking the layers dominates). It has node, npm, git, curl and tar only:
     # no compiler, make, python, docker CLI, jq/yq or unzip. Rust builds (linker),
     # docker builds and anything compiling need ubuntu-latest.
+    #
+    # ubuntu-slim-py is ubuntu-slim plus python3 and make, built by us (Dockerfile in
+    # images/ubuntu-slim-py) and pushed to the plain Harbor project `ci`, which the same
+    # robot can pull. Pinned by digest; to update, rebuild, push, and change the digest.
     - "ubuntu-slim:docker://harbor.rye.ninja/gitea/runner-images:ubuntu-latest-slim"
+    - "ubuntu-slim-py:docker://harbor.rye.ninja/ci/runner-images@sha256:8ebebec5d1dcc9e515756923551e2c1fd79acd65953eda19950ffd4056b80d98"
     - "ubuntu-latest:docker://harbor.rye.ninja/gitea/runner-images:ubuntu-latest"
     - "ubuntu-24.04:docker://harbor.rye.ninja/gitea/runner-images:ubuntu-24.04"
     - "ubuntu-22.04:docker://harbor.rye.ninja/gitea/runner-images:ubuntu-22.04"
