@@ -159,6 +159,17 @@ KEDA counts jobs with `GET /api/v1/admin/actions/jobs?status=queued` using the t
 
 Add `runs-on: ubuntu-slim` for jobs that need only node, git, curl and tar (lint, release scripts, Go builds without cgo): the image is 132 MB compressed instead of 569 MB, which cuts a cold pull from about 160 s to about 60 s. It has no gcc/make, python, docker CLI, jq/yq or unzip, so Rust, Docker image builds and anything that compiles stay on `ubuntu-latest`. Layer unpacking (about 1 core, gzip) dominates the pull, not the network; zstd-recompressed layers saved only about 45 s on `ubuntu-latest` and would need a conversion job, so they are not used (measured 2026-11-15).
 
+`runs-on: ubuntu-slim-py` is ubuntu-slim plus python3 (3.13) and make, for jobs that need only those. It is our own image (`applications/gitea-runner/images/ubuntu-slim-py/Dockerfile`) in the plain Harbor project `ci` (proxy-cache projects reject pushes), pinned by digest in `config.yaml`. The base is pinned by digest too and runs as root. To update it:
+
+```sh
+docker pull --platform linux/amd64 harbor.rye.ninja/gitea/runner-images:ubuntu-latest-slim   # new base digest -> Dockerfile FROM
+docker build --builder default --platform linux/amd64 -t harbor.rye.ninja/ci/runner-images:ubuntu-slim-py3-make applications/gitea-runner/images/ubuntu-slim-py
+docker push harbor.rye.ninja/ci/runner-images:ubuntu-slim-py3-make   # new digest -> label in config.yaml
+```
+
+`robot$runner-pull` needs pull on `ci` (set by `harbor-bootstrap`; it resets the robot's permissions, so keep `ci` in `OWN_PROJECTS` in `bootstrap.py`).
+
+
 - **Where they run:** only on the tainted node pool `pool=rootless-test` (nodeSelector and toleration
   in the ScaledJob pod template), a single worker defined in `pcd-ce-deploy/tofu-pcd-talos-cluster/rootless_test_node.tf`
   (`rootless_test_node_enabled`, 80 GiB root disk). Talos disables user namespaces

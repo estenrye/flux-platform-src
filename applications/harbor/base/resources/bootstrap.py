@@ -27,6 +27,8 @@ UPSTREAMS = {
     # registry.k8s.io (Kubernetes images) is also a plain registry API; the project name has no dots.
     "registryk8s": ("registryk8s", "docker-registry", "https://registry.k8s.io"),
 }
+# Plain (non-proxy) projects for images we build ourselves; the runner robot can pull them.
+OWN_PROJECTS = ["ci"]
 ROBOT_NAME = "runner-pull"  # Harbor prefixes it: robot$runner-pull
 
 
@@ -96,12 +98,12 @@ def ensure_project(project, registry_id):
         return
     call("POST", "/projects", {"project_name": project, "public": False, "registry_id": registry_id,
                                 "metadata": {"public": "false"}})
-    print("created proxy-cache project", project)
+    print("created", "proxy-cache" if registry_id else "plain", "project", project)
 
 
 def ensure_robot():
     perms = [{"kind": "project", "namespace": p,
-              "access": [{"resource": "repository", "action": "pull"}]} for p in UPSTREAMS]
+              "access": [{"resource": "repository", "action": "pull"}]} for p in [*UPSTREAMS, *OWN_PROJECTS]]
     _, robots, _ = call("GET", "/robots?page_size=100&q=Level%3Dsystem")
     full = "robot$" + ROBOT_NAME
     cur = next((r for r in robots or [] if r["name"] == full), None)
@@ -121,6 +123,8 @@ def main():
     wait_ready()
     for project, (reg, rtype, url) in UPSTREAMS.items():
         ensure_project(project, ensure_registry(reg, rtype, url))
+    for project in OWN_PROJECTS:
+        ensure_project(project, None)
     ensure_robot()
     print("done")
 
