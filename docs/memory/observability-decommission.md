@@ -26,10 +26,14 @@ trusted it. Related: [[m4-step-tracker]], [[m4-network-architecture-no-isolation
    `clusters/observability/.sops.age-key` (the age **private** key for the cluster's CA key) overwritten and deleted.
 
 ## Deliberately left (check before assuming they are gone)
+- OpenBao on controlplane has been **down since the 2026-11-05 NAS outage** (`openbao-0` 615 restarts; its CNPG database cannot attach
+  volumes because `democratic-csi-iscsi-controller` is crash-looping), so the role/policy below could not be removed. Needs OpenBao
+  back first. Also: its snapshot jobs last completed ~5-7 days before this date.
 - OpenBao on controlplane: policy `remote-observability-secrets-read` and cert role `remote-observability-eso` (trusts
   `spiffe://obs.rye.ninja/ns/external-secrets-operator/sa/external-secrets`). Removing needs the OpenBao root token.
-- 1Password vault `observability` (`sops-age-key`, `service-account-token`). Deleting the item does **not** revoke a 1Password
-  service account: revoke it in the 1Password web admin too.
+- ~~1Password vault `observability`~~ **Done 2026-11-11:** `sops-age-key` and `service-account-token` archived (the vault is empty;
+  permanently deleting `sops-age-key` from the archive is what makes the CA key unrecoverable), and the service account behind the
+  token was revoked in the 1Password web admin (deleting an item does not revoke a token).
 - The observability intermediate CA ("ryezone-labs Intermediate CA observability", signed by controlplane-int, maxPathLen=0) stays
   valid until it expires; its private key is only recoverable via the age key above.
 - `providers/kvm/unifi-frr.conf` (the UDM's BGP config, applied by hand) still has `network fd97:45c2:b3a1:200::/64` and an
