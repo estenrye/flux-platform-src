@@ -10,7 +10,7 @@ resources:
 helmCharts:
   - name: cert-manager-csi-driver-spiffe
     repo: oci://quay.io/jetstack/charts
-    version: v0.12.0
+    version: v0.15.1
     releaseName: cert-manager-csi-driver-spiffe
     namespace: cert-manager
     includeCRDs: true
